@@ -1,0 +1,580 @@
+import React, { useState, useEffect } from 'react';
+import '../styles/equipmentPage.css';
+import { useNavigate } from 'react-router-dom';
+
+const initialEquipment = [
+  {
+    id: 1,
+    name: 'MC-501-MXPULSE',
+    model: 'MC-501-MXPULSE',
+    mac: '001A2B3C4D5E',
+    department: 'Конструкторский отдел ALLOY',
+    status: '',
+    imageUrl: '/images/mx_pulse.webp',
+    commissionDate: '',
+    manufactureYear: '',
+    lastService: '',
+    serialNumber: '',
+    inventoryNumber: '',
+    assignedWelders: []
+  },
+  {
+    id: 2,
+    name: 'T2',
+    model: 'T2',
+    mac: '001A2B3C4D5C',
+    department: 'Конструкторский отдел ALLOY',
+    status: '',
+    imageUrl: '/images/T2.jpg',
+    commissionDate: '',
+    manufactureYear: '',
+    lastService: '',
+    serialNumber: '',
+    inventoryNumber: '',
+    assignedWelders: []
+  },
+  {
+    id: 3,
+    name: 'MC500M1',
+    model: 'MC500M1',
+    mac: '001A2B3C4D5D',
+    department: 'Конструкторский отдел ALLOY',
+    status: '',
+    imageUrl: '/images/MC500M1.jpg',
+    commissionDate: '',
+    manufactureYear: '',
+    lastService: '',
+    serialNumber: '',
+    inventoryNumber: '',
+    assignedWelders: []
+  },
+  {
+    id: 4,
+    name: 'MC-1001A1',
+    model: 'MC-1001A1',
+    mac: '001A2B3C4D5F',
+    department: 'Конструкторский отдел ALLOY',
+    status: '',
+    imageUrl: '/images/MC-1001A1.jpg',
+    commissionDate: '',
+    manufactureYear: '',
+    lastService: '',
+    serialNumber: '',
+    inventoryNumber: '',
+    assignedWelders: []
+  },
+  {
+    id: 5,
+    name: 'МС-501 MX',
+    model: 'МС-501 MX',
+    mac: '001A2B3C4D5G',
+    department: 'Конструкторский отдел ALLOY',
+    status: '',
+    imageUrl: '/images/МС-501 MX.jpg',
+    commissionDate: '',
+    manufactureYear: '',
+    lastService: '',
+    serialNumber: '',
+    inventoryNumber: '',
+    assignedWelders: []
+  },
+  {
+    id: 6,
+    name: 'БМ 500',
+    model: 'БМ 500',
+    mac: '001A2B3C4D5C',
+    department: 'Конструкторский отдел ALLOY',
+    status: '',
+    imageUrl: '/images/БМ 500.jpg',
+    commissionDate: '',
+    manufactureYear: '',
+    lastService: '',
+    serialNumber: '',
+    inventoryNumber: '',
+    assignedWelders: []
+  },
+];
+
+const navMenu = [
+  { label: 'Главная', path: '/' },
+  {
+    label: 'Предприятия',
+    dropdown: [
+      { label: 'Организации', path: '/organizations' },
+      { label: 'Сотрудники', path: '/employees' },
+      { label: 'Сварщики', path: '/welders' },
+    ],
+  },
+  {
+    label: 'Ресурсы',
+    dropdown: [
+      { label: 'Сварочные материалы', path: '/materials' },
+      { label: 'Сварочное оборудование', path: '/equipment' },
+    ],
+  },
+  {
+    label: 'Инструкции',
+    dropdown: [
+      { label: 'Безопасность сварочных работ', path: '/safety' },
+      { label: 'Прошивки', path: '/firmware' },
+      { label: 'Документы', path: '/docs' },
+    ],
+  },
+  {
+    label: 'Мониторинг',
+    dropdown: [
+      { label: 'Архив', path: '/archive' },
+      { label: 'Отчеты', path: '/reports' },
+    ],
+  },
+  {
+    label: 'Обучение',
+    dropdown: [
+      { label: 'Библиотека', path: '/library' },
+    ],
+  },
+  {
+    label: 'ДСЕ',
+    dropdown: [
+      { label: 'Типы проволоки', path: '/wire-types' },
+    ],
+  },
+  { label: 'О программе', path: '/about' },
+];
+
+function WeldingEquipmentPage() {
+  const [equipment, setEquipment] = useState(initialEquipment);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editData, setEditData] = useState({});
+  const [dropdown, setDropdown] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [welders, setWelders] = useState([]);
+  const currentYear = new Date().getFullYear();
+  const navigate = useNavigate();
+
+  // Load welders from localStorage
+  useEffect(() => {
+    const savedWelders = localStorage.getItem('welders');
+    if (savedWelders) {
+      setWelders(JSON.parse(savedWelders));
+    }
+  }, []);
+
+  // Load equipment from localStorage or use initial data
+  useEffect(() => {
+    const savedEquipment = localStorage.getItem('equipment');
+    if (savedEquipment) {
+      setEquipment(JSON.parse(savedEquipment));
+    } else {
+      setEquipment(initialEquipment);
+    }
+  }, []);
+
+  // Save equipment to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('equipment', JSON.stringify(equipment));
+  }, [equipment]);
+
+  // Navigation logic
+  const handleNavClick = (item, e) => {
+    if (item.dropdown) {
+      e.stopPropagation();
+      setDropdown(dropdown === item.label ? null : item.label);
+    } else {
+      window.location.pathname = item.path;
+    }
+  };
+
+  const handleDropdownClick = (subitem) => {
+    window.location.pathname = subitem.path;
+  };
+
+  // Modal logic
+  const openEditModal = (item) => {
+    setEditData(item);
+    setErrors({});
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditData({});
+    setErrors({});
+  };
+
+  const handleInputChange = (e) => {
+    setEditData({ ...editData, [e.target.name]: e.target.value });
+  };
+
+  const openAddModal = () => {
+    setEditData({
+      name: '',
+      model: '',
+      mac: '',
+      department: '',
+      status: '',
+      imageUrl: '',
+      commissionDate: '',
+      manufactureYear: '',
+      lastService: '',
+      serialNumber: '',
+      inventoryNumber: '',
+      assignedWelders: []
+    });
+    setErrors({});
+    setModalOpen(true);
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    // Validation
+    const newErrors = {};
+    if (!editData.name) newErrors.name = 'Это поле обязательно';
+    if (!editData.model) newErrors.model = 'Это поле обязательно';
+    if (!editData.mac || !/^[0-9A-Fa-f]{12}$/.test(editData.mac)) {
+      newErrors.mac = 'MAC-адрес должен содержать 12 символов';
+    }
+    if (!editData.department) newErrors.department = 'Это поле обязательно';
+
+    if (Object.keys(newErrors).length) {
+      setErrors(newErrors);
+      return;
+    }
+
+    if (editData.id) {
+      setEquipment(equipment.map(eq => eq.id === editData.id ? { ...eq, ...editData } : eq));
+    } else {
+      setEquipment([...equipment, { ...editData, id: Date.now() }]);
+    }
+    closeModal();
+  };
+
+  // Delete handler
+  const handleDelete = (id) => {
+    if (window.confirm('Вы уверены, что хотите удалить это оборудование?')) {
+      setEquipment(equipment.filter(eq => eq.id !== id));
+      closeModal();
+    }
+  };
+
+  // Action buttons
+  const handleControl = (item) => {
+    navigate(`/control?machine=${encodeURIComponent(item.name)}`);
+  };
+
+  const navigateToWelderProfile = (welderId) => {
+    if (welderId) {
+      navigate(`/welders/${welderId}`);
+    }
+  };
+
+  const handleSelectAllWelders = () => {
+    setEditData({
+      ...editData,
+      assignedWelders: welders.map(w => w.name)
+    });
+  };
+
+  const handleWelderSelection = (e) => {
+    const selectedOptions = Array.from(e.target.selectedOptions).map(option => option.value);
+    setEditData({
+      ...editData,
+      assignedWelders: selectedOptions
+    });
+  };
+
+  return (
+      <div className="equipment-page">
+        <div className="equipment-header">
+          <h1 className="equipment-title">Сварочное оборудование</h1>
+          <button className="add-equipment-btn" onClick={openAddModal}>
+            <i className="fas fa-plus"></i>
+            Добавить оборудование
+          </button>
+        </div>
+
+        <div className="equipment-grid">
+          {equipment.map((item) => (
+              <div key={item.id} className="equipment-card">
+                <img
+                    src={item.imageUrl}
+                    alt={item.name}
+                    className="equipment-image"
+                    onError={(e) => {
+                      e.target.src = '/images/placeholder.jpg';
+                    }}
+                />
+                <div className="equipment-info">
+                  <h3 className="equipment-name">{item.name}</h3>
+                  <p className="equipment-model">Модель: {item.model}</p>
+                  <div className="equipment-details">
+                    <div className="detail-item">
+                      <span className="detail-label">MAC:</span>
+                      {item.mac}
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Отдел:</span>
+                      {item.department}
+                    </div>
+                    {item.serialNumber && (
+                        <div className="detail-item">
+                          <span className="detail-label">Серийный номер:</span>
+                          {item.serialNumber}
+                        </div>
+                    )}
+                    {item.inventoryNumber && (
+                        <div className="detail-item">
+                          <span className="detail-label">Инв. номер:</span>
+                          {item.inventoryNumber}
+                        </div>
+                    )}
+                  </div>
+                  {item.assignedWelders && item.assignedWelders.length > 0 && (
+                      <div className="assigned-welders">
+                        <div className="detail-label">Назначенные сварщики:</div>
+                        {item.assignedWelders.map(welderName => {
+                          const welder = welders.find(w => w.name === welderName);
+                          return (
+                              <div
+                                  key={welderName}
+                                  className="assigned-welder"
+                                  onClick={() => navigateToWelderProfile(welder?.id)}
+                              >
+                                <div>{welderName}</div>
+                                <div className="rfid-code">
+                                  RFID: {welder?.rfidCode || 'Не указан'}
+                                </div>
+                              </div>
+                          );
+                        })}
+                      </div>
+                  )}
+                  <div className="equipment-actions">
+                    <button
+                        className="action-btn control-btn"
+                        onClick={() => handleControl(item)}
+                    >
+                      <i className="fas fa-cog"></i>
+                      Управление
+                    </button>
+                    <button
+                        className="action-btn edit-btn"
+                        onClick={() => openEditModal(item)}
+                    >
+                      <i className="fas fa-edit"></i>
+                      Редактировать
+                    </button>
+                    <button
+                        className="action-btn delete-btn"
+                        onClick={() => handleDelete(item.id)}
+                    >
+                      <i className="fas fa-trash"></i>
+                      Удалить
+                    </button>
+                  </div>
+                </div>
+              </div>
+          ))}
+        </div>
+
+        {modalOpen && (
+            <div className="modal-overlay" onClick={closeModal}>
+              <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h2 className="modal-title">
+                    {editData.id ? 'Редактировать оборудование' : 'Добавить оборудование'}
+                  </h2>
+                  <button className="close-btn" onClick={closeModal}>
+                    <i className="fas fa-times"></i>
+                  </button>
+                </div>
+                <form onSubmit={handleSave}>
+                  <div className="form-group">
+                    <label className="form-label">Название</label>
+                    <input
+                        type="text"
+                        name="name"
+                        value={editData.name || ''}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        placeholder="Введите название"
+                    />
+                    {errors.name && <p className="error-message">{errors.name}</p>}
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Модель</label>
+                    <input
+                        type="text"
+                        name="model"
+                        value={editData.model || ''}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        placeholder="Введите модель"
+                    />
+                    {errors.model && <p className="error-message">{errors.model}</p>}
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">MAC-адрес</label>
+                    <input
+                        type="text"
+                        name="mac"
+                        value={editData.mac || ''}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        placeholder="Введите MAC-адрес"
+                    />
+                    {errors.mac && <p className="error-message">{errors.mac}</p>}
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Отдел</label>
+                    <input
+                        type="text"
+                        name="department"
+                        value={editData.department || ''}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        placeholder="Введите отдел"
+                    />
+                    {errors.department && (
+                        <p className="error-message">{errors.department}</p>
+                    )}
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">URL изображения</label>
+                    <input
+                        type="text"
+                        name="imageUrl"
+                        value={editData.imageUrl || ''}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        placeholder="Введите URL изображения"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Дата ввода в эксплуатацию</label>
+                    <input
+                        type="date"
+                        name="commissionDate"
+                        value={editData.commissionDate || ''}
+                        onChange={handleInputChange}
+                        className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Год выпуска</label>
+                    <input
+                        type="number"
+                        name="manufactureYear"
+                        value={editData.manufactureYear || ''}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        min="1900"
+                        max={currentYear}
+                        placeholder="Введите год выпуска"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Последнее обслуживание</label>
+                    <input
+                        type="date"
+                        name="lastService"
+                        value={editData.lastService || ''}
+                        onChange={handleInputChange}
+                        className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Серийный номер</label>
+                    <input
+                        type="text"
+                        name="serialNumber"
+                        value={editData.serialNumber || ''}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        placeholder="Введите серийный номер"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Инвентарный номер</label>
+                    <input
+                        type="text"
+                        name="inventoryNumber"
+                        value={editData.inventoryNumber || ''}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        placeholder="Введите инвентарный номер"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Назначенные сварщики</label>
+                    <select
+                        multiple
+                        name="assignedWelders"
+                        value={editData.assignedWelders || []}
+                        onChange={handleWelderSelection}
+                        className="welder-select"
+                    >
+                      {welders.map(welder => (
+                          <option key={welder.id} value={welder.name}>
+                            {welder.name} (RFID: {welder?.rfidCode || 'Не указан'})
+                          </option>
+                      ))}
+                    </select>
+                    <button
+                        type="button"
+                        className="select-all-btn"
+                        onClick={handleSelectAllWelders}
+                    >
+                      Выбрать всех сварщиков
+                    </button>
+                  </div>
+
+                  {editData.assignedWelders && editData.assignedWelders.length > 0 && (
+                      <div className="assigned-welders">
+                        <label className="form-label">Текущие назначения:</label>
+                        {editData.assignedWelders.map(welderName => {
+                          const welder = welders.find(w => w.name === welderName);
+                          return (
+                              <div
+                                  key={welderName}
+                                  className="assigned-welder"
+                                  onClick={() => navigateToWelderProfile(welder?.id)}
+                              >
+                                <div>{welderName}</div>
+                                <div className="rfid-code">
+                                  RFID: {welder?.rfidCode || 'Не указан'}
+                                </div>
+                              </div>
+                          );
+                        })}
+                      </div>
+                  )}
+
+                  <div className="modal-actions">
+                    <button type="submit" className="save-btn">
+                      <i className="fas fa-save"></i>
+                      Сохранить
+                    </button>
+                    <button type="button" className="cancel-btn" onClick={closeModal}>
+                      Отмена
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+        )}
+      </div>
+  );
+}
+
+export default WeldingEquipmentPage;

@@ -1,0 +1,239 @@
+.firmware-page {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  margin-top: 70px;
+}
+
+.firmware-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.firmware-header h1 {
+  font-size: 2.5rem;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.firmware-header p {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+}
+
+.machines-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+
+.machine-card {
+  background: var(--surface);
+  border-radius: 15px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--card-shadow);
+  transition: transform 0.3s ease;
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+.machine-card:hover {
+  transform: translateY(-5px);
+}
+
+.machine-image {
+  width: 100%;
+  height: 300px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.machine-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.machine-image img:hover {
+  transform: scale(1.05);
+}
+
+.machine-info {
+  padding: 2rem;
+}
+
+.machine-info h2 {
+  font-size: 1.8rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.machine-info > p {
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+}
+
+.firmware-section,
+.instructions-section {
+  margin-top: 2rem;
+}
+
+.firmware-section h3,
+.instructions-section h3 {
+  font-size: 1.4rem;
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.firmware-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.firmware-info {
+  flex: 1;
+}
+
+.firmware-info h4 {
+  font-size: 1.2rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.firmware-info p {
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.firmware-date {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.instructions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.instruction-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.instruction-icon {
+  font-size: 2rem;
+  color: var(--primary);
+  width: 40px;
+  text-align: center;
+}
+
+.instruction-info {
+  flex: 1;
+}
+
+.instruction-info h4 {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  margin-bottom: 0.3rem;
+}
+
+.file-type {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.download-btn {
+  background: rgba(108, 99, 255, 0.1);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.download-btn:hover {
+  background: var(--primary);
+  color: white;
+}
+
+@media (min-width: 768px) {
+  .machine-card {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+  }
+
+  .machine-image {
+    height: 100%;
+    border-bottom: none;
+    border-right: 1px solid var(--border-color);
+  }
+}
+
+@media (max-width: 768px) {
+  .firmware-page {
+    padding: 1rem;
+  }
+
+  .firmware-header h1 {
+    font-size: 2rem;
+  }
+
+  .machine-image {
+    height: 200px;
+  }
+
+  .machine-info {
+    padding: 1.5rem;
+  }
+
+  .firmware-item {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .instructions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .instruction-item {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+} 
