@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Организации</title>
+    <style>
+        :root {
+            --primary: #6C63FF;
+            --secondary: #FF6584;
+            --bg-color: #1A1A2E;
+            --surface: rgba(255,255,255,0.05);
+            --border: rgba(255,255,255,0.1);
+        }
+
+        body {
+            background: var(--bg-color);
+            color: white;
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 100px 20px 40px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .add-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .add-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        .organizations-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--surface);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .organizations-table th,
+        .organizations-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .organizations-table th {
+            background: rgba(0,0,0,0.2);
+            font-weight: 500;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.3s;
+            margin-right: 0.5rem;
+        }
+
+        .action-btn.edit {
+            background: var(--primary);
+        }
+
+        .action-btn.delete {
+            background: var(--secondary);
+        }
+
+        .action-btn:hover {
+            opacity: 0.8;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--bg-color);
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.2);
+            color: white;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .required::after {
+            content: '*';
+            color: var(--secondary);
+            margin-left: 4px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 2rem;
+        }
+
+        .modal-btn {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .modal-btn.cancel {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+
+        .modal-btn.save {
+            background: var(--primary);
+            color: white;
+        }
+
+        .modal-btn.delete {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .modal-btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Navigation styles */
+        .nav-container {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(26, 26, 46, 0.98);
+            backdrop-filter: blur(15px);
+            z-index: 1000;
+            box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+        }
+
+        .nav-menu {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            height: 60px;
+        }
+
+        .nav-item {
+            position: relative;
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+        }
+
+        .nav-item:hover {
+            background: rgba(108, 99, 255, 0.1);
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        /* Dropdown styles */
+        .dropdown-parent {
+            position: relative;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: rgba(26, 26, 46, 0.98);
+            border-radius: 12px;
+            padding: 0.8rem;
+            min-width: 240px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            z-index: 1001;
+        }
+
+        .dropdown-menu.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(5px);
+        }
+
+        .dropdown-item {
+            padding: 0.8rem 1.2rem;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(108, 99, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="nav-container">
+        <nav class="nav-menu">
+            <button class="nav-item">Главная</button>
+            <div class="nav-item dropdown-parent">
+                Предприятия
+                <div class="dropdown-menu">
+                    <div class="dropdown-item">Организации</div>
+                    <div class="dropdown-item">Сотрудники</div>
+                    <div class="dropdown-item">Сварщики</div>
+                </div>
+            </div>
+            <div class="nav-item dropdown-parent">
+                Ресурсы
+                <div class="dropdown-menu">
+                    <div class="dropdown-item">Сварочные материалы</div>
+                    <div class="dropdown-item">Сварочное оборудование</div>
+                </div>
+            </div>
+            <div class="nav-item dropdown-parent">
+                Инструкции
+                <div class="dropdown-menu">
+                    <div class="dropdown-item">Безопасность сварочных работ</div>
+                    <div class="dropdown-item">Прошивки</div>
+                    <div class="dropdown-item">Документы</div>
+                </div>
+            </div>
+            <div class="nav-item dropdown-parent">
+                Мониторинг
+                <div class="dropdown-menu">
+                    <div class="dropdown-item">Архив</div>
+                    <div class="dropdown-item">Отчеты</div>
+                </div>
+            </div>
+            <div class="nav-item dropdown-parent">
+                Обучение
+                <div class="dropdown-menu">
+                    <div class="dropdown-item">Библиотека</div>
+                </div>
+            </div>
+            <div class="nav-item dropdown-parent">
+                ДСЕ
+                <div class="dropdown-menu">
+                    <div class="dropdown-item">Типы проволоки</div>
+                </div>
+            </div>
+            <button class="nav-item">О программе</button>
+        </nav>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>Организации</h1>
+            <button class="add-btn" onclick="openAddModal()">Добавить</button>
+        </div>
+
+        <table class="organizations-table">
+            <thead>
+                <tr>
+                    <th>Наименование</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="organizationsTableBody">
+                <!-- Organizations will be added here dynamically -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal" id="organizationModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Добавить организацию</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="organizationForm">
+                <div class="form-group">
+                    <label class="required">Наименование</label>
+                    <input type="text" id="name" required>
+                </div>
+                <div class="form-group">
+                    <label>Полное наименование организации</label>
+                    <input type="text" id="fullName">
+                </div>
+                <div class="form-group">
+                    <label>Сфера деятельности</label>
+                    <input type="text" id="businessArea">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="email">
+                </div>
+                <div class="form-group">
+                    <label>Сайт организации</label>
+                    <input type="url" id="website">
+                </div>
+                <div class="form-group">
+                    <label>Номера телефонов</label>
+                    <input type="text" id="phones">
+                </div>
+                <div class="form-group">
+                    <label>Адрес</label>
+                    <input type="text" id="address">
+                </div>
+                <div class="form-group">
+                    <label>Руководитель</label>
+                    <input type="text" id="director">
+                </div>
+                <div class="form-group">
+                    <label>ИНН</label>
+                    <input type="text" id="inn">
+                </div>
+                <div class="form-group">
+                    <label>ОГРН(ОГРНИП)</label>
+                    <input type="text" id="ogrn">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="modal-btn delete" id="deleteBtn" style="display: none;" onclick="confirmDelete()">Удалить</button>
+                    <div>
+                        <button type="button" class="modal-btn cancel" onclick="closeModal()">Отмена</button>
+                        <button type="submit" class="modal-btn save">Сохранить</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let organizations = [];
+        let editingOrganizationId = null;
+
+        function openAddModal() {
+            editingOrganizationId = null;
+            document.getElementById('modalTitle').textContent = 'Добавить организацию';
+            document.getElementById('organizationForm').reset();
+            document.getElementById('deleteBtn').style.display = 'none';
+            document.getElementById('organizationModal').classList.add('active');
+        }
+
+        function openEditModal(organization) {
+            editingOrganizationId = organization.id;
+            document.getElementById('modalTitle').textContent = 'Редактировать организацию';
+            
+            // Fill form with organization data
+            document.getElementById('name').value = organization.name;
+            document.getElementById('fullName').value = organization.fullName;
+            document.getElementById('businessArea').value = organization.businessArea;
+            document.getElementById('email').value = organization.email;
+            document.getElementById('website').value = organization.website;
+            document.getElementById('phones').value = organization.phones.join(', ');
+            document.getElementById('address').value = organization.address;
+            document.getElementById('director').value = organization.director;
+            document.getElementById('inn').value = organization.inn;
+            document.getElementById('ogrn').value = organization.ogrn;
+
+            // Show delete button
+            document.getElementById('deleteBtn').style.display = 'block';
+            
+            document.getElementById('organizationModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('organizationModal').classList.remove('active');
+        }
+
+        function confirmDelete() {
+            if (confirm('Вы уверены, что хотите удалить эту организацию?')) {
+                organizations = organizations.filter(org => org.id !== editingOrganizationId);
+                renderOrganizations();
+                closeModal();
+            }
+        }
+
+        function renderOrganizations() {
+            const tbody = document.getElementById('organizationsTableBody');
+            tbody.innerHTML = organizations.map(org => `
+                <tr>
+                    <td>${org.name}</td>
+                    <td>
+                        <button class="action-btn edit" onclick="openEditModal(${JSON.stringify(org).replace(/"/g, '&quot;')})">
+                            Изменить
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('organizationForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                id: editingOrganizationId || Date.now().toString(),
+                name: document.getElementById('name').value,
+                fullName: document.getElementById('fullName').value,
+                businessArea: document.getElementById('businessArea').value,
+                email: document.getElementById('email').value,
+                website: document.getElementById('website').value,
+                phones: document.getElementById('phones').value.split(',').map(phone => phone.trim()),
+                address: document.getElementById('address').value,
+                director: document.getElementById('director').value,
+                inn: document.getElementById('inn').value,
+                ogrn: document.getElementById('ogrn').value
+            };
+
+            if (editingOrganizationId) {
+                const index = organizations.findIndex(org => org.id === editingOrganizationId);
+                organizations[index] = formData;
+            } else {
+                organizations.push(formData);
+            }
+
+            renderOrganizations();
+            closeModal();
+        });
+
+        // Navigation handlers
+        document.querySelector('.nav-item').addEventListener('click', () => {
+            window.location.href = 'main_page.html';
+        });
+
+        document.querySelectorAll('.dropdown-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const text = this.textContent.trim();
+                if (text === "Организации") {
+                    window.location.href = 'organizations.html';
+                }
+            });
+        });
+
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const text = this.textContent.trim();
+
+                if(text === "О программе") {
+                    window.location.href = 'about.html'
+                }
+            });
+        });
+
+        document.querySelectorAll('.dropdown-item').forEach(item => {
+            if(item.textContent.trim() === "Сварочное оборудование") {
+                item.addEventListener('click', () => {
+                    window.location.href = 'welding_equipment.html';
+                });
+            }
+        });
+
+        document.querySelectorAll('.dropdown-item').forEach(item => {
+            item.addEventListener('click', function () {
+                const text = this.textContent.trim();
+
+                if (text === "Организации") {
+                    window.location.href = 'organizations.html';
+                }
+            });
+        });
+
+        // Dropdown menu handlers
+        document.querySelectorAll('.dropdown-parent').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const menu = this.querySelector('.dropdown-menu');
+                const isActive = menu.classList.contains('active');
+
+                document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('active'));
+                if(!isActive) menu.classList.add('active');
+            });
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.dropdown-parent')) {
+                document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('active'));
+            }
+        });
+
+        // Add event listener to close modal when clicking outside
+        document.getElementById('organizationModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Add some sample data for testing
+        organizations = [
+            {
+                id: '1',
+                name: 'ООО "СварТех"',
+                fullName: 'Общество с ограниченной ответственностью "СварТех"',
+                businessArea: 'Производство сварочного оборудования',
+                email: 'info@svartech.ru',
+                website: 'https://svartech.ru',
+                phones: ['+7 (495) 123-45-67', '+7 (495) 765-43-21'],
+                address: 'г. Москва, ул. Сварочная, д. 1',
+                director: 'Иванов Иван Иванович',
+                inn: '7700123456',
+                ogrn: '1027700123456'
+            },
+            {
+                id: '2',
+                name: 'ЗАО "МеталлСвар"',
+                fullName: 'Закрытое акционерное общество "МеталлСвар"',
+                businessArea: 'Металлообработка и сварка',
+                email: 'contact@metallsvar.ru',
+                website: 'https://metallsvar.ru',
+                phones: ['+7 (812) 234-56-78'],
+                address: 'г. Санкт-Петербург, пр. Металлистов, д. 10',
+                director: 'Петров Петр Петрович',
+                inn: '7812345678',
+                ogrn: '1037812345678'
+            }
+        ];
+
+        // Initial render
+        renderOrganizations();
+    </script>
+</body>
+</html> 

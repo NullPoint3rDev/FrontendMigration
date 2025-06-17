@@ -1,0 +1,721 @@
+<!-- welding_equipment.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Сварочное оборудование</title>
+  <style>
+    :root {
+      --primary: #6C63FF;
+      --secondary: #FF6584;
+      --gradient: linear-gradient(135deg, var(--primary), var(--secondary));
+    }
+
+    body {
+      background: radial-gradient(circle at top right, #1A1A2E, #16213E);
+      color: white;
+      font-family: 'Poppins', sans-serif;
+      overflow-x: hidden;
+      margin: 0;
+    }
+
+    /* Улучшенная навигация */
+    .nav-container {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      background: rgba(26, 26, 46, 0.98);
+      backdrop-filter: blur(15px);
+      z-index: 1000;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+    }
+
+    .nav-menu {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      height: 60px;
+    }
+
+    .nav-item {
+      position: relative;
+      padding: 1rem 1.5rem;
+      cursor: pointer;
+      background: none;
+      border: none;
+      color: white;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      border-radius: 8px;
+    }
+
+    .nav-item:hover {
+      background: rgba(108, 99, 255, 0.1);
+    }
+
+    .nav-item.active {
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    .dropdown-parent {
+      position: relative;
+    }
+
+    .dropdown-menu {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: rgba(26, 26, 46, 0.98);
+      border-radius: 12px;
+      padding: 0.8rem;
+      min-width: 240px;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      z-index: 1001;
+    }
+
+    .dropdown-menu.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(5px);
+    }
+
+    .dropdown-item {
+      padding: 0.8rem 1.2rem;
+      border-radius: 8px;
+      transition: background 0.3s ease;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+
+    .dropdown-item:hover {
+      background: rgba(108, 99, 255, 0.1);
+    }
+
+    /* Контент страницы */
+    .equipment-list {
+      max-width: 1200px;
+      margin: 100px auto;
+      padding: 2rem;
+    }
+
+    .equipment-item {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      position: relative;
+      transition: transform 0.3s ease;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .equipment-item:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .equipment-image {
+      width: 200px;
+      height: 150px;
+      border-radius: 12px;
+      object-fit: cover;
+      margin-right: 2rem;
+      flex-shrink: 0;
+    }
+
+    .equipment-info {
+      flex-grow: 1;
+    }
+
+    .equipment-info h3 {
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .equipment-actions {
+      position: relative;
+      margin-left: auto;
+      display: flex;
+      gap: 10px;
+    }
+
+    .action-btn {
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: white;
+      padding: 0.8rem 1.5rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1.1rem;
+    }
+
+    .action-btn:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .action-btn.edit {
+      color: var(--primary);
+    }
+
+    .action-btn.control {
+      color: var(--secondary);
+    }
+
+    .equipment-item {
+      position: relative;
+      z-index: 1; /* Добавляем базовый z-index */
+    }
+
+    /* Активный элемент с открытым меню */
+    .equipment-item.active {
+      z-index: 2;
+    }
+
+    .action-menu {
+      z-index: 1001; /* Увеличиваем значение */
+      top: auto;
+      bottom: 100%; /* Меню открывается вверх */
+      transform: translateY(10px); /* Корректируем анимацию */
+    }
+
+    .action-menu.active {
+      transform: translateY(0);
+    }
+
+    @keyframes gradientFlow {
+      0% { transform: rotate(0deg) translateX(0); }
+      100% { transform: rotate(30deg) translateX(200px); }
+    }
+
+    /* Мобильная навигация */
+    @media (max-width: 768px) {
+      .nav-menu {
+        padding: 0 1rem;
+        height: 50px;
+      }
+
+      .nav-item {
+        padding: 0.8rem 1rem;
+        font-size: 0.9rem;
+      }
+
+      .dropdown-menu {
+        min-width: 200px;
+      }
+
+      .equipment-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .equipment-image {
+        width: 100%;
+        height: 200px;
+        margin-right: 0;
+        margin-bottom: 1rem;
+      }
+    }
+
+    /* Modal styles */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      backdrop-filter: blur(5px);
+    }
+
+    .modal.active {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background: #1A1A2E;
+      border-radius: 16px;
+      padding: 2rem;
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .modal-title {
+      color: var(--primary);
+      font-size: 1.5rem;
+      margin: 0;
+    }
+
+    .close-modal {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0.5rem;
+      transition: color 0.3s ease;
+    }
+
+    .close-modal:hover {
+      color: var(--secondary);
+    }
+
+    .form-group {
+      margin-bottom: 1.2rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 0.8rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      color: white;
+      font-size: 1rem;
+      transition: border-color 0.3s ease;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .form-group input::placeholder {
+      color: rgba(255,255,255,0.3);
+    }
+
+    .required-field label::after {
+      content: " *";
+      color: var(--secondary);
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .modal-btn {
+      padding: 0.8rem 1.5rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    .modal-btn.cancel {
+      background: rgba(255,255,255,0.1);
+      color: white;
+    }
+
+    .modal-btn.cancel:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .modal-btn.save {
+      background: var(--primary);
+      color: white;
+    }
+
+    .modal-btn.save:hover {
+      background: #5B54FF;
+    }
+
+    .error-message {
+      color: var(--secondary);
+      font-size: 0.9rem;
+      margin-top: 0.3rem;
+      display: none;
+    }
+
+    .form-group.error input {
+      border-color: var(--secondary);
+    }
+
+    .form-group.error .error-message {
+      display: block;
+    }
+  </style>
+
+</head>
+<body>
+<div class="nav-container">
+  <nav class="nav-menu">
+    <button class="nav-item active">Главная</button>
+    <div class="nav-item dropdown-parent">
+      Предприятия
+      <div class="dropdown-menu">
+        <div class="dropdown-item">Организации</div>
+        <div class="dropdown-item">Сотрудники</div>
+        <div class="dropdown-item">Сварщики</div>
+      </div>
+    </div>
+    <div class="nav-item dropdown-parent">
+      Ресурсы
+      <div class="dropdown-menu">
+        <div class="dropdown-item">Сварочные материалы</div>
+        <div class="dropdown-item">Сварочное оборудование</div>
+      </div>
+    </div>
+    <div class="nav-item dropdown-parent">
+      Инструкции
+      <div class="dropdown-menu">
+        <div class="dropdown-item">Безопасность сварочных работ</div>
+        <div class="dropdown-item">Прошивки</div>
+        <div class="dropdown-item">Документы</div>
+      </div>
+    </div>
+    <div class="nav-item dropdown-parent">
+      Мониторинг
+      <div class="dropdown-menu">
+        <div class="dropdown-item">Архив</div>
+        <div class="dropdown-item">Отчеты</div>
+      </div>
+    </div>
+    <div class="nav-item dropdown-parent">
+      Обучение
+      <div class="dropdown-menu">
+        <div class="dropdown-item">Библиотека</div>
+      </div>
+    </div>
+    <div class="nav-item dropdown-parent">
+      ДСЕ
+      <div class="dropdown-menu">
+        <div class="dropdown-item">Типы проволоки</div>
+      </div>
+    </div>
+    <button class="nav-item">О программе</button>
+  </nav>
+</div>
+
+<div class="equipment-list">
+  <!-- Элементы оборудования -->
+  <div class="equipment-item">
+    <img src="images/mx_pulse.webp" class="equipment-image" alt="MC-501-MXPULSE">
+    <div class="equipment-info">
+      <h3>MC-501-MXPULSE</h3>
+      <p>MAC: 001A2B3C4D5E</p>
+      <p>Предприятие: Конструкторский отдел ALLOY</p>
+      <p>Статус:</p>
+    </div>
+    <div class="equipment-actions">
+      <button class="action-btn edit">✏️ Изменить</button>
+      <button class="action-btn control">⚙️ Управление</button>
+    </div>
+  </div>
+  <div class="equipment-item">
+    <img src="images/T2.jpg" class="equipment-image" alt="T2">
+    <div class="equipment-info">
+      <h3>T2</h3>
+      <p>MAC: 001A2B3C4D5C</p>
+      <p>Предприятие: Конструкторский отдел ALLOY</p>
+      <p>Статус:</p>
+    </div>
+    <div class="equipment-actions">
+      <button class="action-btn edit">✏️ Изменить</button>
+      <button class="action-btn control">⚙️ Управление</button>
+    </div>
+  </div>
+  <div class="equipment-item">
+    <img src="images/MC500M1.jpg" class="equipment-image" alt="MC-500M1">
+    <div class="equipment-info">
+      <h3>MC500M1</h3>
+      <p>MAC: 001A2B3C4D5D</p>
+      <p>Предприятие: Конструкторский отдел ALLOY</p>
+      <p>Статус:</p>
+    </div>
+    <div class="equipment-actions">
+      <button class="action-btn edit">✏️ Изменить</button>
+      <button class="action-btn control">⚙️ Управление</button>
+    </div>
+  </div>
+  <div class="equipment-item">
+    <img src="images/MC-1001A1.jpg" class="equipment-image" alt="MC-1001A1">
+    <div class="equipment-info">
+      <h3>MC-1001A1</h3>
+      <p>MAC: 001A2B3C4D5F</p>
+      <p>Предприятие: Конструкторский отдел ALLOY</p>
+      <p>Статус:</p>
+    </div>
+    <div class="equipment-actions">
+      <button class="action-btn edit">✏️ Изменить</button>
+      <button class="action-btn control">⚙️ Управление</button>
+    </div>
+  </div>
+  <div class="equipment-item">
+    <img src="images/МС-501%20MX.jpg" class="equipment-image" alt="МС-501 MX">
+    <div class="equipment-info">
+      <h3>МС-501 MX</h3>
+      <p>MAC: 001A2B3C4D5G</p>
+      <p>Предприятие: Конструкторский отдел ALLOY</p>
+      <p>Статус:</p>
+    </div>
+    <div class="equipment-actions">
+      <button class="action-btn edit">✏️ Изменить</button>
+      <button class="action-btn control">⚙️ Управление</button>
+    </div>
+  </div>
+  <div class="equipment-item">
+    <img src="images/БМ%20500.jpg" class="equipment-image" alt="БМ 500">
+    <div class="equipment-info">
+      <h3>БМ 500</h3>
+      <p>MAC: 001A2B3C4D5C</p>
+      <p>Предприятие: Конструкторский отдел ALLOY</p>
+      <p>Статус:</p>
+    </div>
+    <div class="equipment-actions">
+      <button class="action-btn edit">✏️ Изменить</button>
+      <button class="action-btn control">⚙️ Управление</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal for editing machine parameters -->
+<div class="modal" id="editModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="modal-title">Редактирование параметров</h2>
+      <button class="close-modal">&times;</button>
+    </div>
+    <form id="editForm">
+      <div class="form-group required-field">
+        <label for="machineName">Имя</label>
+        <input type="text" id="machineName" name="machineName" required>
+        <div class="error-message">Это поле обязательно для заполнения</div>
+      </div>
+      <div class="form-group required-field">
+        <label for="machineModel">Модель</label>
+        <input type="text" id="machineModel" name="machineModel" required>
+        <div class="error-message">Это поле обязательно для заполнения</div>
+      </div>
+      <div class="form-group required-field">
+        <label for="macAddress">MAC-адрес</label>
+        <input type="text" id="macAddress" name="macAddress" required
+               pattern="^[0-9A-Fa-f]{12}$"
+               minlength="12" maxlength="12"
+               placeholder="XXXXXXXXXXXX">
+        <div class="error-message">MAC-адрес должен содержать 12 символов в формате XXXXXXXXXXXX</div>
+      </div>
+      <div class="form-group required-field">
+        <label for="department">Подразделение</label>
+        <input type="text" id="department" name="department" required>
+        <div class="error-message">Это поле обязательно для заполнения</div>
+      </div>
+      <div class="form-group">
+        <label for="commissionDate">Дата ввода в эксплуатацию</label>
+        <input type="date" id="commissionDate" name="commissionDate">
+      </div>
+      <div class="form-group">
+        <label for="manufactureYear">Год выпуска</label>
+        <input type="number" id="manufactureYear" name="manufactureYear" min="1990" max="2025">
+      </div>
+      <div class="form-group">
+        <label for="lastService">Дата последнего обслуживания</label>
+        <input type="date" id="lastService" name="lastService">
+      </div>
+      <div class="form-group">
+        <label for="serialNumber">Серийный номер</label>
+        <input type="text" id="serialNumber" name="serialNumber">
+      </div>
+      <div class="form-group">
+        <label for="inventoryNumber">Инвентарный номер</label>
+        <input type="text" id="inventoryNumber" name="inventoryNumber">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="modal-btn cancel">Отмена</button>
+        <button type="submit" class="modal-btn save">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Обработчики навигации
+  document.querySelectorAll('.nav-item').forEach(item => {
+    // Закрытие меню при повторном клике
+    item.addEventListener('click', function(e) {
+      if(this.classList.contains('dropdown-parent')) {
+        e.stopPropagation();
+        const menu = this.querySelector('.dropdown-menu');
+        const isActive = menu.classList.contains('active');
+
+        document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('active'));
+        if(!isActive) menu.classList.add('active');
+      }
+    });
+  });
+
+  // Закрытие меню при клике вне
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.equipment-actions')) {
+      document.querySelectorAll('.action-menu.active').forEach(menu => {
+        menu.classList.remove('active');
+        menu.closest('.equipment-item').classList.remove('active');
+      });
+    }
+  });
+
+  // Обработчики действий оборудования
+  document.querySelectorAll('.action-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const action = this.classList.contains('control') ? 'control' : 'edit';
+      const equipmentItem = this.closest('.equipment-item');
+      const equipmentName = equipmentItem.querySelector('h3').textContent;
+
+      if (action === 'control') {
+        window.location.href = `control.html?machine=${encodeURIComponent(equipmentName)}`;
+      } else {
+        // Open edit modal
+        const modal = document.getElementById('editModal');
+        const form = document.getElementById('editForm');
+
+        // Fill form with current values
+        document.getElementById('machineName').value = equipmentName;
+        document.getElementById('machineModel').value = equipmentItem.querySelector('h3').textContent;
+        document.getElementById('macAddress').value = equipmentItem.querySelector('p').textContent.replace('MAC: ', '');
+        document.getElementById('department').value = equipmentItem.querySelectorAll('p')[1].textContent.replace('Предприятие: ', '');
+
+        modal.classList.add('active');
+      }
+    });
+  });
+
+  // Возврат на главную
+  document.querySelector('.nav-item.active').addEventListener('click', () => {
+    window.location.href = 'main_page.html';
+  });
+
+  // Обработчик для перехода между страницами
+  document.querySelectorAll('.dropdown-item').forEach(item => {
+    item.addEventListener('click', function() {
+      const text = this.textContent.trim();
+
+      if(text === "Сварочное оборудование") {
+        window.location.href = 'welding_equipment.html';
+      }
+    });
+  });
+
+  document.querySelectorAll('.dropdown-item').forEach(item => {
+    item.addEventListener('click', function () {
+      const text = this.textContent.trim();
+
+      if (text === "Организации") {
+        window.location.href = 'organizations.html';
+      }
+    });
+  });
+
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', function() {
+      const text = this.textContent.trim();
+
+      if(text === "О программе") {
+        window.location.href = 'about.html'
+      }
+    });
+  });
+
+  // Закрытие всех меню при скролле
+  window.addEventListener('scroll', () => {
+    document.querySelectorAll('.dropdown-menu, .action-menu').forEach(m => m.classList.remove('active'));
+  });
+
+  // Modal close handlers
+  document.querySelector('.close-modal').addEventListener('click', () => {
+    document.getElementById('editModal').classList.remove('active');
+  });
+
+  document.querySelector('.modal-btn.cancel').addEventListener('click', () => {
+    document.getElementById('editModal').classList.remove('active');
+  });
+
+  // Close modal when clicking outside
+  document.getElementById('editModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('editModal')) {
+      document.getElementById('editModal').classList.remove('active');
+    }
+  });
+
+  // Form submission handler
+  document.getElementById('editForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    // Reset all error states
+    document.querySelectorAll('.form-group').forEach(group => {
+      group.classList.remove('error');
+    });
+
+    // Validate required fields
+    const requiredFields = ['machineName', 'machineModel', 'macAddress', 'department'];
+    let hasError = false;
+
+    requiredFields.forEach(fieldId => {
+      const field = document.getElementById(fieldId);
+      if (!field.value.trim()) {
+        field.closest('.form-group').classList.add('error');
+        hasError = true;
+      }
+    });
+
+    if (hasError) {
+      return;
+    }
+
+    // Here you would typically send the data to your backend
+    // For now, we'll just close the modal
+    document.getElementById('editModal').classList.remove('active');
+
+    // You can add code here to update the UI with the new values
+    console.log('Form submitted with values:', {
+      machineName: document.getElementById('machineName').value,
+      machineModel: document.getElementById('machineModel').value,
+      macAddress: document.getElementById('macAddress').value,
+      department: document.getElementById('department').value,
+      commissionDate: document.getElementById('commissionDate').value,
+      manufactureYear: document.getElementById('manufactureYear').value,
+      lastService: document.getElementById('lastService').value,
+      serialNumber: document.getElementById('serialNumber').value,
+      inventoryNumber: document.getElementById('inventoryNumber').value
+    });
+  });
+</script>
+</body>
+</html>

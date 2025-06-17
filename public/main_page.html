@@ -1,0 +1,283 @@
+<!-- main_page.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>WELDTelecom - Главная</title>
+  <!-- Подключаем GSAP для анимаций -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <style>
+    :root {
+      --primary: #6C63FF;
+      --secondary: #FF6584;
+      --gradient: linear-gradient(135deg, var(--primary), var(--secondary));
+    }
+
+    body {
+      background: radial-gradient(circle at top right, #1A1A2E, #16213E);
+      color: white;
+      font-family: 'Poppins', sans-serif;
+      overflow-x: hidden;
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    /* Навигационная панель */
+    .nav-container {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      background: rgba(26, 26, 46, 0.98);
+      backdrop-filter: blur(15px);
+      z-index: 1000;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+    }
+
+    .nav-menu {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      height: 60px;
+    }
+
+    .nav-item {
+      position: relative;
+      padding: 1rem 1.5rem;
+      cursor: pointer;
+      background: none;
+      border: none;
+      color: white;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      border-radius: 8px;
+    }
+
+    .nav-item:hover {
+      background: rgba(108, 99, 255, 0.1);
+    }
+
+    .nav-item.active {
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    /* Выпадающие меню */
+    .dropdown-parent {
+      position: relative;
+    }
+
+    .dropdown-menu {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: rgba(26, 26, 46, 0.98);
+      border-radius: 12px;
+      padding: 0.8rem;
+      min-width: 240px;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      z-index: 1001;
+    }
+
+    .dropdown-menu.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(5px);
+    }
+
+    .dropdown-item {
+      padding: 0.8rem 1.2rem;
+      border-radius: 8px;
+      transition: background 0.3s ease;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+
+    .dropdown-item:hover {
+      background: rgba(108, 99, 255, 0.1);
+    }
+
+    /* Основной контент */
+    .main-content {
+      margin-top: 100px;
+      padding: 2rem;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeIn 1s forwards;
+    }
+
+    .main-content img {
+      max-width: 1000px;
+      width: 90%;
+      height: auto;
+      margin: 2rem auto;
+      display: block;
+      border-radius: 20px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+    }
+
+    .neon-text {
+      font-size: 1.8rem;
+      text-shadow: 0 0 10px rgba(108, 99, 255, 0.5),
+      0 0 20px rgba(108, 99, 255, 0.3),
+      0 0 30px rgba(108, 99, 255, 0.2);
+      /*margin-bottom: 1rem;*/
+      /*letter-spacing: 0.5px;*/
+      /*font-weight: 500;*/
+    }
+
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Адаптивность */
+    @media (max-width: 768px) {
+      .nav-menu {
+        padding: 0 1rem;
+        height: 50px;
+      }
+
+      .nav-item {
+        padding: 0.8rem;
+        font-size: 0.9rem;
+      }
+
+      .neon-text {
+        font-size: 1.8rem;
+      }
+
+      .main-content {
+        margin-top: 80px;
+        padding: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="nav-container">
+  <nav class="nav-menu">
+    <button class="nav-item active">Главная</button>
+    <div class="nav-item dropdown-parent">
+      Предприятия
+      <div class="dropdown-menu">
+        <div class="dropdown-item">Организации</div>
+        <div class="dropdown-item">Сотрудники</div>
+        <div class="dropdown-item">Сварщики</div>
+      </div>
+    </div>
+    <div class="nav-item dropdown-parent">
+      Ресурсы
+      <div class="dropdown-menu">
+        <div class="dropdown-item">Сварочные материалы</div>
+        <div class="dropdown-item">Сварочное оборудование</div>
+      </div>
+    </div>
+    <div class="nav-item dropdown-parent">
+      Инструкции
+      <div class="dropdown-menu">
+        <div class="dropdown-item">Безопасность сварочных работ</div>
+        <div class="dropdown-item">Прошивки</div>
+        <div class="dropdown-item">Документы</div>
+      </div>
+    </div>
+    <div class="nav-item dropdown-parent">
+      Мониторинг
+      <div class="dropdown-menu">
+        <div class="dropdown-item">Архив</div>
+        <div class="dropdown-item">Отчеты</div>
+      </div>
+    </div>
+    <div class="nav-item dropdown-parent">
+      Обучение
+      <div class="dropdown-menu">
+        <div class="dropdown-item">Библиотека</div>
+      </div>
+    </div>
+    <div class="nav-item dropdown-parent">
+      ДСЕ
+      <div class="dropdown-menu">
+        <div class="dropdown-item">Типы проволоки</div>
+      </div>
+    </div>
+    <button class="nav-item">О программе</button>
+  </nav>
+</div>
+
+<div class="main-content">
+  <h2 class="neon-text">Добро пожаловать в систему управления сварочным процессом WELDTelecom</h2>
+  <img src="images/wt.webp" alt="Интерфейс WELDTelecom" style="max-width: 1800px; margin: 85px auto; display: block;">
+</div>
+
+<script>
+  // Инициализация при загрузке страницы
+  document.addEventListener('DOMContentLoaded', () => {
+    // Анимация появления контента
+    gsap.to(".main-content", { duration: 1, opacity: 1, y: 0 });
+  });
+
+  // Обработчики выпадающих меню
+  document.querySelectorAll('.dropdown-parent').forEach(item => {
+    item.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const menu = this.querySelector('.dropdown-menu');
+      const isActive = menu.classList.contains('active');
+
+      document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('active'));
+      if(!isActive) menu.classList.add('active');
+    });
+  });
+
+  // Закрытие меню при клике вне
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.dropdown-parent')) {
+      document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('active'));
+    }
+  });
+
+  // Обработчик для перехода между страницами
+  document.querySelectorAll('.dropdown-item').forEach(item => {
+    item.addEventListener('click', function() {
+      const text = this.textContent.trim();
+
+      if(text === "Сварочное оборудование") {
+        window.location.href = 'welding_equipment.html';
+      } else if(text === "Организации") {
+        window.location.href = 'organizations.html';
+      }
+    });
+  });
+
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', function() {
+      const text = this.textContent.trim();
+
+      if(text === "О программе") {
+        window.location.href = 'about.html'
+      }
+    });
+  });
+
+  // Обновление активного пункта меню
+  function setActiveNavItem() {
+    const currentPage = window.location.pathname.split('/').pop();
+    document.querySelectorAll('.nav-item').forEach(item => {
+      const link = item.querySelector('a');
+      if (link && link.getAttribute('href') === currentPage) {
+        item.classList.add('active');
+      }
+    });
+  }
+  setActiveNavItem();
+</script>
+</body>
+</html>

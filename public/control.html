@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Управление аппаратом</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/weldingMachine.js"></script>
+    <style>
+        :root {
+            --primary: #6C63FF;
+            --secondary: #FF6584;
+            --bg-color: #1A1A2E;
+            --surface: rgba(255,255,255,0.05);
+            --border: rgba(255,255,255,0.1);
+        }
+
+        /* Навигация */
+        .nav-container {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(26, 26, 46, 0.98);
+            backdrop-filter: blur(15px);
+            z-index: 1000;
+            box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+        }
+
+        .nav-menu {
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            height: 60px;
+            gap: 1.5rem;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.8rem 1.2rem;
+            border-radius: 8px;
+            transition: background 0.3s;
+        }
+
+        .back-btn:hover {
+            background: rgba(108, 99, 255, 0.1);
+        }
+
+        body {
+            background: var(--bg-color);
+            color: white;
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 100px 20px 40px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            gap: 2rem;
+        }
+
+        /* Status Panel */
+        .status-panel {
+            display: grid;
+            grid-template-columns: 0.8fr 1.2fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .device-display {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .device-display img {
+            max-width: 100%;
+            height: auto;
+            object-fit: contain;
+            border-radius: 12px;
+            transition: transform 0.3s ease;
+        }
+
+        .device-display:hover img {
+            transform: scale(1.02);
+        }
+
+        .parameters {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .parameters::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .parameters::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+        }
+
+        .parameters::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+
+        .parameter-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            transition: background-color 0.2s ease;
+        }
+
+        .parameter-row:hover {
+            background: rgba(108, 99, 255, 0.1);
+        }
+
+        .parameter-row span:first-child {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.95rem;
+        }
+
+        .parameter-row span:last-child {
+            color: #fff;
+            font-weight: 500;
+            padding: 0.25rem 0.75rem;
+            background: rgba(108, 99, 255, 0.1);
+            border-radius: 6px;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        /* Charts */
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            height: 400px;
+        }
+
+        .chart-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .chart-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+        }
+
+        .chart-title {
+            position: absolute;
+            top: 1rem;
+            left: 1.5rem;
+            font-size: 1.1rem;
+            color: var(--primary);
+            font-weight: 500;
+            z-index: 1;
+        }
+
+        .chart-container canvas {
+            margin-top: 2rem;
+        }
+
+        /* Controls */
+        .controls {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .control-group label {
+            font-weight: 500;
+            color: var(--primary);
+        }
+
+        select {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--primary);
+            color: white;
+            padding: 0.8rem 1rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        select:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .slider {
+            flex: 1;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            cursor: pointer;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            width: 20px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        .value-display {
+            min-width: 80px;
+            text-align: right;
+            font-weight: 500;
+        }
+
+        /* Save Button */
+        .save-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem 3rem;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.3s;
+            display: block;
+            margin: 0 auto;
+            width: fit-content;
+        }
+
+        .save-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 1200px) {
+            .status-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .device-display {
+                min-height: 300px;
+            }
+
+            .parameters {
+                max-height: none;
+                overflow-y: visible;
+            }
+
+            .charts {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .chart-container {
+                height: 400px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+
+            .nav-menu {
+                padding: 0 1rem;
+            }
+
+            .parameter-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .parameter-row span:last-child {
+                align-self: flex-end;
+            }
+
+            .controls {
+                grid-template-columns: 1fr;
+            }
+
+            .parameters {
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            }
+
+            .control-group {
+                min-width: 280px;
+            }
+        }
+
+        .error-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #ff5252;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="nav-container">
+    <nav class="nav-menu">
+        <button class="back-btn" onclick="window.location.href='welding_equipment.html'">
+            ← Назад к оборудованию
+        </button>
+    </nav>
+</div>
+
+<div class="container">
+    <!-- Status Panel -->
+    <div class="status-panel">
+        <div class="device-display">
+            <img src="" alt="Дисплей аппарата" id="deviceImage" style="max-height: 400px">
+        </div>
+        <div class="parameters" id="parametersContainer"></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts">
+        <div class="chart-container">
+            <div class="chart-title">График тока</div>
+            <canvas id="currentChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <div class="chart-title">График напряжения</div>
+            <canvas id="voltageChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls" id="controlsContainer"></div>
+
+    <button class="save-btn" onclick="saveSettings()">Сохранить настройки</button>
+</div>
+
+
+<script>
+    // Обновленные зависимости Chart.js
+    const devicesConfig = {
+        Pulse: {
+            image: "pulseFront.png",
+            parameters: [
+                {label: "Состояние", value: "Выключен", id: "status"},
+                {label: "MAC Адрес", value: "001A2B3C4D5E", id: "mac"},
+                {label: "Модель аппарата", value: "0", id: "model"},
+                {label: "Версия прошивки", value: "0", id: "version"},
+                {label: "Материал сварочной проволоки", value: "Алюминий", id: "material"},
+                {label: "Тип сварки", value: "Pulse", id: "weldingType"},
+                {label: "Режим работы горелки", value: "2T", id: "burnerMode"},
+                {label: "Диаметр сварочной проволоки", value: "1.2", id: "weldingFeed"},
+                {label: "Номер программы", value: "0", id: "programNumber"},
+                {label: "Ток MIGMAG", value: "0 A", id: "currentMIG"},
+                {label: "Напряжение MIGMAG", value: "0 В", id: "voltageMIG"},
+                {label: "Индуктивность MIG", value: "0", id: "inductionMIG"},
+                {label: "Размер Катета сварного шва", value: "0 mm", id: "alloyDimension"},
+                {label: "Скорость подачи сварочной проволоки", value: "0 м/мин", id: "wireFeedSpeed"},
+                {label: "Толщина металла", value: "0 mm", id: "metalThickness"},
+                {label: "Скорость движения горелки во время сварки", value: "0 мм/сек", id: "burnerSpeed"},
+                {label: "Степень эластичности дуги", value: "0", id: "elastic"},
+                {label: "Индуктивность P-MIG", value: "0", id: "inductionPMIG"},
+                {label: "Ток", value: "0 A", id: "current"},
+                {label: "Напряжение", value: "0 В", id: "voltage"},
+                {label: "Форсаж дуги", value: "0", id: "arcBoost"}
+            ],
+            controls: [
+                {
+                    type: "select",
+                    label: "Режим управления",
+                    id: "controlMode",
+                    options: [
+                        {value: "unlimited", text: "Без ограничений"},
+                        {value: "current", text: "Блокировка"},
+                        {value: "passive", text: "Пассивный"}
+                    ]
+                },
+                {
+                    type: "slider",
+                    label: "Ток MIGMAG",
+                    id: "currentMIG",
+                    min: 8,
+                    max: 500,
+                    unit: " А"
+                },
+                {
+                    type: "slider",
+                    label: "Напряжение",
+                    id: "voltage",
+                    min: 8,
+                    max: 50,
+                    unit: "В"
+                }
+            ]
+        },
+        T2: {
+            image: "T2Front.png",
+            parameters: [
+                {label: "Состояние", value: "Выключен", id: "status"},
+                {label: "Частота АС", value: "0 Hz", id: "acFreq"}
+            ],
+            controls: [
+                {
+                    type: "select",
+                    label: "Режим сварки",
+                    id: "weldMode",
+                    options: [
+                        {value: "tig", text: "TIG"},
+                        {value: "ac", text: "AC"}
+                    ]
+                },
+                {
+                    type: "slider",
+                    label: "Частота АС (30-300 Hz)",
+                    id: "acFreq",
+                    min: 30,
+                    max: 300,
+                    unit: " Hz"
+                }
+            ]
+        }
+    };
+
+    let currentChart, voltageChart;
+    let weldingMachine;
+
+    function initDevice() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const deviceId = urlParams.get('device') || 'Pulse';
+        const device = devicesConfig[deviceId];
+
+        // Исправление пути к изображению
+        const img = document.getElementById('deviceImage');
+        if(img) {
+            img.src = `/public/images/${device.image}`;
+            img.onerror = () => console.error('Изображение не найдено:', device.image);
+        }
+
+        // Динамическая генерация параметров
+        const paramsContainer = document.getElementById('parametersContainer');
+        if(paramsContainer) {
+            paramsContainer.innerHTML = device.parameters.map(param => `
+                <div class="parameter-row">
+                    <span>${param.label}:</span>
+                    <span id="${param.id}">${param.value}</span>
+                </div>
+            `).join('');
+        }
+
+        // Динамическая генерация элементов управления
+        const controlsContainer = document.getElementById('controlsContainer');
+        if(controlsContainer) {
+            controlsContainer.innerHTML = device.controls.map(control => {
+                if (control.type === 'select') {
+                    return `
+                        <div class="control-group">
+                            <label>${control.label}</label>
+                            <select id="${control.id}">
+                                ${control.options.map(opt =>
+                        `<option value="${opt.value}">${opt.text}</option>`
+                    ).join('')}
+                            </select>
+                        </div>
+                    `;
+                }
+                if (control.type === 'slider') {
+                    return `
+                        <div class="control-group">
+                            <label>${control.label}</label>
+                            <div class="slider-container">
+                                <input type="range" min="${control.min}" max="${control.max}"
+                                       value="${control.min}" class="slider" id="${control.id}Range">
+                                <span class="value-display" id="${control.id}Value">
+                                    ${control.min}${control.unit}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        // Инициализация ползунков
+        device.controls.filter(c => c.type === 'slider').forEach(control => {
+            const slider = document.getElementById(`${control.id}Range`);
+            const output = document.getElementById(`${control.id}Value`);
+            if(slider && output) {
+                slider.addEventListener('input', function() {
+                    output.textContent = `${this.value}${control.unit}`;
+                });
+            }
+        });
+
+        // Инициализация графиков
+        initCharts();
+    }
+
+    function initCharts() {
+        let currentData = Array(50).fill({ x: Date.now(), y: 200 });
+        let voltageData = Array(50).fill({ x: Date.now(), y: 24 });
+
+        // Конфигурация графиков
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    display: false
+                },
+                y: {
+                    grid: {
+                        color: 'rgba(255,255,255,0.05)'
+                    },
+                    ticks: {
+                        color: '#fff'
+                    }
+                }
+            },
+            animation: {
+                duration: 0
+            }
+        };
+
+        // Уничтожение старых графиков
+        if(currentChart) currentChart.destroy();
+        if(voltageChart) voltageChart.destroy();
+
+        // Создание новых графиков
+        currentChart = new Chart(document.getElementById('currentChart').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: Array(50).fill(''),
+                datasets: [{
+                    label: 'Ток (А)',
+                    borderColor: '#6C63FF',
+                    backgroundColor: 'rgba(108, 99, 255, 0.1)',
+                    fill: true,
+                    data: currentData.map(d => d.y),
+                    borderWidth: 2,
+                    pointRadius: 0
+                }]
+            },
+            options: chartOptions
+        });
+
+        voltageChart = new Chart(document.getElementById('voltageChart').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: Array(50).fill(''),
+                datasets: [{
+                    label: 'Напряжение (В)',
+                    borderColor: '#FF6584',
+                    backgroundColor: 'rgba(255, 101, 132, 0.1)',
+                    fill: true,
+                    data: voltageData.map(d => d.y),
+                    borderWidth: 2,
+                    pointRadius: 0
+                }]
+            },
+            options: chartOptions
+        });
+
+        function updateCharts() {
+            // Получение последних значений
+            const lastCurrent = currentData[currentData.length - 1].y;
+            const lastVoltage = voltageData[voltageData.length - 1].y;
+
+            // Генерация новых значений
+            const newCurrent = Math.max(150, Math.min(250, lastCurrent + (Math.random() - 0.5) * 10));
+            const newVoltage = Math.max(20, Math.min(28, lastVoltage + (Math.random() - 0.5) * 2));
+
+            // Обновление данных
+            currentData.push({ x: Date.now(), y: newCurrent });
+            voltageData.push({ x: Date.now(), y: newVoltage });
+            currentData.shift();
+            voltageData.shift();
+
+            // Обновление графиков
+            currentChart.data.datasets[0].data = currentData.map(d => d.y);
+            voltageChart.data.datasets[0].data = voltageData.map(d => d.y);
+
+            currentChart.update();
+            voltageChart.update();
+        }
+
+        // Обновление каждые 100мс
+        setInterval(updateCharts, 100);
+    }
+
+    function saveSettings() {
+        const deviceId = new URLSearchParams(window.location.search).get('device') || 'Pulse';
+        const settings = {};
+
+        devicesConfig[deviceId].controls.forEach(control => {
+            const element = document.getElementById(control.id + (control.type === 'slider' ? 'Range' : ''));
+            if(element) settings[control.id] = element.value;
+        });
+
+        localStorage.setItem(`welderSettings_${deviceId}`, JSON.stringify(settings));
+        alert('Настройки успешно сохранены!');
+    }
+
+    function loadSettings() {
+        const deviceId = new URLSearchParams(window.location.search).get('device') || 'Pulse';
+        const saved = JSON.parse(localStorage.getItem(`welderSettings_${deviceId}`));
+
+        if(saved) {
+            devicesConfig[deviceId].controls.forEach(control => {
+                const element = document.getElementById(control.id + (control.type === 'slider' ? 'Range' : ''));
+                if(element && saved[control.id]) {
+                    element.value = saved[control.id];
+                    if(control.type === 'slider') {
+                        document.getElementById(`${control.id}Value`).textContent =
+                            `${saved[control.id]}${control.unit}`;
+                    }
+                }
+            });
+        }
+    }
+
+    // Инициализация подключения к сварочному аппарату
+    async function initWeldingMachine() {
+        weldingMachine = new WeldingMachineConnection({
+            onDataReceived: (data) => {
+                updateParameters(data);
+                updateCharts(data);
+            },
+            onConnectionChange: (connected) => {
+                updateConnectionStatus(connected);
+                if (!connected) {
+                    showConnectionError();
+                }
+            },
+            onError: (error) => {
+                console.error('Machine error:', error);
+                showError(error);
+            }
+        });
+
+        try {
+            await weldingMachine.connect();
+        } catch (error) {
+            showError('Не удалось подключиться к сварочному аппарату. Проверьте подключение к сети WELDTELECOM.');
+        }
+    }
+
+    function updateParameters(data) {
+        // Обновление значений на странице
+        const elements = {
+            status: document.getElementById('status'),
+            current: document.getElementById('currentMIG'),
+            voltage: document.getElementById('voltageMIG'),
+            wireSpeed: document.getElementById('wireFeedSpeed'),
+            model: document.getElementById('model'),
+            version: document.getElementById('version'),
+            material: document.getElementById('material'),
+            weldingType: document.getElementById('weldingType'),
+            burnerMode: document.getElementById('burnerMode'),
+            programNumber: document.getElementById('programNumber')
+        };
+
+        // Обновление значений если элементы существуют
+        if (elements.status) elements.status.textContent = data.status || 'Неизвестно';
+        if (elements.current) elements.current.textContent = `${data.current || 0} A`;
+        if (elements.voltage) elements.voltage.textContent = `${data.voltage || 0} В`;
+        if (elements.wireSpeed) elements.wireSpeed.textContent = `${data.wireSpeed || 0} м/мин`;
+        if (elements.model) elements.model.textContent = 'mxpulse';
+        if (elements.version) elements.version.textContent = data.version || '1.0';
+        if (elements.material) elements.material.textContent = data.material || 'Алюминий';
+        if (elements.weldingType) elements.weldingType.textContent = data.weldingType || 'Pulse';
+        if (elements.burnerMode) elements.burnerMode.textContent = data.burnerMode || '2T';
+        if (elements.programNumber) elements.programNumber.textContent = data.program || '0';
+    }
+
+    function updateCharts(data) {
+        if (!currentChart || !voltageChart) return;
+
+        const now = Date.now();
+
+        // Добавление новых точек с реальными данными
+        currentChart.data.datasets[0].data.push({
+            x: now,
+            y: data.current || 0
+        });
+        voltageChart.data.datasets[0].data.push({
+            x: now,
+            y: data.voltage || 0
+        });
+
+        // Удаление старых точек
+        if (currentChart.data.datasets[0].data.length > 50) {
+            currentChart.data.datasets[0].data.shift();
+            voltageChart.data.datasets[0].data.shift();
+        }
+
+        // Обновление графиков
+        currentChart.update();
+        voltageChart.update();
+    }
+
+    function updateConnectionStatus(connected) {
+        const status = document.getElementById('status');
+        if (status) {
+            status.textContent = connected ? 'Подключен' : 'Отключен';
+            status.style.color = connected ? '#4CAF50' : '#FF5252';
+        }
+    }
+
+    function showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = message;
+        document.body.appendChild(errorDiv);
+
+        setTimeout(() => {
+            errorDiv.remove();
+        }, 5000);
+    }
+
+    function showConnectionError() {
+        showError('Потеряно соединение со сварочным аппаратом. Попытка переподключения...');
+    }
+
+    // Обработчики событий для элементов управления
+    function initControlHandlers() {
+        // Обработчик изменения тока
+        const currentRange = document.getElementById('currentMIGRange');
+        if (currentRange) {
+            currentRange.addEventListener('change', async () => {
+                await weldingMachine.sendCommand({
+                    type: 'setCurrent',
+                    value: parseInt(currentRange.value)
+                });
+            });
+        }
+
+        // Обработчик изменения напряжения
+        const voltageRange = document.getElementById('voltageRange');
+        if (voltageRange) {
+            voltageRange.addEventListener('change', async () => {
+                await weldingMachine.sendCommand({
+                    type: 'setVoltage',
+                    value: parseInt(voltageRange.value)
+                });
+            });
+        }
+
+        // Обработчик изменения скорости подачи проволоки
+        const wireSpeedRange = document.getElementById('wireSpeedRange');
+        if (wireSpeedRange) {
+            wireSpeedRange.addEventListener('change', async () => {
+                await weldingMachine.sendCommand({
+                    type: 'setWireSpeed',
+                    value: parseInt(wireSpeedRange.value)
+                });
+            });
+        }
+    }
+
+    // Инициализация при загрузке страницы
+    window.addEventListener('load', async () => {
+        initDevice();
+        loadSettings();
+        initControlHandlers();
+        await initWeldingMachine();
+    });
+</script>
+</body>
+</html>

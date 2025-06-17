@@ -1,0 +1,469 @@
+<!-- weldtelecom.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>WELDTelecom</title>
+    <link rel="stylesheet" href="https://unpkg.com/swiper/swiper-bundle.min.css">
+    <style>
+        :root {
+            --primary: #6C63FF;
+            --secondary: #FF6584;
+            --gradient: linear-gradient(135deg, var(--primary), var(--secondary));
+        }
+
+        body {
+            background: radial-gradient(circle at top right, #1A1A2E, #16213E);
+            color: white;
+            font-family: 'Poppins', sans-serif;
+            overflow-x: hidden;
+            margin: 0;
+        }
+
+        /* Hero section */
+        .hero {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: var(--gradient);
+            filter: blur(150px);
+            opacity: 0.3;
+            animation: gradientFlow 15s infinite alternate;
+            z-index: -1;
+        }
+
+        .hero .container {
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Cards section */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: -100px auto 0;
+            position: relative;
+            z-index: 3;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .card:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 25px 40px rgba(0,0,0,0.3);
+        }
+
+        .card h3 {
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .card p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        /* Modals */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            width: 400px;
+            transform: scale(0.8);
+            opacity: 0;
+            transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255,255,255,0.2);
+            position: relative;
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        /* Navigation */
+        .nav-container {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: none;
+        }
+
+        .nav-menu {
+            display: flex;
+            justify-content: center;
+            padding: 1rem;
+            gap: 2rem;
+        }
+
+        .nav-item {
+            position: relative;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .dropdown-parent {
+            position: relative;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: rgba(26, 26, 46, 0.95);
+            border-radius: 10px;
+            padding: 0.5rem;
+            min-width: 200px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            z-index: 1001;
+        }
+
+        .dropdown-menu.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-item {
+            padding: 0.8rem 1rem;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+            cursor: pointer;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(108, 99, 255, 0.1);
+        }
+
+        /* Main content */
+        .main-content {
+            display: none;
+            margin-top: 80px;
+            padding: 2rem;
+        }
+
+        /* Animations */
+        @keyframes gradientFlow {
+            0% { transform: rotate(0deg) translateX(0); }
+            100% { transform: rotate(30deg) translateX(200px); }
+        }
+
+        .neon-text {
+            text-shadow: 0 0 10px rgba(108, 99, 255, 0.5),
+            0 0 20px rgba(108, 99, 255, 0.3),
+            0 0 30px rgba(108, 99, 255, 0.2);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .modal-content {
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(25px);
+            border: 2px solid rgba(108, 99, 255, 0.3);
+        }
+
+        .modal-content h2 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.8rem;
+        }
+
+        .form-input {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(108, 99, 255, 0.3);
+            font-size: 0.95rem;
+            padding: 1.2rem;
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .submit-btn {
+            margin-top: 1.5rem;
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
+        }
+
+        .close-btn {
+            top: 1.2rem;
+            right: 1.2rem;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Стили для изображения на главной */
+        .main-content img {
+            max-width: 800px;
+            width: 100%;
+            height: auto;
+            margin: 2rem auto;
+            display: block;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .main-content {
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+<header class="hero">
+    <div class="container">
+        <h1 class="neon-text">Welcome to WELDTelecom</h1>
+        <p>Инновационные решения для ваших сварочных процессов</p>
+    </div>
+</header>
+
+<section class="features">
+    <div class="card" id="loginCard">
+        <h3>Вход для клиентов</h3>
+        <p>Войдите в свой личный кабинет</p>
+    </div>
+    <div class="card" id="registerCard">
+        <h3>Хочу стать клиентом</h3>
+        <p>Давайте договоримся о сотрудничестве</p>
+    </div>
+</section>
+
+<!-- Модальное окно регистрации -->
+<div id="registerModal" class="modal">
+    <div class="modal-content">
+        <button class="close-btn">&times;</button>
+        <h2 class="neon-text">Регистрация</h2>
+        <form id="registerForm">
+            <div class="form-group">
+                <input type="text" class="form-input" placeholder="Имя" required>
+            </div>
+            <div class="form-group">
+                <input type="email" class="form-input" placeholder="Email" required>
+            </div>
+            <div class="form-group">
+                <input type="tel" class="form-input" placeholder="Телефон" required>
+            </div>
+            <div class="form-group">
+                <input type="password" class="form-input" placeholder="Пароль" required>
+            </div>
+            <button type="submit" class="submit-btn">Зарегистрироваться</button>
+        </form>
+    </div>
+</div>
+
+<div class="nav-container">
+    <nav class="nav-menu">
+        <button class="nav-item">Главная</button>
+        <div class="nav-item dropdown-parent">
+            Предприятия
+            <div class="dropdown-menu">
+                <div class="dropdown-item">Организации</div>
+                <div class="dropdown-item">Сотрудники</div>
+                <div class="dropdown-item">Сварщики</div>
+            </div>
+        </div>
+        <div class="nav-item dropdown-parent">
+            Ресурсы
+            <div class="dropdown-menu">
+                <div class="dropdown-item">Сварочные материалы</div>
+                <div class="dropdown-item">Сварочное оборудование</div>
+            </div>
+        </div>
+        <div class="nav-item dropdown-parent">
+            Инструкции
+            <div class="dropdown-menu">
+                <div class="dropdown-item">Безопасность сварочных работ</div>
+                <div class="dropdown-item">Прошивки</div>
+                <div class="dropdown-item">Документы</div>
+            </div>
+        </div>
+        <div class="nav-item dropdown-parent">
+            Мониторинг
+            <div class="dropdown-menu">
+                <div class="dropdown-item">Архив</div>
+                <div class="dropdown-item">Отчеты</div>
+            </div>
+        </div>
+        <div class="nav-item dropdown-parent">
+            Обучение
+            <div class="dropdown-menu">
+                <div class="dropdown-item">Библиотека</div>
+            </div>
+        </div>
+        <div class="nav-item dropdown-parent">
+            ДСЕ
+            <div class="dropdown-menu">
+                <div class="dropdown-item">Типы проволоки</div>
+            </div>
+        </div>
+        <button class="nav-item">О программе</button>
+    </nav>
+</div>
+
+<div class="main-content">
+    <h2 class="neon-text">Добро пожаловать в систему управления сварочным процессом WELDTelecom</h2>
+    <img src="/images/wt.webp" alt="Интерфейс WELDTelecom" style="max-width: 1800px; margin: 85px auto; display: block;">
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Обработчики карточек
+        const loginCard = document.getElementById('loginCard');
+        const registerCard = document.getElementById('registerCard');
+        const registerModal = document.getElementById('registerModal');
+        const closeBtns = document.querySelectorAll('.close-btn');
+
+        // Переход на главную
+        loginCard.addEventListener('click', () => {
+            document.querySelector('.hero').classList.add('hidden');
+            document.querySelector('.features').classList.add('hidden');
+            document.querySelector('.nav-container').style.display = 'block';
+            document.querySelector('.main-content').style.display = 'block';
+
+            gsap.from(".nav-container", { y: -100, opacity: 0, duration: 0.8 });
+            gsap.from(".main-content", { y: 50, opacity: 0, duration: 1 });
+        });
+
+        // Открытие модального окна регистрации
+        registerCard.addEventListener('click', () => {
+            registerModal.classList.add('active');
+            gsap.fromTo(registerModal.querySelector('.modal-content'),
+                { scale: 0.8, opacity: 0 },
+                { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(1.7)" }
+            );
+        });
+
+        // Закрытие модальных окон
+        closeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                registerModal.classList.remove('active');
+            });
+        });
+
+        // Обработчики выпадающих меню
+        document.querySelectorAll('.dropdown-parent').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const menu = this.querySelector('.dropdown-menu');
+                const isActive = menu.classList.contains('active');
+
+                document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('active'));
+                if(!isActive) menu.classList.add('active');
+            });
+        });
+
+        // Закрытие меню при клике вне
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.dropdown-parent')) {
+                document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('active'));
+            }
+        });
+
+        // Анимация элементов
+        gsap.from(".hero h1", { duration: 1.5, y: 100, opacity: 0, ease: "power4.out" });
+        gsap.from(".card", { duration: 1, y: 50, opacity: 0, stagger: 0.2, delay: 0.5 });
+        gsap.from(".features", {
+            duration: 1,
+            opacity: 0,
+            y: 50,
+            delay: 0.8
+        });
+        // обработчик для возврата на главную
+        document.querySelector('.nav-item:first-child').addEventListener('click', () => {
+            window.location.href = 'main_page.html';
+        });
+        // Обработчик для "Сварочное оборудование"
+        document.querySelectorAll('.dropdown-item').forEach(item => {
+            if(item.textContent.trim() === "Сварочное оборудование") {
+                item.addEventListener('click', () => {
+                    window.location.href = 'welding_equipment.html';
+                });
+            }
+        });
+
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const text = this.textContent.trim();
+
+                if(text === "О программе") {
+                    window.location.href = 'about.html'
+                }
+            });
+        });
+    });
+</script>
+</body>
+</html>
