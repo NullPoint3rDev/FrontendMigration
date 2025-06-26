@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/equipmentPage.css';
 import { useNavigate } from 'react-router-dom';
+import SockJS from 'sockjs-client';
+import { Client } from '@stomp/stompjs';
+import { createWeldingMachine, updateWeldingMachine, deleteWeldingMachine, getAllWeldingMachines } from '../api/weldingMachineApi';
 
 const initialEquipment = [
   {
@@ -143,7 +146,7 @@ const navMenu = [
 ];
 
 function WeldingEquipmentPage() {
-  const [equipment, setEquipment] = useState(initialEquipment);
+  const [equipment, setEquipment] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editData, setEditData] = useState({});
   const [dropdown, setDropdown] = useState(null);
@@ -151,6 +154,7 @@ function WeldingEquipmentPage() {
   const [welders, setWelders] = useState([]);
   const currentYear = new Date().getFullYear();
   const navigate = useNavigate();
+  const [deviceDataByMac, setDeviceDataByMac] = useState({});
 
   // Load welders from localStorage
   useEffect(() => {
@@ -174,6 +178,27 @@ function WeldingEquipmentPage() {
   useEffect(() => {
     localStorage.setItem('equipment', JSON.stringify(equipment));
   }, [equipment]);
+
+  useEffect(() => {
+    const stompClient = new Client({
+      brokerURL: undefined, // обязательно undefined, если используешь SockJS
+      webSocketFactory: () => new SockJS('http://localhost:8084/api/ws'),
+      reconnectDelay: 5000,
+      onConnect: () => {
+        stompClient.subscribe('/topic/device', (message) => {
+          if (message.body) {
+            const [mac, ...dataArr] = message.body.split(':');
+            const data = dataArr.join(':');
+            setDeviceDataByMac(prev => ({ ...prev, [mac]: data }));
+          }
+        });
+      }
+    });
+    stompClient.activate();
+    return () => {
+      stompClient.deactivate();
+    };
+  }, []);
 
   // Navigation logic
   const handleNavClick = (item, e) => {
@@ -225,14 +250,29 @@ function WeldingEquipmentPage() {
     setModalOpen(true);
   };
 
-  const handleSave = (e) => {
+  // Загрузка оборудования с сервера
+  const loadEquipment = async () => {
+    try {
+      const data = await getAllWeldingMachines();
+      setEquipment(data);
+    } catch (err) {
+      setErrors({ api: 'Ошибка загрузки оборудования: ' + err.message });
+    }
+  };
+
+  useEffect(() => {
+    loadEquipment();
+  }, []);
+
+  const handleSave = async (e) => {
     e.preventDefault();
-    // Validation
     const newErrors = {};
     if (!editData.name) newErrors.name = 'Это поле обязательно';
     if (!editData.model) newErrors.model = 'Это поле обязательно';
-    if (!editData.mac || !/^[0-9A-Fa-f]{12}$/.test(editData.mac)) {
-      newErrors.mac = 'MAC-адрес должен содержать 12 символов';
+    // Приводим MAC к формату: только заглавные буквы, без двоеточий
+    let mac = (editData.mac || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+    if (!mac || mac.length !== 12) {
+      newErrors.mac = 'MAC-адрес должен содержать 12 символов (только 0-9, A-F)';
     }
     if (!editData.department) newErrors.department = 'Это поле обязательно';
 
@@ -241,19 +281,29 @@ function WeldingEquipmentPage() {
       return;
     }
 
-    if (editData.id) {
-      setEquipment(equipment.map(eq => eq.id === editData.id ? { ...eq, ...editData } : eq));
-    } else {
-      setEquipment([...equipment, { ...editData, id: Date.now() }]);
+    try {
+      if (editData.id) {
+        await updateWeldingMachine(editData.id, { ...editData, mac });
+      } else {
+        await createWeldingMachine({ ...editData, mac });
+      }
+      await loadEquipment();
+      closeModal();
+    } catch (err) {
+      setErrors({ api: err.message });
     }
-    closeModal();
   };
 
   // Delete handler
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Вы уверены, что хотите удалить это оборудование?')) {
-      setEquipment(equipment.filter(eq => eq.id !== id));
-      closeModal();
+      try {
+        await deleteWeldingMachine(id);
+        await loadEquipment();
+        closeModal();
+      } catch (err) {
+        setErrors({ api: err.message });
+      }
     }
   };
 
@@ -348,6 +398,13 @@ function WeldingEquipmentPage() {
                           );
                         })}
                       </div>
+                  )}
+                  {/* Данные от аппарата по MAC */}
+                  {deviceDataByMac[item.mac] && (
+                    <div className="device-data-block">
+                      <strong>Данные от аппарата:</strong>
+                      <pre>{deviceDataByMac[item.mac]}</pre>
+                    </div>
                   )}
                   <div className="equipment-actions">
                     <button
