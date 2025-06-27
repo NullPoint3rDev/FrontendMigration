@@ -71,7 +71,12 @@ function OrganizationsPage() {
   };
 
   const openEditModal = (org) => {
-    setEditOrg({ ...org, phones: org.phones.join(', ') });
+    setEditOrg({
+      ...org,
+      phones: Array.isArray(org.phones)
+          ? org.phones.join(', ')
+          : (typeof org.phones === 'string' ? org.phones : ''),
+    });
     setIsEdit(true);
     setModalOpen(true);
   };
