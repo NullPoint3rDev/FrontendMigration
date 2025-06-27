@@ -1,4 +1,4 @@
-const API_URL = '/api/welding-machines';
+const API_URL = '/welding-machines';
 
 // Получить все сварочные машины
 export async function getAllWeldingMachines() {

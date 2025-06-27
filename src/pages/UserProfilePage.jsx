@@ -127,7 +127,7 @@ const UserProfilePage = () => {
             return photo;
         }
         const token = localStorage.getItem('token');
-        return `${process.env.REACT_APP_API_URL || 'http://192.168.10.137:8083/api'}/user-accounts/photo/${photo}?token=${token}`;
+        return `${process.env.REACT_APP_API_URL || 'http://192.168.10.137:8084/api'}/user-accounts/photo/${photo}?token=${token}`;
     };
 
     if (loading) return <div className="main-content"><Typography>Загрузка...</Typography></div>;

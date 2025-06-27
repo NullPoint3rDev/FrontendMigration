@@ -1,6 +1,6 @@
 // API service for making HTTP requests to WT backend
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://192.168.10.137:8083/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://192.168.10.137:8084/api';
 
 // Helper function for handling API responses
 const handleResponse = async (response) => {
