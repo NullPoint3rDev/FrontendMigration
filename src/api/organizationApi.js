@@ -1,4 +1,5 @@
-const API_URL = '/api/organizations';
+import { API_BASE_URL } from '../config';
+const API_URL = `${API_BASE_URL}/organizations`;
 
 // Получить все организации
 export async function getAllOrganizations() {

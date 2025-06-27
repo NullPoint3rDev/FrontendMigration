@@ -44,7 +44,7 @@ const handleResponse = async (response) => {
 };
 
 // Helper function for adding auth headers
-const getAuthHeaders = () => {
+export const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     console.log('Getting auth headers with token:', token);
     if (!token) {

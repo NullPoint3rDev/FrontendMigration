@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import '../styles/organizations.css';
+import { createOrganization, getAllOrganizations } from '../api/organizationApi';
 
 const defaultOrganizations = [
   {
@@ -50,20 +51,18 @@ function OrganizationsPage() {
   const [editOrg, setEditOrg] = useState(emptyOrg);
   const [isEdit, setIsEdit] = useState(false);
 
-  // Load from localStorage
+  // Загрузка организаций с сервера
   useEffect(() => {
-    const saved = localStorage.getItem('organizations');
-    if (saved) {
-      setOrganizations(JSON.parse(saved));
-    } else {
-      setOrganizations(defaultOrganizations);
+    async function fetchOrgs() {
+      try {
+        const orgs = await getAllOrganizations();
+        setOrganizations(orgs);
+      } catch (e) {
+        setOrganizations([]);
+      }
     }
+    fetchOrgs();
   }, []);
-
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem('organizations', JSON.stringify(organizations));
-  }, [organizations]);
 
   const openAddModal = () => {
     setEditOrg(emptyOrg);
@@ -87,21 +86,23 @@ function OrganizationsPage() {
     setEditOrg({ ...editOrg, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const orgData = {
       ...editOrg,
       phones: editOrg.phones.split(',').map((p) => p.trim()).filter(Boolean),
     };
     if (isEdit) {
-      setOrganizations((prev) =>
-          prev.map((org) => (org.id === editOrg.id ? { ...org, ...orgData } : org))
-      );
+      // TODO: реализовать updateOrganization аналогично create
     } else {
-      setOrganizations((prev) => [
-        ...prev,
-        { ...orgData, id: Date.now().toString() },
-      ]);
+      try {
+        await createOrganization(orgData);
+        // После успешного создания — обновить список с сервера:
+        const orgs = await getAllOrganizations();
+        setOrganizations(orgs);
+      } catch (err) {
+        alert('Ошибка при создании организации');
+      }
     }
     closeModal();
   };

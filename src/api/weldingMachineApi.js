@@ -1,38 +1,52 @@
-const API_URL = '/welding-machines';
+import { API_BASE_URL } from '../config';
+import { getAuthHeaders } from '../services/api';
+const API_URL = `${API_BASE_URL}/welding-machines`;
 
 // Получить все сварочные машины
 export async function getAllWeldingMachines() {
-    const res = await fetch(API_URL);
+    const res = await fetch(API_URL, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить машину по ID
 export async function getWeldingMachineById(id) {
-    const res = await fetch(`${API_URL}/${id}`);
+    const res = await fetch(`${API_URL}/${id}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить машины по типу
 export async function getWeldingMachinesByType(typeId) {
-    const res = await fetch(`${API_URL}/type/${typeId}`);
+    const res = await fetch(`${API_URL}/type/${typeId}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить машины по статусу
 export async function getWeldingMachinesByStatus(status) {
-    const res = await fetch(`${API_URL}/status/${status}`);
+    const res = await fetch(`${API_URL}/status/${status}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить машины по организации
 export async function getWeldingMachinesByOrganization(orgId) {
-    const res = await fetch(`${API_URL}/organization/${orgId}`);
+    const res = await fetch(`${API_URL}/organization/${orgId}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Поиск машин
 export async function searchWeldingMachines(searchTerm) {
-    const res = await fetch(`${API_URL}/search?searchTerm=${searchTerm}`);
+    const res = await fetch(`${API_URL}/search?searchTerm=${searchTerm}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
@@ -40,9 +54,7 @@ export async function searchWeldingMachines(searchTerm) {
 export async function createWeldingMachine(machine) {
     const res = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(machine),
     });
     return res.json();
@@ -52,9 +64,7 @@ export async function createWeldingMachine(machine) {
 export async function updateWeldingMachine(id, machine) {
     const res = await fetch(`${API_URL}/${id}`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(machine),
     });
     return res.json();
@@ -64,6 +74,7 @@ export async function updateWeldingMachine(id, machine) {
 export async function deleteWeldingMachine(id) {
     const res = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
     });
     return res.status === 204;
 }
@@ -72,13 +83,16 @@ export async function deleteWeldingMachine(id) {
 export async function hardDeleteWeldingMachine(id) {
     const res = await fetch(`${API_URL}/${id}/hard`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
     });
     return res.status === 204;
 }
 
 // Получить параметры машины
 export async function getWeldingMachineParameters(id) {
-    const res = await fetch(`${API_URL}/${id}/parameters`);
+    const res = await fetch(`${API_URL}/${id}/parameters`, {
+        headers: getAuthHeaders(),
+    });
     return res.json();
 }
 
@@ -86,9 +100,7 @@ export async function getWeldingMachineParameters(id) {
 export async function updateWeldingMachineParameters(id, parameters) {
     const res = await fetch(`${API_URL}/${id}/parameters`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(parameters),
     });
     return res.json();
@@ -96,13 +108,17 @@ export async function updateWeldingMachineParameters(id, parameters) {
 
 // Получить историю состояний машины
 export async function getWeldingMachineStateHistory(id) {
-    const res = await fetch(`${API_URL}/${id}/states/history`);
+    const res = await fetch(`${API_URL}/${id}/states/history`, {
+        headers: getAuthHeaders(),
+    });
     return res.json();
 }
 
 // Получить текущее состояние машины
 export async function getWeldingMachineCurrentState(id) {
-    const res = await fetch(`${API_URL}/${id}/states/current`);
+    const res = await fetch(`${API_URL}/${id}/states/current`, {
+        headers: getAuthHeaders(),
+    });
     return res.json();
 }
 
@@ -110,9 +126,7 @@ export async function getWeldingMachineCurrentState(id) {
 export async function updateWeldingMachineState(id, state) {
     const res = await fetch(`${API_URL}/${id}/states`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(state),
     });
     return res.json();

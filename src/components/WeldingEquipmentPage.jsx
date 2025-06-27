@@ -254,9 +254,11 @@ function WeldingEquipmentPage() {
     const loadEquipment = async () => {
         try {
             const data = await getAllWeldingMachines();
-            setEquipment(data);
+            console.log('equipment from API:', data);
+            setEquipment(Array.isArray(data) ? data : []);
         } catch (err) {
             setErrors({ api: 'Ошибка загрузки оборудования: ' + err.message });
+            setEquipment([]);
         }
     };
 
