@@ -15,6 +15,7 @@ import ManualsPage from './pages/ManualsPage';
 import ManualsByEquipmentPage from './pages/ManualsByEquipmentPage';
 import AuthPage from './components/AuthPage';
 import UserProfilePage from './pages/UserProfilePage';
+import ReportsPage from './components/ReportsPage';
 import './App.css';
 
 const theme = createTheme({
@@ -58,7 +59,7 @@ function App() {
                                 <Route path="/firmware" element={<FirmwarePage />} />
                                 <Route path="/docs" element={<div className="main-content"><h2>Документы</h2></div>} />
                                 <Route path="/archive" element={<div className="main-content"><h2>Архив</h2></div>} />
-                                <Route path="/reports" element={<div className="main-content"><h2>Отчеты</h2></div>} />
+                                <Route path="/reports" element={<ReportsPage />} />
                                 <Route path="/library" element={<div className="main-content"><h2>Библиотека</h2></div>} />
                                 <Route path="/wire-types" element={<div className="main-content"><h2>Типы проволоки</h2></div>} />
                                 <Route path="/control" element={<WeldingMachineControlPage />} />

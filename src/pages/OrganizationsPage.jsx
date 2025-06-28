@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import '../styles/organizations.css';
-import { createOrganization, getAllOrganizations } from '../api/organizationApi';
 
 const defaultOrganizations = [
   {
@@ -51,18 +50,20 @@ function OrganizationsPage() {
   const [editOrg, setEditOrg] = useState(emptyOrg);
   const [isEdit, setIsEdit] = useState(false);
 
-  // Загрузка организаций с сервера
+  // Load from localStorage
   useEffect(() => {
-    async function fetchOrgs() {
-      try {
-        const orgs = await getAllOrganizations();
-        setOrganizations(orgs);
-      } catch (e) {
-        setOrganizations([]);
-      }
+    const saved = localStorage.getItem('organizations');
+    if (saved) {
+      setOrganizations(JSON.parse(saved));
+    } else {
+      setOrganizations(defaultOrganizations);
     }
-    fetchOrgs();
   }, []);
+
+  // Save to localStorage
+  useEffect(() => {
+    localStorage.setItem('organizations', JSON.stringify(organizations));
+  }, [organizations]);
 
   const openAddModal = () => {
     setEditOrg(emptyOrg);
@@ -71,12 +72,7 @@ function OrganizationsPage() {
   };
 
   const openEditModal = (org) => {
-    setEditOrg({
-      ...org,
-      phones: Array.isArray(org.phones)
-          ? org.phones.join(', ')
-          : (typeof org.phones === 'string' ? org.phones : ''),
-    });
+    setEditOrg({ ...org, phones: org.phones.join(', ') });
     setIsEdit(true);
     setModalOpen(true);
   };
@@ -91,23 +87,21 @@ function OrganizationsPage() {
     setEditOrg({ ...editOrg, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     const orgData = {
       ...editOrg,
       phones: editOrg.phones.split(',').map((p) => p.trim()).filter(Boolean),
     };
     if (isEdit) {
-      // TODO: реализовать updateOrganization аналогично create
+      setOrganizations((prev) =>
+          prev.map((org) => (org.id === editOrg.id ? { ...org, ...orgData } : org))
+      );
     } else {
-      try {
-        await createOrganization(orgData);
-        // После успешного создания — обновить список с сервера:
-        const orgs = await getAllOrganizations();
-        setOrganizations(orgs);
-      } catch (err) {
-        alert('Ошибка при создании организации');
-      }
+      setOrganizations((prev) => [
+        ...prev,
+        { ...orgData, id: Date.now().toString() },
+      ]);
     }
     closeModal();
   };
