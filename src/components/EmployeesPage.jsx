@@ -59,7 +59,7 @@ const EmployeesPage = () => {
   const fetchUnits = async () => {
     try {
       const data = await getAllOrganizationUnits();
-      setUnits(data);
+      setUnits(Array.isArray(data) ? data : []);
     } catch (e) {
       setUnits([]);
     }
@@ -68,7 +68,7 @@ const EmployeesPage = () => {
   const fetchRoles = async () => {
     try {
       const data = await getAllUserRoles();
-      setRoles(data);
+      setRoles(Array.isArray(data) ? data : []);
     } catch (e) {
       setRoles([]);
     }
@@ -198,8 +198,8 @@ const EmployeesPage = () => {
               <div className="detail-item"><span className="detail-label">Email:</span> {emp.email}</div>
               <div className="detail-item"><span className="detail-label">Телефон:</span> {emp.phone}</div>
               <div className="detail-item"><span className="detail-label">Подразделение:</span> {emp.organizationUnit?.name || '-'}</div>
-              <div className="detail-item"><span className="detail-label">Роль:</span> {roles.find(r => String(r.id) === String(emp.userRoleId))?.name || '-'}</div>
-              <div className="detail-item"><span className="detail-label">Статус:</span> {statuses.find(s => s.value === emp.status)?.label || emp.status}</div>
+              <div className="detail-item"><span className="detail-label">Роль:</span> {Array.isArray(roles) && roles.find(r => String(r.id) === String(emp.userRoleId))?.name || '-'}</div>
+              <div className="detail-item"><span className="detail-label">Статус:</span> {Array.isArray(statuses) && statuses.find(s => s.value === emp.status)?.label || emp.status}</div>
             </div>
             <div className="equipment-actions">
               <button className="edit-btn action-btn" onClick={() => openEditModal(emp)}>Редактировать</button>
