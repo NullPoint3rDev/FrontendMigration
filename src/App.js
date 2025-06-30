@@ -16,6 +16,7 @@ import ManualsByEquipmentPage from './pages/ManualsByEquipmentPage';
 import AuthPage from './components/AuthPage';
 import UserProfilePage from './pages/UserProfilePage';
 import ReportsPage from './components/ReportsPage';
+import EmployeesPage from './components/EmployeesPage';
 import './App.css';
 
 const theme = createTheme({
@@ -53,7 +54,7 @@ function App() {
                                 <Route path="/welders" element={<WeldersPage />} />
                                 <Route path="/welders/:id" element={<WelderProfilePage />} />
                                 <Route path="/profile" element={<UserProfilePage />} />
-                                <Route path="/employees" element={<div className="main-content"><h2>Сотрудники</h2></div>} />
+                                <Route path="/employees" element={<EmployeesPage />} />
                                 <Route path="/materials" element={<div className="main-content"><h2>Сварочные материалы</h2></div>} />
                                 <Route path="/safety" element={<div className="main-content"><h2>Безопасность сварочных работ</h2></div>} />
                                 <Route path="/firmware" element={<FirmwarePage />} />
