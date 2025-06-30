@@ -1,4 +1,7 @@
 import { API_BASE_URL } from '../config';
+import { getAuthHeaders } from '../services/api';
+
+const API_URL = `${API_BASE_URL}/user-accounts`;
 
 const handleResponse = async (response) => {
     console.log('Response status:', response.status);
@@ -24,23 +27,6 @@ const handleResponse = async (response) => {
         console.error('Error parsing success response:', e);
         throw new Error('Invalid JSON response from server');
     }
-};
-
-const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    console.log('Token from localStorage:', token);
-
-    const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    };
-
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    console.log('Generated headers:', headers);
-    return headers;
 };
 
 export const userAccountApi = {
@@ -98,3 +84,78 @@ export const userAccountApi = {
         return handleResponse(response);
     }
 };
+
+export async function getAllEmployees() {
+    const res = await fetch(API_URL, {
+        headers: getAuthHeaders()
+    });
+    return res.json();
+}
+
+export async function createEmployee(employee) {
+    const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(employee),
+    });
+    return res.json();
+}
+
+export async function updateEmployee(id, employee) {
+    const res = await fetch(`${API_URL}/${id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(employee),
+    });
+    return res.json();
+}
+
+export async function deleteEmployee(id) {
+    const res = await fetch(`${API_URL}/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+    });
+    return res.status === 204;
+}
+
+// Получить все подразделения (organization units)
+export async function getAllOrganizationUnits() {
+    const res = await fetch(`${API_BASE_URL}/organization-units`, {
+        headers: getAuthHeaders()
+    });
+    return res.json();
+}
+
+// Получить все роли
+export async function getAllUserRoles() {
+    const res = await fetch(`${API_BASE_URL}/roles`, {
+        headers: getAuthHeaders()
+    });
+    return res.json();
+}
+
+// Получить все статусы (захардкодим, если нет API)
+export function getAllStatuses() {
+    return [
+        { value: 'ACTIVE', label: 'Активен' },
+        { value: 'INACTIVE', label: 'Неактивен' },
+        { value: 'BLOCKED', label: 'Заблокирован' },
+    ];
+}
+
+// Загрузить аватарку пользователя
+export async function uploadUserPhoto(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_URL}/photo`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders() },
+        body: formData,
+    });
+    return res.json(); // возвращает UUID
+}
+
+// Получить аватарку пользователя по UUID
+export function getUserPhotoUrl(photoId) {
+    return `${API_URL}/photo/${photoId}`;
+}

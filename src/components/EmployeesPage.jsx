@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { getAllEmployees, createEmployee, updateEmployee, deleteEmployee } from '../api/userAccountApi';
+import {
+  getAllEmployees,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+  getAllOrganizationUnits,
+  getAllUserRoles,
+  getAllStatuses,
+  uploadUserPhoto,
+  getUserPhotoUrl
+} from '../api/userAccountApi';
 import '../styles/equipmentPage.css';
 
 const emptyEmployee = {
@@ -8,9 +18,11 @@ const emptyEmployee = {
   fullName: '',
   email: '',
   organizationUnit: null,
+  userRoleId: '',
   position: '',
   phone: '',
   status: '',
+  photo: null,
 };
 
 const EmployeesPage = () => {
@@ -20,9 +32,16 @@ const EmployeesPage = () => {
   const [isEdit, setIsEdit] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [units, setUnits] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [statuses, setStatuses] = useState(getAllStatuses());
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
 
   useEffect(() => {
     fetchEmployees();
+    fetchUnits();
+    fetchRoles();
   }, []);
 
   const fetchEmployees = async () => {
@@ -37,15 +56,42 @@ const EmployeesPage = () => {
     }
   };
 
+  const fetchUnits = async () => {
+    try {
+      const data = await getAllOrganizationUnits();
+      setUnits(data);
+    } catch (e) {
+      setUnits([]);
+    }
+  };
+
+  const fetchRoles = async () => {
+    try {
+      const data = await getAllUserRoles();
+      setRoles(data);
+    } catch (e) {
+      setRoles([]);
+    }
+  };
+
   const openAddModal = () => {
     setEditData(emptyEmployee);
     setIsEdit(false);
+    setAvatarFile(null);
+    setAvatarPreview(null);
     setModalOpen(true);
   };
 
   const openEditModal = (employee) => {
-    setEditData(employee);
+    setEditData({
+      ...employee,
+      userRoleId: employee.userRoleId || '',
+      status: employee.status || '',
+      organizationUnit: employee.organizationUnit || null,
+    });
     setIsEdit(true);
+    setAvatarFile(null);
+    setAvatarPreview(employee.photo ? getUserPhotoUrl(employee.photo) : null);
     setModalOpen(true);
   };
 
@@ -53,6 +99,8 @@ const EmployeesPage = () => {
     setModalOpen(false);
     setEditData(emptyEmployee);
     setError('');
+    setAvatarFile(null);
+    setAvatarPreview(null);
   };
 
   const handleInputChange = (e) => {
@@ -60,14 +108,49 @@ const EmployeesPage = () => {
     setEditData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleUnitChange = (e) => {
+    const unitId = e.target.value;
+    const unit = units.find(u => String(u.id) === String(unitId));
+    setEditData((prev) => ({ ...prev, organizationUnit: unit ? { id: unit.id, name: unit.name } : null }));
+  };
+
+  const handleRoleChange = (e) => {
+    setEditData((prev) => ({ ...prev, userRoleId: e.target.value }));
+  };
+
+  const handleStatusChange = (e) => {
+    setEditData((prev) => ({ ...prev, status: e.target.value }));
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    setAvatarFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setAvatarPreview(reader.result);
+      reader.readAsDataURL(file);
+    } else {
+      setAvatarPreview(null);
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
+      let photoId = editData.photo;
+      if (avatarFile) {
+        const uploadRes = await uploadUserPhoto(avatarFile);
+        photoId = uploadRes;
+      }
+      const payload = {
+        ...editData,
+        photo: photoId,
+      };
       if (isEdit) {
-        await updateEmployee(editData.id, editData);
+        await updateEmployee(editData.id, payload);
       } else {
-        await createEmployee(editData);
+        await createEmployee(payload);
       }
       await fetchEmployees();
       closeModal();
@@ -101,13 +184,22 @@ const EmployeesPage = () => {
       <div className="equipment-grid">
         {employees.map((emp) => (
           <div className="equipment-card" key={emp.id}>
+            {emp.photo && (
+              <img
+                src={getUserPhotoUrl(emp.photo)}
+                alt="avatar"
+                className="equipment-image"
+                style={{ objectFit: 'cover', height: 120, width: 120, borderRadius: '50%', margin: '0 auto 1rem auto' }}
+              />
+            )}
             <div className="equipment-info">
               <div className="equipment-name">{emp.fullName || emp.username}</div>
               <div className="equipment-model">{emp.position}</div>
               <div className="detail-item"><span className="detail-label">Email:</span> {emp.email}</div>
               <div className="detail-item"><span className="detail-label">Телефон:</span> {emp.phone}</div>
               <div className="detail-item"><span className="detail-label">Подразделение:</span> {emp.organizationUnit?.name || '-'}</div>
-              <div className="detail-item"><span className="detail-label">Статус:</span> {emp.status}</div>
+              <div className="detail-item"><span className="detail-label">Роль:</span> {roles.find(r => String(r.id) === String(emp.userRoleId))?.name || '-'}</div>
+              <div className="detail-item"><span className="detail-label">Статус:</span> {statuses.find(s => s.value === emp.status)?.label || emp.status}</div>
             </div>
             <div className="equipment-actions">
               <button className="edit-btn action-btn" onClick={() => openEditModal(emp)}>Редактировать</button>
@@ -141,7 +233,40 @@ const EmployeesPage = () => {
                 <label className="form-label">Телефон</label>
                 <input className="form-input" name="phone" value={editData.phone} onChange={handleInputChange} />
               </div>
-              {/* TODO: добавить выбор подразделения, статус, роль и другие поля при необходимости */}
+              <div className="form-group">
+                <label className="form-label">Подразделение</label>
+                <select className="form-input" value={editData.organizationUnit?.id || ''} onChange={handleUnitChange} required>
+                  <option value="">Выберите подразделение</option>
+                  {units.map(unit => (
+                    <option key={unit.id} value={unit.id}>{unit.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Роль</label>
+                <select className="form-input" value={editData.userRoleId || ''} onChange={handleRoleChange} required>
+                  <option value="">Выберите роль</option>
+                  {roles.map(role => (
+                    <option key={role.id} value={role.id}>{role.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Статус</label>
+                <select className="form-input" value={editData.status || ''} onChange={handleStatusChange} required>
+                  <option value="">Выберите статус</option>
+                  {statuses.map(status => (
+                    <option key={status.value} value={status.value}>{status.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Аватарка</label>
+                <input className="form-input" type="file" accept="image/*" onChange={handleAvatarChange} />
+                {avatarPreview && (
+                  <img src={avatarPreview} alt="avatar preview" style={{ width: 80, height: 80, borderRadius: '50%', marginTop: 8 }} />
+                )}
+              </div>
               <div className="modal-actions">
                 <button className="save-btn" type="submit" disabled={loading}>{isEdit ? 'Сохранить' : 'Добавить'}</button>
                 <button className="cancel-btn" type="button" onClick={closeModal}>Отмена</button>
