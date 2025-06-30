@@ -1,94 +1,109 @@
-const API_URL = '/api/queue-tasks';
+import { API_BASE_URL } from '../config';
+import { getAuthHeaders } from '../services/api';
+
+const API_URL = `${API_BASE_URL}/queue-tasks`;
 
 // Получить все задачи
-export async function getAllTasks() {
-    const res = await fetch(API_URL);
+export async function getAllQueueTasks() {
+    const res = await fetch(API_URL, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить задачу по ID
-export async function getTaskById(id) {
-    const res = await fetch(`${API_URL}/${id}`);
+export async function getQueueTaskById(id) {
+    const res = await fetch(`${API_URL}/${id}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить задачи по статусу
-export async function getTasksByStatus(status) {
-    const res = await fetch(`${API_URL}/status/${status}`);
+export async function getQueueTasksByStatus(status) {
+    const res = await fetch(`${API_URL}/status/${status}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить задачи по типу
-export async function getTasksByType(type) {
-    const res = await fetch(`${API_URL}/type/${type}`);
+export async function getQueueTasksByType(type) {
+    const res = await fetch(`${API_URL}/type/${type}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Создать новую задачу
-export async function createTask(task) {
+export async function createQueueTask(task) {
     const res = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(task),
     });
     return res.json();
 }
 
 // Обновить задачу
-export async function updateTask(id, task) {
+export async function updateQueueTask(id, task) {
     const res = await fetch(`${API_URL}/${id}`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(task),
     });
     return res.json();
 }
 
 // Удалить задачу
-export async function deleteTask(id) {
+export async function deleteQueueTask(id) {
     const res = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders()
     });
     return res.status === 204;
 }
 
 // Приостановить задачу
-export async function pauseTask(id) {
+export async function pauseQueueTask(id) {
     const res = await fetch(`${API_URL}/${id}/pause`, {
         method: 'PUT',
+        headers: getAuthHeaders()
     });
     return res.status === 200;
 }
 
 // Возобновить задачу
-export async function resumeTask(id) {
+export async function resumeQueueTask(id) {
     const res = await fetch(`${API_URL}/${id}/resume`, {
         method: 'PUT',
+        headers: getAuthHeaders()
     });
     return res.status === 200;
 }
 
 // Отменить задачу
-export async function cancelTask(id) {
+export async function cancelQueueTask(id) {
     const res = await fetch(`${API_URL}/${id}/cancel`, {
         method: 'PUT',
+        headers: getAuthHeaders()
     });
     return res.status === 200;
 }
 
 // Получить активные задачи
-export async function getActiveTasks() {
-    const res = await fetch(`${API_URL}/active`);
+export async function getActiveQueueTasks() {
+    const res = await fetch(`${API_URL}/active`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить завершенные задачи
-export async function getCompletedTasks() {
-    const res = await fetch(`${API_URL}/completed`);
+export async function getCompletedQueueTasks() {
+    const res = await fetch(`${API_URL}/completed`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 

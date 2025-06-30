@@ -1,38 +1,61 @@
-const API_URL = '/api/notifications';
+import { API_BASE_URL } from '../config';
+import { getAuthHeaders } from '../services/api';
+
+const API_URL = `${API_BASE_URL}/notifications`;
 
 // Получить все уведомления
 export async function getAllNotifications() {
-    const res = await fetch(API_URL);
+    const res = await fetch(API_URL, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить уведомление по ID
 export async function getNotificationById(id) {
-    const res = await fetch(`${API_URL}/${id}`);
+    const res = await fetch(`${API_URL}/${id}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить уведомления по статусу
 export async function getNotificationsByStatus(status) {
-    const res = await fetch(`${API_URL}/status/${status}`);
+    const res = await fetch(`${API_URL}/status/${status}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить уведомления по типу
 export async function getNotificationsByType(type) {
-    const res = await fetch(`${API_URL}/type/${type}`);
+    const res = await fetch(`${API_URL}/type/${type}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить уведомления пользователя
-export async function getUserNotifications() {
-    const res = await fetch(`${API_URL}/user`);
+export async function getUserNotifications(userId) {
+    const res = await fetch(`${API_URL}/user/${userId}`, {
+        headers: getAuthHeaders()
+    });
+    return res.json();
+}
+
+// Получить уведомления по дате
+export async function getNotificationsByDate(startDate, endDate) {
+    const res = await fetch(`${API_URL}/date-range?start=${startDate}&end=${endDate}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Поиск уведомлений
 export async function searchNotifications(searchTerm) {
-    const res = await fetch(`${API_URL}/search?searchTerm=${searchTerm}`);
+    const res = await fetch(`${API_URL}/search?searchTerm=${searchTerm}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
@@ -40,9 +63,7 @@ export async function searchNotifications(searchTerm) {
 export async function createNotification(notification) {
     const res = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(notification),
     });
     return res.json();
@@ -52,9 +73,7 @@ export async function createNotification(notification) {
 export async function updateNotification(id, notification) {
     const res = await fetch(`${API_URL}/${id}`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(notification),
     });
     return res.json();
@@ -64,6 +83,7 @@ export async function updateNotification(id, notification) {
 export async function deleteNotification(id) {
     const res = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders()
     });
     return res.status === 204;
 }
@@ -72,21 +92,25 @@ export async function deleteNotification(id) {
 export async function markNotificationAsRead(id) {
     const res = await fetch(`${API_URL}/${id}/read`, {
         method: 'PUT',
+        headers: getAuthHeaders()
     });
     return res.status === 200;
 }
 
-// Отметить все уведомления как прочитанные
-export async function markAllNotificationsAsRead() {
-    const res = await fetch(`${API_URL}/read-all`, {
+// Отметить уведомление как не прочитанное
+export async function markNotificationAsUnread(id) {
+    const res = await fetch(`${API_URL}/${id}/unread`, {
         method: 'PUT',
+        headers: getAuthHeaders()
     });
     return res.status === 200;
 }
 
 // Получить непрочитанные уведомления
 export async function getUnreadNotifications() {
-    const res = await fetch(`${API_URL}/unread`);
+    const res = await fetch(`${API_URL}/unread`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 

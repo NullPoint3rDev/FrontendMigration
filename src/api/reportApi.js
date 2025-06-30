@@ -6,29 +6,74 @@ const BASE_URL = `${API_BASE_URL}/reports`;
 export const reportApi = {
     // Получить типы отчетов
     getReportTypes: async () => {
-        const res = await fetch(`${BASE_URL}/types`, {
-            method: 'GET',
-            headers: getAuthHeaders()
-        });
-        return res.json();
+        try {
+            console.log('Отправляем запрос на получение типов отчетов...');
+            const res = await fetch(`${BASE_URL}/types`, {
+                method: 'GET',
+                headers: getAuthHeaders()
+            });
+            console.log('Статус ответа для типов отчетов:', res.status);
+            
+            if (!res.ok) {
+                console.error('Ошибка получения типов отчетов:', res.status, res.statusText);
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            
+            const data = await res.json();
+            console.log('Полученные типы отчетов:', data);
+            return data;
+        } catch (error) {
+            console.error('Ошибка в getReportTypes:', error);
+            throw error;
+        }
     },
 
     // Получить форматы отчетов
     getReportFormats: async () => {
-        const res = await fetch(`${BASE_URL}/formats`, {
-            method: 'GET',
-            headers: getAuthHeaders()
-        });
-        return res.json();
+        try {
+            console.log('Отправляем запрос на получение форматов отчетов...');
+            const res = await fetch(`${BASE_URL}/formats`, {
+                method: 'GET',
+                headers: getAuthHeaders()
+            });
+            console.log('Статус ответа для форматов отчетов:', res.status);
+            
+            if (!res.ok) {
+                console.error('Ошибка получения форматов отчетов:', res.status, res.statusText);
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            
+            const data = await res.json();
+            console.log('Полученные форматы отчетов:', data);
+            return data;
+        } catch (error) {
+            console.error('Ошибка в getReportFormats:', error);
+            throw error;
+        }
     },
 
     // Получить периоды отчетов
     getReportPeriods: async () => {
-        const res = await fetch(`${BASE_URL}/periods`, {
-            method: 'GET',
-            headers: getAuthHeaders()
-        });
-        return res.json();
+        try {
+            console.log('Отправляем запрос на получение периодов отчетов...');
+            const res = await fetch(`${BASE_URL}/periods`, {
+                method: 'GET',
+                headers: getAuthHeaders()
+            });
+            console.log('Статус ответа для периодов отчетов:', res.status);
+            
+            if (!res.ok) {
+                console.error('Ошибка получения периодов отчетов:', res.status, res.statusText);
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            
+            const data = await res.json();
+            console.log('Полученные периоды отчетов:', data);
+            return data;
+        } catch (error) {
+            console.error('Ошибка в getReportPeriods:', error);
+            throw error;
+        }
     },
 
     // Сгенерировать отчет по расходу проволоки

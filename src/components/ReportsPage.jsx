@@ -21,16 +21,36 @@ const ReportsPage = () => {
 
     const loadReportOptions = async () => {
         try {
-            const [types, formatsData, periodsData] = await Promise.all([
+            console.log('Загружаем опции отчетов...');
+            
+            const [typesResponse, formatsResponse, periodsResponse] = await Promise.all([
                 reportApi.getReportTypes(),
                 reportApi.getReportFormats(),
                 reportApi.getReportPeriods()
             ]);
+            
+            console.log('Ответ от API типов отчетов:', typesResponse);
+            console.log('Ответ от API форматов:', formatsResponse);
+            console.log('Ответ от API периодов:', periodsResponse);
+            
+            // Защита от неверных ответов
+            const types = Array.isArray(typesResponse) ? typesResponse : [];
+            const formatsData = Array.isArray(formatsResponse) ? formatsResponse : [];
+            const periodsData = Array.isArray(periodsResponse) ? periodsResponse : [];
+            
+            console.log('Обработанные типы отчетов:', types);
+            console.log('Обработанные форматы:', formatsData);
+            console.log('Обработанные периоды:', periodsData);
+            
             setReportTypes(types);
             setFormats(formatsData);
             setPeriods(periodsData);
         } catch (error) {
             console.error('Ошибка загрузки опций отчетов:', error);
+            // Устанавливаем пустые массивы в случае ошибки
+            setReportTypes([]);
+            setFormats([]);
+            setPeriods([]);
         }
     };
 
@@ -87,7 +107,7 @@ const ReportsPage = () => {
                             onChange={(e) => setSelectedReportType(e.target.value)}
                         >
                             <option value="">Выберите тип отчета</option>
-                            {reportTypes.map(type => (
+                            {Array.isArray(reportTypes) && reportTypes.map(type => (
                                 <option key={type} value={type}>
                                     {type === 'WIRE_CONSUMPTION' && 'Расход проволоки'}
                                     {type === 'WELDER_REPORT' && 'Отчет по сварщику'}
@@ -108,7 +128,7 @@ const ReportsPage = () => {
                             value={selectedFormat} 
                             onChange={(e) => setSelectedFormat(e.target.value)}
                         >
-                            {formats.map(format => (
+                            {Array.isArray(formats) && formats.map(format => (
                                 <option key={format} value={format}>
                                     {format === 'EXCEL' && 'Excel (.xlsx)'}
                                     {format === 'PDF' && 'PDF (.pdf)'}
@@ -123,7 +143,7 @@ const ReportsPage = () => {
                             value={selectedPeriod} 
                             onChange={(e) => setSelectedPeriod(e.target.value)}
                         >
-                            {periods.map(period => (
+                            {Array.isArray(periods) && periods.map(period => (
                                 <option key={period} value={period}>
                                     {period === 'DAY' && 'День'}
                                     {period === 'MONTH' && 'Месяц'}

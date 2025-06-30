@@ -1,32 +1,45 @@
-const API_URL = '/api/maintenance';
+import { API_BASE_URL } from '../config';
+import { getAuthHeaders } from '../services/api';
+
+const API_URL = `${API_BASE_URL}/maintenance`;
 
 // Получить все записи обслуживания
-export async function getAllMaintenanceRecords() {
-    const res = await fetch(API_URL);
+export async function getAllMaintenance() {
+    const res = await fetch(API_URL, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить запись обслуживания по ID
-export async function getMaintenanceRecordById(id) {
-    const res = await fetch(`${API_URL}/${id}`);
+export async function getMaintenanceById(id) {
+    const res = await fetch(`${API_URL}/${id}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить записи обслуживания по машине
-export async function getMaintenanceRecordsByMachine(machineId) {
-    const res = await fetch(`${API_URL}/machine/${machineId}`);
+export async function getMaintenanceByMachine(machineId) {
+    const res = await fetch(`${API_URL}/machine/${machineId}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить записи обслуживания по статусу
-export async function getMaintenanceRecordsByStatus(status) {
-    const res = await fetch(`${API_URL}/status/${status}`);
+export async function getMaintenanceByStatus(status) {
+    const res = await fetch(`${API_URL}/status/${status}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить записи обслуживания по типу
-export async function getMaintenanceRecordsByType(type) {
-    const res = await fetch(`${API_URL}/type/${type}`);
+export async function getMaintenanceByType(type) {
+    const res = await fetch(`${API_URL}/type/${type}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
@@ -37,45 +50,74 @@ export async function searchMaintenanceRecords(searchTerm) {
 }
 
 // Создать новую запись обслуживания
-export async function createMaintenanceRecord(record) {
+export async function createMaintenance(maintenance) {
     const res = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(record),
+        headers: getAuthHeaders(),
+        body: JSON.stringify(maintenance),
     });
     return res.json();
 }
 
 // Обновить запись обслуживания
-export async function updateMaintenanceRecord(id, record) {
+export async function updateMaintenance(id, maintenance) {
     const res = await fetch(`${API_URL}/${id}`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(record),
+        headers: getAuthHeaders(),
+        body: JSON.stringify(maintenance),
     });
     return res.json();
 }
 
 // Удалить запись обслуживания
-export async function deleteMaintenanceRecord(id) {
+export async function deleteMaintenance(id) {
     const res = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders()
     });
     return res.status === 204;
 }
 
 // Запланировать обслуживание
-export async function scheduleMaintenance(machineId, schedule) {
-    const res = await fetch(`${API_URL}/schedule/${machineId}`, {
+export async function scheduleMaintenance(maintenance) {
+    const res = await fetch(`${API_URL}/schedule`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(schedule),
+        headers: getAuthHeaders(),
+        body: JSON.stringify(maintenance),
+    });
+    return res.json();
+}
+
+// Завершить обслуживание
+export async function completeMaintenance(id) {
+    const res = await fetch(`${API_URL}/${id}/complete`, {
+        method: 'PUT',
+        headers: getAuthHeaders()
+    });
+    return res.status === 200;
+}
+
+// Отменить обслуживание
+export async function cancelMaintenance(id) {
+    const res = await fetch(`${API_URL}/${id}/cancel`, {
+        method: 'PUT',
+        headers: getAuthHeaders()
+    });
+    return res.status === 200;
+}
+
+// Получить запланированное обслуживание
+export async function getScheduledMaintenance() {
+    const res = await fetch(`${API_URL}/scheduled`, {
+        headers: getAuthHeaders()
+    });
+    return res.json();
+}
+
+// Получить завершенное обслуживание
+export async function getCompletedMaintenance() {
+    const res = await fetch(`${API_URL}/completed`, {
+        headers: getAuthHeaders()
     });
     return res.json();
 }
@@ -96,14 +138,6 @@ export async function updateMaintenanceSchedule(machineId, schedule) {
         body: JSON.stringify(schedule),
     });
     return res.json();
-}
-
-// Отметить обслуживание как выполненное
-export async function markMaintenanceAsCompleted(id) {
-    const res = await fetch(`${API_URL}/${id}/complete`, {
-        method: 'PUT',
-    });
-    return res.status === 200;
 }
 
 // Получить предстоящие обслуживания
