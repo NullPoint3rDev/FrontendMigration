@@ -1,27 +1,36 @@
 import { API_BASE_URL } from '../config';
+import { getAuthHeaders } from '../services/api';
 const API_URL = `${API_BASE_URL}/organizations`;
 
 // Получить все организации
 export async function getAllOrganizations() {
-    const res = await fetch(API_URL);
+    const res = await fetch(API_URL, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить организацию по ID
 export async function getOrganizationById(id) {
-    const res = await fetch(`${API_URL}/${id}`);
+    const res = await fetch(`${API_URL}/${id}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Получить организации по статусу
 export async function getOrganizationsByStatus(status) {
-    const res = await fetch(`${API_URL}/status/${status}`);
+    const res = await fetch(`${API_URL}/status/${status}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
 // Поиск организаций
 export async function searchOrganizations(searchTerm) {
-    const res = await fetch(`${API_URL}/search?searchTerm=${searchTerm}`);
+    const res = await fetch(`${API_URL}/search?searchTerm=${searchTerm}`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
@@ -29,9 +38,7 @@ export async function searchOrganizations(searchTerm) {
 export async function createOrganization(organization) {
     const res = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(organization),
     });
     return res.json();
@@ -41,9 +48,7 @@ export async function createOrganization(organization) {
 export async function updateOrganization(id, organization) {
     const res = await fetch(`${API_URL}/${id}`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(organization),
     });
     return res.json();
@@ -53,6 +58,7 @@ export async function updateOrganization(id, organization) {
 export async function deleteOrganization(id) {
     const res = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders()
     });
     return res.status === 204;
 }
@@ -61,13 +67,16 @@ export async function deleteOrganization(id) {
 export async function hardDeleteOrganization(id) {
     const res = await fetch(`${API_URL}/${id}/hard`, {
         method: 'DELETE',
+        headers: getAuthHeaders()
     });
     return res.status === 204;
 }
 
 // Получить подразделения организации
 export async function getOrganizationUnits(orgId) {
-    const res = await fetch(`${API_URL}/${orgId}/units`);
+    const res = await fetch(`${API_URL}/${orgId}/units`, {
+        headers: getAuthHeaders()
+    });
     return res.json();
 }
 
@@ -75,9 +84,7 @@ export async function getOrganizationUnits(orgId) {
 export async function addOrganizationUnit(orgId, unit) {
     const res = await fetch(`${API_URL}/${orgId}/units`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(unit),
     });
     return res.json();
@@ -87,9 +94,7 @@ export async function addOrganizationUnit(orgId, unit) {
 export async function updateOrganizationUnit(orgId, unitId, unit) {
     const res = await fetch(`${API_URL}/${orgId}/units/${unitId}`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(unit),
     });
     return res.json();
@@ -99,6 +104,7 @@ export async function updateOrganizationUnit(orgId, unitId, unit) {
 export async function deleteOrganizationUnit(orgId, unitId) {
     const res = await fetch(`${API_URL}/${orgId}/units/${unitId}`, {
         method: 'DELETE',
+        headers: getAuthHeaders()
     });
     return res.status === 204;
 }

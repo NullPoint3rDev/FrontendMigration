@@ -1,46 +1,68 @@
-import { apiRequest } from '../services/api';
+import { API_BASE_URL } from '../config';
+import { getAuthHeaders } from '../services/api';
 
-const BASE_URL = 'http://localhost:8080/api/reports';
+const BASE_URL = `${API_BASE_URL}/reports`;
 
 export const reportApi = {
     // Получить типы отчетов
-    getReportTypes: () => {
-        return apiRequest(`${BASE_URL}/types`, 'GET');
+    getReportTypes: async () => {
+        const res = await fetch(`${BASE_URL}/types`, {
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+        return res.json();
     },
 
     // Получить форматы отчетов
-    getReportFormats: () => {
-        return apiRequest(`${BASE_URL}/formats`, 'GET');
+    getReportFormats: async () => {
+        const res = await fetch(`${BASE_URL}/formats`, {
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+        return res.json();
     },
 
     // Получить периоды отчетов
-    getReportPeriods: () => {
-        return apiRequest(`${BASE_URL}/periods`, 'GET');
+    getReportPeriods: async () => {
+        const res = await fetch(`${BASE_URL}/periods`, {
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+        return res.json();
     },
 
     // Сгенерировать отчет по расходу проволоки
-    generateWireConsumptionReport: (requestData) => {
-        return apiRequest(`${BASE_URL}/wire-consumption`, 'POST', requestData, {
-            responseType: 'blob'
+    generateWireConsumptionReport: async (requestData) => {
+        const res = await fetch(`${BASE_URL}/wire-consumption`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(requestData)
         });
+        return res.blob();
     },
 
     // Сгенерировать отчет по сварщику
-    generateWelderReport: (requestData) => {
-        return apiRequest(`${BASE_URL}/welder`, 'POST', requestData, {
-            responseType: 'blob'
+    generateWelderReport: async (requestData) => {
+        const res = await fetch(`${BASE_URL}/welder`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(requestData)
         });
+        return res.blob();
     },
 
     // Сгенерировать отчет по работе
-    generateWorkReport: (requestData) => {
-        return apiRequest(`${BASE_URL}/work`, 'POST', requestData, {
-            responseType: 'blob'
+    generateWorkReport: async (requestData) => {
+        const res = await fetch(`${BASE_URL}/work`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(requestData)
         });
+        return res.blob();
     },
 
     // Универсальный метод для генерации отчетов
-    generateReport: (reportType, requestData) => {
+    generateReport: async (reportType, requestData) => {
         const endpoints = {
             'WIRE_CONSUMPTION': `${BASE_URL}/wire-consumption`,
             'WELDER_REPORT': `${BASE_URL}/welder`,
@@ -52,9 +74,12 @@ export const reportApi = {
             throw new Error(`Неизвестный тип отчета: ${reportType}`);
         }
 
-        return apiRequest(endpoint, 'POST', requestData, {
-            responseType: 'blob'
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(requestData)
         });
+        return res.blob();
     }
 };
 
