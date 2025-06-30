@@ -97,7 +97,7 @@ const ReportsPage = () => {
     return (
         <div className="reports-page">
             <div className="reports-container">
-                <h1>Генерация отчетов</h1>
+                <h1 className="equipment-title">Генерация отчетов</h1>
                 
                 <div className="report-form">
                     <div className="form-group">
