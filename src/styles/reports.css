@@ -1,6 +1,6 @@
 .reports-page {
     min-height: 100vh;
-    background: linear-gradient(135deg, #0f2027 0%, #2c5364 100%);
+    background: linear-gradient(135deg, #181c2f 0%, #232946 100%);
     padding: 40px 0;
     display: flex;
     justify-content: center;
@@ -11,105 +11,103 @@
     max-width: 600px;
     width: 100%;
     margin: 0 auto;
-    background: rgba(20, 24, 38, 0.95);
-    border-radius: 20px;
-    box-shadow: 0 0 40px 5px #00fff7, 0 0 80px 0 #8f00ff inset;
-    padding: 40px 32px 32px 32px;
-    animation: fadeIn 0.8s cubic-bezier(.77,0,.18,1);
-    border: 2px solid #00fff7;
+    background: rgba(28, 32, 48, 0.98);
+    border-radius: 18px;
+    box-shadow: 0 4px 32px 0 #23294644, 0 0 0 1.5px #3e4a6d;
+    padding: 38px 28px 28px 28px;
+    animation: fadeIn 0.7s cubic-bezier(.77,0,.18,1);
+    border: 1.5px solid #3e4a6d;
 }
 
 .reports-container h1 {
     text-align: center;
-    color: #00fff7;
-    margin-bottom: 32px;
-    font-size: 2.5em;
+    color: #e0e6f7;
+    margin-bottom: 28px;
+    font-size: 2.2em;
     font-weight: 700;
-    letter-spacing: 2px;
-    text-shadow: 0 0 10px #00fff7, 0 0 20px #8f00ff;
+    letter-spacing: 1.5px;
+    text-shadow: 0 2px 8px #23294633;
 }
 
 .report-form {
-    background: rgba(30, 34, 54, 0.85);
-    padding: 28px 20px;
-    border-radius: 14px;
-    margin-bottom: 32px;
-    border: 1.5px solid #8f00ff;
-    box-shadow: 0 0 20px #8f00ff44;
+    background: rgba(36, 40, 60, 0.92);
+    padding: 24px 16px;
+    border-radius: 12px;
+    margin-bottom: 28px;
+    border: 1.5px solid #3e4a6d;
+    box-shadow: 0 2px 12px #23294622;
     transition: box-shadow 0.3s;
 }
 
 .form-group {
-    margin-bottom: 22px;
+    margin-bottom: 18px;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 7px;
     font-weight: 600;
-    color: #00fff7;
+    color: #b8c1ec;
     font-size: 15px;
-    letter-spacing: 1px;
-    text-shadow: 0 0 6px #00fff799;
+    letter-spacing: 0.5px;
 }
 
 .form-group select,
 .form-group input {
     width: 100%;
-    padding: 13px 16px;
-    border: 2px solid #00fff7;
-    border-radius: 8px;
+    padding: 12px 14px;
+    border: 1.5px solid #3e4a6d;
+    border-radius: 7px;
     font-size: 15px;
-    background: #181c2f;
-    color: #fff;
-    box-shadow: 0 0 10px #00fff733;
+    background: #232946;
+    color: #e0e6f7;
+    box-shadow: 0 1px 4px #23294611;
     transition: border-color 0.3s, box-shadow 0.3s;
     outline: none;
 }
 
 .form-group select:focus,
 .form-group input:focus {
-    border-color: #8f00ff;
-    box-shadow: 0 0 12px #8f00ff99, 0 0 4px #00fff799;
+    border-color: #6c63ff;
+    box-shadow: 0 0 8px #6c63ff33;
 }
 
 .report-description {
-    margin-top: 8px;
+    margin-top: 7px;
     font-size: 13px;
-    color: #fff;
+    color: #b8c1ec;
     font-style: italic;
-    padding: 8px 12px;
-    background: linear-gradient(90deg, #8f00ff33 0%, #00fff733 100%);
+    padding: 7px 11px;
+    background: linear-gradient(90deg, #232946 0%, #3e4a6d 100%);
     border-radius: 5px;
-    border-left: 3px solid #00fff7;
-    box-shadow: 0 0 8px #00fff744;
+    border-left: 3px solid #6c63ff;
 }
 
 .generate-button {
     width: 100%;
-    padding: 16px;
-    background: linear-gradient(90deg, #00fff7 0%, #8f00ff 100%);
-    color: #181c2f;
+    padding: 14px;
+    background: linear-gradient(90deg, #6c63ff 0%, #19c7c7 100%);
+    color: #fff;
     border: none;
-    border-radius: 10px;
-    font-size: 17px;
+    border-radius: 8px;
+    font-size: 16px;
     font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 0 20px #00fff799, 0 0 40px #8f00ff44;
+    box-shadow: 0 2px 12px #23294633;
     transition: all 0.3s cubic-bezier(.77,0,.18,1);
-    margin-top: 10px;
-    letter-spacing: 1px;
-    text-shadow: 0 0 8px #fff;
+    margin-top: 8px;
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 4px #23294633;
 }
 
 .generate-button:hover:not(:disabled) {
-    transform: translateY(-2px) scale(1.03);
-    box-shadow: 0 0 40px #00fff7cc, 0 0 80px #8f00ff99;
-    background: linear-gradient(90deg, #8f00ff 0%, #00fff7 100%);
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 0 4px 24px #6c63ff33, 0 0 0 #19c7c7;
+    background: linear-gradient(90deg, #19c7c7 0%, #6c63ff 100%);
 }
 
 .generate-button:disabled {
-    background: #333;
+    background: #232946;
     color: #888;
     cursor: not-allowed;
     box-shadow: none;
@@ -117,18 +115,18 @@
 }
 
 .report-info {
-    background: linear-gradient(90deg, #8f00ff22 0%, #00fff722 100%);
-    padding: 22px;
-    border-radius: 12px;
-    border-left: 4px solid #00fff7;
-    box-shadow: 0 0 16px #00fff744;
+    background: linear-gradient(90deg, #232946 0%, #232946 100%);
+    padding: 18px;
+    border-radius: 10px;
+    border-left: 4px solid #19c7c7;
+    box-shadow: 0 1px 8px #23294622;
 }
 
 .report-info h3 {
-    color: #00fff7;
-    margin-bottom: 15px;
-    font-size: 1.2em;
-    text-shadow: 0 0 8px #00fff7;
+    color: #19c7c7;
+    margin-bottom: 13px;
+    font-size: 1.1em;
+    text-shadow: 0 1px 4px #19c7c733;
 }
 
 .report-info ul {
@@ -137,11 +135,11 @@
 }
 
 .report-info li {
-    padding: 10px 0;
-    border-bottom: 1px solid #8f00ff44;
-    color: #fff;
+    padding: 8px 0;
+    border-bottom: 1px solid #3e4a6d44;
+    color: #e0e6f7;
     line-height: 1.6;
-    text-shadow: 0 0 4px #8f00ff44;
+    text-shadow: 0 1px 4px #23294622;
 }
 
 .report-info li:last-child {
@@ -149,11 +147,10 @@
 }
 
 .report-info strong {
-    color: #00fff7;
-    text-shadow: 0 0 6px #00fff7;
+    color: #6c63ff;
+    text-shadow: 0 1px 4px #6c63ff22;
 }
 
-/* Анимации */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -166,24 +163,23 @@
 }
 
 .reports-container {
-    animation: fadeIn 0.8s cubic-bezier(.77,0,.18,1);
+    animation: fadeIn 0.7s cubic-bezier(.77,0,.18,1);
 }
 
-/* Адаптивность */
 @media (max-width: 768px) {
     .reports-container {
         margin: 10px;
-        padding: 16px;
+        padding: 12px;
     }
     .reports-container h1 {
-        font-size: 1.5em;
+        font-size: 1.2em;
     }
     .report-form {
-        padding: 12px;
+        padding: 8px;
     }
     .form-group select,
     .form-group input {
-        padding: 8px 10px;
+        padding: 7px 8px;
     }
 }
 
