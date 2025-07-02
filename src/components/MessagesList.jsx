@@ -1,41 +1,33 @@
 import React from 'react';
+import './messages.css';
 
-const MessagesList = ({ messages, onSelect }) => {
-  if (!Array.isArray(messages)) {
-    return <div style={{ padding: 24, color: '#888' }}>Нет сообщений</div>;
+const MessagesList = ({ messages, onSelect, selectedId }) => {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return <div className="messages-empty">Нет сообщений</div>;
   }
   return (
     <div className="messages-list">
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th>Тема</th>
-            <th>Отправитель</th>
-            <th>Получатель</th>
-            <th>Дата</th>
-            <th>Вложения</th>
-            <th>Статус</th>
-          </tr>
-        </thead>
-        <tbody>
-          {messages.map(msg => (
-            <tr
-              key={msg.id}
-              className={msg.isRead ? '' : 'unread'}
-              style={{ cursor: 'pointer', background: msg.isRead ? 'inherit' : '#f0f4ff' }}
-              onClick={() => onSelect(msg)}
-            >
-              <td>{msg.subject}</td>
-              <td>{msg.sender ? `${msg.sender.lastName} ${msg.sender.firstName}` : ''}</td>
-              <td>{msg.recipient ? `${msg.recipient.lastName} ${msg.recipient.firstName}` : ''}</td>
-              <td>{msg.dateSent ? new Date(msg.dateSent).toLocaleString() : ''}</td>
-              <td>{msg.attachments && msg.attachments.length > 0 ? '📎' : ''}</td>
-              <td>{msg.isRead ? 'Прочитано' : 'Непрочитано'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {messages.length === 0 && <div style={{ padding: 24, color: '#888' }}>Нет сообщений</div>}
+      {messages.map(msg => (
+        <div
+          key={msg.id}
+          className={`message-item${msg.isRead ? '' : ' unread'}${selectedId === msg.id ? ' selected' : ''}`}
+          onClick={() => onSelect(msg)}
+        >
+          <div className="message-avatar">{msg.sender?.firstName?.[0] || '?'}</div>
+          <div className="message-content">
+            <div className="message-header">
+              <span className="message-subject">{msg.subject || '(Без темы)'}</span>
+              <span className="message-date">{msg.dateSent ? new Date(msg.dateSent).toLocaleString() : ''}</span>
+            </div>
+            <div className="message-meta">
+              <span className="message-from">{msg.sender ? `${msg.sender.lastName} ${msg.sender.firstName}` : ''}</span>
+              <span className="message-to">→ {msg.recipient ? `${msg.recipient.lastName} ${msg.recipient.firstName}` : ''}</span>
+              {msg.attachments && msg.attachments.length > 0 && <span className="message-attach">📎</span>}
+              <span className="message-status">{msg.isRead ? 'Прочитано' : 'Непрочитано'}</span>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 };

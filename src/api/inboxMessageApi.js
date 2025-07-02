@@ -37,11 +37,20 @@ export async function getInboxMessagesByType(type) {
 
 // Создать новое сообщение
 export async function createInboxMessage(message) {
-    const res = await fetch(API_URL, {
+    let options = {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(message),
-    });
+        body: null,
+    };
+    if (message instanceof FormData) {
+        // Для FormData не добавляем Content-Type, browser сам выставит
+        options.headers = { ...options.headers };
+        delete options.headers['Content-Type'];
+        options.body = message;
+    } else {
+        options.body = JSON.stringify(message);
+    }
+    const res = await fetch(API_URL, options);
     return res.json();
 }
 
@@ -191,4 +200,22 @@ export async function forwardInboxMessage(id, forwardData) {
         body: JSON.stringify(forwardData),
     });
     return res.json();
+}
+
+// Скачать вложение по id
+export async function downloadInboxMessageAttachment(messageId, attachmentId, fileName) {
+    const res = await fetch(`${API_URL}/${messageId}/attachments/${attachmentId}/download`, {
+        headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Ошибка скачивания файла');
+    const blob = await res.blob();
+    // Создаем ссылку и инициируем скачивание
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName || 'attachment';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
 } 

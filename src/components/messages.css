@@ -1,0 +1,310 @@
+.messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #181c2a;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  padding: 0.5rem 0;
+  max-height: 100vh;
+  overflow-y: auto;
+}
+.message-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1.2rem;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+  border-left: 4px solid transparent;
+}
+.message-item:hover {
+  background: #232846;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.message-item.selected {
+  background: #232846;
+  border-left: 4px solid #7c3aed;
+}
+.message-item.unread .message-subject {
+  font-weight: bold;
+  color: #fff;
+}
+.message-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed 60%, #232846 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-right: 1rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.message-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.message-subject {
+  font-size: 1.05rem;
+  color: #e0e0ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+.message-date {
+  font-size: 0.92rem;
+  color: #a0a0c0;
+  margin-left: 1rem;
+  white-space: nowrap;
+}
+.message-meta {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  font-size: 0.95rem;
+  color: #b0b0c0;
+}
+.message-from, .message-to {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.message-attach {
+  font-size: 1.1rem;
+  color: #7c3aed;
+}
+.message-status {
+  font-size: 0.92rem;
+  color: #7c3aed;
+}
+.messages-empty {
+  color: #888;
+  padding: 2rem;
+  text-align: center;
+  font-size: 1.1rem;
+}
+@media (max-width: 700px) {
+  .message-subject { max-width: 120px; }
+  .message-from, .message-to { max-width: 60px; }
+}
+
+.messages-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #15182a;
+}
+.messages-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.2rem 2.2rem 0.7rem 2.2rem;
+  background: #181c2a;
+  border-bottom: 1px solid #232846;
+}
+.messages-title {
+  font-size: 1.5rem;
+  color: #e0e0ff;
+  font-weight: 600;
+}
+.messages-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+.btn-action {
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 0.5rem 1.2rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-action:hover {
+  background: #a78bfa;
+  color: #232846;
+}
+.btn-danger {
+  background: #e11d48;
+}
+.btn-danger:hover {
+  background: #f43f5e;
+  color: #fff;
+}
+.messages-search {
+  background: #232846;
+  color: #e0e0ff;
+  border: none;
+  border-radius: 7px;
+  padding: 0.45rem 1rem;
+  font-size: 1rem;
+  outline: none;
+}
+.messages-layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.messages-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+}
+.folders-col {
+  width: 220px;
+  background: #181c2a;
+  border-right: 1px solid #232846;
+  padding: 1.2rem 0.5rem 1.2rem 1.2rem;
+}
+.list-col {
+  width: 380px;
+  border-right: 1px solid #232846;
+  padding: 1.2rem 0.5rem 1.2rem 0.5rem;
+  background: #181c2a;
+}
+.preview-col {
+  flex: 1;
+  padding: 1.2rem 2.2rem 1.2rem 2.2rem;
+  background: #15182a;
+  min-width: 0;
+}
+.folders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 1rem;
+  border-radius: 7px;
+  color: #b0b0c0;
+  font-size: 1.08rem;
+  cursor: pointer;
+  transition: background 0.13s, color 0.13s;
+}
+.folder-item.selected, .folder-item:hover {
+  background: #232846;
+  color: #fff;
+}
+.folder-icon {
+  font-size: 1.2rem;
+}
+.folder-label {
+  flex: 1;
+}
+.message-preview {
+  background: #181c2a;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  padding: 2.2rem 2.2rem 1.2rem 2.2rem;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  color: #e0e0ff;
+}
+.message-preview-empty {
+  color: #888;
+  font-size: 1.2rem;
+  text-align: center;
+  margin-top: 4rem;
+}
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.2rem;
+}
+.preview-subject {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+}
+.preview-date {
+  font-size: 1rem;
+  color: #a0a0c0;
+  margin-top: 0.2rem;
+}
+.preview-meta {
+  font-size: 1rem;
+  color: #b0b0c0;
+}
+.preview-attachments {
+  margin: 0.7rem 0 0.2rem 0;
+  color: #a78bfa;
+  font-size: 1.05rem;
+}
+.preview-attach {
+  margin-right: 1.2rem;
+}
+.preview-body {
+  font-size: 1.08rem;
+  color: #e0e0ff;
+  background: #232846;
+  border-radius: 7px;
+  padding: 1.1rem 1.2rem;
+  min-height: 120px;
+  white-space: pre-line;
+}
+.preview-actions {
+  display: flex;
+  gap: 1.2rem;
+  margin-top: 1.2rem;
+}
+@media (max-width: 1100px) {
+  .folders-col { width: 120px; padding-left: 0.3rem; }
+  .list-col { width: 180px; }
+  .preview-col { padding: 1.2rem 0.5rem; }
+}
+@media (max-width: 700px) {
+  .messages-layout { flex-direction: column; }
+  .folders-col, .list-col, .preview-col { width: 100%; padding: 0.5rem !important; }
+  .message-preview { padding: 1rem; }
+}
+
+.folder-unread {
+  background: #e11d48;
+  color: #fff;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  margin-left: 8px;
+  min-width: 24px;
+  text-align: center;
+  display: inline-block;
+}
+
+.btn-download {
+  background: none;
+  border: none;
+  color: #7c3aed;
+  font-size: 1.1rem;
+  margin-left: 8px;
+  cursor: pointer;
+  transition: color 0.15s;
+  vertical-align: middle;
+}
+.btn-download:hover {
+  color: #a78bfa;
+} 
