@@ -1,6 +1,9 @@
 import React from 'react';
 
 const MessagesList = ({ messages, onSelect }) => {
+  if (!Array.isArray(messages)) {
+    return <div style={{ padding: 24, color: '#888' }}>Нет сообщений</div>;
+  }
   return (
     <div className="messages-list">
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
