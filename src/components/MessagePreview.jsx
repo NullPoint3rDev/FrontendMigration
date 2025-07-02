@@ -2,9 +2,15 @@ import React from 'react';
 import './messages.css';
 import { downloadInboxMessageAttachment } from '../api/inboxMessageApi';
 
-const MessagePreview = ({ message, onDelete }) => {
+const MessagePreview = ({ message, onDelete, onNewMessage }) => {
   if (!message) {
-    return <div className="message-preview-empty">Выберите письмо для просмотра</div>;
+    return (
+      <div className="message-preview-empty-full">
+        <div className="message-preview-empty-icon">✉️</div>
+        <div className="message-preview-empty-title">Выберите или создайте письмо для просмотра</div>
+        {onNewMessage && <button className="btn-action btn-large" onClick={onNewMessage}>+ Новое сообщение</button>}
+      </div>
+    );
   }
   const handleDelete = () => {
     if (window.confirm('Вы действительно хотите удалить это письмо?')) {
