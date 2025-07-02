@@ -18,6 +18,7 @@ import UserProfilePage from './pages/UserProfilePage';
 import ReportsPage from './components/ReportsPage';
 import EmployeesPage from './components/EmployeesPage';
 import LibraryPage from './pages/LibraryPage';
+import SupportPage from './pages/SupportPage';
 import './App.css';
 
 const theme = createTheme({
@@ -68,6 +69,7 @@ function App() {
                                 <Route path="/manuals" element={<ManualsPage />} />
                                 <Route path="/manuals/:id" element={<ManualsByEquipmentPage />} />
                                 <Route path="/profile" element={<UserProfilePage />} />
+                                <Route path="/support" element={<SupportPage />} />
                             </Routes>
                         </PrivateRoute>
                     } />
