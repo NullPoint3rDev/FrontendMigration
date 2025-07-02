@@ -48,6 +48,13 @@ const Navbar = () => {
             ],
         },
         {
+            label: 'Общение',
+            dropdown: [
+                { label: 'Сообщения', path: '/messages' },
+                { label: 'Поддержка', path: '/support' },
+            ],
+        },
+        {
             label: 'ДСЕ',
             dropdown: [
                 { label: 'Типы проволоки', path: '/wire-types' },
