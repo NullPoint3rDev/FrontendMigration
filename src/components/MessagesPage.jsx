@@ -26,6 +26,8 @@ const MessagesPage = () => {
   const [showCompose, setShowCompose] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Загрузка сообщений
   useEffect(() => {
@@ -34,8 +36,16 @@ const MessagesPage = () => {
   }, []);
 
   const fetchMessages = async () => {
-    const data = await getAllInboxMessages();
-    setMessages(Array.isArray(data) ? data : []);
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getAllInboxMessages();
+      setMessages(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setError('Ошибка загрузки писем');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchUnreadCounts = async () => {
@@ -86,7 +96,17 @@ const MessagesPage = () => {
           <MessageFolders selected={folder} onSelect={setFolder} unreadCounts={unreadCounts} />
         </div>
         <div className="messages-col list-col">
-          <MessagesList messages={displayed} onSelect={handleSelect} selectedId={selectedId} />
+          {error ? (
+            <div className="messages-loading" style={{color:'#e11d48'}}>{error}</div>
+          ) : (
+            <MessagesList
+              messages={displayed}
+              onSelect={handleSelect}
+              selectedId={selectedId}
+              onNewMessage={() => setShowCompose(true)}
+              loading={loading}
+            />
+          )}
         </div>
         <div className="messages-col preview-col">
           <MessagePreview message={selectedMessage} onDelete={handleDelete} />

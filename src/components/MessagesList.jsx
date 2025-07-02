@@ -1,9 +1,18 @@
 import React from 'react';
 import './messages.css';
 
-const MessagesList = ({ messages, onSelect, selectedId }) => {
+const MessagesList = ({ messages, onSelect, selectedId, onNewMessage, loading }) => {
+  if (loading) {
+    return <div className="messages-loading">Загрузка сообщений...</div>;
+  }
   if (!Array.isArray(messages) || messages.length === 0) {
-    return <div className="messages-empty">Нет сообщений</div>;
+    return (
+      <div className="messages-empty-state">
+        <div className="messages-empty-icon">📭</div>
+        <div className="messages-empty-text">Нет сообщений</div>
+        {onNewMessage && <button className="btn-action" onClick={onNewMessage}>+ Новое сообщение</button>}
+      </div>
+    );
   }
   return (
     <div className="messages-list">

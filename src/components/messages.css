@@ -307,4 +307,28 @@
 }
 .btn-download:hover {
   color: #a78bfa;
+}
+
+.messages-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 3rem 1rem;
+  color: #b0b0c0;
+}
+.messages-empty-icon {
+  font-size: 3.5rem;
+  margin-bottom: 1.2rem;
+}
+.messages-empty-text {
+  font-size: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.messages-loading {
+  color: #a78bfa;
+  text-align: center;
+  padding: 3rem 0;
+  font-size: 1.2rem;
 } 
