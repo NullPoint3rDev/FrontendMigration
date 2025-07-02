@@ -259,4 +259,31 @@ export const api = {
         });
         return handleResponse(response);
     },
+
+    get: async (url, options = {}) => {
+        const response = await fetch(`${API_BASE_URL}${url}`, {
+            method: 'GET',
+            headers: getAuthHeaders(),
+            ...options,
+        });
+        return handleResponse(response);
+    },
+
+    post: async (url, data, options = {}) => {
+        let headers = getAuthHeaders();
+        let body = data;
+        if (data instanceof FormData) {
+            headers = { ...headers };
+            delete headers['Content-Type'];
+        } else if (typeof data === 'object') {
+            body = JSON.stringify(data);
+        }
+        const response = await fetch(`${API_BASE_URL}${url}`, {
+            method: 'POST',
+            headers,
+            body,
+            ...options,
+        });
+        return handleResponse(response);
+    },
 };
