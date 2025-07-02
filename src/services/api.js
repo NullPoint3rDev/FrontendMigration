@@ -286,4 +286,13 @@ export const api = {
         });
         return handleResponse(response);
     },
+
+    delete: async (url, options = {}) => {
+        const response = await fetch(`${API_BASE_URL}${url}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+            ...options,
+        });
+        return handleResponse(response);
+    },
 };
