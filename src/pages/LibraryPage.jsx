@@ -66,14 +66,25 @@ const LibraryPage = () => {
 
   const handleDownload = async (id, fileName) => {
     try {
-      const res = await downloadLibraryDocument(id);
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL || 'http://192.168.10.137:8084/api'}/library-documents/${id}/download`,
+        {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+          }
+        }
+      );
+      if (!response.ok) throw new Error('Ошибка скачивания файла');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (e) {
       setError('Ошибка скачивания файла');
     }
