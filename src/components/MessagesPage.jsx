@@ -10,7 +10,7 @@ import {
   markInboxMessageAsRead,
   getUnreadInboxMessages
 } from '../api/inboxMessageApi';
-import './messages.css';
+import '../styles/messages.css';
 
 const folderMap = {
   inbox: msg => !msg.deleted && !msg.draft && !msg.sent,

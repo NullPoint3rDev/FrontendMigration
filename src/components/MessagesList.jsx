@@ -1,5 +1,5 @@
 import React from 'react';
-import './messages.css';
+import '../styles/messages.css';
 
 const MessagesList = ({ messages, onSelect, selectedId, onNewMessage, loading }) => {
   if (loading) {

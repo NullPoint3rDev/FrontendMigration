@@ -1,5 +1,5 @@
 import React from 'react';
-import './messages.css';
+import '../styles/messages.css';
 
 const folders = [
   { key: 'inbox', label: 'Входящие', icon: '📥' },

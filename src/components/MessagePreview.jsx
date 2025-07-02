@@ -1,5 +1,5 @@
 import React from 'react';
-import './messages.css';
+import '../styles/messages.css';
 import { downloadInboxMessageAttachment } from '../api/inboxMessageApi';
 
 const MessagePreview = ({ message, onDelete, onNewMessage }) => {
