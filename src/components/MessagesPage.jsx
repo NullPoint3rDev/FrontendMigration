@@ -97,7 +97,7 @@ const MessagesPage = () => {
           <MessageFolders selected={folder} onSelect={setFolder} unreadCounts={unreadCounts} />
         </div>
         {isEmpty ? (
-          <div className="messages-col list-col preview-col merged-empty">
+          <div className="messages-col merged-empty">
             <MessagePreview message={null} onNewMessage={() => setShowCompose(true)} />
           </div>
         ) : (
