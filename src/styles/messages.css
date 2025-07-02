@@ -157,10 +157,10 @@
   font-size: 1rem;
   outline: none;
 }
-.messages-layout {
-  flex: 1;
+.messages-layout, .messages-content {
   display: flex;
-  min-height: 0;
+  height: 100%;
+  min-height: 80vh;
 }
 .messages-col {
   display: flex;
@@ -309,70 +309,47 @@
   color: #a78bfa;
 }
 
-.messages-empty-state {
+.merged-empty, .messages-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 100%;
   height: 100%;
-  padding: 3rem 1rem;
-  color: #b0b0c0;
+  min-height: 400px;
+  background: none;
+  position: relative;
+  z-index: 1;
 }
+
 .messages-empty-icon {
   font-size: 3.5rem;
   margin-bottom: 1.2rem;
 }
+
 .messages-empty-text {
   font-size: 1.25rem;
   margin-bottom: 1.5rem;
 }
-.messages-loading {
-  color: #a78bfa;
-  text-align: center;
-  padding: 3rem 0;
-  font-size: 1.2rem;
-}
 
-.message-preview-empty-full {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  min-height: 320px;
-  color: #b0b0c0;
-  animation: fadeIn 0.7s;
-}
-.message-preview-empty-icon {
-  font-size: 4rem;
-  margin-bottom: 1.5rem;
-}
-.message-preview-empty-title {
-  font-size: 1.4rem;
-  margin-bottom: 2rem;
-  color: #e0e0ff;
-  text-align: center;
-}
-.btn-large {
+.btn-action, .btn-large {
+  display: inline-block;
   font-size: 1.15rem;
   padding: 0.9rem 2.2rem;
   border-radius: 10px;
   margin-top: 0.5rem;
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
-.merged-empty {
-  flex: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #181c2a;
-  border-radius: 0 0 12px 12px;
-  min-height: 400px;
+.btn-action:hover, .btn-large:hover {
+  background: #a78bfa;
+  color: #232846;
 }
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: none; }
-}
+
 @media (max-width: 900px) {
-  .merged-empty { min-height: 220px; }
-  .message-preview-empty-full { min-height: 180px; }
+  .merged-empty, .messages-empty-state { min-height: 180px; }
 } 
