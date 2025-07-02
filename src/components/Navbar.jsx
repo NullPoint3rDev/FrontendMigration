@@ -82,38 +82,40 @@ const Navbar = () => {
     return (
         <div className="nav-container">
             <nav className="nav-menu">
-                {navMenu.map((item) => (
-                    <div
-                        key={item.label}
-                        className={`nav-item${location.pathname === item.path ? ' active' : ''}${
-                            item.dropdown ? ' dropdown-parent' : ''
-                        }`}
-                        onClick={(e) => handleNavClick(item, e)}
-                        onMouseEnter={() => item.dropdown && setDropdown(item.label)}
-                        onMouseLeave={() => setDropdown(null)}
-                    >
-                        {item.dropdown ? (
-                            <>
-                                {item.label}
-                                <div className={`dropdown-menu${dropdown === item.label ? ' active' : ''}`}>
-                                    {item.dropdown.map((subitem) => (
-                                        <div
-                                            key={subitem.label}
-                                            className="dropdown-item"
-                                            onClick={(e) => handleDropdownClick(e, subitem.path)}
-                                        >
-                                            {subitem.label}
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        ) : (
-                            <Link to={item.path} className="nav-link">
-                                {item.label}
-                            </Link>
-                        )}
-                    </div>
-                ))}
+                <div className="nav-items">
+                    {navMenu.map((item) => (
+                        <div
+                            key={item.label}
+                            className={`nav-item${location.pathname === item.path ? ' active' : ''}${
+                                item.dropdown ? ' dropdown-parent' : ''
+                            }`}
+                            onClick={(e) => handleNavClick(item, e)}
+                            onMouseEnter={() => item.dropdown && setDropdown(item.label)}
+                            onMouseLeave={() => setDropdown(null)}
+                        >
+                            {item.dropdown ? (
+                                <>
+                                    {item.label}
+                                    <div className={`dropdown-menu${dropdown === item.label ? ' active' : ''}`}>
+                                        {item.dropdown.map((subitem) => (
+                                            <div
+                                                key={subitem.label}
+                                                className="dropdown-item"
+                                                onClick={(e) => handleDropdownClick(e, subitem.path)}
+                                            >
+                                                {subitem.label}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            ) : (
+                                <Link to={item.path} className="nav-link">
+                                    {item.label}
+                                </Link>
+                            )}
+                        </div>
+                    ))}
+                </div>
                 <UserProfile />
             </nav>
         </div>

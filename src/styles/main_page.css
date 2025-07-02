@@ -34,6 +34,11 @@ body {
     height: 60px;
 }
 
+.nav-items {
+    display: flex;
+    align-items: center;
+}
+
 .nav-item {
     position: relative;
     padding: 1rem 1.5rem;
