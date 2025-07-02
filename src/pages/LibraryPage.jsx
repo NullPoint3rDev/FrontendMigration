@@ -14,9 +14,10 @@ const LibraryPage = () => {
   const loadDocuments = async () => {
     try {
       const res = await fetchLibraryDocuments();
-      setDocuments(res.data);
+      setDocuments(Array.isArray(res) ? res : []);
     } catch (e) {
       setError('Ошибка загрузки документов');
+      setDocuments([]);
     }
   };
 
