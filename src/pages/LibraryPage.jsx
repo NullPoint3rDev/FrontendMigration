@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchLibraryDocuments, uploadLibraryDocument, downloadLibraryDocument } from '../api/libraryApi';
+import { fetchLibraryDocuments, uploadLibraryDocument, downloadLibraryDocument, deleteLibraryDocument } from '../api/libraryApi';
 import '../styles/organizations.css';
 
 const LibraryPage = () => {
@@ -79,6 +79,16 @@ const LibraryPage = () => {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Удалить этот документ?')) return;
+    try {
+      await deleteLibraryDocument(id);
+      loadDocuments();
+    } catch (e) {
+      setError('Ошибка удаления документа');
+    }
+  };
+
   return (
     <div className="container">
       <div className="header">
@@ -106,6 +116,9 @@ const LibraryPage = () => {
               <td>
                 <button className="action-btn edit" onClick={() => handleDownload(doc.id, doc.fileName)}>
                   <span>Скачать</span>
+                </button>
+                <button className="action-btn delete" onClick={() => handleDelete(doc.id)} style={{marginLeft: 8}}>
+                  <span>Удалить</span>
                 </button>
               </td>
             </tr>

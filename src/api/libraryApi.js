@@ -12,4 +12,6 @@ export const uploadLibraryDocument = (file, comment, uploader) => {
 
 export const downloadLibraryDocument = (id) => {
   return api.get(`/library-documents/${id}/download`, { responseType: 'blob' });
-}; 
+};
+
+export const deleteLibraryDocument = (id) => api.delete(`/library-documents/${id}`); 
