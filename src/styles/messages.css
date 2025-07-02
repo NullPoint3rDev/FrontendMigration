@@ -362,4 +362,22 @@
 
 @media (max-width: 900px) {
   .merged-empty, .messages-empty-state { min-height: 180px; }
+}
+
+.messages-col.main-col {
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  padding-top: 120px;
+}
+.messages-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 80px;
 } 

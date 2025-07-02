@@ -96,30 +96,23 @@ const MessagesPage = () => {
         <div className="messages-col folders-col">
           <MessageFolders selected={folder} onSelect={setFolder} unreadCounts={unreadCounts} />
         </div>
-        {isEmpty ? (
-          <div className="messages-col merged-empty">
-            <MessagePreview message={null} onNewMessage={() => setShowCompose(true)} />
-          </div>
-        ) : (
-          <>
-            <div className="messages-col list-col">
-              {error ? (
-                <div className="messages-loading" style={{color:'#e11d48'}}>{error}</div>
-              ) : (
-                <MessagesList
-                  messages={displayed}
-                  onSelect={handleSelect}
-                  selectedId={selectedId}
-                  onNewMessage={() => setShowCompose(true)}
-                  loading={loading}
-                />
-              )}
+        <div className="messages-col main-col">
+          {isEmpty ? (
+            <div className="messages-empty-state">
+              <div className="messages-empty-icon">📭</div>
+              <div className="messages-empty-text">Нет сообщений</div>
+              <button className="btn-action" onClick={() => setShowCompose(true)}>+ Новое сообщение</button>
             </div>
-            <div className="messages-col preview-col">
-              <MessagePreview message={selectedMessage} onDelete={handleDelete} onNewMessage={() => setShowCompose(true)} />
-            </div>
-          </>
-        )}
+          ) : (
+            <MessagesList
+              messages={displayed}
+              onSelect={handleSelect}
+              selectedId={selectedId}
+              onNewMessage={() => setShowCompose(true)}
+              loading={loading}
+            />
+          )}
+        </div>
       </div>
       {showCompose && <MessageCompose onClose={() => setShowCompose(false)} onSend={handleSend} />}
     </div>
