@@ -114,12 +114,14 @@ const LibraryPage = () => {
               <td>{doc.uploader}</td>
               <td>{doc.uploadDate ? new Date(doc.uploadDate).toLocaleString() : ''}</td>
               <td>
-                <button className="action-btn edit" onClick={() => handleDownload(doc.id, doc.fileName)}>
-                  <span>Скачать</span>
-                </button>
-                <button className="action-btn delete" onClick={() => handleDelete(doc.id)} style={{marginLeft: 8}}>
-                  <span>Удалить</span>
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="action-btn edit" onClick={() => handleDownload(doc.id, doc.fileName)}>
+                    <span>Скачать</span>
+                  </button>
+                  <button className="action-btn delete" onClick={() => handleDelete(doc.id)}>
+                    <span>Удалить</span>
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
