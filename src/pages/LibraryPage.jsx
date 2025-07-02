@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchLibraryDocuments, uploadLibraryDocument, downloadLibraryDocument, deleteLibraryDocument } from '../api/libraryApi';
-import '../styles/organizations.css';
+import '../styles/equipmentPage.css';
 
 const LibraryPage = () => {
   const [documents, setDocuments] = useState([]);
@@ -101,9 +101,9 @@ const LibraryPage = () => {
   };
 
   return (
-    <div className="container">
-      <div className="header">
-        <h1>Библиотека документов</h1>
+    <div className="container equipment-page">
+      <div className="header equipment-header">
+        <h1 className="equipment-title">Библиотека документов</h1>
         <button className="add-btn" onClick={openModal}>Добавить</button>
       </div>
       {error && <div className="error-message" style={{ marginBottom: 8 }}>{error}</div>}
