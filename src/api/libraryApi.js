@@ -7,9 +7,7 @@ export const uploadLibraryDocument = (file, comment, uploader) => {
   formData.append('file', file);
   formData.append('comment', comment);
   formData.append('uploader', uploader);
-  return api.post('/library-documents', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  return api.post('/library-documents', formData);
 };
 
 export const downloadLibraryDocument = (id) => {
