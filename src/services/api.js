@@ -295,4 +295,36 @@ export const api = {
         });
         return handleResponse(response);
     },
+
+    getMessages: (type, userId) => fetch(`${API_BASE_URL}/messages/${type}?userId=${userId}`).then(r => r.json()),
+    getMessage: (id) => fetch(`${API_BASE_URL}/messages/${id}`).then(r => r.json()),
+    sendMessage: (formData) => fetch(`${API_BASE_URL}/messages`, { method: 'POST', body: formData }).then(r => r.json()),
+    markAsRead: async (id) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/messages/${id}/read`, {
+                method: 'POST',
+                headers: { 'Authorization': localStorage.getItem('token') },
+            });
+            if (!response.ok) throw new Error('Ошибка');
+            return response.json();
+        } catch (error) {
+            console.error('Mark as read error:', error);
+            throw error;
+        }
+    },
+    deleteMessage: async (id) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/messages/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': localStorage.getItem('token') },
+            });
+            if (!response.ok) throw new Error('Ошибка удаления');
+            return response.json();
+        } catch (error) {
+            console.error('Delete message error:', error);
+            throw error;
+        }
+    },
+    downloadAttachment: (attachmentId) => fetch(`${API_BASE_URL}/messages/attachments/${attachmentId}`),
+    getAllUsers: () => fetch('/api/user-accounts').then(r => r.json()),
 };
