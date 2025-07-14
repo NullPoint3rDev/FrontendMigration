@@ -326,5 +326,5 @@ export const api = {
         }
     },
     downloadAttachment: (attachmentId) => fetch(`${API_BASE_URL}/messages/attachments/${attachmentId}`),
-    getAllUsers: () => fetch('/api/user-accounts').then(r => r.json()),
+    getAllUsers: () => fetch(`${API_BASE_URL}/user-accounts`, { headers: getAuthHeaders() }).then(handleResponse),
 };

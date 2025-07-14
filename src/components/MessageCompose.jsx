@@ -107,7 +107,7 @@ const MessageCompose = ({ onClose, onSend }) => {
   };
 
   return (
-      <div className="compose-modal-overlay" onClick={e => { if (e.target.classList.contains('compose-modal-overlay')) onClose(); }}>
+      <div className="compose-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
         <div className="compose-modal">
           <form onSubmit={handleSubmit} autoComplete="off">
             <h2>Новое сообщение</h2>
