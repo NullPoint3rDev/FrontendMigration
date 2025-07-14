@@ -86,7 +86,7 @@ const MessageCompose = ({ onClose, onSend }) => {
     }
   }, [highlighted, showDropdown]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!recipientId) return;
 
@@ -100,124 +100,129 @@ const MessageCompose = ({ onClose, onSend }) => {
 
     files.forEach(f => formData.append('files', f));
 
-    if (onSend) onSend(formData);
-    onClose();
+    if (onSend) {
+      await onSend(formData);
+      onClose();
+    }
   };
 
   return (
-      <div className="compose-modal">
-        <form onSubmit={handleSubmit} autoComplete="off">
-          <h2>Новое сообщение</h2>
+      <div className="compose-modal-overlay" onClick={e => { if (e.target.classList.contains('compose-modal-overlay')) onClose(); }}>
+        <div className="compose-modal">
+          <form onSubmit={handleSubmit} autoComplete="off">
+            <h2>Новое сообщение</h2>
 
-          <div style={{ marginBottom: 16, position: 'relative' }}>
-            <label>
-              Получатель:
-              <input
-                  type="text"
-                  value={recipient}
-                  onChange={e => setRecipient(e.target.value)}
-                  required
-                  autoComplete="off"
-                  ref={inputRef}
-                  onFocus={() => setShowDropdown(filtered.length > 0)}
-                  onKeyDown={handleKeyDown}
-              />
-            </label>
+            <div style={{ marginBottom: 16, position: 'relative' }}>
+              <label>
+                Получатель:
+                <input
+                    type="text"
+                    value={recipient}
+                    onChange={e => setRecipient(e.target.value)}
+                    required
+                    autoComplete="off"
+                    ref={inputRef}
+                    onFocus={() => setShowDropdown(filtered.length > 0)}
+                    onKeyDown={handleKeyDown}
+                />
+              </label>
 
-            {loadingUsers && (
-                <div style={{ position: 'absolute', top: 48, color: '#aaa' }}>
-                  Загрузка пользователей...
-                </div>
-            )}
+              {loadingUsers && (
+                  <div style={{ position: 'absolute', top: 48, color: '#aaa' }}>
+                    Загрузка пользователей...
+                  </div>
+              )}
 
-            {usersError && (
-                <div style={{ color: 'red' }}>{usersError}</div>
-            )}
+              {usersError && (
+                  <div style={{ color: 'red' }}>{usersError}</div>
+              )}
 
-            {showDropdown && (
-                <div
-                    ref={dropdownRef}
-                    style={{
-                      position: 'absolute',
-                      top: 48,
-                      background: '#333',
-                      borderRadius: 6,
-                      zIndex: 10,
-                      maxHeight: 180,
-                      overflowY: 'auto',
-                      width: '100%'
-                    }}
-                >
-                  {filtered.map((u, i) => (
-                      <div
-                          key={u.id}
-                          style={{
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            borderBottom: '1px solid #444',
-                            background: highlighted === i ? '#444' : undefined
-                          }}
-                          onClick={() => handleSelectUser(u)}
-                          onMouseEnter={() => setHighlighted(i)}
-                      >
-                        {u.lastName} {u.firstName}
-                        <span style={{ color: '#aaa' }}>({u.userName})</span>
-                      </div>
-                  ))}
-                </div>
-            )}
-          </div>
+              {showDropdown && (
+                  <div
+                      ref={dropdownRef}
+                      style={{
+                        position: 'absolute',
+                        top: 48,
+                        background: '#333',
+                        borderRadius: 6,
+                        zIndex: 10,
+                        maxHeight: 180,
+                        overflowY: 'auto',
+                        width: '100%'
+                      }}
+                  >
+                    {filtered.map((u, i) => (
+                        <div
+                            key={u.id}
+                            style={{
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid #444',
+                              background: highlighted === i ? '#444' : undefined
+                            }}
+                            onClick={() => handleSelectUser(u)}
+                            onMouseEnter={() => setHighlighted(i)}
+                        >
+                          {u.lastName} {u.firstName}
+                          <span style={{ color: '#aaa' }}>({u.userName})</span>
+                        </div>
+                    ))}
+                  </div>
+              )}
+            </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <label>
-              Тема:
-              <input
-                  type="text"
-                  value={subject}
-                  onChange={e => setSubject(e.target.value)}
-                  required
-              />
-            </label>
-          </div>
+            <div style={{ marginBottom: 16 }}>
+              <label>
+                Тема:
+                <input
+                    type="text"
+                    value={subject}
+                    onChange={e => setSubject(e.target.value)}
+                    required
+                />
+              </label>
+            </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <label>
-              Сообщение:
-              <textarea
-                  value={body}
-                  onChange={e => setBody(e.target.value)}
-                  required
-                  style={{ minHeight: 80 }}
-              />
-            </label>
-          </div>
+            <div style={{ marginBottom: 16 }}>
+              <label>
+                Сообщение:
+                <textarea
+                    value={body}
+                    onChange={e => setBody(e.target.value)}
+                    required
+                    style={{ minHeight: 80 }}
+                />
+              </label>
+            </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <label>
-              Вложения:
-              <input type="file" multiple onChange={handleFileChange} />
-            </label>
-          </div>
+            <div style={{ marginBottom: 16 }}>
+              <label>
+                Вложения:
+                <input type="file" multiple onChange={handleFileChange} />
+              </label>
+            </div>
 
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
-            <button type="button" onClick={onClose}>
-              Отмена
-            </button>
-            <button
-                type="submit"
-                style={{
-                  background: '#6C63FF',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '8px 24px',
-                  borderRadius: 6
-                }}
-                disabled={!recipientId}
-            >
-              Отправить
-            </button>
-          </div>
-        </form>
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={onClose} className="btn-action cancel-action">
+                Отмена
+              </button>
+              <button
+                  type="submit"
+                  style={{
+                    background: '#6C63FF',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '8px 24px',
+                    borderRadius: 6
+                  }}
+                  className="btn-action main-action"
+                  disabled={!recipientId || !subject || !body}
+              >
+                Отправить
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
   );
 };
