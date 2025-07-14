@@ -52,9 +52,26 @@
   display: flex;
   flex: 1;
   min-height: 0;
+  gap: 2.5rem;
 }
-
 .messages-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 1.5rem 0.8rem;
+}
+.messages-list-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 1.2rem 0.5rem;
+  background: #181c2a;
+  border-radius: 14px;
+}
+.preview-col {
+  flex: 1;
+  padding: 1.2rem 0.5rem;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -94,14 +111,6 @@
 .folder-item:hover {
   background: #232846;
   color: #fff;
-}
-
-.messages-list-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 1.2rem;
 }
 
 .messages-list {
@@ -191,14 +200,6 @@
   white-space: nowrap;
 }
 
-.preview-col {
-  flex: 1;
-  padding: 1.2rem;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
 .message-preview {
   background: #181c2a;
   border-radius: 12px;
@@ -243,17 +244,16 @@
 }
 
 .messages-empty-state {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding: 2.5rem 0 1.5rem 0;
 }
-
 .messages-empty-icon {
-  font-size: 3.5rem;
+  font-size: 4.2rem;
   margin-bottom: 1.2rem;
+  color: #6C63FF;
 }
 
 .messages-empty-text {
@@ -284,13 +284,47 @@
 }
 
 .compose-modal form {
-  background: #222;
-  padding: 32px;
-  border-radius: 12px;
-  min-width: 400px;
-  max-width: calc(100vw - 40px);
+  background: #232846;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  padding: 36px 32px;
+  max-width: 420px;
   color: #fff;
+}
+.compose-modal h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 24px;
+  color: #fff;
+}
+.compose-modal input,
+.compose-modal textarea {
+  border-radius: 8px;
+  border: 1px solid #444;
+  background: #181c2a;
+  color: #fff;
+  padding: 10px 14px;
+  font-size: 1rem;
+  margin-bottom: 18px;
+  width: 100%;
   box-sizing: border-box;
+}
+.compose-modal label {
+  font-size: 1rem;
+  color: #b0b0c0;
+  margin-bottom: 6px;
+  display: block;
+}
+.compose-modal .btn-action.main-action {
+  margin-top: 0;
+  width: 100%;
+}
+.compose-modal .btn-action {
+  margin-top: 0;
+}
+.compose-modal .error {
+  color: #e11d48;
+  margin-bottom: 10px;
 }
 
 /* Адаптивные стили */

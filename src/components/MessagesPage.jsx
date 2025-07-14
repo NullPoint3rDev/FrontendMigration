@@ -84,7 +84,7 @@ const MessagesPage = () => {
         <div className="messages-topbar">
           <div className="messages-title">Сообщения</div>
           <div className="messages-actions">
-            <button className="btn-action" onClick={() => setShowCompose(true)}>
+            <button className="btn-action main-action" onClick={() => setShowCompose(true)}>
               + Новое сообщение
             </button>
             <input
@@ -112,7 +112,7 @@ const MessagesPage = () => {
                     <div className="messages-empty-icon">📭</div>
                     <div className="messages-empty-text">Нет сообщений</div>
                     <button
-                        className="btn-action"
+                        className="btn-action main-action"
                         onClick={() => setShowCompose(true)}
                     >
                       + Новое сообщение
