@@ -1,10 +1,10 @@
 /* Общие стили */
 .messages-page {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #15182a;
-  overflow: hidden;
+  display: block;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-bottom: 4rem;
+  min-height: 100vh;
 }
 
 .messages-topbar {
@@ -50,9 +50,9 @@
 
 .messages-layout {
   display: flex;
-  flex: 1;
-  min-height: 0;
   gap: 2.5rem;
+  align-items: flex-start;
+  margin: 0 2.5rem;
 }
 .messages-col {
   display: flex;
@@ -65,16 +65,24 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 1.2rem 0.5rem;
+  padding: 0.5rem 0.5rem;
   background: #181c2a;
   border-radius: 14px;
+  max-height: 600px;
+  overflow-y: auto;
 }
 .preview-col {
   flex: 1;
-  padding: 1.2rem 0.5rem;
+  padding: 1.5rem 1.2rem;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 350px;
+  max-width: 600px;
+  background: #181c2a;
+  border-radius: 14px;
+  margin-bottom: 2.5rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
 
 .folders-col {
@@ -395,17 +403,64 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+.mail-header {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 2.5rem;
+  margin-left: 2.5rem;
+  margin-bottom: 1.2rem;
+  letter-spacing: 0.5px;
+}
+
+.mail-tabs {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2.5rem;
+  margin-bottom: 2.2rem;
+}
+.mail-tab {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #b0b0c0;
+  background: none;
+  border: none;
+  padding: 0.7rem 2.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+.mail-tab.active, .mail-tab:hover {
+  background: #232846;
+  color: #6C63FF;
+}
+
 /* Адаптивные стили */
 @media (max-width: 1100px) {
   .folders-col { width: 180px; }
 }
 
 @media (max-width: 900px) {
-  .messages-layout { flex-direction: column; }
+  .messages-layout {
+    flex-direction: column;
+    margin: 0 0.5rem;
+  }
+  .mail-header {
+    margin-left: 1rem;
+    font-size: 1.5rem;
+  }
+  .mail-tabs {
+    gap: 1.2rem;
+  }
   .folders-col, .main-col, .preview-col {
     width: 100%;
     padding: 0.8rem !important;
   }
   .message-preview { padding: 1rem; }
   .messages-list-container { padding: 0.8rem; }
+  .preview-col {
+    min-width: unset;
+    max-width: unset;
+  }
 }

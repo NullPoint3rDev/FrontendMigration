@@ -81,19 +81,12 @@ const MessagesPage = () => {
 
   return (
       <div className="messages-page">
-        <div className="messages-topbar">
-          <div className="messages-title">Сообщения</div>
-          <div className="messages-actions">
-            <button className="btn-action main-action" onClick={() => setShowCompose(true)}>
-              + Новое сообщение
-            </button>
-            <input
-                className="messages-search"
-                placeholder="Поиск..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-            />
-          </div>
+        <div className="mail-header">Почта</div>
+        <div className="mail-tabs">
+          <button className={`tab-btn ${folder === 'inbox' ? 'active' : ''}`} onClick={() => setFolder('inbox')}>Входящие</button>
+          <button className={`tab-btn ${folder === 'sent' ? 'active' : ''}`} onClick={() => setFolder('sent')}>Отправленные</button>
+          <button className={`tab-btn ${folder === 'drafts' ? 'active' : ''}`} onClick={() => setFolder('drafts')}>Черновики</button>
+          <button className={`tab-btn ${folder === 'trash' ? 'active' : ''}`} onClick={() => setFolder('trash')}>Корзина</button>
         </div>
 
         <div className="messages-layout">
