@@ -58,12 +58,10 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
     }
 
     const rec = recipient.toLowerCase();
-    // Фильтруем только валидных пользователей
+    // Фильтруем только по username
     const f = users
-      .filter(u => u.id && (u.lastName || u.firstName || u.userName))
-      .filter(u =>
-        `${u.lastName || ''} ${u.firstName || ''} ${u.userName || ''}`.toLowerCase().includes(rec)
-      );
+      .filter(u => u.id && u.userName)
+      .filter(u => u.userName.toLowerCase().includes(rec));
 
     setFiltered(f);
     setShowDropdown(f.length > 0);
@@ -75,7 +73,7 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
   };
 
   const handleSelectUser = (user) => {
-    setRecipient(`${user.lastName} ${user.firstName} (${user.userName})`);
+    setRecipient(user.userName);
     setRecipientId(user.id);
     setShowDropdown(false);
   };
@@ -190,10 +188,7 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
                             onClick={() => handleSelectUser(u)}
                             onMouseEnter={() => setHighlighted(i)}
                         >
-                          {((u.lastName || '') + ' ' + (u.firstName || '')).trim() || u.userName}
-                          {((u.lastName || '') + ' ' + (u.firstName || '')).trim() && u.userName
-                            ? <span style={{ color: '#aaa' }}> ({u.userName})</span>
-                            : null}
+                          {u.userName}
                         </div>
                     ))}
                   </div>
