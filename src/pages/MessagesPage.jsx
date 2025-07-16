@@ -17,11 +17,20 @@ const MessagesPage = () => {
   const [forwardData, setForwardData] = useState(null);
   const [alertMsg, setAlertMsg] = useState('');
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [userId, setUserId] = useState(null); // добавлено состояние для userId
 
+  // Получаем id пользователя при монтировании
   useEffect(() => {
-    // TODO: заменить userId на реальный id текущего пользователя
-    api.getMessages(tab, 1).then(data => setMessages(Array.isArray(data) ? data : []));
-  }, [tab]);
+    api.getCurrentUser().then(user => {
+      setUserId(user.id);
+    });
+  }, []);
+
+  // Загружаем сообщения только когда userId получен
+  useEffect(() => {
+    if (!userId) return;
+    api.getMessages(tab, userId).then(data => setMessages(Array.isArray(data) ? data : []));
+  }, [tab, userId]);
 
   // Фильтрация по поиску
   const filteredMessages = messages.filter(msg => {
@@ -78,10 +87,10 @@ const MessagesPage = () => {
       setComposeOpen(false);
       setReplyTo(null);
       if (tab === 'outbox') {
-        api.getMessages('outbox', 1).then(setMessages);
+        api.getMessages('outbox', userId).then(setMessages);
       }
       if (tab === 'inbox') {
-        api.getMessages('inbox', 1).then(setMessages);
+        api.getMessages('inbox', userId).then(setMessages);
       }
     } catch (e) {
       setAlert('Ошибка отправки сообщения');
@@ -143,7 +152,7 @@ const MessagesPage = () => {
       await api.deleteMessages(selectedIds);
       setAlert('Сообщения удалены');
       setSelectedIds([]);
-      api.getMessages(tab, 1).then(setMessages);
+      api.getMessages(tab, userId).then(setMessages);
     } catch (e) {
       setAlert('Ошибка удаления сообщений');
     } finally {
@@ -158,7 +167,7 @@ const MessagesPage = () => {
     try {
       await api.markAsReadMessages(selectedIds);
       setAlert('Отмечено как прочитанное');
-      api.getMessages(tab, 1).then(setMessages);
+      api.getMessages(tab, userId).then(setMessages);
       setSelectedIds([]); // Clear selectedIds after marking as read
     } catch (e) {
       setAlert('Ошибка');
@@ -261,6 +270,7 @@ const MessagesPage = () => {
           onSend={handleSend}
           replyTo={replyTo}
           forwardData={forwardData}
+          userId={userId}
         />
       )}
       {confirmDeleteOpen && (

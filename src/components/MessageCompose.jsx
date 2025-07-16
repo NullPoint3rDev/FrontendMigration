@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import '../styles/messages.css';
 
-const MessageCompose = ({ onClose, onSend, replyTo, forwardData }) => {
+const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
   const [recipient, setRecipient] = useState('');
   const [recipientId, setRecipientId] = useState('');
   const [users, setUsers] = useState([]);
@@ -109,7 +109,7 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData }) => {
 
     const formData = new FormData();
     formData.append('message', JSON.stringify({
-      sender: { id: 1 },
+      sender: { id: userId },
       recipient: { id: Number(recipientId) },
       subject,
       body
