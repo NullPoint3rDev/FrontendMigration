@@ -104,6 +104,17 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
     }
   }, [highlighted, showDropdown]);
 
+  const handleRecipientBlur = () => {
+    // Если введённый userName совпадает с кем-то из users — выбрать его
+    const found = users.find(u => u.userName && u.userName.toLowerCase() === recipient.toLowerCase());
+    if (found) {
+      setRecipient(found.userName);
+      setRecipientId(found.id);
+    } else {
+      setRecipientId('');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!recipientId || isNaN(Number(recipientId))) {
@@ -148,6 +159,7 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
                     ref={inputRef}
                     onFocus={() => setShowDropdown(filtered.length > 0)}
                     onKeyDown={handleKeyDown}
+                    onBlur={handleRecipientBlur}
                     disabled={!!replyTo} // Если replyTo — disabled
                 />
               </label>
