@@ -20,7 +20,7 @@ const MessagesPage = () => {
 
   useEffect(() => {
     // TODO: заменить userId на реальный id текущего пользователя
-    api.getMessages(tab, 1).then(setMessages);
+    api.getMessages(tab, 1).then(data => setMessages(Array.isArray(data) ? data : []));
   }, [tab]);
 
   // Фильтрация по поиску
@@ -39,7 +39,7 @@ const MessagesPage = () => {
     setLoading(true);
     try {
       await Promise.all(selectedIds.map(id => api.deleteMessage(id)));
-      setMessages(prev => prev.filter(m => !selectedIds.includes(m.id)));
+      setMessages(prev => Array.isArray(prev) ? prev.filter(m => !selectedIds.includes(m.id)) : []);
       setSelectedIds([]);
     } finally {
       setLoading(false);
@@ -52,7 +52,7 @@ const MessagesPage = () => {
     setLoading(true);
     try {
       await Promise.all(selectedIds.map(id => api.markAsRead(id)));
-      setMessages(prev => prev.map(m => selectedIds.includes(m.id) ? { ...m, isRead: true } : m));
+      setMessages(prev => Array.isArray(prev) ? prev.map(m => selectedIds.includes(m.id) ? { ...m, isRead: true } : m) : []);
       setSelectedIds([]);
     } finally {
       setLoading(false);
@@ -111,7 +111,7 @@ const MessagesPage = () => {
     setLoading(true);
     try {
       await api.deleteMessage(modalMessage.id);
-      setMessages(prev => prev.filter(m => m.id !== modalMessage.id));
+      setMessages(prev => Array.isArray(prev) ? prev.filter(m => m.id !== modalMessage.id) : []);
       setAlertMsg('Письмо удалено');
       setModalMessage(null);
     } finally {
