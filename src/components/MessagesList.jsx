@@ -1,60 +1,61 @@
 import React from 'react';
 import '../styles/messages.css';
 
-const MessagesList = ({ messages, onSelect, selectedId, loading }) => {
+const MessagesList = ({ messages, selectedIds = [], onToggleSelect, onOpenMessage, loading }) => {
   if (loading) {
-    return <div className="messages-loading">Загрузка сообщений...</div>;
+    return <div className="mail-placeholder">Загрузка сообщений...</div>;
   }
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return (
-        <div className="messages-empty-state">
-          <div className="messages-empty-icon">📭</div>
-          <div className="messages-empty-text">Нет сообщений</div>
-        </div>
+      <div className="mail-placeholder">
+        Нет сообщений
+      </div>
     );
   }
 
   return (
-      <div className="messages-list">
+    <table className="mail-list">
+      <thead>
+        <tr>
+          <th><input type="checkbox" checked={messages.length > 0 && selectedIds.length === messages.length} onChange={e => messages.forEach(m => onToggleSelect(m.id, e.target.checked))} /></th>
+          <th>Отправитель</th>
+          <th>Тема</th>
+          <th>Дата</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
         {messages.map(msg => (
-            <div
-                key={msg.id}
-                className={`message-item${msg.isRead ? '' : ' unread'}${selectedId === msg.id ? ' selected' : ''}`}
-                onClick={() => onSelect(msg)}
-            >
-              <div className="message-avatar">
-                {msg.sender?.firstName?.[0] || '?'}
-              </div>
-
-              <div className="message-content">
-                <div className="message-header">
-              <span className="message-subject">
-                {msg.subject || '(Без темы)'}
-              </span>
-                  <span className="message-date">
-                {msg.dateSent ? new Date(msg.dateSent).toLocaleString() : ''}
-              </span>
-                </div>
-
-                <div className="message-meta">
-              <span className="message-from">
-                {msg.sender ? `${msg.sender.lastName} ${msg.sender.firstName}` : ''}
-              </span>
-                  <span className="message-to">
-                → {msg.recipient ? `${msg.recipient.lastName} ${msg.recipient.firstName}` : ''}
-              </span>
-                  {msg.attachments && msg.attachments.length > 0 && (
-                      <span className="message-attach">📎</span>
-                  )}
-                  <span className="message-status">
-                {msg.isRead ? 'Прочитано' : 'Непрочитано'}
-              </span>
-                </div>
-              </div>
-            </div>
+          <tr
+            key={msg.id}
+            className={
+              (msg.isRead ? '' : 'unread ') + (selectedIds.includes(msg.id) ? 'selected' : '')
+            }
+            onClick={e => {
+              // Не открывать модалку, если клик по чекбоксу
+              if (e.target.type !== 'checkbox') onOpenMessage(msg);
+            }}
+          >
+            <td>
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(msg.id)}
+                onChange={e => onToggleSelect(msg.id, e.target.checked)}
+                onClick={e => e.stopPropagation()}
+              />
+            </td>
+            <td>{msg.sender ? `${msg.sender.lastName || ''} ${msg.sender.firstName || ''}` : ''}</td>
+            <td>
+              {msg.subject || '(Без темы)'}
+              {msg.attachments && msg.attachments.length > 0 && <span className="icon-attach">📎</span>}
+            </td>
+            <td>{msg.dateSent ? new Date(msg.dateSent).toLocaleString() : ''}</td>
+            <td></td>
+          </tr>
         ))}
-      </div>
+      </tbody>
+    </table>
   );
 };
 

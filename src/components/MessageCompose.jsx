@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import '../styles/messages.css';
 
-const MessageCompose = ({ onClose, onSend }) => {
+const MessageCompose = ({ onClose, onSend, replyTo, forwardData }) => {
   const [recipient, setRecipient] = useState('');
   const [recipientId, setRecipientId] = useState('');
   const [users, setUsers] = useState([]);
@@ -16,6 +16,23 @@ const MessageCompose = ({ onClose, onSend }) => {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [files, setFiles] = useState([]);
+
+  // Автозаполнение для replyTo и forwardData
+  useEffect(() => {
+    if (replyTo) {
+      setRecipient(`${replyTo.sender?.lastName || ''} ${replyTo.sender?.firstName || ''} (${replyTo.sender?.userName || ''})`);
+      setRecipientId(replyTo.sender?.id || '');
+      setSubject('Re: ' + (replyTo.subject || ''));
+      setBody(`\n\n--- Исходное сообщение ---\n${replyTo.body || ''}`);
+    } else if (forwardData) {
+      setRecipient('');
+      setRecipientId('');
+      setSubject(forwardData.subject || '');
+      setBody(`\n\n--- Пересылаемое сообщение ---\n${forwardData.body || ''}`);
+      // Вложения только имена (без файлов)
+      setFiles([]);
+    }
+  }, [replyTo, forwardData]);
 
   useEffect(() => {
     setLoadingUsers(true);
@@ -108,8 +125,11 @@ const MessageCompose = ({ onClose, onSend }) => {
 
   return (
       <div className="compose-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-        <div className="compose-modal">
+        <div className="compose-modal compose-modal-animated">
           <form onSubmit={handleSubmit} autoComplete="off">
+            {/* Визуальное выделение режима */}
+            {replyTo && <div className="compose-mode-banner reply">Ответ на сообщение</div>}
+            {forwardData && <div className="compose-mode-banner forward">Пересылка сообщения</div>}
             <h2>Новое сообщение</h2>
 
             <div style={{ marginBottom: 16, position: 'relative' }}>
@@ -124,6 +144,7 @@ const MessageCompose = ({ onClose, onSend }) => {
                     ref={inputRef}
                     onFocus={() => setShowDropdown(filtered.length > 0)}
                     onKeyDown={handleKeyDown}
+                    disabled={!!replyTo} // Если replyTo — disabled
                 />
               </label>
 
@@ -201,6 +222,18 @@ const MessageCompose = ({ onClose, onSend }) => {
                 <input type="file" multiple onChange={handleFileChange} />
               </label>
             </div>
+
+            {/* При пересылке — показать имена вложений */}
+            {forwardData && forwardData.attachments && forwardData.attachments.length > 0 && (
+              <div className="compose-forward-attachments">
+                <b>Вложения для пересылки:</b>
+                <ul>
+                  {forwardData.attachments.map((a, i) => (
+                    <li key={i}>📎 {a.name}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
               <button type="button" onClick={onClose} className="btn-action cancel-action">
