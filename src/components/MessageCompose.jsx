@@ -49,16 +49,16 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
   }, []);
 
   useEffect(() => {
+    // Показывать всех пользователей, если поле пустое
     if (recipient.length === 0) {
-      setFiltered([]);
-      setShowDropdown(false);
+      setFiltered(users.filter(u => u.id && u.userName));
+      setShowDropdown(true);
       setRecipientId('');
       setHighlighted(-1);
       return;
     }
 
     const rec = recipient.toLowerCase();
-    // Фильтруем только по username
     const f = users
       .filter(u => u.id && u.userName)
       .filter(u => u.userName.toLowerCase().includes(rec));
