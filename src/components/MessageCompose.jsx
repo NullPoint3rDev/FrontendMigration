@@ -190,8 +190,10 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
                             onClick={() => handleSelectUser(u)}
                             onMouseEnter={() => setHighlighted(i)}
                         >
-                          {(u.lastName || '') + ' ' + (u.firstName || '')}
-                          <span style={{ color: '#aaa' }}>{u.userName ? ` (${u.userName})` : ''}</span>
+                          {((u.lastName || '') + ' ' + (u.firstName || '')).trim() || u.userName}
+                          {((u.lastName || '') + ' ' + (u.firstName || '')).trim() && u.userName
+                            ? <span style={{ color: '#aaa' }}> ({u.userName})</span>
+                            : null}
                         </div>
                     ))}
                   </div>
