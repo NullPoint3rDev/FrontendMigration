@@ -58,9 +58,12 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
     }
 
     const rec = recipient.toLowerCase();
-    const f = users.filter(u =>
-        `${u.lastName} ${u.firstName} ${u.userName}`.toLowerCase().includes(rec)
-    );
+    // Фильтруем только валидных пользователей
+    const f = users
+      .filter(u => u.id && (u.lastName || u.firstName || u.userName))
+      .filter(u =>
+        `${u.lastName || ''} ${u.firstName || ''} ${u.userName || ''}`.toLowerCase().includes(rec)
+      );
 
     setFiltered(f);
     setShowDropdown(f.length > 0);
@@ -105,7 +108,10 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!recipientId) return;
+    if (!recipientId || isNaN(Number(recipientId))) {
+      // Можно показать ошибку пользователю
+      return;
+    }
 
     const formData = new FormData();
     formData.append('message', JSON.stringify({
@@ -184,8 +190,8 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
                             onClick={() => handleSelectUser(u)}
                             onMouseEnter={() => setHighlighted(i)}
                         >
-                          {u.lastName} {u.firstName}
-                          <span style={{ color: '#aaa' }}>({u.userName})</span>
+                          {(u.lastName || '') + ' ' + (u.firstName || '')}
+                          <span style={{ color: '#aaa' }}>{u.userName ? ` (${u.userName})` : ''}</span>
                         </div>
                     ))}
                   </div>
