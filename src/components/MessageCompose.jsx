@@ -51,7 +51,7 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
   useEffect(() => {
     // Показывать всех пользователей, если поле пустое
     if (recipient.length === 0) {
-      setFiltered(users.filter(u => u.id && u.userName));
+      setFiltered(users.filter(u => u.id && u.username));
       setShowDropdown(true);
       setRecipientId('');
       setHighlighted(-1);
@@ -60,8 +60,8 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
 
     const rec = recipient.toLowerCase();
     const f = users
-      .filter(u => u.id && u.userName)
-      .filter(u => u.userName.toLowerCase().includes(rec));
+      .filter(u => u.id && u.username)
+      .filter(u => u.username.toLowerCase().includes(rec));
 
     setFiltered(f);
     setShowDropdown(f.length > 0);
@@ -73,7 +73,7 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
   };
 
   const handleSelectUser = (user) => {
-    setRecipient(user.userName);
+    setRecipient(user.username);
     setRecipientId(user.id);
     setShowDropdown(false);
   };
@@ -105,10 +105,10 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
   }, [highlighted, showDropdown]);
 
   const handleRecipientBlur = () => {
-    // Если введённый userName совпадает с кем-то из users — выбрать его
-    const found = users.find(u => u.userName && u.userName.toLowerCase() === recipient.toLowerCase());
+    // Если введённый username совпадает с кем-то из users — выбрать его
+    const found = users.find(u => u.username && u.username.toLowerCase() === recipient.toLowerCase());
     if (found) {
-      setRecipient(found.userName);
+      setRecipient(found.username);
       setRecipientId(found.id);
     } else {
       setRecipientId('');
@@ -200,7 +200,7 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
                             onClick={() => handleSelectUser(u)}
                             onMouseEnter={() => setHighlighted(i)}
                         >
-                          {u.userName}
+                          {u.username}
                         </div>
                     ))}
                   </div>

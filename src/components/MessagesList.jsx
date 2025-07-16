@@ -45,7 +45,7 @@ const MessagesList = ({ messages, selectedIds = [], onToggleSelect, onOpenMessag
                 onClick={e => e.stopPropagation()}
               />
             </td>
-            <td>{msg.sender ? `${msg.sender.lastName || ''} ${msg.sender.firstName || ''}` : ''}</td>
+            <td>{msg.sender ? (msg.sender.username || `${msg.sender.lastName || ''} ${msg.sender.firstName || ''}`) : ''}</td>
             <td>
               {msg.subject || '(Без темы)'}
               {msg.attachments && msg.attachments.length > 0 && <span className="icon-attach">📎</span>}
