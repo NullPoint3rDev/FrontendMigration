@@ -90,23 +90,6 @@ const UserProfilePage = () => {
     const handleAboutChange = (e) => {
         setEditedData(prev => ({ ...prev, about: e.target.value }));
     };
-    const handleSocialChange = (idx, field, value) => {
-        setEditedData(prev => {
-            const socials = [...(prev.socials || [])];
-            socials[idx] = { ...socials[idx], [field]: value };
-            return { ...prev, socials };
-        });
-    };
-    const addSocial = () => {
-        setEditedData(prev => ({ ...prev, socials: [...(prev.socials || []), { type: 'instagram', url: '' }] }));
-    };
-    const removeSocial = (idx) => {
-        setEditedData(prev => {
-            const socials = [...(prev.socials || [])];
-            socials.splice(idx, 1);
-            return { ...prev, socials };
-        });
-    };
     const getPhotoSrc = (photo) => {
         if (!photo) return null;
         if (typeof photo === 'string' && photo.startsWith('data:image/')) return photo;
@@ -167,33 +150,11 @@ const UserProfilePage = () => {
                             </select>
                             <textarea
                                 className="profile-modern-input profile-modern-about"
-                                value={editedData.about || ''}
+                                value={editedData.about || editedData.description || ''}
                                 onChange={handleAboutChange}
                                 placeholder="О себе"
                                 rows={3}
                             />
-                            <div className="profile-modern-socials-edit">
-                                <div style={{ fontWeight: 500, marginBottom: 4 }}>Соцсети:</div>
-                                {(editedData.socials || []).map((s, idx) => (
-                                    <div key={idx} className="profile-modern-social-edit-row">
-                                        <select
-                                            value={s.type}
-                                            onChange={e => handleSocialChange(idx, 'type', e.target.value)}
-                                        >
-                                            <option value="instagram">Instagram</option>
-                                            <option value="telegram">Telegram</option>
-                                            <option value="vk">VK</option>
-                                        </select>
-                                        <input
-                                            value={s.url}
-                                            onChange={e => handleSocialChange(idx, 'url', e.target.value)}
-                                            placeholder="Ссылка"
-                                        />
-                                        <button type="button" onClick={() => removeSocial(idx)} className="profile-modern-social-remove">&times;</button>
-                                    </div>
-                                ))}
-                                <button type="button" className="profile-modern-social-add" onClick={addSocial}>+ Добавить</button>
-                            </div>
                             <div className="profile-modern-actions">
                                 <button className="profile-modern-btn save" onClick={handleSave}><FaSave /> Сохранить</button>
                                 <button className="profile-modern-btn cancel" onClick={handleCancel}><FaTimes /> Отмена</button>
@@ -203,15 +164,9 @@ const UserProfilePage = () => {
                         <>
                             <div className="profile-modern-name">{userData.name || ''}</div>
                             <div className="profile-modern-position">{userData.position || ''}</div>
-                            <div className="profile-modern-org">{userData.organization?.name || ''}</div>
-                            {userData.about && <div className="profile-modern-about">{userData.about}</div>}
-                            <div className="profile-modern-socials">
-                                {(userData.socials || []).map((s, idx) => (
-                                    <a key={idx} href={s.url} target="_blank" rel="noopener noreferrer" className="profile-modern-social-link">
-                                        {socialIcons[s.type]}
-                                    </a>
-                                ))}
-                            </div>
+                            {userData.description && (
+                                <div className="profile-modern-about">{userData.description}</div>
+                            )}
                             <div className="profile-modern-actions">
                                 <button className="profile-modern-btn edit" onClick={handleEdit}><FaEdit /> Редактировать</button>
                             </div>
