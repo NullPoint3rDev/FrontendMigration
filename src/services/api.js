@@ -302,8 +302,8 @@ export const api = {
     markAsRead: async (id) => {
         try {
             const response = await fetch(`${API_BASE_URL}/messages/${id}/read`, {
-                method: 'POST',
-                headers: { 'Authorization': localStorage.getItem('token') },
+                method: 'PATCH',
+                headers: getAuthHeaders(),
             });
             if (!response.ok) throw new Error('Ошибка');
             return response.json();
