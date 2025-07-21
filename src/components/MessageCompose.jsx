@@ -123,12 +123,19 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
     }
 
     const formData = new FormData();
-    formData.append('message', JSON.stringify({
-      sender: { id: userId },
-      recipient: { id: Number(recipientId) },
-      subject,
-      body
-    }));
+    formData.append(
+      'message',
+      new Blob([
+        JSON.stringify({
+          sender: { id: userId },
+          recipient: { id: recipientId },
+          subject,
+          body,
+          ...(replyTo ? { replyToId: replyTo.id } : {}),
+          ...(forwardData ? { forwardData } : {})
+        })
+      ], { type: 'application/json' })
+    );
 
     files.forEach(f => formData.append('files', f));
 
