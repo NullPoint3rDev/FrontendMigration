@@ -317,10 +317,11 @@ export const api = {
         try {
             const response = await fetch(`${API_BASE_URL}/messages/${id}`, {
                 method: 'DELETE',
-                headers: { 'Authorization': localStorage.getItem('token') },
+                headers: getAuthHeaders(),
             });
             if (!response.ok) throw new Error('Ошибка удаления');
-            return response.json();
+            // Не парсим json, если тело пустое
+            return;
         } catch (error) {
             console.error('Delete message error:', error);
             throw error;
