@@ -128,7 +128,7 @@ const UserProfilePage = () => {
                         <>
                             <input
                                 className="profile-modern-input profile-modern-name"
-                                value={editedData.name || ''}
+                                value={editedData.name || editedData.fullName || editedData.username || ''}
                                 onChange={handleChange('name')}
                                 placeholder="Имя пользователя"
                             />
@@ -162,7 +162,7 @@ const UserProfilePage = () => {
                         </>
                     ) : (
                         <>
-                            <div className="profile-modern-name">{userData.name || ''}</div>
+                            <div className="profile-modern-name">{userData.name || userData.fullName || userData.username || ''}</div>
                             <div className="profile-modern-position">{userData.position || ''}</div>
                             {userData.description && (
                                 <div className="profile-modern-about">{userData.description}</div>
