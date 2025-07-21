@@ -59,6 +59,7 @@ export const userAccountApi = {
         const headers = {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
         };
+        // Не добавляем Content-Type! Браузер сам выставит boundary
         console.log('Making request to /user-accounts/photo with headers:', headers);
         const response = await fetch(`${API_BASE_URL}/user-accounts/photo`, {
             method: 'POST',
