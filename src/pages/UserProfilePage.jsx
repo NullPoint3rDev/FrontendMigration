@@ -77,10 +77,8 @@ const UserProfilePage = () => {
         try {
             let photoId = editedData.photo;
             if (selectedFile) {
-                const formData = new FormData();
-                formData.append('file', selectedFile);
                 console.log('Uploading file:', selectedFile);
-                photoId = await userAccountApi.uploadUserPhoto(formData);
+                photoId = await userAccountApi.uploadUserPhoto(selectedFile);
             }
             const name = [editedData.lastName, editedData.firstName, editedData.middleName].filter(Boolean).join(' ');
             const profileData = {
