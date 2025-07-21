@@ -306,7 +306,8 @@ export const api = {
                 headers: getAuthHeaders(),
             });
             if (!response.ok) throw new Error('Ошибка');
-            return response.json();
+            // Не парсим json, если тело пустое
+            return;
         } catch (error) {
             console.error('Mark as read error:', error);
             throw error;
