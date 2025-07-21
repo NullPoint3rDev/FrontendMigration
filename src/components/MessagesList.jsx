@@ -18,7 +18,7 @@ const MessagesList = ({ messages, selectedIds = [], onToggleSelect, onOpenMessag
     <table className="mail-list">
       <thead>
         <tr>
-          <th><input type="checkbox" checked={messages.length > 0 && selectedIds.length === messages.length} onChange={e => messages.forEach(m => onToggleSelect(m.id, e.target.checked))} /></th>
+          <th></th>
           <th>Отправитель</th>
           <th>Тема</th>
           <th>Дата</th>
@@ -26,7 +26,7 @@ const MessagesList = ({ messages, selectedIds = [], onToggleSelect, onOpenMessag
         </tr>
       </thead>
       <tbody>
-        {messages.map(msg => (
+        {messages.filter(msg => msg && msg.id).map(msg => (
           <tr
             key={msg.id}
             className={
