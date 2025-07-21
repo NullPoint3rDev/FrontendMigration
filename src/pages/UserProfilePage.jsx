@@ -1,23 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import {
-    Box,
-    Container,
-    Paper,
-    Typography,
-    Avatar,
-    Grid,
-    TextField,
-    Button,
-    IconButton,
-    Select,
-    MenuItem,
-    FormControl,
-    InputLabel
-} from '@mui/material';
-import { AccountCircle, Edit, Save, Cancel } from '@mui/icons-material';
+import React, { useState, useEffect, useRef } from 'react';
 import { userAccountApi } from '../api/userAccountApi';
 import '../styles/userProfile.css';
+import { FaEdit, FaSave, FaTimes, FaInstagram, FaTelegram, FaVk } from 'react-icons/fa';
 import { useNavigate } from "react-router-dom";
+
+const socialIcons = {
+  instagram: <FaInstagram />,
+  telegram: <FaTelegram />,
+  vk: <FaVk />,
+};
 
 const UserProfilePage = () => {
     const [userData, setUserData] = useState(null);
@@ -27,31 +18,25 @@ const UserProfilePage = () => {
     const [editedData, setEditedData] = useState(null);
     const [organizations, setOrganizations] = useState([]);
     const [selectedFile, setSelectedFile] = useState(null);
-    const fileInputRef = React.useRef();
+    const fileInputRef = useRef();
     const navigate = useNavigate();
 
     useEffect(() => {
         const fetchData = async () => {
             const token = localStorage.getItem('token');
-            console.log('Token before profile request:', token);
             if (!token) {
-                console.error('No token found, redirecting to login');
                 navigate('/login');
                 return;
             }
-
             try {
                 const [userData, orgsData] = await Promise.all([
                     userAccountApi.getCurrentUser(),
                     userAccountApi.getOrganizations()
                 ]);
-                console.log('User data received:', userData);
-                console.log('Organizations data received:', orgsData);
                 setUserData(userData);
-                setEditedData(userData);
+                setEditedData({ ...userData, about: userData.about || '', socials: userData.socials || [] });
                 setOrganizations(orgsData);
             } catch (e) {
-                console.error('Error fetching data:', e);
                 if (e.message.includes('401') || e.message.includes('Unauthorized')) {
                     navigate('/login');
                 } else {
@@ -64,27 +49,20 @@ const UserProfilePage = () => {
         fetchData();
     }, [navigate]);
 
-    const handleEdit = () => {
-        setIsEditing(true);
-    };
-
-    const handleCancel = () => {
-        setEditedData(userData);
-        setIsEditing(false);
-    };
-
+    const handleEdit = () => setIsEditing(true);
+    const handleCancel = () => { setEditedData(userData); setIsEditing(false); setSelectedFile(null); };
     const handleSave = async () => {
         try {
             let photoId = editedData.photo;
             if (selectedFile) {
-                console.log('Uploading file:', selectedFile);
                 photoId = await userAccountApi.uploadUserPhoto(selectedFile);
             }
-            const name = [editedData.lastName, editedData.firstName, editedData.middleName].filter(Boolean).join(' ');
             const profileData = {
-                name,
+                name: editedData.name,
                 position: editedData.position,
-                organizationId: editedData.organizationId
+                organizationId: editedData.organizationId,
+                about: editedData.about,
+                socials: editedData.socials
             };
             const updatedUser = await userAccountApi.updateUserProfile(profileData);
             setUserData({ ...updatedUser, photo: photoId });
@@ -92,173 +70,155 @@ const UserProfilePage = () => {
             setIsEditing(false);
             setSelectedFile(null);
         } catch (e) {
-            console.error('Error saving data:', e);
             setError(e.message || 'Ошибка сохранения данных');
         }
     };
-
     const handleFileChange = (event) => {
         const file = event.target.files[0];
         if (file) {
             setSelectedFile(file);
             const reader = new FileReader();
             reader.onloadend = () => {
-                setEditedData(prev => ({
-                    ...prev,
-                    photo: reader.result
-                }));
+                setEditedData(prev => ({ ...prev, photo: reader.result }));
             };
             reader.readAsDataURL(file);
         }
     };
-
     const handleChange = (field) => (event) => {
-        setEditedData(prev => ({
-            ...prev,
-            [field]: event.target.value
-        }));
+        setEditedData(prev => ({ ...prev, [field]: event.target.value }));
     };
-
+    const handleAboutChange = (e) => {
+        setEditedData(prev => ({ ...prev, about: e.target.value }));
+    };
+    const handleSocialChange = (idx, field, value) => {
+        setEditedData(prev => {
+            const socials = [...(prev.socials || [])];
+            socials[idx] = { ...socials[idx], [field]: value };
+            return { ...prev, socials };
+        });
+    };
+    const addSocial = () => {
+        setEditedData(prev => ({ ...prev, socials: [...(prev.socials || []), { type: 'instagram', url: '' }] }));
+    };
+    const removeSocial = (idx) => {
+        setEditedData(prev => {
+            const socials = [...(prev.socials || [])];
+            socials.splice(idx, 1);
+            return { ...prev, socials };
+        });
+    };
     const getPhotoSrc = (photo) => {
         if (!photo) return null;
-        if (typeof photo === 'string' && photo.startsWith('data:image/')) {
-            return photo;
-        }
+        if (typeof photo === 'string' && photo.startsWith('data:image/')) return photo;
         const token = localStorage.getItem('token');
         return `${process.env.REACT_APP_API_URL || 'http://192.168.10.137:8084/api'}/user-accounts/photo/${photo}?token=${token}`;
     };
-
-    if (loading) return <div className="main-content"><Typography>Загрузка...</Typography></div>;
-    if (error) return <div className="main-content"><Typography color="error">{error}</Typography></div>;
+    if (loading) return <div className="profile-modern-loading">Загрузка...</div>;
+    if (error) return <div className="profile-modern-error">{error}</div>;
     if (!userData) return null;
 
     return (
-        <div className="main-content">
-            <Container maxWidth="md">
-                <Paper elevation={3} className="profile-paper">
-                    <Box sx={{ p: 4 }}>
-                        <Grid container spacing={4}>
-                            <Grid item xs={12} md={4} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <Box sx={{ position: 'relative' }}>
-                                    {editedData?.photo ? (
-                                        <Avatar
-                                            src={getPhotoSrc(editedData.photo)}
-                                            sx={{ width: 200, height: 200 }}
-                                        />
-                                    ) : (
-                                        <AccountCircle sx={{ width: 200, height: 200, color: 'primary.main' }} />
-                                    )}
-                                    {isEditing && (
-                                        <IconButton
-                                            sx={{
-                                                position: 'absolute',
-                                                bottom: 0,
-                                                right: 0,
-                                                backgroundColor: 'white'
-                                            }}
-                                            onClick={() => fileInputRef.current.click()}
+        <div className="profile-modern-root">
+            <div className="profile-modern-cover" />
+            <div className="profile-modern-card">
+                <div className="profile-modern-avatar-wrap">
+                    <img
+                        src={getPhotoSrc(editedData?.photo) || '/images/default-avatar.png'}
+                        alt="avatar"
+                        className="profile-modern-avatar"
+                    />
+                    {isEditing && (
+                        <button className="profile-modern-avatar-edit" onClick={() => fileInputRef.current.click()}>
+                            <FaEdit />
+                        </button>
+                    )}
+                    <input
+                        type="file"
+                        hidden
+                        ref={fileInputRef}
+                        accept="image/*"
+                        onChange={handleFileChange}
+                    />
+                </div>
+                <div className="profile-modern-info">
+                    {isEditing ? (
+                        <>
+                            <input
+                                className="profile-modern-input profile-modern-name"
+                                value={editedData.name || ''}
+                                onChange={handleChange('name')}
+                                placeholder="Имя пользователя"
+                            />
+                            <input
+                                className="profile-modern-input profile-modern-position"
+                                value={editedData.position || ''}
+                                onChange={handleChange('position')}
+                                placeholder="Должность"
+                            />
+                            <select
+                                className="profile-modern-input profile-modern-org"
+                                value={editedData.organizationId || ''}
+                                onChange={handleChange('organizationId')}
+                            >
+                                <option value="">Место работы</option>
+                                {organizations.map(org => (
+                                    <option key={org.id} value={org.id}>{org.name}</option>
+                                ))}
+                            </select>
+                            <textarea
+                                className="profile-modern-input profile-modern-about"
+                                value={editedData.about || ''}
+                                onChange={handleAboutChange}
+                                placeholder="О себе"
+                                rows={3}
+                            />
+                            <div className="profile-modern-socials-edit">
+                                <div style={{ fontWeight: 500, marginBottom: 4 }}>Соцсети:</div>
+                                {(editedData.socials || []).map((s, idx) => (
+                                    <div key={idx} className="profile-modern-social-edit-row">
+                                        <select
+                                            value={s.type}
+                                            onChange={e => handleSocialChange(idx, 'type', e.target.value)}
                                         >
-                                            <Edit />
-                                        </IconButton>
-                                    )}
-                                    <input
-                                        type="file"
-                                        hidden
-                                        ref={fileInputRef}
-                                        accept="image/*"
-                                        onChange={handleFileChange}
-                                    />
-                                </Box>
-                            </Grid>
-                            <Grid item xs={12} md={8}>
-                                {isEditing ? (
-                                    <>
-                                        <TextField
-                                            fullWidth
-                                            label="Имя"
-                                            value={editedData.firstName || ''}
-                                            onChange={handleChange('firstName')}
-                                            margin="normal"
+                                            <option value="instagram">Instagram</option>
+                                            <option value="telegram">Telegram</option>
+                                            <option value="vk">VK</option>
+                                        </select>
+                                        <input
+                                            value={s.url}
+                                            onChange={e => handleSocialChange(idx, 'url', e.target.value)}
+                                            placeholder="Ссылка"
                                         />
-                                        <TextField
-                                            fullWidth
-                                            label="Фамилия"
-                                            value={editedData.lastName || ''}
-                                            onChange={handleChange('lastName')}
-                                            margin="normal"
-                                        />
-                                        <TextField
-                                            fullWidth
-                                            label="Отчество"
-                                            value={editedData.middleName || ''}
-                                            onChange={handleChange('middleName')}
-                                            margin="normal"
-                                        />
-                                        <TextField
-                                            fullWidth
-                                            label="Должность"
-                                            value={editedData.position || ''}
-                                            onChange={handleChange('position')}
-                                            margin="normal"
-                                        />
-                                        <FormControl fullWidth margin="normal">
-                                            <InputLabel>Место работы</InputLabel>
-                                            <Select
-                                                value={editedData.organizationId || ''}
-                                                onChange={handleChange('organizationId')}
-                                                label="Место работы"
-                                            >
-                                                {organizations.map(org => (
-                                                    <MenuItem key={org.id} value={org.id}>
-                                                        {org.name}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                        <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-                                            <Button
-                                                variant="contained"
-                                                color="primary"
-                                                onClick={handleSave}
-                                                startIcon={<Save />}
-                                            >
-                                                Сохранить
-                                            </Button>
-                                            <Button
-                                                variant="outlined"
-                                                onClick={handleCancel}
-                                                startIcon={<Cancel />}
-                                            >
-                                                Отмена
-                                            </Button>
-                                        </Box>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Typography variant="h4" gutterBottom>
-                                            {userData.name || ''}
-                                        </Typography>
-                                        <Typography variant="h6" color="text.secondary" gutterBottom>
-                                            {userData.position || ''}
-                                        </Typography>
-                                        <Typography variant="body1" paragraph>
-                                            Место работы: {userData.organization?.name || ''}
-                                        </Typography>
-                                        <Button
-                                            variant="contained"
-                                            color="primary"
-                                            onClick={handleEdit}
-                                            startIcon={<Edit />}
-                                        >
-                                            Редактировать
-                                        </Button>
-                                    </>
-                                )}
-                            </Grid>
-                        </Grid>
-                    </Box>
-                </Paper>
-            </Container>
+                                        <button type="button" onClick={() => removeSocial(idx)} className="profile-modern-social-remove">&times;</button>
+                                    </div>
+                                ))}
+                                <button type="button" className="profile-modern-social-add" onClick={addSocial}>+ Добавить</button>
+                            </div>
+                            <div className="profile-modern-actions">
+                                <button className="profile-modern-btn save" onClick={handleSave}><FaSave /> Сохранить</button>
+                                <button className="profile-modern-btn cancel" onClick={handleCancel}><FaTimes /> Отмена</button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="profile-modern-name">{userData.name || ''}</div>
+                            <div className="profile-modern-position">{userData.position || ''}</div>
+                            <div className="profile-modern-org">{userData.organization?.name || ''}</div>
+                            {userData.about && <div className="profile-modern-about">{userData.about}</div>}
+                            <div className="profile-modern-socials">
+                                {(userData.socials || []).map((s, idx) => (
+                                    <a key={idx} href={s.url} target="_blank" rel="noopener noreferrer" className="profile-modern-social-link">
+                                        {socialIcons[s.type]}
+                                    </a>
+                                ))}
+                            </div>
+                            <div className="profile-modern-actions">
+                                <button className="profile-modern-btn edit" onClick={handleEdit}><FaEdit /> Редактировать</button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
         </div>
     );
 };
