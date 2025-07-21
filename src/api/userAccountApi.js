@@ -53,21 +53,19 @@ export const userAccountApi = {
         return handleResponse(response);
     },
 
-    uploadUserPhoto: async (formData) => {
-        const token = localStorage.getItem('token');
+    uploadUserPhoto: async (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
         const headers = {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
         };
-
-        console.log('Making request to /user-accounts/upload-photo with headers:', headers);
-
-        const response = await fetch(`${API_BASE_URL}/user-accounts/upload-photo`, {
+        console.log('Making request to /user-accounts/photo with headers:', headers);
+        const response = await fetch(`${API_BASE_URL}/user-accounts/photo`, {
             method: 'POST',
             headers,
             body: formData,
             credentials: 'include'
         });
-
         return handleResponse(response);
     },
 
@@ -141,18 +139,6 @@ export function getAllStatuses() {
         { value: 'INACTIVE', label: 'Неактивен' },
         { value: 'BLOCKED', label: 'Заблокирован' },
     ];
-}
-
-// Загрузить аватарку пользователя
-export async function uploadUserPhoto(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await fetch(`${API_URL}/photo`, {
-        method: 'POST',
-        headers: { ...getAuthHeaders() },
-        body: formData,
-    });
-    return res.json(); // возвращает UUID
 }
 
 // Получить аватарку пользователя по UUID

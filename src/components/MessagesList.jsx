@@ -10,7 +10,7 @@ const MessagesList = ({ messages, selectedIds = [], onToggleSelect, onOpenMessag
     return (
       <div className="mail-placeholder">
         Нет сообщений
-      </div>
+        </div>
     );
   }
 
@@ -28,7 +28,7 @@ const MessagesList = ({ messages, selectedIds = [], onToggleSelect, onOpenMessag
       <tbody>
         {messages.filter(msg => msg && msg.id).map(msg => (
           <tr
-            key={msg.id}
+                key={msg.id}
             className={
               (msg.isRead ? '' : 'unread ') + (selectedIds.includes(msg.id) ? 'selected' : '')
             }
@@ -36,7 +36,7 @@ const MessagesList = ({ messages, selectedIds = [], onToggleSelect, onOpenMessag
               // Не открывать модалку, если клик по чекбоксу
               if (e.target.type !== 'checkbox') onOpenMessage(msg);
             }}
-          >
+            >
             <td>
               <input
                 type="checkbox"
@@ -47,7 +47,7 @@ const MessagesList = ({ messages, selectedIds = [], onToggleSelect, onOpenMessag
             </td>
             <td>{msg.sender ? (msg.sender.username || `${msg.sender.lastName || ''} ${msg.sender.firstName || ''}`) : ''}</td>
             <td>
-              {msg.subject || '(Без темы)'}
+                {msg.subject || '(Без темы)'}
               {msg.attachments && msg.attachments.length > 0 && <span className="icon-attach">📎</span>}
             </td>
             <td>{msg.dateSent ? new Date(msg.dateSent).toLocaleString() : ''}</td>

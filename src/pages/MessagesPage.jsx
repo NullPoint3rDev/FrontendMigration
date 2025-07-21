@@ -225,7 +225,7 @@ const MessagesPage = () => {
               <span>{selectedIds.length} выбрано</span>
               <button className="btn-action" onClick={handleMassDelete}>Удалить</button>
               <button className="btn-action" onClick={handleMassMarkRead}>Отметить как прочитанное</button>
-            </div>
+        </div>
           )}
           <MessagesList
             messages={filteredMessages}
