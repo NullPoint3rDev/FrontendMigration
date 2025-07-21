@@ -7,8 +7,8 @@ import {
   getAllOrganizationUnits,
   getAllUserRoles,
   getAllStatuses,
-  uploadUserPhoto,
-  getUserPhotoUrl
+  getUserPhotoUrl,
+  userAccountApi
 } from '../api/userAccountApi';
 import '../styles/equipmentPage.css';
 
@@ -140,7 +140,7 @@ const EmployeesPage = () => {
     try {
       let photoId = editData.photo;
       if (avatarFile) {
-        const uploadRes = await uploadUserPhoto(avatarFile);
+        const uploadRes = await userAccountApi.uploadUserPhoto(avatarFile);
         photoId = uploadRes;
       }
       const payload = {
