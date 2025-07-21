@@ -20,7 +20,7 @@ const MessageCompose = ({ onClose, onSend, replyTo, forwardData, userId }) => {
   // Автозаполнение для replyTo и forwardData
   useEffect(() => {
     if (replyTo) {
-      setRecipient(`${replyTo.sender?.lastName || ''} ${replyTo.sender?.firstName || ''} (${replyTo.sender?.userName || ''})`);
+      setRecipient(replyTo.sender?.username || '');
       setRecipientId(replyTo.sender?.id || '');
       setSubject('Re: ' + (replyTo.subject || ''));
       setBody(`\n\n--- Исходное сообщение ---\n${replyTo.body || ''}`);
