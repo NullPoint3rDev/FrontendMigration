@@ -109,9 +109,7 @@ const Navbar = () => {
                                     </div>
                                 </>
                             ) : (
-                                <Link to={item.path} className="nav-link">
-                                    {item.label}
-                                </Link>
+                                item.label
                             )}
                         </div>
                     ))}
