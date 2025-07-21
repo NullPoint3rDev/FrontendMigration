@@ -5,9 +5,9 @@ import { FaEdit, FaSave, FaTimes, FaInstagram, FaTelegram, FaVk } from 'react-ic
 import { useNavigate } from "react-router-dom";
 
 const socialIcons = {
-  instagram: <FaInstagram />,
-  telegram: <FaTelegram />,
-  vk: <FaVk />,
+    instagram: <FaInstagram />,
+    telegram: <FaTelegram />,
+    vk: <FaVk />,
 };
 
 const UserProfilePage = () => {
@@ -16,7 +16,7 @@ const UserProfilePage = () => {
     const [error, setError] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [editedData, setEditedData] = useState(null);
-    const [units, setUnits] = useState([]);
+    const [organizations, setOrganizations] = useState([]);
     const [selectedFile, setSelectedFile] = useState(null);
     const fileInputRef = useRef();
     const navigate = useNavigate();
@@ -29,13 +29,13 @@ const UserProfilePage = () => {
                 return;
             }
             try {
-                const [userData, unitsData] = await Promise.all([
+                const [userData, orgsData] = await Promise.all([
                     userAccountApi.getCurrentUser(),
-                    userAccountApi.getAllOrganizationUnits()
+                    userAccountApi.getOrganizations()
                 ]);
                 setUserData(userData);
                 setEditedData({ ...userData, about: userData.about || '', socials: userData.socials || [] });
-                setUnits(unitsData);
+                setOrganizations(orgsData);
             } catch (e) {
                 if (e.message.includes('401') || e.message.includes('Unauthorized')) {
                     navigate('/login');
@@ -144,8 +144,8 @@ const UserProfilePage = () => {
                                 onChange={handleChange('organizationId')}
                             >
                                 <option value="">Место работы</option>
-                                {units.map(unit => (
-                                    <option key={unit.id} value={unit.id}>{unit.name}</option>
+                                {organizations.map(org => (
+                                    <option key={org.id} value={org.id}>{org.name}</option>
                                 ))}
                             </select>
                             <textarea
