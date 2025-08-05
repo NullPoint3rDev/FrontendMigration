@@ -31,56 +31,38 @@ const handleResponse = async (response) => {
 
 export const userAccountApi = {
     getCurrentUser: async () => {
-        const headers = getAuthHeaders();
-        console.log('Making request to /user-accounts/current with headers:', headers);
-
-        const response = await fetch(`${API_BASE_URL}/user-accounts/current`, {
-            method: 'GET',
-            headers,
-            credentials: 'include'
+        // Мок: возвращаем фейкового пользователя
+        return Promise.resolve({
+            id: 1,
+            name: "Демо Пользователь",
+            username: "demo",
+            position: "Инженер",
+            organizationId: "1",
+            about: "Это демонстрационный профиль пользователя.",
+            socials: [
+                { type: "telegram", value: "@demo_user" },
+                { type: "vk", value: "vk.com/demo" }
+            ],
+            photo: null
         });
-
-        return handleResponse(response);
     },
 
     updateUserProfile: async (userData) => {
-        console.log('Making request to /user-accounts/profile with headers:', getAuthHeaders());
-        const response = await fetch(`${API_BASE_URL}/user-accounts/profile`, {
-            method: 'PUT',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(userData)
-        });
-        return handleResponse(response);
+        // Мок: возвращаем обновлённые данные
+        return Promise.resolve({ ...userData, id: 1, name: userData.name || "Демо Пользователь" });
     },
 
     uploadUserPhoto: async (file) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        const headers = {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-        };
-        // Не добавляем Content-Type! Браузер сам выставит boundary
-        console.log('Making request to /user-accounts/photo with headers:', headers);
-        const response = await fetch(`${API_BASE_URL}/user-accounts/photo`, {
-            method: 'POST',
-            headers,
-            body: formData,
-            credentials: 'include'
-        });
-        return handleResponse(response);
+        // Мок: возвращаем base64 строку (или null)
+        return Promise.resolve(null);
     },
 
     getOrganizations: async () => {
-        const headers = getAuthHeaders();
-        console.log('Making request to /organizations with headers:', headers);
-
-        const response = await fetch(`${API_BASE_URL}/organizations`, {
-            method: 'GET',
-            headers,
-            credentials: 'include'
-        });
-
-        return handleResponse(response);
+        // Мок: возвращаем список организаций
+        return Promise.resolve([
+            { id: "1", name: "ООО \"СварТех\"" },
+            { id: "2", name: "ЗАО \"МеталлСвар\"" }
+        ]);
     }
 };
 
