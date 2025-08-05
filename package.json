@@ -19,12 +19,12 @@
     "sockjs-client": "^1.6.1"
   },
   "scripts": {
-    "start": "cross-env REACT_APP_API_URL=http://192.168.0.100:8084/api react-scripts start",
-    "build": "cross-env REACT_APP_API_URL=http://192.168.0.100:8084/api react-scripts build",
+    "start": "cross-env REACT_APP_API_URL=http://95.172.58.219:8084/api react-scripts start",
+    "build": "cross-env REACT_APP_API_URL=http://95.172.58.219:8084/api react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "dev": "cross-env REACT_APP_API_URL=http://192.168.0.100:8084/api PORT=3001 react-scripts start",
-    "start-external": "cross-env REACT_APP_API_URL=http://192.168.0.100:8084/api HOST=0.0.0.0 PORT=3001 react-scripts start"
+    "dev": "cross-env REACT_APP_API_URL=http://95.172.58.219:8084/api PORT=3001 react-scripts start",
+    "start-external": "cross-env REACT_APP_API_URL=http://95.172.58.219:8084/api HOST=0.0.0.0 PORT=3001 react-scripts start"
   },
   "eslintConfig": {
     "extends": [
