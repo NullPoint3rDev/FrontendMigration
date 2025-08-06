@@ -125,8 +125,8 @@ const DeviceMonitorPage = () => {
                     if (part.includes(':')) {
                         const [key, value] = part.split(':');
                         if (key && value) {
-                            // Показываем только ток и напряжение
-                            if (key.trim() === 'State.I' || key.trim() === 'State.U') {
+                            // Показываем только ток
+                            if (key.trim() === 'State.I') {
                                 // Конвертируем hex в десятичное число
                                 const decimalValue = parseInt(value.trim(), 16);
                                 params[key.trim()] = decimalValue.toString();
@@ -155,11 +155,11 @@ const DeviceMonitorPage = () => {
                 const mac = '8CAAB579425A'; // MAC адрес сварочного аппарата
                 const params = {};
                 
-                // Извлекаем только ток и напряжение из структурированных данных
+                // Извлекаем только ток из структурированных данных
                 Object.entries(data.state.properties).forEach(([key, prop]) => {
                     if (prop && prop.value) {
-                        // Показываем только ток и напряжение
-                        if (key === 'State.I' || key === 'State.U') {
+                        // Показываем только ток
+                        if (key === 'State.I') {
                             // Конвертируем hex в десятичное число
                             const decimalValue = parseInt(prop.value, 16);
                             params[key] = decimalValue.toString();
@@ -196,7 +196,6 @@ const DeviceMonitorPage = () => {
     const getParameterDisplayName = (key) => {
         switch (key) {
             case 'State.I': return 'Ток (А)';
-            case 'State.U': return 'Напряжение (В)';
             default: return key;
         }
     };
@@ -227,7 +226,6 @@ const DeviceMonitorPage = () => {
         if (lowerKey.includes('memory')) return <Memory />;
         if (lowerKey.includes('status')) return <Settings />;
         if (key === 'State.I') return <ElectricBolt />; // Иконка для тока
-        if (key === 'State.U') return <ElectricBolt />; // Иконка для напряжения
         return <Settings />;
     };
 
@@ -298,10 +296,9 @@ const DeviceMonitorPage = () => {
                     <Card sx={{ boxShadow: 3 }}>
                         <CardContent>
                             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                                ⚡ Основные параметры сварочного аппарата
+                                ⚡ Ток сварочного аппарата
                             </Typography>
                             <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                                Значения автоматически конвертируются из hex в десятичные
                             </Typography>
                             <Divider sx={{ mb: 2 }} />
                             
@@ -319,15 +316,15 @@ const DeviceMonitorPage = () => {
                                                         if (key === 'timestamp') return null;
                                                         
                                                         return (
-                                                            <Grid item xs={12} sm={6} key={key}>
-                                                                <Paper elevation={2} sx={{ p: 3, textAlign: 'center', backgroundColor: 'white', border: '2px solid #e3f2fd' }}>
-                                                                    <Box display="flex" alignItems="center" justifyContent="center" mb={2}>
+                                                            <Grid item xs={12} key={key}>
+                                                                <Paper elevation={3} sx={{ p: 4, textAlign: 'center', backgroundColor: 'white', border: '3px solid #1976d2' }}>
+                                                                    <Box display="flex" alignItems="center" justifyContent="center" mb={3}>
                                                                         {getParameterIcon(key)}
-                                                                        <Typography variant="h6" color="textSecondary" ml={1}>
+                                                                        <Typography variant="h4" color="textSecondary" ml={2}>
                                                                             {getParameterDisplayName(key)}
                                                                         </Typography>
                                                                     </Box>
-                                                                    <Typography variant="h3" fontWeight="bold" color="primary">
+                                                                    <Typography variant="h1" fontWeight="bold" color="primary">
                                                                         {value}
                                                                     </Typography>
                                                                 </Paper>
@@ -350,7 +347,7 @@ const DeviceMonitorPage = () => {
                                     <Warning sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
                                     <Typography variant="body1" color="textSecondary">
                                         {connectionStatus === 'connected' 
-                                            ? 'Ожидание данных тока и напряжения от сварочного аппарата...' 
+                                            ? 'Ожидание данных тока от сварочного аппарата...' 
                                             : 'Нет подключения к сварочному аппарату'}
                                     </Typography>
                                 </Box>
