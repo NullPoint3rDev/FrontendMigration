@@ -182,16 +182,24 @@ function WeldingEquipmentPage() {
     useEffect(() => {
         const stompClient = new Client({
             brokerURL: undefined, // обязательно undefined, если используешь SockJS
-            webSocketFactory: () => new SockJS('http://localhost:8084/api/ws'),
+            webSocketFactory: () => new SockJS('http://95.172.58.219:8084/api/ws'),
             reconnectDelay: 5000,
             onConnect: () => {
+                console.log('WebSocket подключен к сварочному аппарату');
                 stompClient.subscribe('/topic/device', (message) => {
                     if (message.body) {
+                        console.log('Получены данные от устройства:', message.body);
                         const [mac, ...dataArr] = message.body.split(':');
                         const data = dataArr.join(':');
                         setDeviceDataByMac(prev => ({ ...prev, [mac]: data }));
                     }
                 });
+            },
+            onDisconnect: () => {
+                console.log('WebSocket отключен от сварочного аппарата');
+            },
+            onStompError: (error) => {
+                console.error('WebSocket ошибка:', error);
             }
         });
         stompClient.activate();
