@@ -39,6 +39,7 @@ const Navbar = () => {
             dropdown: [
                 { label: 'Архив', path: '/archive' },
                 { label: 'Отчеты', path: '/reports' },
+                { label: 'Мониторинг сварочного аппарата', path: '/device-monitor' },
             ],
         },
         {

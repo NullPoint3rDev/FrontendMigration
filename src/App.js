@@ -20,6 +20,7 @@ import EmployeesPage from './components/EmployeesPage';
 import LibraryPage from './pages/LibraryPage';
 import SupportPage from './pages/SupportPage';
 import MessagesPage from './pages/MessagesPage';
+import DeviceMonitorPage from './components/DeviceMonitorPage';
 import './App.css';
 
 const theme = createTheme({
@@ -72,6 +73,7 @@ function App() {
                                 <Route path="/profile" element={<UserProfilePage />} />
                                 <Route path="/support" element={<SupportPage />} />
                                 <Route path="/messages" element={<MessagesPage />} />
+                                <Route path="/device-monitor" element={<DeviceMonitorPage />} />
                             </Routes>
                         </PrivateRoute>
                     } />
