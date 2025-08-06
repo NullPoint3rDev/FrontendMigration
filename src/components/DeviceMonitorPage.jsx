@@ -125,7 +125,12 @@ const DeviceMonitorPage = () => {
                     if (part.includes(':')) {
                         const [key, value] = part.split(':');
                         if (key && value) {
-                            params[key.trim()] = value.trim();
+                            // Показываем только ток и напряжение
+                            if (key.trim() === 'State.I' || key.trim() === 'State.U') {
+                                // Конвертируем hex в десятичное число
+                                const decimalValue = parseInt(value.trim(), 16);
+                                params[key.trim()] = decimalValue.toString();
+                            }
                         }
                     }
                 });
@@ -150,17 +155,17 @@ const DeviceMonitorPage = () => {
                 const mac = '8CAAB579425A'; // MAC адрес сварочного аппарата
                 const params = {};
                 
-                // Извлекаем параметры из структурированных данных
+                // Извлекаем только ток и напряжение из структурированных данных
                 Object.entries(data.state.properties).forEach(([key, prop]) => {
                     if (prop && prop.value) {
-                        params[key] = prop.value;
+                        // Показываем только ток и напряжение
+                        if (key === 'State.I' || key === 'State.U') {
+                            // Конвертируем hex в десятичное число
+                            const decimalValue = parseInt(prop.value, 16);
+                            params[key] = decimalValue.toString();
+                        }
                     }
                 });
-                
-                // Добавляем статус
-                if (data.state.status) {
-                    params['Status'] = data.state.status;
-                }
                 
                 setDeviceData(prev => ({
                     ...prev,
@@ -175,6 +180,24 @@ const DeviceMonitorPage = () => {
             }
         } catch (err) {
             console.error('Ошибка обработки структурированных данных:', err);
+        }
+    };
+
+    // Функция для конвертации hex в десятичное число
+    const hexToDecimal = (hexValue) => {
+        try {
+            return parseInt(hexValue, 16).toString();
+        } catch (err) {
+            return hexValue; // Возвращаем исходное значение, если не удалось конвертировать
+        }
+    };
+
+    // Функция для получения читаемого названия параметра
+    const getParameterDisplayName = (key) => {
+        switch (key) {
+            case 'State.I': return 'Ток (А)';
+            case 'State.U': return 'Напряжение (В)';
+            default: return key;
         }
     };
 
@@ -203,6 +226,8 @@ const DeviceMonitorPage = () => {
         if (lowerKey.includes('power')) return <ElectricBolt />;
         if (lowerKey.includes('memory')) return <Memory />;
         if (lowerKey.includes('status')) return <Settings />;
+        if (key === 'State.I') return <ElectricBolt />; // Иконка для тока
+        if (key === 'State.U') return <ElectricBolt />; // Иконка для напряжения
         return <Settings />;
     };
 
@@ -273,7 +298,10 @@ const DeviceMonitorPage = () => {
                     <Card sx={{ boxShadow: 3 }}>
                         <CardContent>
                             <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                                📈 Данные сварочного аппарата
+                                ⚡ Основные параметры сварочного аппарата
+                            </Typography>
+                            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                                Значения автоматически конвертируются из hex в десятичные
                             </Typography>
                             <Divider sx={{ mb: 2 }} />
                             
@@ -291,15 +319,15 @@ const DeviceMonitorPage = () => {
                                                         if (key === 'timestamp') return null;
                                                         
                                                         return (
-                                                            <Grid item xs={12} sm={6} md={4} key={key}>
-                                                                <Paper elevation={1} sx={{ p: 2, textAlign: 'center', backgroundColor: 'white' }}>
-                                                                    <Box display="flex" alignItems="center" justifyContent="center" mb={1}>
+                                                            <Grid item xs={12} sm={6} key={key}>
+                                                                <Paper elevation={2} sx={{ p: 3, textAlign: 'center', backgroundColor: 'white', border: '2px solid #e3f2fd' }}>
+                                                                    <Box display="flex" alignItems="center" justifyContent="center" mb={2}>
                                                                         {getParameterIcon(key)}
-                                                                        <Typography variant="subtitle2" color="textSecondary" ml={1}>
-                                                                            {key}
+                                                                        <Typography variant="h6" color="textSecondary" ml={1}>
+                                                                            {getParameterDisplayName(key)}
                                                                         </Typography>
                                                                     </Box>
-                                                                    <Typography variant="h6" fontWeight="bold" color="primary">
+                                                                    <Typography variant="h3" fontWeight="bold" color="primary">
                                                                         {value}
                                                                     </Typography>
                                                                 </Paper>
@@ -322,7 +350,7 @@ const DeviceMonitorPage = () => {
                                     <Warning sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
                                     <Typography variant="body1" color="textSecondary">
                                         {connectionStatus === 'connected' 
-                                            ? 'Ожидание данных от сварочного аппарата...' 
+                                            ? 'Ожидание данных тока и напряжения от сварочного аппарата...' 
                                             : 'Нет подключения к сварочному аппарату'}
                                     </Typography>
                                 </Box>
