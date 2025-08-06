@@ -75,6 +75,20 @@ const DeviceMonitorPage = () => {
                         ]);
                     }
                 });
+                
+                // Подписываемся на структурированные данные
+                stompClient.subscribe('/topic/device-state', (message) => {
+                    if (message.body) {
+                        try {
+                            const data = JSON.parse(message.body);
+                            console.log('📊 Получены структурированные данные:', data);
+                            processStructuredData(data);
+                            setLastUpdate(new Date());
+                        } catch (err) {
+                            console.error('Ошибка парсинга JSON:', err);
+                        }
+                    }
+                });
             },
             onDisconnect: () => {
                 console.log('❌ WebSocket отключен от сварочного аппарата');
@@ -127,6 +141,40 @@ const DeviceMonitorPage = () => {
             }
         } catch (err) {
             console.error('Ошибка обработки данных:', err);
+        }
+    };
+
+    const processStructuredData = (data) => {
+        try {
+            if (data.state && data.state.properties) {
+                const mac = '8CAAB579425A'; // MAC адрес сварочного аппарата
+                const params = {};
+                
+                // Извлекаем параметры из структурированных данных
+                Object.entries(data.state.properties).forEach(([key, prop]) => {
+                    if (prop && prop.value) {
+                        params[key] = prop.value;
+                    }
+                });
+                
+                // Добавляем статус
+                if (data.state.status) {
+                    params['Status'] = data.state.status;
+                }
+                
+                setDeviceData(prev => ({
+                    ...prev,
+                    [mac]: {
+                        ...prev[mac],
+                        ...params,
+                        timestamp: data.timestamp || new Date().toLocaleTimeString()
+                    }
+                }));
+                
+                console.log('✅ Структурированные данные обработаны:', params);
+            }
+        } catch (err) {
+            console.error('Ошибка обработки структурированных данных:', err);
         }
     };
 
