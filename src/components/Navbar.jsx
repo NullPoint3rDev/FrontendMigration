@@ -11,54 +11,47 @@ const Navbar = () => {
     const navMenu = [
         { label: 'Главная', path: '/' },
         {
-            label: 'Предприятия',
+            label: '1. Предприятие',
             dropdown: [
-                { label: 'Организации', path: '/organizations' },
-                { label: 'Сотрудники', path: '/employees' },
+                { label: 'Подразделения', path: '/departments' },
+                { label: 'Сотрудники (пользователи)', path: '/employees' },
                 { label: 'Сварщики', path: '/welders' },
             ],
         },
         {
-            label: 'Ресурсы',
+            label: '2. Ресурсы',
             dropdown: [
-                { label: 'Сварочные материалы', path: '/materials' },
                 { label: 'Сварочное оборудование', path: '/equipment' },
+                { label: 'Сетевое оборудование системы мониторинга', path: '/network-equipment' },
+                { label: 'Сварочные материалы', path: '/materials' },
+                { label: 'Технологические карты сварки (WPS)', path: '/wps' },
             ],
         },
         {
-            label: 'Инструкции',
+            label: '3. Мониторинг',
             dropdown: [
-                { label: 'Безопасность сварочных работ', path: '/safety' },
-                { label: 'Прошивки', path: '/firmware' },
-                { label: 'Документы', path: '/docs' },
-                { label: 'Руководства', path: '/manuals' },
+                { label: 'Карта предприятия', path: '/enterprise-map' },
+                { label: 'Перечень оборудования', path: '/equipment-list' },
             ],
         },
         {
-            label: 'Мониторинг',
+            label: '4. Отчеты',
             dropdown: [
-                { label: 'Архив', path: '/archive' },
-                { label: 'Отчеты', path: '/reports' },
-                { label: 'Мониторинг сварочного аппарата', path: '/device-monitor' },
+                { label: 'По работе оборудования', path: '/reports/equipment' },
+                { label: 'По работе сварщиков', path: '/reports/welders' },
+                { label: 'По расходу материалов', path: '/reports/materials' },
+                { label: 'По сварочным швам', path: '/reports/welds' },
+                { label: 'Отправка уведомлений и отчетов по эл. почте', path: '/reports/notifications' },
+                { label: 'По ошибкам сварочного оборудования', path: '/reports/errors' },
+                { label: 'Перечень швов, выполненных с нарушением', path: '/reports/violations' },
+                { label: 'Отчет о выполнении сварочного задания', path: '/reports/tasks' },
             ],
         },
         {
-            label: 'Обучение',
+            label: '5. Настройки',
             dropdown: [
-                { label: 'Библиотека', path: '/library' },
-            ],
-        },
-        {
-            label: 'Общение',
-            dropdown: [
-                { label: 'Сообщения', path: '/messages' },
-                { label: 'Поддержка', path: '/support' },
-            ],
-        },
-        {
-            label: 'ДСЕ',
-            dropdown: [
-                { label: 'Типы проволоки', path: '/wire-types' },
+                { label: 'Время хранения информации в БД', path: '/settings/storage' },
+                { label: 'Время отсутствия активности пользователя', path: '/settings/inactivity' },
             ],
         },
         { label: 'О программе', path: '/about' },
