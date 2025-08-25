@@ -11,7 +11,7 @@ const Navbar = () => {
     const navMenu = [
         { label: 'Главная', path: '/' },
         {
-            label: '1. Предприятие',
+            label: 'Предприятие',
             dropdown: [
                 { label: 'Подразделения', path: '/departments' },
                 { label: 'Сотрудники (пользователи)', path: '/employees' },
@@ -19,7 +19,7 @@ const Navbar = () => {
             ],
         },
         {
-            label: '2. Ресурсы',
+            label: 'Ресурсы',
             dropdown: [
                 { label: 'Сварочное оборудование', path: '/equipment' },
                 { label: 'Сетевое оборудование системы мониторинга', path: '/network-equipment' },
@@ -28,14 +28,14 @@ const Navbar = () => {
             ],
         },
         {
-            label: '3. Мониторинг',
+            label: 'Мониторинг',
             dropdown: [
                 { label: 'Карта предприятия', path: '/enterprise-map' },
                 { label: 'Перечень оборудования', path: '/equipment-list' },
             ],
         },
         {
-            label: '4. Отчеты',
+            label: 'Отчеты',
             dropdown: [
                 { label: 'По работе оборудования', path: '/reports/equipment' },
                 { label: 'По работе сварщиков', path: '/reports/welders' },
@@ -48,7 +48,7 @@ const Navbar = () => {
             ],
         },
         {
-            label: '5. Настройки',
+            label: 'Настройки',
             dropdown: [
                 { label: 'Время хранения информации в БД', path: '/settings/storage' },
                 { label: 'Время отсутствия активности пользователя', path: '/settings/inactivity' },
