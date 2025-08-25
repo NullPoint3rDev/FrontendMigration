@@ -213,7 +213,7 @@ const NetworkEquipmentPage = () => {
                                 >
                                     <option value="">Выберите тип</option>
                                     <option value="monitoring_block">Блок мониторинга</option>
-                                    <option value="hub">Концентратор</option>
+                                    <option value="hub">Радио-приемник</option>
                                     <option value="router">Роутер</option>
                                 </select>
                                 {errors.type && <p className="error-message">{errors.type}</p>}
