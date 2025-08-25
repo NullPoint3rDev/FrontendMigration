@@ -1,24 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/equipmentPage.css';
+import { 
+    getAllNetworkEquipment, 
+    createNetworkEquipment, 
+    updateNetworkEquipment, 
+    deleteNetworkEquipment 
+} from '../api/networkEquipmentApi';
 
 const NetworkEquipmentPage = () => {
     const [equipment, setEquipment] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
     const [editData, setEditData] = useState({});
     const [errors, setErrors] = useState({});
+    const [loading, setLoading] = useState(false);
 
-    // Load equipment from localStorage
+    // Load equipment from API
     useEffect(() => {
-        const savedEquipment = localStorage.getItem('networkEquipment');
-        if (savedEquipment) {
-            setEquipment(JSON.parse(savedEquipment));
-        }
+        loadEquipment();
     }, []);
 
-    // Save equipment to localStorage when it changes
-    useEffect(() => {
-        localStorage.setItem('networkEquipment', JSON.stringify(equipment));
-    }, [equipment]);
+    const loadEquipment = async () => {
+        try {
+            setLoading(true);
+            const data = await getAllNetworkEquipment();
+            setEquipment(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Ошибка загрузки оборудования:', error);
+            setEquipment([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const openAddModal = () => {
         setEditData({
@@ -28,7 +40,7 @@ const NetworkEquipmentPage = () => {
             macAddress: '',
             location: '',
             description: '',
-            status: 'active'
+            status: 'Active'
         });
         setErrors({});
         setModalOpen(true);
@@ -52,12 +64,16 @@ const NetworkEquipmentPage = () => {
 
     const getEquipmentTypeLabel = (type) => {
         switch (type) {
-            case 'monitoring_block':
+            case 'MONITORING_BLOCK':
                 return 'Блок мониторинга';
-            case 'hub':
+            case 'RADIO_RECEIVER':
                 return 'Радио-приемник';
-            case 'router':
+            case 'ROUTER':
                 return 'Роутер';
+            case 'HUB':
+                return 'Концентратор';
+            case 'SWITCH':
+                return 'Коммутатор';
             default:
                 return 'Неизвестно';
         }
@@ -65,18 +81,18 @@ const NetworkEquipmentPage = () => {
 
     const getStatusLabel = (status) => {
         switch (status) {
-            case 'active':
+            case 'Active':
                 return 'Активен';
-            case 'inactive':
+            case 'Inactive':
                 return 'Неактивен';
-            case 'maintenance':
+            case 'Maintenance':
                 return 'Обслуживание';
             default:
                 return 'Неизвестно';
         }
     };
 
-    const handleSave = (e) => {
+    const handleSave = async (e) => {
         e.preventDefault();
         const newErrors = {};
         if (!editData.name) newErrors.name = 'Это поле обязательно';
@@ -90,32 +106,56 @@ const NetworkEquipmentPage = () => {
             return;
         }
 
-        if (editData.id) {
-            setEquipment(prev =>
-                prev.map(item => item.id === editData.id ? editData : item)
-            );
-        } else {
-            const newEquipment = {
-                ...editData,
-                id: Date.now().toString(),
-                lastSeen: new Date().toLocaleString()
-            };
-            setEquipment(prev => [...prev, newEquipment]);
+        try {
+            setLoading(true);
+            if (editData.id) {
+                await updateNetworkEquipment(editData.id, editData);
+            } else {
+                await createNetworkEquipment(editData);
+            }
+            await loadEquipment();
+            closeModal();
+        } catch (error) {
+            console.error('Ошибка сохранения оборудования:', error);
+            setErrors({ api: error.message || 'Ошибка сохранения' });
+        } finally {
+            setLoading(false);
         }
-        closeModal();
     };
 
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (window.confirm('Вы уверены, что хотите удалить это оборудование?')) {
-            setEquipment(prev => prev.filter(item => item.id !== id));
+            try {
+                setLoading(true);
+                await deleteNetworkEquipment(id);
+                await loadEquipment();
+            } catch (error) {
+                console.error('Ошибка удаления оборудования:', error);
+                alert('Ошибка удаления оборудования: ' + error.message);
+            } finally {
+                setLoading(false);
+            }
         }
     };
+
+    if (loading && equipment.length === 0) {
+        return (
+            <div className="equipment-page">
+                <div className="equipment-header">
+                    <h1 className="equipment-title">Сетевое оборудование системы мониторинга</h1>
+                </div>
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                    Загрузка...
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="equipment-page">
             <div className="equipment-header">
                 <h1 className="equipment-title">Сетевое оборудование системы мониторинга</h1>
-                <button className="add-equipment-btn" onClick={openAddModal}>
+                <button className="add-equipment-btn" onClick={openAddModal} disabled={loading}>
                     <i className="fas fa-plus"></i>
                     Добавить оборудование
                 </button>
@@ -147,7 +187,7 @@ const NetworkEquipmentPage = () => {
                                 {item.lastSeen && (
                                     <div className="detail-item">
                                         <span className="detail-label">Последняя активность:</span>
-                                        {item.lastSeen}
+                                        {new Date(item.lastSeen).toLocaleString()}
                                     </div>
                                 )}
                             </div>
@@ -161,6 +201,7 @@ const NetworkEquipmentPage = () => {
                                 <button
                                     className="action-btn edit-btn"
                                     onClick={() => openEditModal(item)}
+                                    disabled={loading}
                                 >
                                     <i className="fas fa-edit"></i>
                                     Редактировать
@@ -168,6 +209,7 @@ const NetworkEquipmentPage = () => {
                                 <button
                                     className="action-btn delete-btn"
                                     onClick={() => handleDelete(item.id)}
+                                    disabled={loading}
                                 >
                                     <i className="fas fa-trash"></i>
                                     Удалить
@@ -199,6 +241,7 @@ const NetworkEquipmentPage = () => {
                                     onChange={handleInputChange}
                                     className="form-input"
                                     placeholder="Введите название оборудования"
+                                    disabled={loading}
                                 />
                                 {errors.name && <p className="error-message">{errors.name}</p>}
                             </div>
@@ -210,11 +253,14 @@ const NetworkEquipmentPage = () => {
                                     value={editData.type || ''}
                                     onChange={handleInputChange}
                                     className="form-input"
+                                    disabled={loading}
                                 >
                                     <option value="">Выберите тип</option>
-                                    <option value="monitoring_block">Блок мониторинга</option>
-                                    <option value="hub">Радио-приемник</option>
-                                    <option value="router">Роутер</option>
+                                    <option value="MONITORING_BLOCK">Блок мониторинга</option>
+                                    <option value="RADIO_RECEIVER">Радио-приемник</option>
+                                    <option value="ROUTER">Роутер</option>
+                                    <option value="HUB">Концентратор</option>
+                                    <option value="SWITCH">Коммутатор</option>
                                 </select>
                                 {errors.type && <p className="error-message">{errors.type}</p>}
                             </div>
@@ -228,6 +274,7 @@ const NetworkEquipmentPage = () => {
                                     onChange={handleInputChange}
                                     className="form-input"
                                     placeholder="Введите IP адрес"
+                                    disabled={loading}
                                 />
                                 {errors.ipAddress && <p className="error-message">{errors.ipAddress}</p>}
                             </div>
@@ -241,6 +288,7 @@ const NetworkEquipmentPage = () => {
                                     onChange={handleInputChange}
                                     className="form-input"
                                     placeholder="Введите MAC адрес"
+                                    disabled={loading}
                                 />
                                 {errors.macAddress && <p className="error-message">{errors.macAddress}</p>}
                             </div>
@@ -254,6 +302,7 @@ const NetworkEquipmentPage = () => {
                                     onChange={handleInputChange}
                                     className="form-input"
                                     placeholder="Введите расположение"
+                                    disabled={loading}
                                 />
                                 {errors.location && <p className="error-message">{errors.location}</p>}
                             </div>
@@ -267,6 +316,7 @@ const NetworkEquipmentPage = () => {
                                     className="form-input"
                                     placeholder="Введите описание"
                                     rows="3"
+                                    disabled={loading}
                                 />
                             </div>
 
@@ -274,22 +324,25 @@ const NetworkEquipmentPage = () => {
                                 <label className="form-label">Статус</label>
                                 <select
                                     name="status"
-                                    value={editData.status || 'active'}
+                                    value={editData.status || 'Active'}
                                     onChange={handleInputChange}
                                     className="form-input"
+                                    disabled={loading}
                                 >
-                                    <option value="active">Активен</option>
-                                    <option value="inactive">Неактивен</option>
-                                    <option value="maintenance">Обслуживание</option>
+                                    <option value="Active">Активен</option>
+                                    <option value="Inactive">Неактивен</option>
+                                    <option value="Maintenance">Обслуживание</option>
                                 </select>
                             </div>
 
+                            {errors.api && <p className="error-message">{errors.api}</p>}
+
                             <div className="modal-actions">
-                                <button type="button" className="cancel-btn" onClick={closeModal}>
+                                <button type="button" className="cancel-btn" onClick={closeModal} disabled={loading}>
                                     Отмена
                                 </button>
-                                <button type="submit" className="save-btn">
-                                    {editData.id ? 'Сохранить' : 'Добавить'}
+                                <button type="submit" className="save-btn" disabled={loading}>
+                                    {loading ? 'Сохранение...' : (editData.id ? 'Сохранить' : 'Добавить')}
                                 </button>
                             </div>
                         </form>
