@@ -1,280 +1,220 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Container,
-    Typography,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Button,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    TextField,
-    IconButton,
-    Box,
-    Chip
-} from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import '../styles/equipmentPage.css';
 
 const DepartmentsPage = () => {
     const [departments, setDepartments] = useState([]);
-    const [openDialog, setOpenDialog] = useState(false);
-    const [editingDepartment, setEditingDepartment] = useState(null);
-    const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        parentDepartment: '',
-        level: 1
-    });
+    const [modalOpen, setModalOpen] = useState(false);
+    const [editData, setEditData] = useState({});
+    const [errors, setErrors] = useState({});
 
+    // Load departments from localStorage
     useEffect(() => {
-        // Здесь будет загрузка данных с сервера
-        loadDepartments();
+        const savedDepartments = localStorage.getItem('departments');
+        if (savedDepartments) {
+            setDepartments(JSON.parse(savedDepartments));
+        }
     }, []);
 
-    const loadDepartments = async () => {
-        try {
-            // TODO: Заменить на реальный API вызов
-            const mockData = [
-                {
-                    id: 1,
-                    name: 'Производственный цех №1',
-                    description: 'Основной производственный цех',
-                    parentDepartment: null,
-                    level: 1,
-                    employeeCount: 25
-                },
-                {
-                    id: 2,
-                    name: 'Сварочный участок',
-                    description: 'Участок сварочных работ',
-                    parentDepartment: 'Производственный цех №1',
-                    level: 2,
-                    employeeCount: 12
-                },
-                {
-                    id: 3,
-                    name: 'Отдел качества',
-                    description: 'Контроль качества продукции',
-                    parentDepartment: null,
-                    level: 1,
-                    employeeCount: 8
-                }
-            ];
-            setDepartments(mockData);
-        } catch (error) {
-            console.error('Ошибка загрузки подразделений:', error);
-        }
-    };
+    // Save departments to localStorage when it changes
+    useEffect(() => {
+        localStorage.setItem('departments', JSON.stringify(departments));
+    }, [departments]);
 
-    const handleOpenDialog = (department = null) => {
-        if (department) {
-            setEditingDepartment(department);
-            setFormData({
-                name: department.name,
-                description: department.description,
-                parentDepartment: department.parentDepartment || '',
-                level: department.level
-            });
-        } else {
-            setEditingDepartment(null);
-            setFormData({
-                name: '',
-                description: '',
-                parentDepartment: '',
-                level: 1
-            });
-        }
-        setOpenDialog(true);
-    };
-
-    const handleCloseDialog = () => {
-        setOpenDialog(false);
-        setEditingDepartment(null);
-        setFormData({
+    const openAddModal = () => {
+        setEditData({
             name: '',
             description: '',
             parentDepartment: '',
             level: 1
         });
+        setErrors({});
+        setModalOpen(true);
     };
 
-    const handleSubmit = async () => {
-        try {
-            if (editingDepartment) {
-                // Обновление существующего подразделения
-                // TODO: API вызов для обновления
-                console.log('Обновление подразделения:', formData);
-            } else {
-                // Создание нового подразделения
-                // TODO: API вызов для создания
-                console.log('Создание подразделения:', formData);
-            }
-            handleCloseDialog();
-            loadDepartments();
-        } catch (error) {
-            console.error('Ошибка сохранения подразделения:', error);
+    const openEditModal = (department) => {
+        setEditData(department);
+        setErrors({});
+        setModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setModalOpen(false);
+        setEditData({});
+        setErrors({});
+    };
+
+    const handleInputChange = (e) => {
+        setEditData({ ...editData, [e.target.name]: e.target.value });
+    };
+
+    const handleSave = (e) => {
+        e.preventDefault();
+        const newErrors = {};
+        if (!editData.name) newErrors.name = 'Это поле обязательно';
+        if (!editData.description) newErrors.description = 'Это поле обязательно';
+
+        if (Object.keys(newErrors).length) {
+            setErrors(newErrors);
+            return;
         }
+
+        if (editData.id) {
+            setDepartments(prev =>
+                prev.map(dept => dept.id === editData.id ? editData : dept)
+            );
+        } else {
+            const newDepartment = {
+                ...editData,
+                id: Date.now().toString(),
+                employeeCount: 0
+            };
+            setDepartments(prev => [...prev, newDepartment]);
+        }
+        closeModal();
     };
 
-    const handleDelete = async (id) => {
+    const handleDelete = (id) => {
         if (window.confirm('Вы уверены, что хотите удалить это подразделение?')) {
-            try {
-                // TODO: API вызов для удаления
-                console.log('Удаление подразделения:', id);
-                loadDepartments();
-            } catch (error) {
-                console.error('Ошибка удаления подразделения:', error);
-            }
+            setDepartments(prev => prev.filter(dept => dept.id !== id));
         }
     };
 
     return (
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h4" component="h1">
-                    Подразделения
-                </Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => handleOpenDialog()}
-                >
+        <div className="equipment-page">
+            <div className="equipment-header">
+                <h1 className="equipment-title">Подразделения</h1>
+                <button className="add-equipment-btn" onClick={openAddModal}>
+                    <i className="fas fa-plus"></i>
                     Добавить подразделение
-                </Button>
-            </Box>
+                </button>
+            </div>
 
-            <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-                <TableContainer>
-                    <Table stickyHeader>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Название</TableCell>
-                                <TableCell>Описание</TableCell>
-                                <TableCell>Родительское подразделение</TableCell>
-                                <TableCell>Уровень</TableCell>
-                                <TableCell>Количество сотрудников</TableCell>
-                                <TableCell>Действия</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {departments.map((department) => (
-                                <TableRow key={department.id}>
-                                    <TableCell>
-                                        <Typography variant="body1" fontWeight="medium">
-                                            {department.name}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>{department.description}</TableCell>
-                                    <TableCell>
-                                        {department.parentDepartment ? (
-                                            <Chip label={department.parentDepartment} size="small" />
-                                        ) : (
-                                            <Typography variant="body2" color="text.secondary">
-                                                -
-                                            </Typography>
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Chip 
-                                            label={`Уровень ${department.level}`} 
-                                            size="small" 
-                                            color="primary" 
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="body2">
-                                            {department.employeeCount} чел.
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <IconButton
-                                            size="small"
-                                            onClick={() => handleOpenDialog(department)}
-                                            color="primary"
-                                        >
-                                            <EditIcon />
-                                        </IconButton>
-                                        <IconButton
-                                            size="small"
-                                            onClick={() => handleDelete(department.id)}
-                                            color="error"
-                                        >
-                                            <DeleteIcon />
-                                        </IconButton>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
+            <div className="equipment-grid">
+                {departments.map((department) => (
+                    <div key={department.id} className="equipment-card">
+                        <div className="equipment-info">
+                            <h3 className="equipment-name">{department.name}</h3>
+                            <p className="equipment-model">{department.description}</p>
+                            <div className="equipment-details">
+                                <div className="detail-item">
+                                    <span className="detail-label">Уровень:</span>
+                                    {department.level}
+                                </div>
+                                {department.parentDepartment && (
+                                    <div className="detail-item">
+                                        <span className="detail-label">Родительское подразделение:</span>
+                                        {department.parentDepartment}
+                                    </div>
+                                )}
+                                <div className="detail-item">
+                                    <span className="detail-label">Количество сотрудников:</span>
+                                    {department.employeeCount || 0} чел.
+                                </div>
+                            </div>
+                            <div className="equipment-actions">
+                                <button
+                                    className="action-btn edit-btn"
+                                    onClick={() => openEditModal(department)}
+                                >
+                                    <i className="fas fa-edit"></i>
+                                    Редактировать
+                                </button>
+                                <button
+                                    className="action-btn delete-btn"
+                                    onClick={() => handleDelete(department.id)}
+                                >
+                                    <i className="fas fa-trash"></i>
+                                    Удалить
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
 
-            <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-                <DialogTitle>
-                    {editingDepartment ? 'Редактировать подразделение' : 'Добавить подразделение'}
-                </DialogTitle>
-                <DialogContent>
-                    <Box sx={{ pt: 2 }}>
-                        <TextField
-                            fullWidth
-                            label="Название подразделения"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            margin="normal"
-                            required
-                        />
-                        <TextField
-                            fullWidth
-                            label="Описание"
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            margin="normal"
-                            multiline
-                            rows={3}
-                        />
-                        <TextField
-                            fullWidth
-                            label="Родительское подразделение"
-                            value={formData.parentDepartment}
-                            onChange={(e) => setFormData({ ...formData, parentDepartment: e.target.value })}
-                            margin="normal"
-                            select
-                            SelectProps={{ native: true }}
-                        >
-                            <option value="">Нет родительского подразделения</option>
-                            {departments
-                                .filter(dept => dept.level < 3)
-                                .map((dept) => (
-                                    <option key={dept.id} value={dept.name}>
-                                        {dept.name}
-                                    </option>
-                                ))}
-                        </TextField>
-                        <TextField
-                            fullWidth
-                            label="Уровень"
-                            type="number"
-                            value={formData.level}
-                            onChange={(e) => setFormData({ ...formData, level: parseInt(e.target.value) })}
-                            margin="normal"
-                            inputProps={{ min: 1, max: 5 }}
-                        />
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCloseDialog}>Отмена</Button>
-                    <Button onClick={handleSubmit} variant="contained">
-                        {editingDepartment ? 'Сохранить' : 'Добавить'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
-        </Container>
+            {modalOpen && (
+                <div className="modal-overlay" onClick={closeModal}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">
+                                {editData.id ? 'Редактировать подразделение' : 'Добавить подразделение'}
+                            </h2>
+                            <button className="close-btn" onClick={closeModal}>
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <form onSubmit={handleSave}>
+                            <div className="form-group">
+                                <label className="form-label">Название подразделения</label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={editData.name || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите название подразделения"
+                                />
+                                {errors.name && <p className="error-message">{errors.name}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Описание</label>
+                                <textarea
+                                    name="description"
+                                    value={editData.description || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите описание"
+                                    rows="3"
+                                />
+                                {errors.description && <p className="error-message">{errors.description}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Родительское подразделение</label>
+                                <select
+                                    name="parentDepartment"
+                                    value={editData.parentDepartment || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                >
+                                    <option value="">Нет родительского подразделения</option>
+                                    {departments
+                                        .filter(dept => dept.level < 3 && dept.id !== editData.id)
+                                        .map((dept) => (
+                                            <option key={dept.id} value={dept.name}>
+                                                {dept.name}
+                                            </option>
+                                        ))}
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Уровень</label>
+                                <input
+                                    type="number"
+                                    name="level"
+                                    value={editData.level || 1}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    min="1"
+                                    max="5"
+                                />
+                            </div>
+
+                            <div className="modal-actions">
+                                <button type="button" className="cancel-btn" onClick={closeModal}>
+                                    Отмена
+                                </button>
+                                <button type="submit" className="save-btn">
+                                    {editData.id ? 'Сохранить' : 'Добавить'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 

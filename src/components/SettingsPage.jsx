@@ -1,25 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Container,
-    Typography,
-    Paper,
-    Grid,
-    Card,
-    CardContent,
-    CardActions,
-    Button,
-    TextField,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    Switch,
-    FormControlLabel,
-    Box,
-    Divider,
-    Alert
-} from '@mui/material';
-import { Save as SaveIcon, Refresh as RefreshIcon } from '@mui/icons-material';
+import '../styles/equipmentPage.css';
 
 const SettingsPage = () => {
     const [settings, setSettings] = useState({
@@ -52,26 +32,18 @@ const SettingsPage = () => {
     const [loading, setLoading] = useState(false);
     const [saved, setSaved] = useState(false);
 
+    // Load settings from localStorage
     useEffect(() => {
-        loadSettings();
+        const savedSettings = localStorage.getItem('systemSettings');
+        if (savedSettings) {
+            setSettings(JSON.parse(savedSettings));
+        }
     }, []);
 
-    const loadSettings = async () => {
-        try {
-            setLoading(true);
-            // TODO: Заменить на реальный API вызов
-            // const response = await api.getSettings();
-            // setSettings(response.data);
-            
-            // Имитация загрузки
-            setTimeout(() => {
-                setLoading(false);
-            }, 1000);
-        } catch (error) {
-            console.error('Ошибка загрузки настроек:', error);
-            setLoading(false);
-        }
-    };
+    // Save settings to localStorage when it changes
+    useEffect(() => {
+        localStorage.setItem('systemSettings', JSON.stringify(settings));
+    }, [settings]);
 
     const handleSave = async () => {
         try {
@@ -93,7 +65,30 @@ const SettingsPage = () => {
 
     const handleReset = () => {
         if (window.confirm('Вы уверены, что хотите сбросить все настройки к значениям по умолчанию?')) {
-            loadSettings();
+            const defaultSettings = {
+                dataRetention: {
+                    weldingData: 365,
+                    userLogs: 90,
+                    systemLogs: 180,
+                    reports: 730,
+                    tempFiles: 7
+                },
+                userInactivity: {
+                    sessionTimeout: 30,
+                    autoLogout: true,
+                    warningTime: 5,
+                    maxSessions: 3
+                },
+                system: {
+                    backupEnabled: true,
+                    backupFrequency: 'daily',
+                    emailNotifications: true,
+                    smsNotifications: false,
+                    language: 'ru',
+                    timezone: 'Europe/Moscow'
+                }
+            };
+            setSettings(defaultSettings);
         }
     };
 
@@ -108,251 +103,251 @@ const SettingsPage = () => {
     };
 
     return (
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h4" component="h1">
-                    Настройки системы
-                </Typography>
-                <Box>
-                    <Button
-                        variant="outlined"
-                        startIcon={<RefreshIcon />}
+        <div className="equipment-page">
+            <div className="equipment-header">
+                <h1 className="equipment-title">Настройки системы</h1>
+                <div className="header-controls">
+                    <button
+                        className="action-btn edit-btn"
                         onClick={handleReset}
-                        sx={{ mr: 2 }}
                         disabled={loading}
                     >
+                        <i className="fas fa-undo"></i>
                         Сбросить
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<SaveIcon />}
+                    </button>
+                    <button
+                        className="add-equipment-btn"
                         onClick={handleSave}
                         disabled={loading}
                     >
+                        <i className="fas fa-save"></i>
                         Сохранить
-                    </Button>
-                </Box>
-            </Box>
+                    </button>
+                </div>
+            </div>
 
             {saved && (
-                <Alert severity="success" sx={{ mb: 3 }}>
+                <div className="success-message">
                     Настройки успешно сохранены!
-                </Alert>
+                </div>
             )}
 
-            <Grid container spacing={3}>
+            <div className="settings-container">
                 {/* Время хранения информации в БД */}
-                <Grid item xs={12} md={6}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="h6" gutterBottom>
-                                Время хранения информации в БД
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                                Настройте период хранения различных типов данных в базе данных
-                            </Typography>
-                            
-                            <TextField
-                                fullWidth
-                                label="Данные сварки (дни)"
+                <div className="settings-section">
+                    <h2 className="section-title">Время хранения информации в БД</h2>
+                    <p className="section-description">
+                        Настройте период хранения различных типов данных в базе данных
+                    </p>
+                    
+                    <div className="settings-grid">
+                        <div className="setting-item">
+                            <label className="setting-label">Данные сварки (дни)</label>
+                            <input
                                 type="number"
                                 value={settings.dataRetention.weldingData}
                                 onChange={(e) => updateSetting('dataRetention', 'weldingData', parseInt(e.target.value))}
-                                margin="normal"
-                                inputProps={{ min: 30, max: 3650 }}
+                                className="setting-input"
+                                min="30"
+                                max="3650"
                             />
-                            
-                            <TextField
-                                fullWidth
-                                label="Логи пользователей (дни)"
+                        </div>
+                        
+                        <div className="setting-item">
+                            <label className="setting-label">Логи пользователей (дни)</label>
+                            <input
                                 type="number"
                                 value={settings.dataRetention.userLogs}
                                 onChange={(e) => updateSetting('dataRetention', 'userLogs', parseInt(e.target.value))}
-                                margin="normal"
-                                inputProps={{ min: 7, max: 365 }}
+                                className="setting-input"
+                                min="7"
+                                max="365"
                             />
-                            
-                            <TextField
-                                fullWidth
-                                label="Системные логи (дни)"
+                        </div>
+                        
+                        <div className="setting-item">
+                            <label className="setting-label">Системные логи (дни)</label>
+                            <input
                                 type="number"
                                 value={settings.dataRetention.systemLogs}
                                 onChange={(e) => updateSetting('dataRetention', 'systemLogs', parseInt(e.target.value))}
-                                margin="normal"
-                                inputProps={{ min: 30, max: 365 }}
+                                className="setting-input"
+                                min="30"
+                                max="365"
                             />
-                            
-                            <TextField
-                                fullWidth
-                                label="Отчеты (дни)"
+                        </div>
+                        
+                        <div className="setting-item">
+                            <label className="setting-label">Отчеты (дни)</label>
+                            <input
                                 type="number"
                                 value={settings.dataRetention.reports}
                                 onChange={(e) => updateSetting('dataRetention', 'reports', parseInt(e.target.value))}
-                                margin="normal"
-                                inputProps={{ min: 90, max: 3650 }}
+                                className="setting-input"
+                                min="90"
+                                max="3650"
                             />
-                            
-                            <TextField
-                                fullWidth
-                                label="Временные файлы (дни)"
+                        </div>
+                        
+                        <div className="setting-item">
+                            <label className="setting-label">Временные файлы (дни)</label>
+                            <input
                                 type="number"
                                 value={settings.dataRetention.tempFiles}
                                 onChange={(e) => updateSetting('dataRetention', 'tempFiles', parseInt(e.target.value))}
-                                margin="normal"
-                                inputProps={{ min: 1, max: 30 }}
+                                className="setting-input"
+                                min="1"
+                                max="30"
                             />
-                        </CardContent>
-                    </Card>
-                </Grid>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Время отсутствия активности пользователя */}
-                <Grid item xs={12} md={6}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="h6" gutterBottom>
-                                Время отсутствия активности пользователя
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                                Настройте параметры сессий пользователей и автоматического выхода
-                            </Typography>
-                            
-                            <TextField
-                                fullWidth
-                                label="Таймаут сессии (минуты)"
+                <div className="settings-section">
+                    <h2 className="section-title">Время отсутствия активности пользователя</h2>
+                    <p className="section-description">
+                        Настройте параметры сессий пользователей и автоматического выхода
+                    </p>
+                    
+                    <div className="settings-grid">
+                        <div className="setting-item">
+                            <label className="setting-label">Таймаут сессии (минуты)</label>
+                            <input
                                 type="number"
                                 value={settings.userInactivity.sessionTimeout}
                                 onChange={(e) => updateSetting('userInactivity', 'sessionTimeout', parseInt(e.target.value))}
-                                margin="normal"
-                                inputProps={{ min: 5, max: 480 }}
+                                className="setting-input"
+                                min="5"
+                                max="480"
                             />
-                            
-                            <TextField
-                                fullWidth
-                                label="Время предупреждения (минуты)"
+                        </div>
+                        
+                        <div className="setting-item">
+                            <label className="setting-label">Время предупреждения (минуты)</label>
+                            <input
                                 type="number"
                                 value={settings.userInactivity.warningTime}
                                 onChange={(e) => updateSetting('userInactivity', 'warningTime', parseInt(e.target.value))}
-                                margin="normal"
-                                inputProps={{ min: 1, max: 30 }}
+                                className="setting-input"
+                                min="1"
+                                max="30"
                             />
-                            
-                            <TextField
-                                fullWidth
-                                label="Максимум одновременных сессий"
+                        </div>
+                        
+                        <div className="setting-item">
+                            <label className="setting-label">Максимум одновременных сессий</label>
+                            <input
                                 type="number"
                                 value={settings.userInactivity.maxSessions}
                                 onChange={(e) => updateSetting('userInactivity', 'maxSessions', parseInt(e.target.value))}
-                                margin="normal"
-                                inputProps={{ min: 1, max: 10 }}
+                                className="setting-input"
+                                min="1"
+                                max="10"
                             />
-                            
-                            <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={settings.userInactivity.autoLogout}
-                                        onChange={(e) => updateSetting('userInactivity', 'autoLogout', e.target.checked)}
-                                    />
-                                }
-                                label="Автоматический выход при неактивности"
-                                sx={{ mt: 2 }}
-                            />
-                        </CardContent>
-                    </Card>
-                </Grid>
+                        </div>
+                        
+                        <div className="setting-item checkbox-item">
+                            <label className="setting-label">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.userInactivity.autoLogout}
+                                    onChange={(e) => updateSetting('userInactivity', 'autoLogout', e.target.checked)}
+                                    className="setting-checkbox"
+                                />
+                                Автоматический выход при неактивности
+                            </label>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Дополнительные настройки системы */}
-                <Grid item xs={12}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="h6" gutterBottom>
-                                Дополнительные настройки
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                                Общие настройки системы и уведомлений
-                            </Typography>
-                            
-                            <Grid container spacing={3}>
-                                <Grid item xs={12} md={6}>
-                                    <FormControlLabel
-                                        control={
-                                            <Switch
-                                                checked={settings.system.backupEnabled}
-                                                onChange={(e) => updateSetting('system', 'backupEnabled', e.target.checked)}
-                                            />
-                                        }
-                                        label="Автоматическое резервное копирование"
-                                    />
-                                    
-                                    {settings.system.backupEnabled && (
-                                        <FormControl fullWidth margin="normal">
-                                            <InputLabel>Частота резервного копирования</InputLabel>
-                                            <Select
-                                                value={settings.system.backupFrequency}
-                                                onChange={(e) => updateSetting('system', 'backupFrequency', e.target.value)}
-                                            >
-                                                <MenuItem value="hourly">Каждый час</MenuItem>
-                                                <MenuItem value="daily">Ежедневно</MenuItem>
-                                                <MenuItem value="weekly">Еженедельно</MenuItem>
-                                                <MenuItem value="monthly">Ежемесячно</MenuItem>
-                                            </Select>
-                                        </FormControl>
-                                    )}
-                                </Grid>
-                                
-                                <Grid item xs={12} md={6}>
-                                    <FormControlLabel
-                                        control={
-                                            <Switch
-                                                checked={settings.system.emailNotifications}
-                                                onChange={(e) => updateSetting('system', 'emailNotifications', e.target.checked)}
-                                            />
-                                        }
-                                        label="Email уведомления"
-                                    />
-                                    
-                                    <FormControlLabel
-                                        control={
-                                            <Switch
-                                                checked={settings.system.smsNotifications}
-                                                onChange={(e) => updateSetting('system', 'smsNotifications', e.target.checked)}
-                                            />
-                                        }
-                                        label="SMS уведомления"
-                                    />
-                                </Grid>
-                                
-                                <Grid item xs={12} md={6}>
-                                    <FormControl fullWidth margin="normal">
-                                        <InputLabel>Язык интерфейса</InputLabel>
-                                        <Select
-                                            value={settings.system.language}
-                                            onChange={(e) => updateSetting('system', 'language', e.target.value)}
-                                        >
-                                            <MenuItem value="ru">Русский</MenuItem>
-                                            <MenuItem value="en">English</MenuItem>
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
-                                
-                                <Grid item xs={12} md={6}>
-                                    <FormControl fullWidth margin="normal">
-                                        <InputLabel>Часовой пояс</InputLabel>
-                                        <Select
-                                            value={settings.system.timezone}
-                                            onChange={(e) => updateSetting('system', 'timezone', e.target.value)}
-                                        >
-                                            <MenuItem value="Europe/Moscow">Москва (UTC+3)</MenuItem>
-                                            <MenuItem value="Europe/London">Лондон (UTC+0)</MenuItem>
-                                            <MenuItem value="America/New_York">Нью-Йорк (UTC-5)</MenuItem>
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
-                            </Grid>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
-        </Container>
+                <div className="settings-section">
+                    <h2 className="section-title">Дополнительные настройки</h2>
+                    <p className="section-description">
+                        Общие настройки системы и уведомлений
+                    </p>
+                    
+                    <div className="settings-grid">
+                        <div className="setting-item">
+                            <label className="setting-label">Частота резервного копирования</label>
+                            <select
+                                value={settings.system.backupFrequency}
+                                onChange={(e) => updateSetting('system', 'backupFrequency', e.target.value)}
+                                className="setting-input"
+                                disabled={!settings.system.backupEnabled}
+                            >
+                                <option value="hourly">Каждый час</option>
+                                <option value="daily">Ежедневно</option>
+                                <option value="weekly">Еженедельно</option>
+                                <option value="monthly">Ежемесячно</option>
+                            </select>
+                        </div>
+                        
+                        <div className="setting-item">
+                            <label className="setting-label">Язык интерфейса</label>
+                            <select
+                                value={settings.system.language}
+                                onChange={(e) => updateSetting('system', 'language', e.target.value)}
+                                className="setting-input"
+                            >
+                                <option value="ru">Русский</option>
+                                <option value="en">English</option>
+                            </select>
+                        </div>
+                        
+                        <div className="setting-item">
+                            <label className="setting-label">Часовой пояс</label>
+                            <select
+                                value={settings.system.timezone}
+                                onChange={(e) => updateSetting('system', 'timezone', e.target.value)}
+                                className="setting-input"
+                            >
+                                <option value="Europe/Moscow">Москва (UTC+3)</option>
+                                <option value="Europe/London">Лондон (UTC+0)</option>
+                                <option value="America/New_York">Нью-Йорк (UTC-5)</option>
+                            </select>
+                        </div>
+                        
+                        <div className="setting-item checkbox-item">
+                            <label className="setting-label">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.system.backupEnabled}
+                                    onChange={(e) => updateSetting('system', 'backupEnabled', e.target.checked)}
+                                    className="setting-checkbox"
+                                />
+                                Автоматическое резервное копирование
+                            </label>
+                        </div>
+                        
+                        <div className="setting-item checkbox-item">
+                            <label className="setting-label">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.system.emailNotifications}
+                                    onChange={(e) => updateSetting('system', 'emailNotifications', e.target.checked)}
+                                    className="setting-checkbox"
+                                />
+                                Email уведомления
+                            </label>
+                        </div>
+                        
+                        <div className="setting-item checkbox-item">
+                            <label className="setting-label">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.system.smsNotifications}
+                                    onChange={(e) => updateSetting('system', 'smsNotifications', e.target.checked)}
+                                    className="setting-checkbox"
+                                />
+                                SMS уведомления
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 };
 

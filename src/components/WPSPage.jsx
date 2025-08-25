@@ -1,140 +1,59 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Container,
-    Typography,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Button,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    TextField,
-    IconButton,
-    Box,
-    Chip,
-    Grid,
-    Card,
-    CardContent,
-    CardActions,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem
-} from '@mui/material';
-import { 
-    Add as AddIcon, 
-    Edit as EditIcon, 
-    Delete as DeleteIcon,
-    Description as DescriptionIcon,
-    Download as DownloadIcon
-} from '@mui/icons-material';
+import '../styles/equipmentPage.css';
 
 const WPSPage = () => {
     const [wpsList, setWpsList] = useState([]);
-    const [openDialog, setOpenDialog] = useState(false);
-    const [editingWPS, setEditingWPS] = useState(null);
-    const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        weldingMethod: '',
-        materialType: '',
-        thickness: '',
-        currentMin: '',
-        currentMax: '',
-        voltageMin: '',
-        voltageMax: '',
-        feedRate: '',
-        gasConsumption: '',
-        gostStandard: '',
-        status: 'active'
-    });
+    const [modalOpen, setModalOpen] = useState(false);
+    const [editData, setEditData] = useState({});
+    const [errors, setErrors] = useState({});
 
+    // Load WPS from localStorage
     useEffect(() => {
-        loadWPS();
+        const savedWPS = localStorage.getItem('wpsList');
+        if (savedWPS) {
+            setWpsList(JSON.parse(savedWPS));
+        }
     }, []);
 
-    const loadWPS = async () => {
-        try {
-            // TODO: Заменить на реальный API вызов
-            const mockData = [
-                {
-                    id: 1,
-                    name: 'WPS-001',
-                    description: 'Сварка низкоуглеродистой стали',
-                    weldingMethod: 'MIG',
-                    materialType: 'Ст3',
-                    thickness: '3-8 мм',
-                    currentMin: 120,
-                    currentMax: 180,
-                    voltageMin: 18,
-                    voltageMax: 22,
-                    feedRate: '4-6 м/мин',
-                    gasConsumption: '12-15 л/мин',
-                    gostStandard: 'ГОСТ 14771-76',
-                    status: 'active',
-                    createdAt: '2024-01-10',
-                    updatedAt: '2024-01-15'
-                },
-                {
-                    id: 2,
-                    name: 'WPS-002',
-                    description: 'Сварка нержавеющей стали',
-                    weldingMethod: 'TIG',
-                    materialType: '12Х18Н10Т',
-                    thickness: '1-4 мм',
-                    currentMin: 80,
-                    currentMax: 140,
-                    voltageMin: 12,
-                    voltageMax: 16,
-                    feedRate: '2-4 м/мин',
-                    gasConsumption: '8-12 л/мин',
-                    gostStandard: 'ГОСТ 14776-79',
-                    status: 'active',
-                    createdAt: '2024-01-12',
-                    updatedAt: '2024-01-14'
-                },
-                {
-                    id: 3,
-                    name: 'WPS-003',
-                    description: 'Сварка алюминия',
-                    weldingMethod: 'MIG',
-                    materialType: 'АМг6',
-                    thickness: '2-6 мм',
-                    currentMin: 140,
-                    currentMax: 200,
-                    voltageMin: 20,
-                    voltageMax: 24,
-                    feedRate: '5-7 м/мин',
-                    gasConsumption: '15-18 л/мин',
-                    gostStandard: 'ГОСТ 14806-80',
-                    status: 'draft',
-                    createdAt: '2024-01-13',
-                    updatedAt: '2024-01-13'
-                }
-            ];
-            setWpsList(mockData);
-        } catch (error) {
-            console.error('Ошибка загрузки WPS:', error);
-        }
+    // Save WPS to localStorage when it changes
+    useEffect(() => {
+        localStorage.setItem('wpsList', JSON.stringify(wpsList));
+    }, [wpsList]);
+
+    const openAddModal = () => {
+        setEditData({
+            name: '',
+            description: '',
+            weldingMethod: '',
+            materialType: '',
+            thickness: '',
+            currentMin: '',
+            currentMax: '',
+            voltageMin: '',
+            voltageMax: '',
+            feedRate: '',
+            gasConsumption: '',
+            gostStandard: '',
+            status: 'active'
+        });
+        setErrors({});
+        setModalOpen(true);
     };
 
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'active':
-                return 'success';
-            case 'draft':
-                return 'warning';
-            case 'archived':
-                return 'default';
-            default:
-                return 'default';
-        }
+    const openEditModal = (wps) => {
+        setEditData(wps);
+        setErrors({});
+        setModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setModalOpen(false);
+        setEditData({});
+        setErrors({});
+    };
+
+    const handleInputChange = (e) => {
+        setEditData({ ...editData, [e.target.name]: e.target.value });
     };
 
     const getStatusLabel = (status) => {
@@ -150,351 +69,336 @@ const WPSPage = () => {
         }
     };
 
-    const handleOpenDialog = (wps = null) => {
-        if (wps) {
-            setEditingWPS(wps);
-            setFormData({
-                name: wps.name,
-                description: wps.description,
-                weldingMethod: wps.weldingMethod,
-                materialType: wps.materialType,
-                thickness: wps.thickness,
-                currentMin: wps.currentMin,
-                currentMax: wps.currentMax,
-                voltageMin: wps.voltageMin,
-                voltageMax: wps.voltageMax,
-                feedRate: wps.feedRate,
-                gasConsumption: wps.gasConsumption,
-                gostStandard: wps.gostStandard,
-                status: wps.status
-            });
+    const handleSave = (e) => {
+        e.preventDefault();
+        const newErrors = {};
+        if (!editData.name) newErrors.name = 'Это поле обязательно';
+        if (!editData.description) newErrors.description = 'Это поле обязательно';
+        if (!editData.weldingMethod) newErrors.weldingMethod = 'Это поле обязательно';
+        if (!editData.materialType) newErrors.materialType = 'Это поле обязательно';
+        if (!editData.thickness) newErrors.thickness = 'Это поле обязательно';
+        if (!editData.currentMin) newErrors.currentMin = 'Это поле обязательно';
+        if (!editData.currentMax) newErrors.currentMax = 'Это поле обязательно';
+        if (!editData.voltageMin) newErrors.voltageMin = 'Это поле обязательно';
+        if (!editData.voltageMax) newErrors.voltageMax = 'Это поле обязательно';
+        if (!editData.feedRate) newErrors.feedRate = 'Это поле обязательно';
+        if (!editData.gasConsumption) newErrors.gasConsumption = 'Это поле обязательно';
+        if (!editData.gostStandard) newErrors.gostStandard = 'Это поле обязательно';
+
+        if (Object.keys(newErrors).length) {
+            setErrors(newErrors);
+            return;
+        }
+
+        if (editData.id) {
+            setWpsList(prev =>
+                prev.map(wps => wps.id === editData.id ? editData : wps)
+            );
         } else {
-            setEditingWPS(null);
-            setFormData({
-                name: '',
-                description: '',
-                weldingMethod: '',
-                materialType: '',
-                thickness: '',
-                currentMin: '',
-                currentMax: '',
-                voltageMin: '',
-                voltageMax: '',
-                feedRate: '',
-                gasConsumption: '',
-                gostStandard: '',
-                status: 'active'
-            });
+            const newWPS = {
+                ...editData,
+                id: Date.now().toString(),
+                createdAt: new Date().toLocaleDateString(),
+                updatedAt: new Date().toLocaleDateString()
+            };
+            setWpsList(prev => [...prev, newWPS]);
         }
-        setOpenDialog(true);
+        closeModal();
     };
 
-    const handleCloseDialog = () => {
-        setOpenDialog(false);
-        setEditingWPS(null);
-        setFormData({
-            name: '',
-            description: '',
-            weldingMethod: '',
-            materialType: '',
-            thickness: '',
-            currentMin: '',
-            currentMax: '',
-            voltageMin: '',
-            voltageMax: '',
-            feedRate: '',
-            gasConsumption: '',
-            gostStandard: '',
-            status: 'active'
-        });
-    };
-
-    const handleSubmit = async () => {
-        try {
-            if (editingWPS) {
-                // Обновление существующей WPS
-                console.log('Обновление WPS:', formData);
-            } else {
-                // Создание новой WPS
-                console.log('Создание WPS:', formData);
-            }
-            handleCloseDialog();
-            loadWPS();
-        } catch (error) {
-            console.error('Ошибка сохранения WPS:', error);
-        }
-    };
-
-    const handleDelete = async (id) => {
+    const handleDelete = (id) => {
         if (window.confirm('Вы уверены, что хотите удалить эту технологическую карту?')) {
-            try {
-                console.log('Удаление WPS:', id);
-                loadWPS();
-            } catch (error) {
-                console.error('Ошибка удаления WPS:', error);
-            }
+            setWpsList(prev => prev.filter(wps => wps.id !== id));
         }
     };
 
     const handleDownload = (wps) => {
         // TODO: Реализовать скачивание WPS в формате PDF
         console.log('Скачивание WPS:', wps.name);
+        alert('Функция скачивания будет реализована позже');
     };
 
     return (
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h4" component="h1">
-                    Технологические карты сварки (WPS)
-                </Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => handleOpenDialog()}
-                >
+        <div className="equipment-page">
+            <div className="equipment-header">
+                <h1 className="equipment-title">Технологические карты сварки (WPS)</h1>
+                <button className="add-equipment-btn" onClick={openAddModal}>
+                    <i className="fas fa-plus"></i>
                     Добавить WPS
-                </Button>
-            </Box>
+                </button>
+            </div>
 
-            <Grid container spacing={3}>
+            <div className="equipment-grid">
                 {wpsList.map((wps) => (
-                    <Grid item xs={12} md={6} lg={4} key={wps.id}>
-                        <Card>
-                            <CardContent>
-                                <Box display="flex" alignItems="center" mb={2}>
-                                    <DescriptionIcon />
-                                    <Typography variant="h6" ml={1}>
-                                        {wps.name}
-                                    </Typography>
-                                </Box>
-                                
-                                <Typography variant="body2" color="text.secondary" gutterBottom>
-                                    {wps.description}
-                                </Typography>
-                                
-                                <Box mt={2}>
-                                    <Typography variant="body2">
-                                        <strong>Метод сварки:</strong> {wps.weldingMethod}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        <strong>Материал:</strong> {wps.materialType}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        <strong>Толщина:</strong> {wps.thickness}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        <strong>Ток:</strong> {wps.currentMin}-{wps.currentMax} А
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        <strong>Напряжение:</strong> {wps.voltageMin}-{wps.voltageMax} В
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        <strong>Скорость подачи:</strong> {wps.feedRate}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        <strong>Расход газа:</strong> {wps.gasConsumption}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        <strong>ГОСТ:</strong> {wps.gostStandard}
-                                    </Typography>
-                                </Box>
-                                
-                                <Box mt={2} display="flex" gap={1}>
-                                    <Chip 
-                                        label={getStatusLabel(wps.status)} 
-                                        color={getStatusColor(wps.status)}
-                                        size="small"
-                                    />
-                                </Box>
-                            </CardContent>
-                            <CardActions>
-                                <IconButton
-                                    size="small"
-                                    onClick={() => handleOpenDialog(wps)}
-                                    color="primary"
+                    <div key={wps.id} className="equipment-card">
+                        <div className="equipment-info">
+                            <h3 className="equipment-name">{wps.name}</h3>
+                            <p className="equipment-model">{wps.description}</p>
+                            <div className="equipment-details">
+                                <div className="detail-item">
+                                    <span className="detail-label">Метод сварки:</span>
+                                    {wps.weldingMethod}
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">Материал:</span>
+                                    {wps.materialType}
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">Толщина:</span>
+                                    {wps.thickness}
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">Ток:</span>
+                                    {wps.currentMin}-{wps.currentMax} А
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">Напряжение:</span>
+                                    {wps.voltageMin}-{wps.voltageMax} В
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">Скорость подачи:</span>
+                                    {wps.feedRate}
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">Расход газа:</span>
+                                    {wps.gasConsumption}
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">ГОСТ:</span>
+                                    {wps.gostStandard}
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">Статус:</span>
+                                    {getStatusLabel(wps.status)}
+                                </div>
+                            </div>
+                            <div className="equipment-actions">
+                                <button
+                                    className="action-btn edit-btn"
+                                    onClick={() => openEditModal(wps)}
                                 >
-                                    <EditIcon />
-                                </IconButton>
-                                <IconButton
-                                    size="small"
+                                    <i className="fas fa-edit"></i>
+                                    Редактировать
+                                </button>
+                                <button
+                                    className="action-btn control-btn"
                                     onClick={() => handleDownload(wps)}
-                                    color="secondary"
                                 >
-                                    <DownloadIcon />
-                                </IconButton>
-                                <IconButton
-                                    size="small"
+                                    <i className="fas fa-download"></i>
+                                    Скачать
+                                </button>
+                                <button
+                                    className="action-btn delete-btn"
                                     onClick={() => handleDelete(wps.id)}
-                                    color="error"
                                 >
-                                    <DeleteIcon />
-                                </IconButton>
-                            </CardActions>
-                        </Card>
-                    </Grid>
+                                    <i className="fas fa-trash"></i>
+                                    Удалить
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 ))}
-            </Grid>
+            </div>
 
-            <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-                <DialogTitle>
-                    {editingWPS ? 'Редактировать WPS' : 'Добавить WPS'}
-                </DialogTitle>
-                <DialogContent>
-                    <Box sx={{ pt: 2 }}>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Название WPS"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    margin="normal"
-                                    required
+            {modalOpen && (
+                <div className="modal-overlay" onClick={closeModal}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">
+                                {editData.id ? 'Редактировать WPS' : 'Добавить WPS'}
+                            </h2>
+                            <button className="close-btn" onClick={closeModal}>
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <form onSubmit={handleSave}>
+                            <div className="form-group">
+                                <label className="form-label">Название WPS</label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={editData.name || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите название WPS"
                                 />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <FormControl fullWidth margin="normal" required>
-                                    <InputLabel>Метод сварки</InputLabel>
-                                    <Select
-                                        value={formData.weldingMethod}
-                                        onChange={(e) => setFormData({ ...formData, weldingMethod: e.target.value })}
-                                    >
-                                        <MenuItem value="MIG">MIG</MenuItem>
-                                        <MenuItem value="TIG">TIG</MenuItem>
-                                        <MenuItem value="MMA">MMA</MenuItem>
-                                        <MenuItem value="SAW">SAW</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Описание"
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    margin="normal"
-                                    multiline
-                                    rows={3}
+                                {errors.name && <p className="error-message">{errors.name}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Описание</label>
+                                <textarea
+                                    name="description"
+                                    value={editData.description || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите описание"
+                                    rows="3"
                                 />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Тип материала"
-                                    value={formData.materialType}
-                                    onChange={(e) => setFormData({ ...formData, materialType: e.target.value })}
-                                    margin="normal"
-                                    required
+                                {errors.description && <p className="error-message">{errors.description}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Метод сварки</label>
+                                <select
+                                    name="weldingMethod"
+                                    value={editData.weldingMethod || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                >
+                                    <option value="">Выберите метод</option>
+                                    <option value="MIG">MIG</option>
+                                    <option value="TIG">TIG</option>
+                                    <option value="MMA">MMA</option>
+                                    <option value="SAW">SAW</option>
+                                </select>
+                                {errors.weldingMethod && <p className="error-message">{errors.weldingMethod}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Тип материала</label>
+                                <input
+                                    type="text"
+                                    name="materialType"
+                                    value={editData.materialType || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите тип материала"
                                 />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Толщина"
-                                    value={formData.thickness}
-                                    onChange={(e) => setFormData({ ...formData, thickness: e.target.value })}
-                                    margin="normal"
-                                    required
+                                {errors.materialType && <p className="error-message">{errors.materialType}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Толщина</label>
+                                <input
+                                    type="text"
+                                    name="thickness"
+                                    value={editData.thickness || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите толщину"
                                 />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Минимальный ток (А)"
+                                {errors.thickness && <p className="error-message">{errors.thickness}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Минимальный ток (А)</label>
+                                <input
                                     type="number"
-                                    value={formData.currentMin}
-                                    onChange={(e) => setFormData({ ...formData, currentMin: e.target.value })}
-                                    margin="normal"
-                                    required
+                                    name="currentMin"
+                                    value={editData.currentMin || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите минимальный ток"
                                 />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Максимальный ток (А)"
+                                {errors.currentMin && <p className="error-message">{errors.currentMin}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Максимальный ток (А)</label>
+                                <input
                                     type="number"
-                                    value={formData.currentMax}
-                                    onChange={(e) => setFormData({ ...formData, currentMax: e.target.value })}
-                                    margin="normal"
-                                    required
+                                    name="currentMax"
+                                    value={editData.currentMax || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите максимальный ток"
                                 />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Минимальное напряжение (В)"
+                                {errors.currentMax && <p className="error-message">{errors.currentMax}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Минимальное напряжение (В)</label>
+                                <input
                                     type="number"
-                                    value={formData.voltageMin}
-                                    onChange={(e) => setFormData({ ...formData, voltageMin: e.target.value })}
-                                    margin="normal"
-                                    required
+                                    name="voltageMin"
+                                    value={editData.voltageMin || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите минимальное напряжение"
                                 />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Максимальное напряжение (В)"
+                                {errors.voltageMin && <p className="error-message">{errors.voltageMin}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Максимальное напряжение (В)</label>
+                                <input
                                     type="number"
-                                    value={formData.voltageMax}
-                                    onChange={(e) => setFormData({ ...formData, voltageMax: e.target.value })}
-                                    margin="normal"
-                                    required
+                                    name="voltageMax"
+                                    value={editData.voltageMax || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите максимальное напряжение"
                                 />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Скорость подачи"
-                                    value={formData.feedRate}
-                                    onChange={(e) => setFormData({ ...formData, feedRate: e.target.value })}
-                                    margin="normal"
-                                    required
+                                {errors.voltageMax && <p className="error-message">{errors.voltageMax}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Скорость подачи</label>
+                                <input
+                                    type="text"
+                                    name="feedRate"
+                                    value={editData.feedRate || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите скорость подачи"
                                 />
-                            </Grid>
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Расход газа"
-                                    value={formData.gasConsumption}
-                                    onChange={(e) => setFormData({ ...formData, gasConsumption: e.target.value })}
-                                    margin="normal"
-                                    required
+                                {errors.feedRate && <p className="error-message">{errors.feedRate}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Расход газа</label>
+                                <input
+                                    type="text"
+                                    name="gasConsumption"
+                                    value={editData.gasConsumption || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите расход газа"
                                 />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="ГОСТ"
-                                    value={formData.gostStandard}
-                                    onChange={(e) => setFormData({ ...formData, gostStandard: e.target.value })}
-                                    margin="normal"
-                                    required
+                                {errors.gasConsumption && <p className="error-message">{errors.gasConsumption}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">ГОСТ</label>
+                                <input
+                                    type="text"
+                                    name="gostStandard"
+                                    value={editData.gostStandard || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите ГОСТ"
                                 />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <FormControl fullWidth margin="normal">
-                                    <InputLabel>Статус</InputLabel>
-                                    <Select
-                                        value={formData.status}
-                                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                    >
-                                        <MenuItem value="active">Активна</MenuItem>
-                                        <MenuItem value="draft">Черновик</MenuItem>
-                                        <MenuItem value="archived">Архив</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                        </Grid>
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCloseDialog}>Отмена</Button>
-                    <Button onClick={handleSubmit} variant="contained">
-                        {editingWPS ? 'Сохранить' : 'Добавить'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
-        </Container>
+                                {errors.gostStandard && <p className="error-message">{errors.gostStandard}</p>}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Статус</label>
+                                <select
+                                    name="status"
+                                    value={editData.status || 'active'}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                >
+                                    <option value="active">Активна</option>
+                                    <option value="draft">Черновик</option>
+                                    <option value="archived">Архив</option>
+                                </select>
+                            </div>
+
+                            <div className="modal-actions">
+                                <button type="button" className="cancel-btn" onClick={closeModal}>
+                                    Отмена
+                                </button>
+                                <button type="submit" className="save-btn">
+                                    {editData.id ? 'Сохранить' : 'Добавить'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 
