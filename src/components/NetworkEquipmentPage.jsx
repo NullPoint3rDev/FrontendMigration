@@ -55,7 +55,7 @@ const NetworkEquipmentPage = () => {
             case 'monitoring_block':
                 return 'Блок мониторинга';
             case 'hub':
-                return 'Концентратор';
+                return 'Радио-приемник';
             case 'router':
                 return 'Роутер';
             default:
