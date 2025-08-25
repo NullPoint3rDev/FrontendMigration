@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
     Box,
     Card,
@@ -33,6 +34,11 @@ import {
 } from '@mui/icons-material';
 
 const DeviceMonitorPage = () => {
+    const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const machineName = searchParams.get('machine') || 'Неизвестный аппарат';
+    const machineMac = searchParams.get('mac') || 'Неизвестный MAC';
+    
     const [deviceData, setDeviceData] = useState({});
     const [connectionStatus, setConnectionStatus] = useState('disconnected');
     const [lastUpdate, setLastUpdate] = useState(null);
@@ -237,11 +243,36 @@ const DeviceMonitorPage = () => {
         setMessageHistory([]);
     };
 
+    const handleBackToEquipment = () => {
+        navigate('/equipment');
+    };
+
     return (
         <Box sx={{ p: 3, backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
-            <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#1976d2' }}>
-                📊 Мониторинг сварочного аппарата
-            </Typography>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+                <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                    📊 Мониторинг сварочного аппарата
+                </Typography>
+                <Button
+                    variant="outlined"
+                    onClick={handleBackToEquipment}
+                    sx={{ minWidth: '120px' }}
+                >
+                    ← Назад к оборудованию
+                </Button>
+            </Box>
+            
+            {/* Информация о выбранном аппарате */}
+            <Card sx={{ mb: 3, boxShadow: 2 }}>
+                <CardContent>
+                    <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                        {machineName}
+                    </Typography>
+                    <Typography variant="body1" color="textSecondary">
+                        MAC-адрес: <strong>{machineMac}</strong>
+                    </Typography>
+                </CardContent>
+            </Card>
 
             {/* Статус подключения */}
             <Card sx={{ mb: 3, boxShadow: 3 }}>
@@ -257,7 +288,7 @@ const DeviceMonitorPage = () => {
                                 size="large"
                             />
                             <Typography variant="body1" color="textSecondary">
-                                MAC: <strong>8CAAB579425A</strong>
+                                MAC: <strong>{machineMac}</strong>
                             </Typography>
                             <Typography variant="body2" color="textSecondary">
                                 Сервер: <strong>95.172.58.219:8084</strong>

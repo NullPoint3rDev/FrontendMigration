@@ -319,7 +319,7 @@ function WeldingEquipmentPage() {
 
     // Action buttons
     const handleControl = (item) => {
-        navigate(`/control?machine=${encodeURIComponent(item.name)}`);
+        navigate(`/device-monitor?machine=${encodeURIComponent(item.name)}&mac=${encodeURIComponent(item.mac)}`);
     };
 
     const navigateToWelderProfile = (welderId) => {

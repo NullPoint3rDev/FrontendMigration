@@ -18,6 +18,7 @@ import AuthPage from './components/AuthPage';
 import UserProfilePage from './pages/UserProfilePage';
 import ReportsPage from './components/ReportsPage';
 import EmployeesPage from './components/EmployeesPage';
+import DeviceMonitorPage from './components/DeviceMonitorPage';
 import './App.css';
 
 const theme = createTheme({
@@ -62,6 +63,7 @@ function App() {
                                 <Route path="/network-equipment" element={<NetworkEquipmentPage />} />
                                 <Route path="/materials" element={<div className="main-content"><h2>Сварочные материалы</h2></div>} />
                                 <Route path="/wps" element={<WPSPage />} />
+                                <Route path="/device-monitor" element={<DeviceMonitorPage />} />
                                 
                                 {/* 3. Мониторинг */}
                                 <Route path="/enterprise-map" element={<EnterpriseMapPage />} />
