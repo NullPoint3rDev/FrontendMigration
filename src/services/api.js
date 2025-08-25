@@ -280,6 +280,24 @@ export const api = {
         return handleResponse(response);
     },
 
+    put: async (url, data, options = {}) => {
+        let headers = getAuthHeaders();
+        let body = data;
+        if (data instanceof FormData) {
+            headers = { ...headers };
+            delete headers['Content-Type'];
+        } else if (typeof data === 'object') {
+            body = JSON.stringify(data);
+        }
+        const response = await fetch(`${API_BASE_URL}${url}`, {
+            method: 'PUT',
+            headers,
+            body,
+            ...options,
+        });
+        return handleResponse(response);
+    },
+
     delete: async (url, options = {}) => {
         const response = await fetch(`${API_BASE_URL}${url}`, {
             method: 'DELETE',
