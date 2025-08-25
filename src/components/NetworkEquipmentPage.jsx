@@ -70,10 +70,6 @@ const NetworkEquipmentPage = () => {
                 return 'Радио-приемник';
             case 'ROUTER':
                 return 'Роутер';
-            case 'HUB':
-                return 'Концентратор';
-            case 'SWITCH':
-                return 'Коммутатор';
             default:
                 return 'Неизвестно';
         }
@@ -259,8 +255,6 @@ const NetworkEquipmentPage = () => {
                                     <option value="MONITORING_BLOCK">Блок мониторинга</option>
                                     <option value="RADIO_RECEIVER">Радио-приемник</option>
                                     <option value="ROUTER">Роутер</option>
-                                    <option value="HUB">Концентратор</option>
-                                    <option value="SWITCH">Коммутатор</option>
                                 </select>
                                 {errors.type && <p className="error-message">{errors.type}</p>}
                             </div>
