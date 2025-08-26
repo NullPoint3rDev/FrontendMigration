@@ -90,6 +90,7 @@ const DepartmentsPage = () => {
                     id: 1 // Дефолтная организация
                 }
             };
+            console.log('Отправляемые данные:', apiData);
             
             if (editData.id) {
                 await updateOrganizationUnit(editData.id, apiData);
