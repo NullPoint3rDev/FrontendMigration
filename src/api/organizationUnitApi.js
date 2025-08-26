@@ -46,7 +46,10 @@ export const updateOrganizationUnit = async (id, organizationUnit) => {
 
 export const deleteOrganizationUnit = async (id) => {
     try {
-        await api.delete(`/organization-units/${id}`);
+        console.log('Отправляем запрос на удаление подразделения с ID:', id);
+        const response = await api.delete(`/organization-units/${id}`);
+        console.log('Ответ от API при удалении:', response);
+        return response;
     } catch (error) {
         console.error('Ошибка удаления подразделения:', error);
         throw error;

@@ -18,11 +18,14 @@ const DepartmentsPage = () => {
     const loadDepartments = async () => {
         try {
             setLoading(true);
+            console.log('Начинаем загрузку подразделений...');
             const data = await getAllOrganizationUnits();
             console.log('Полученные данные подразделений:', data);
             console.log('Тип данных:', typeof data);
             console.log('Это массив?', Array.isArray(data));
+            console.log('Количество подразделений:', data ? data.length : 0);
             setDepartments(Array.isArray(data) ? data : []);
+            console.log('Состояние departments обновлено');
         } catch (error) {
             console.error('Ошибка загрузки подразделений:', error);
             setDepartments([]);
@@ -111,8 +114,11 @@ const DepartmentsPage = () => {
         if (window.confirm('Вы уверены, что хотите удалить это подразделение?')) {
             try {
                 setLoading(true);
+                console.log('Удаляем подразделение с ID:', id);
                 await deleteOrganizationUnit(id);
+                console.log('Подразделение удалено, обновляем список...');
                 await loadDepartments();
+                console.log('Список обновлен после удаления');
             } catch (error) {
                 console.error('Ошибка удаления подразделения:', error);
                 alert('Ошибка удаления подразделения: ' + error.message);
