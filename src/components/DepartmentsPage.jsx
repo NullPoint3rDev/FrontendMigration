@@ -37,7 +37,10 @@ const DepartmentsPage = () => {
             name: '',
             description: '',
             parentDepartment: '',
-            level: 1
+            level: 1,
+            address: '',
+            phone: '',
+            email: ''
         });
         setErrors({});
         setModalOpen(true);
@@ -72,10 +75,23 @@ const DepartmentsPage = () => {
 
         try {
             setLoading(true);
+            
+            // Подготавливаем данные в правильном формате для API
+            const apiData = {
+                name: editData.name,
+                description: editData.description,
+                address: editData.address || '',
+                phone: editData.phone || '',
+                email: editData.email || '',
+                organization: {
+                    id: 1 // Дефолтная организация
+                }
+            };
+            
             if (editData.id) {
-                await updateOrganizationUnit(editData.id, editData);
+                await updateOrganizationUnit(editData.id, apiData);
             } else {
-                await createOrganizationUnit(editData);
+                await createOrganizationUnit(apiData);
             }
             await loadDepartments();
             closeModal();
@@ -134,7 +150,7 @@ const DepartmentsPage = () => {
                             <div className="equipment-details">
                                 <div className="detail-item">
                                     <span className="detail-label">Уровень:</span>
-                                    {department.level}
+                                    {department.level || 'Не указан'}
                                 </div>
                                 {department.parentDepartment && (
                                     <div className="detail-item">
@@ -142,10 +158,24 @@ const DepartmentsPage = () => {
                                         {department.parentDepartment}
                                     </div>
                                 )}
-                                <div className="detail-item">
-                                    <span className="detail-label">Количество сотрудников:</span>
-                                    {department.employeeCount || 0} чел.
-                                </div>
+                                {department.address && (
+                                    <div className="detail-item">
+                                        <span className="detail-label">Адрес:</span>
+                                        {department.address}
+                                    </div>
+                                )}
+                                {department.phone && (
+                                    <div className="detail-item">
+                                        <span className="detail-label">Телефон:</span>
+                                        {department.phone}
+                                    </div>
+                                )}
+                                {department.email && (
+                                    <div className="detail-item">
+                                        <span className="detail-label">Email:</span>
+                                        {department.email}
+                                    </div>
+                                )}
                             </div>
                             <div className="equipment-actions">
                                 <button
@@ -239,6 +269,46 @@ const DepartmentsPage = () => {
                                     className="form-input"
                                     min="1"
                                     max="5"
+                                    disabled={loading}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Адрес</label>
+                                <input
+                                    type="text"
+                                    name="address"
+                                    value={editData.address || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите адрес"
+                                    disabled={loading}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Телефон</label>
+                                <input
+                                    type="tel"
+                                    name="phone"
+                                    value={editData.phone || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите номер телефона"
+                                    disabled={loading}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Email</label>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={editData.email || ''}
+                                    onChange={handleInputChange}
+                                    className="form-input"
+                                    placeholder="Введите email"
+                                    disabled={loading}
                                 />
                             </div>
 
