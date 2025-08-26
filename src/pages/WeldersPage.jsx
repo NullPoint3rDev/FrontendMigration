@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import '../styles/welders.css';
+import { getAllEmployees, createEmployee, updateEmployee, deleteEmployee } from '../api/userAccountApi';
 
 const defaultWelders = [
   {
@@ -45,6 +46,7 @@ function WeldersPage() {
   const [editWelder, setEditWelder] = useState(emptyWelder);
   const [isEdit, setIsEdit] = useState(false);
   const [organizations, setOrganizations] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Load organizations from localStorage for department dropdown
   useEffect(() => {
@@ -54,20 +56,23 @@ function WeldersPage() {
     }
   }, []);
 
-  // Load welders from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('welders');
-    if (saved) {
-      setWelders(JSON.parse(saved));
-    } else {
-      setWelders(defaultWelders);
+  // Load welders from API
+  const loadWelders = async () => {
+    try {
+      setLoading(true);
+      const data = await getAllEmployees();
+      setWelders(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Ошибка загрузки сварщиков:', error);
+      setWelders([]);
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  };
 
-  // Save welders to localStorage
   useEffect(() => {
-    localStorage.setItem('welders', JSON.stringify(welders));
-  }, [welders]);
+    loadWelders();
+  }, []);
 
   const openAddModal = () => {
     setEditWelder(emptyWelder);
@@ -91,31 +96,62 @@ function WeldersPage() {
     setEditWelder({ ...editWelder, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isEdit) {
-      setWelders(prev =>
-          prev.map(welder => welder.id === editWelder.id ? editWelder : welder)
-      );
-    } else {
-      setWelders(prev => [...prev, { ...editWelder, id: Date.now().toString() }]);
+    try {
+      setLoading(true);
+      if (isEdit) {
+        await updateEmployee(editWelder.id, editWelder);
+      } else {
+        await createEmployee(editWelder);
+      }
+      await loadWelders();
+      closeModal();
+    } catch (error) {
+      console.error('Ошибка сохранения сварщика:', error);
+      alert('Ошибка сохранения: ' + error.message);
+    } finally {
+      setLoading(false);
     }
-    closeModal();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (window.confirm('Вы уверены, что хотите удалить этого сварщика?')) {
-      setWelders(prev => prev.filter(welder => welder.id !== editWelder.id));
-      closeModal();
+      try {
+        setLoading(true);
+        await deleteEmployee(editWelder.id);
+        await loadWelders();
+        closeModal();
+      } catch (error) {
+        console.error('Ошибка удаления сварщика:', error);
+        alert('Ошибка удаления: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
     }
   };
+
+  if (loading && welders.length === 0) {
+    return (
+      <div>
+        <div className="container">
+          <div className="header">
+            <h1>Сварщики</h1>
+          </div>
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            Загрузка...
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
       <div>
         <div className="container">
           <div className="header">
             <h1>Сварщики</h1>
-            <button className="add-btn" onClick={openAddModal}>Добавить</button>
+            <button className="add-btn" onClick={openAddModal} disabled={loading}>Добавить</button>
           </div>
           <table className="welders-table">
             <thead>
@@ -133,7 +169,7 @@ function WeldersPage() {
                   <td>{welder.status}</td>
                   <td>{welder.department}</td>
                   <td>
-                    <button className="action-btn edit" onClick={() => openEditModal(welder)}>
+                    <button className="action-btn edit" onClick={() => openEditModal(welder)} disabled={loading}>
                       <span>Изменить</span>
                     </button>
                   </td>
@@ -153,7 +189,7 @@ function WeldersPage() {
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label className="required">ФИО</label>
-                <input type="text" name="name" value={editWelder.name} onChange={handleChange} required />
+                <input type="text" name="name" value={editWelder.name} onChange={handleChange} required disabled={loading} />
               </div>
 
               <div className="form-group">
@@ -231,11 +267,13 @@ function WeldersPage() {
 
               <div className="modal-footer">
                 {isEdit && (
-                    <button type="button" className="modal-btn delete" onClick={handleDelete}>Удалить</button>
+                    <button type="button" className="modal-btn delete" onClick={handleDelete} disabled={loading}>Удалить</button>
                 )}
                 <div>
-                  <button type="button" className="modal-btn cancel" onClick={closeModal}>Отмена</button>
-                  <button type="submit" className="modal-btn save">Сохранить</button>
+                  <button type="button" className="modal-btn cancel" onClick={closeModal} disabled={loading}>Отмена</button>
+                  <button type="submit" className="modal-btn save" disabled={loading}>
+                    {loading ? 'Сохранение...' : 'Сохранить'}
+                  </button>
                 </div>
               </div>
             </form>

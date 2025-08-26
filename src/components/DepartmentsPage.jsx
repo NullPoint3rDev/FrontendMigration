@@ -1,24 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/equipmentPage.css';
+import { 
+    getAllOrganizationUnits, 
+    createOrganizationUnit, 
+    updateOrganizationUnit, 
+    deleteOrganizationUnit 
+} from '../api/organizationUnitApi';
 
 const DepartmentsPage = () => {
     const [departments, setDepartments] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
     const [editData, setEditData] = useState({});
     const [errors, setErrors] = useState({});
+    const [loading, setLoading] = useState(false);
 
-    // Load departments from localStorage
-    useEffect(() => {
-        const savedDepartments = localStorage.getItem('departments');
-        if (savedDepartments) {
-            setDepartments(JSON.parse(savedDepartments));
+    // Load departments from API
+    const loadDepartments = async () => {
+        try {
+            setLoading(true);
+            const data = await getAllOrganizationUnits();
+            setDepartments(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Ошибка загрузки подразделений:', error);
+            setDepartments([]);
+        } finally {
+            setLoading(false);
         }
-    }, []);
+    };
 
-    // Save departments to localStorage when it changes
     useEffect(() => {
-        localStorage.setItem('departments', JSON.stringify(departments));
-    }, [departments]);
+        loadDepartments();
+    }, []);
 
     const openAddModal = () => {
         setEditData({
@@ -47,7 +59,7 @@ const DepartmentsPage = () => {
         setEditData({ ...editData, [e.target.name]: e.target.value });
     };
 
-    const handleSave = (e) => {
+    const handleSave = async (e) => {
         e.preventDefault();
         const newErrors = {};
         if (!editData.name) newErrors.name = 'Это поле обязательно';
@@ -58,32 +70,56 @@ const DepartmentsPage = () => {
             return;
         }
 
-        if (editData.id) {
-            setDepartments(prev =>
-                prev.map(dept => dept.id === editData.id ? editData : dept)
-            );
-        } else {
-            const newDepartment = {
-                ...editData,
-                id: Date.now().toString(),
-                employeeCount: 0
-            };
-            setDepartments(prev => [...prev, newDepartment]);
+        try {
+            setLoading(true);
+            if (editData.id) {
+                await updateOrganizationUnit(editData.id, editData);
+            } else {
+                await createOrganizationUnit(editData);
+            }
+            await loadDepartments();
+            closeModal();
+        } catch (error) {
+            console.error('Ошибка сохранения подразделения:', error);
+            setErrors({ api: error.message || 'Ошибка сохранения' });
+        } finally {
+            setLoading(false);
         }
-        closeModal();
     };
 
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (window.confirm('Вы уверены, что хотите удалить это подразделение?')) {
-            setDepartments(prev => prev.filter(dept => dept.id !== id));
+            try {
+                setLoading(true);
+                await deleteOrganizationUnit(id);
+                await loadDepartments();
+            } catch (error) {
+                console.error('Ошибка удаления подразделения:', error);
+                alert('Ошибка удаления подразделения: ' + error.message);
+            } finally {
+                setLoading(false);
+            }
         }
     };
+
+    if (loading && departments.length === 0) {
+        return (
+            <div className="equipment-page">
+                <div className="equipment-header">
+                    <h1 className="equipment-title">Подразделения</h1>
+                </div>
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                    Загрузка...
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="equipment-page">
             <div className="equipment-header">
                 <h1 className="equipment-title">Подразделения</h1>
-                <button className="add-equipment-btn" onClick={openAddModal}>
+                <button className="add-equipment-btn" onClick={openAddModal} disabled={loading}>
                     <i className="fas fa-plus"></i>
                     Добавить подразделение
                 </button>
@@ -115,6 +151,7 @@ const DepartmentsPage = () => {
                                 <button
                                     className="action-btn edit-btn"
                                     onClick={() => openEditModal(department)}
+                                    disabled={loading}
                                 >
                                     <i className="fas fa-edit"></i>
                                     Редактировать
@@ -122,6 +159,7 @@ const DepartmentsPage = () => {
                                 <button
                                     className="action-btn delete-btn"
                                     onClick={() => handleDelete(department.id)}
+                                    disabled={loading}
                                 >
                                     <i className="fas fa-trash"></i>
                                     Удалить
@@ -153,6 +191,7 @@ const DepartmentsPage = () => {
                                     onChange={handleInputChange}
                                     className="form-input"
                                     placeholder="Введите название подразделения"
+                                    disabled={loading}
                                 />
                                 {errors.name && <p className="error-message">{errors.name}</p>}
                             </div>
@@ -166,6 +205,7 @@ const DepartmentsPage = () => {
                                     className="form-input"
                                     placeholder="Введите описание"
                                     rows="3"
+                                    disabled={loading}
                                 />
                                 {errors.description && <p className="error-message">{errors.description}</p>}
                             </div>
@@ -202,12 +242,14 @@ const DepartmentsPage = () => {
                                 />
                             </div>
 
+                            {errors.api && <p className="error-message">{errors.api}</p>}
+
                             <div className="modal-actions">
-                                <button type="button" className="cancel-btn" onClick={closeModal}>
+                                <button type="button" className="cancel-btn" onClick={closeModal} disabled={loading}>
                                     Отмена
                                 </button>
-                                <button type="submit" className="save-btn">
-                                    {editData.id ? 'Сохранить' : 'Добавить'}
+                                <button type="submit" className="save-btn" disabled={loading}>
+                                    {loading ? 'Сохранение...' : (editData.id ? 'Сохранить' : 'Добавить')}
                                 </button>
                             </div>
                         </form>
