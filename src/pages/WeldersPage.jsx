@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import '../styles/welders.css';
-import { getAllEmployees, createEmployee, updateEmployee, deleteEmployee } from '../api/userAccountApi';
+import { getAllWelders, createWelder, updateWelder, deleteWelder } from '../api/welderApi';
 
 const defaultWelders = [
   {
@@ -25,7 +25,7 @@ const defaultWelders = [
 const emptyWelder = {
   id: '',
   name: '',
-  status: 'активен',
+  status: 'ACTIVE',
   department: '',
   position: '',
   grade: '',
@@ -60,7 +60,7 @@ function WeldersPage() {
   const loadWelders = async () => {
     try {
       setLoading(true);
-      const data = await getAllEmployees();
+      const data = await getAllWelders();
       setWelders(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Ошибка загрузки сварщиков:', error);
@@ -101,9 +101,9 @@ function WeldersPage() {
     try {
       setLoading(true);
       if (isEdit) {
-        await updateEmployee(editWelder.id, editWelder);
+        await updateWelder(editWelder.id, editWelder);
       } else {
-        await createEmployee(editWelder);
+        await createWelder(editWelder);
       }
       await loadWelders();
       closeModal();
@@ -119,7 +119,7 @@ function WeldersPage() {
     if (window.confirm('Вы уверены, что хотите удалить этого сварщика?')) {
       try {
         setLoading(true);
-        await deleteEmployee(editWelder.id);
+        await deleteWelder(editWelder.id);
         await loadWelders();
         closeModal();
       } catch (error) {
@@ -166,7 +166,10 @@ function WeldersPage() {
             {welders.map((welder) => (
                 <tr key={welder.id}>
                   <td>{welder.name}</td>
-                  <td>{welder.status}</td>
+                  <td>{welder.status === 'ACTIVE' ? 'Активен' : 
+                       welder.status === 'INACTIVE' ? 'Неактивен' : 
+                       welder.status === 'ON_LEAVE' ? 'В отпуске' : 
+                       welder.status === 'DISMISSED' ? 'Уволен' : welder.status}</td>
                   <td>{welder.department}</td>
                   <td>
                     <button className="action-btn edit" onClick={() => openEditModal(welder)} disabled={loading}>
@@ -194,15 +197,17 @@ function WeldersPage() {
 
               <div className="form-group">
                 <label className="required">Статус</label>
-                <select name="status" value={editWelder.status} onChange={handleChange} required>
-                  <option value="активен">Активен</option>
-                  <option value="неактивен">Неактивен</option>
+                <select name="status" value={editWelder.status} onChange={handleChange} required disabled={loading}>
+                  <option value="ACTIVE">Активен</option>
+                  <option value="INACTIVE">Неактивен</option>
+                  <option value="ON_LEAVE">В отпуске</option>
+                  <option value="DISMISSED">Уволен</option>
                 </select>
               </div>
 
               <div className="form-group">
                 <label className="required">Подразделение</label>
-                <select name="department" value={editWelder.department} onChange={handleChange} required>
+                <select name="department" value={editWelder.department} onChange={handleChange} required disabled={loading}>
                   <option value="">Выберите организацию</option>
                   {organizations.map(org => (
                       <option key={org.id} value={org.name}>{org.name}</option>
@@ -212,57 +217,57 @@ function WeldersPage() {
 
               <div className="form-group">
                 <label>Должность</label>
-                <input type="text" name="position" value={editWelder.position} onChange={handleChange} />
+                <input type="text" name="position" value={editWelder.position} onChange={handleChange} disabled={loading} />
               </div>
 
               <div className="form-group">
                 <label>Разряд</label>
-                <input type="text" name="grade" value={editWelder.grade} onChange={handleChange} />
+                <input type="text" name="grade" value={editWelder.grade} onChange={handleChange} disabled={loading} />
               </div>
 
               <div className="form-group">
                 <label>Табельный номер</label>
-                <input type="text" name="employeeId" value={editWelder.employeeId} onChange={handleChange} />
+                <input type="text" name="employeeId" value={editWelder.employeeId} onChange={handleChange} disabled={loading} />
               </div>
 
               <div className="form-group">
                 <label>Дата приема на работу</label>
-                <input type="date" name="hireDate" value={editWelder.hireDate} onChange={handleChange} />
+                <input type="date" name="hireDate" value={editWelder.hireDate} onChange={handleChange} disabled={loading} />
               </div>
 
               <div className="form-group">
                 <label>Дата рождения</label>
-                <input type="date" name="birthDate" value={editWelder.birthDate} onChange={handleChange} />
+                <input type="date" name="birthDate" value={editWelder.birthDate} onChange={handleChange} disabled={loading} />
               </div>
 
               <div className="form-group">
                 <label>Дата аттестации</label>
-                <input type="date" name="certificationDate" value={editWelder.certificationDate} onChange={handleChange} />
+                <input type="date" name="certificationDate" value={editWelder.certificationDate} onChange={handleChange} disabled={loading} />
               </div>
 
               <div className="form-group">
                 <label>Дата следующей аттестации</label>
-                <input type="date" name="nextCertificationDate" value={editWelder.nextCertificationDate} onChange={handleChange} />
+                <input type="date" name="nextCertificationDate" value={editWelder.nextCertificationDate} onChange={handleChange} disabled={loading} />
               </div>
 
               <div className="form-group">
                 <label>Номер телефона</label>
-                <input type="tel" name="phone" value={editWelder.phone} onChange={handleChange} />
+                <input type="tel" name="phone" value={editWelder.phone} onChange={handleChange} disabled={loading} />
               </div>
 
               <div className="form-group">
                 <label>Адрес</label>
-                <input type="text" name="address" value={editWelder.address} onChange={handleChange} />
+                <input type="text" name="address" value={editWelder.address} onChange={handleChange} disabled={loading} />
               </div>
 
               <div className="form-group">
                 <label>Код бесконтактной карты (RFID)</label>
-                <input type="text" name="rfidCode" value={editWelder.rfidCode} onChange={handleChange} />
+                <input type="text" name="rfidCode" value={editWelder.rfidCode} onChange={handleChange} disabled={loading} />
               </div>
 
               <div className="form-group">
                 <label>Сведения об образовании</label>
-                <textarea name="education" value={editWelder.education} onChange={handleChange} />
+                <textarea name="education" value={editWelder.education} onChange={handleChange} disabled={loading} />
               </div>
 
               <div className="modal-footer">
