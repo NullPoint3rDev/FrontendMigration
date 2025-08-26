@@ -19,6 +19,9 @@ const DepartmentsPage = () => {
         try {
             setLoading(true);
             const data = await getAllOrganizationUnits();
+            console.log('Полученные данные подразделений:', data);
+            console.log('Тип данных:', typeof data);
+            console.log('Это массив?', Array.isArray(data));
             setDepartments(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Ошибка загрузки подразделений:', error);
@@ -142,6 +145,12 @@ const DepartmentsPage = () => {
             </div>
 
             <div className="equipment-grid">
+                {console.log('Рендеринг departments:', departments)}
+                {departments.length === 0 && (
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem' }}>
+                        Подразделения не найдены. Количество: {departments.length}
+                    </div>
+                )}
                 {departments.map((department) => (
                     <div key={department.id} className="equipment-card">
                         <div className="equipment-info">

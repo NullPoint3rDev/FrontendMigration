@@ -3,6 +3,8 @@ import { api } from '../services/api';
 export const getAllOrganizationUnits = async () => {
     try {
         const response = await api.get('/organization-units');
+        console.log('API Response:', response);
+        console.log('API Response data:', response.data);
         return response.data;
     } catch (error) {
         console.error('Ошибка получения подразделений:', error);
