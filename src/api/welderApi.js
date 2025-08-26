@@ -1,6 +1,6 @@
 import { api } from '../services/api';
 
-const API_URL = '/api/welders';
+const API_URL = '/welders';
 
 export const getAllWelders = async () => {
     try {
