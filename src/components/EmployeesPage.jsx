@@ -9,12 +9,13 @@ import {
   getAllStatuses,
   getUserPhotoUrl,
   userAccountApi
-} from '../api/userAccountApi';
+} from '../api/employeeApi';
 import '../styles/equipmentPage.css';
 
 const emptyEmployee = {
   id: null,
   username: '',
+  password: '', // Добавляем поле для пароля
   fullName: '',
   email: '',
   organizationUnit: null,
@@ -85,9 +86,10 @@ const EmployeesPage = () => {
   const openEditModal = (employee) => {
     setEditData({
       ...employee,
-      userRoleId: employee.userRoleId || '',
+      userRoleId: employee.userRole?.id || '',
       status: employee.status || '',
       organizationUnit: employee.organizationUnit || null,
+      password: '', // Не показываем пароль при редактировании
     });
     setIsEdit(true);
     setAvatarFile(null);
@@ -143,15 +145,18 @@ const EmployeesPage = () => {
         const uploadRes = await userAccountApi.uploadUserPhoto(avatarFile);
         photoId = uploadRes;
       }
+      
       const payload = {
         ...editData,
         photo: photoId,
       };
+      
       if (isEdit) {
         await updateEmployee(editData.id, payload);
       } else {
         await createEmployee(payload);
       }
+      
       await fetchEmployees();
       closeModal();
     } catch (e) {
@@ -174,11 +179,27 @@ const EmployeesPage = () => {
     }
   };
 
+  if (loading && employees.length === 0) {
+    return (
+      <div className="equipment-page">
+        <div className="equipment-header">
+          <h1 className="equipment-title">Сотрудники</h1>
+        </div>
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          Загрузка...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="equipment-page">
       <div className="equipment-header">
         <h1 className="equipment-title">Сотрудники</h1>
-        <button className="add-equipment-btn" onClick={openAddModal}>Добавить сотрудника</button>
+        <button className="add-equipment-btn" onClick={openAddModal} disabled={loading}>
+          <i className="fas fa-plus"></i>
+          Добавить сотрудника
+        </button>
       </div>
       {error && <div style={{ color: 'red', marginBottom: 16 }}>{error}</div>}
       <div className="equipment-grid">
@@ -195,10 +216,11 @@ const EmployeesPage = () => {
             <div className="equipment-info">
               <div className="equipment-name">{emp.fullName || emp.username}</div>
               <div className="equipment-model">{emp.position}</div>
+              <div className="detail-item"><span className="detail-label">Логин:</span> {emp.username}</div>
               <div className="detail-item"><span className="detail-label">Email:</span> {emp.email}</div>
               <div className="detail-item"><span className="detail-label">Телефон:</span> {emp.phone}</div>
               <div className="detail-item"><span className="detail-label">Подразделение:</span> {emp.organizationUnit?.name || '-'}</div>
-              <div className="detail-item"><span className="detail-label">Роль:</span> {Array.isArray(roles) && roles.find(r => String(r.id) === String(emp.userRoleId))?.name || '-'}</div>
+              <div className="detail-item"><span className="detail-label">Роль:</span> {emp.userRole?.name || '-'}</div>
               <div className="detail-item"><span className="detail-label">Статус:</span> {Array.isArray(statuses) && statuses.find(s => s.value === emp.status)?.label || emp.status}</div>
             </div>
             <div className="equipment-actions">
@@ -217,9 +239,21 @@ const EmployeesPage = () => {
                 <label className="form-label">Логин</label>
                 <input className="form-input" name="username" value={editData.username} onChange={handleInputChange} required />
               </div>
+              {!isEdit && (
+                <div className="form-group">
+                  <label className="form-label">Пароль</label>
+                  <input className="form-input" type="password" name="password" value={editData.password} onChange={handleInputChange} required />
+                </div>
+              )}
+              {isEdit && (
+                <div className="form-group">
+                  <label className="form-label">Новый пароль (оставьте пустым, если не хотите менять)</label>
+                  <input className="form-input" type="password" name="password" value={editData.password} onChange={handleInputChange} />
+                </div>
+              )}
               <div className="form-group">
                 <label className="form-label">ФИО</label>
-                <input className="form-input" name="fullName" value={editData.fullName} onChange={handleInputChange} />
+                <input className="form-input" name="fullName" value={editData.fullName} onChange={handleInputChange} required />
               </div>
               <div className="form-group">
                 <label className="form-label">Email</label>
