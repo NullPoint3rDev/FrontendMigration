@@ -416,7 +416,7 @@ const EmployeesPage = () => {
                 </div>
               </div>
                              <div className="employee-cell">{emp.username}</div>
-               <div className="employee-cell">
+               <div className="employee-cell employee-type-cell">
                  <span className="employee-type-badge">
                    {employeeTypes.find(type => type.value === emp.employeeType)?.label || '-'}
                  </span>
