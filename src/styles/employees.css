@@ -284,27 +284,29 @@
 }
 
 .edit-btn {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: #007bff;
+  color: white;
+  border: 1px solid #007bff;
 }
 
 .edit-btn:hover {
-  background: var(--primary);
-  border-color: var(--primary);
+  background: #0056b3;
+  border-color: #0056b3;
   transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
 }
 
 .delete-btn {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: #dc3545;
+  color: white;
+  border: 1px solid #dc3545;
 }
 
 .delete-btn:hover {
-  background: var(--secondary);
-  border-color: var(--secondary);
+  background: #c82333;
+  border-color: #c82333;
   transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
 }
 
 .no-employees {
