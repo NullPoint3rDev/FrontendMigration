@@ -3,13 +3,15 @@ import {
   getAllEmployees,
   createEmployee,
   updateEmployee,
-  deleteEmployee,
+  deleteEmployee
+} from '../api/employeeApi';
+import {
   getAllOrganizationUnits,
   getAllUserRoles,
   getAllStatuses,
   getUserPhotoUrl,
   userAccountApi
-} from '../api/employeeApi';
+} from '../api/userAccountApi';
 import '../styles/equipmentPage.css';
 
 const emptyEmployee = {
