@@ -20,6 +20,7 @@ const emptyEmployee = {
   password: '',
   fullName: '',
   email: '',
+  employeeType: '',
   organizationUnit: null,
   userRoleId: '',
   position: '',
@@ -27,6 +28,15 @@ const emptyEmployee = {
   status: '',
   photo: null,
 };
+
+const employeeTypes = [
+  { value: 'ADMIN', label: 'Администратор' },
+  { value: 'MANAGER', label: 'Менеджер' },
+  { value: 'REGULATOR', label: 'Регулировщик' },
+  { value: 'WELDER', label: 'Сварщик' },
+  { value: 'QC', label: 'ОТК' },
+  { value: 'PROGRAMMER', label: 'Программист' }
+];
 
 const EmployeesPage = () => {
   const [employees, setEmployees] = useState([]);
@@ -47,7 +57,8 @@ const EmployeesPage = () => {
     search: '',
     status: '',
     role: '',
-    organizationUnit: ''
+    organizationUnit: '',
+    employeeType: ''
   });
 
   useEffect(() => {
@@ -63,14 +74,15 @@ const EmployeesPage = () => {
   const applyFilters = () => {
     let filtered = [...employees];
 
-    // Поиск по имени, логину, email
+    // Поиск по имени, логину, email, должности, типу
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(emp => 
         emp.fullName?.toLowerCase().includes(searchLower) ||
         emp.username?.toLowerCase().includes(searchLower) ||
         emp.email?.toLowerCase().includes(searchLower) ||
-        emp.position?.toLowerCase().includes(searchLower)
+        emp.position?.toLowerCase().includes(searchLower) ||
+        employeeTypes.find(type => type.value === emp.employeeType)?.label.toLowerCase().includes(searchLower)
       );
     }
 
@@ -89,6 +101,11 @@ const EmployeesPage = () => {
       filtered = filtered.filter(emp => emp.organizationUnit?.id === parseInt(filters.organizationUnit));
     }
 
+    // Фильтр по типу сотрудника
+    if (filters.employeeType) {
+      filtered = filtered.filter(emp => emp.employeeType === filters.employeeType);
+    }
+
     setFilteredEmployees(filtered);
   };
 
@@ -102,7 +119,8 @@ const EmployeesPage = () => {
       search: '',
       status: '',
       role: '',
-      organizationUnit: ''
+      organizationUnit: '',
+      employeeType: ''
     });
   };
 
@@ -273,7 +291,7 @@ const EmployeesPage = () => {
           <div className="filter-group">
             <input
               type="text"
-              placeholder="Поиск по имени, логину, email..."
+              placeholder="Поиск по имени, логину, email, должности, типу..."
               name="search"
               value={filters.search}
               onChange={handleFilterChange}
@@ -319,6 +337,19 @@ const EmployeesPage = () => {
               ))}
             </select>
           </div>
+          <div className="filter-group">
+            <select
+              name="employeeType"
+              value={filters.employeeType}
+              onChange={handleFilterChange}
+              className="filter-select"
+            >
+              <option value="">Все типы</option>
+              {employeeTypes.map(type => (
+                <option key={type.value} value={type.value}>{type.label}</option>
+              ))}
+            </select>
+          </div>
           <button className="clear-filters-btn" onClick={clearFilters}>
             Очистить фильтры
           </button>
@@ -333,7 +364,7 @@ const EmployeesPage = () => {
           <div className="employee-cell">Фото</div>
           <div className="employee-cell">ФИО</div>
           <div className="employee-cell">Логин</div>
-          <div className="employee-cell">Email</div>
+          <div className="employee-cell">Тип</div>
           <div className="employee-cell">Должность</div>
           <div className="employee-cell">Подразделение</div>
           <div className="employee-cell">Роль</div>
@@ -370,9 +401,13 @@ const EmployeesPage = () => {
                   {isAdmin(emp) && <span className="admin-badge">Admin</span>}
                 </div>
               </div>
-              <div className="employee-cell">{emp.username}</div>
-              <div className="employee-cell">{emp.email || '-'}</div>
-              <div className="employee-cell">{emp.position || '-'}</div>
+                             <div className="employee-cell">{emp.username}</div>
+               <div className="employee-cell">
+                 <span className="employee-type-badge">
+                   {employeeTypes.find(type => type.value === emp.employeeType)?.label || '-'}
+                 </span>
+               </div>
+               <div className="employee-cell">{emp.position || '-'}</div>
               <div className="employee-cell">{emp.organizationUnit?.name || '-'}</div>
               <div className="employee-cell">
                 <span className={`role-badge ${isAdmin(emp) ? 'admin-role' : ''}`}>
@@ -436,6 +471,15 @@ const EmployeesPage = () => {
               <div className="form-group">
                 <label className="form-label">Email</label>
                 <input className="form-input" name="email" value={editData.email} onChange={handleInputChange} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Тип сотрудника</label>
+                <select className="form-input" name="employeeType" value={editData.employeeType} onChange={handleInputChange} required>
+                  <option value="">Выберите тип сотрудника</option>
+                  {employeeTypes.map(type => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Должность</label>

@@ -134,7 +134,7 @@
 
 .employees-table-header {
   display: grid;
-  grid-template-columns: 60px 1fr 120px 180px 120px 150px 100px 100px 100px;
+  grid-template-columns: 60px 1fr 120px 100px 120px 150px 100px 100px 100px;
   gap: 1rem;
   padding: 1rem 1.5rem;
   background: rgba(0, 0, 0, 0.2);
@@ -146,7 +146,7 @@
 
 .employee-row {
   display: grid;
-  grid-template-columns: 60px 1fr 120px 180px 120px 150px 100px 100px 100px;
+  grid-template-columns: 60px 1fr 120px 100px 120px 150px 100px 100px 100px;
   gap: 1rem;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--border-color);
@@ -224,6 +224,17 @@
 .role-badge.admin-role {
   background: linear-gradient(135deg, #ffc107, #ff8f00);
   color: white;
+}
+
+.employee-type-badge {
+  background: rgba(108, 99, 255, 0.2);
+  color: var(--primary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid rgba(108, 99, 255, 0.3);
+  white-space: nowrap;
 }
 
 .status-badge {
@@ -440,7 +451,7 @@
 @media (max-width: 1200px) {
   .employees-table-header,
   .employee-row {
-    grid-template-columns: 60px 1fr 100px 150px 100px 120px 80px 80px 80px;
+    grid-template-columns: 60px 1fr 100px 80px 100px 120px 80px 80px 80px;
     gap: 0.8rem;
   }
 }
