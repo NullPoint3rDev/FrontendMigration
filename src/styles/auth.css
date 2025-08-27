@@ -46,18 +46,7 @@
     -webkit-text-fill-color: transparent;
 }
 
-.auth-tabs {
-    margin-bottom: 2rem !important;
-}
 
-.auth-tab {
-    color: rgba(255, 255, 255, 0.7) !important;
-    transition: all 0.3s ease !important;
-}
-
-.auth-tab.Mui-selected {
-    color: #6c63ff !important;
-}
 
 .auth-form-container {
     animation: slideUp 0.5s ease-out;
@@ -155,9 +144,4 @@
     margin-bottom: 1.5rem;
 }
 
-/* Tab indicator styles */
-.auth-tabs .MuiTabs-indicator {
-    background: linear-gradient(90deg, #6c63ff, #ff6584) !important;
-    height: 3px !important;
-    border-radius: 3px;
-} 
+ 
