@@ -12,12 +12,12 @@ import {
   getUserPhotoUrl,
   userAccountApi
 } from '../api/userAccountApi';
-import '../styles/equipmentPage.css';
+import '../styles/employees.css';
 
 const emptyEmployee = {
   id: null,
   username: '',
-  password: '', // Добавляем поле для пароля
+  password: '',
   fullName: '',
   email: '',
   organizationUnit: null,
@@ -30,6 +30,7 @@ const emptyEmployee = {
 
 const EmployeesPage = () => {
   const [employees, setEmployees] = useState([]);
+  const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editData, setEditData] = useState(emptyEmployee);
   const [isEdit, setIsEdit] = useState(false);
@@ -41,11 +42,69 @@ const EmployeesPage = () => {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
 
+  // Фильтры
+  const [filters, setFilters] = useState({
+    search: '',
+    status: '',
+    role: '',
+    organizationUnit: ''
+  });
+
   useEffect(() => {
     fetchEmployees();
     fetchUnits();
     fetchRoles();
   }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [employees, filters]);
+
+  const applyFilters = () => {
+    let filtered = [...employees];
+
+    // Поиск по имени, логину, email
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(emp => 
+        emp.fullName?.toLowerCase().includes(searchLower) ||
+        emp.username?.toLowerCase().includes(searchLower) ||
+        emp.email?.toLowerCase().includes(searchLower) ||
+        emp.position?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Фильтр по статусу
+    if (filters.status) {
+      filtered = filtered.filter(emp => emp.status === filters.status);
+    }
+
+    // Фильтр по роли
+    if (filters.role) {
+      filtered = filtered.filter(emp => emp.userRole?.id === parseInt(filters.role));
+    }
+
+    // Фильтр по подразделению
+    if (filters.organizationUnit) {
+      filtered = filtered.filter(emp => emp.organizationUnit?.id === parseInt(filters.organizationUnit));
+    }
+
+    setFilteredEmployees(filtered);
+  };
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      status: '',
+      role: '',
+      organizationUnit: ''
+    });
+  };
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -91,7 +150,7 @@ const EmployeesPage = () => {
       userRoleId: employee.userRole?.id || '',
       status: employee.status || '',
       organizationUnit: employee.organizationUnit || null,
-      password: '', // Не показываем пароль при редактировании
+      password: '',
     });
     setIsEdit(true);
     setAvatarFile(null);
@@ -181,11 +240,15 @@ const EmployeesPage = () => {
     }
   };
 
+  const isAdmin = (employee) => {
+    return employee.userRole?.name?.toLowerCase().includes('admin');
+  };
+
   if (loading && employees.length === 0) {
     return (
-      <div className="equipment-page">
-        <div className="equipment-header">
-          <h1 className="equipment-title">Сотрудники</h1>
+      <div className="employees-page">
+        <div className="employees-header">
+          <h1 className="employees-title">Сотрудники</h1>
         </div>
         <div style={{ textAlign: 'center', padding: '2rem' }}>
           Загрузка...
@@ -195,43 +258,156 @@ const EmployeesPage = () => {
   }
 
   return (
-    <div className="equipment-page">
-      <div className="equipment-header">
-        <h1 className="equipment-title">Сотрудники</h1>
-        <button className="add-equipment-btn" onClick={openAddModal} disabled={loading}>
+    <div className="employees-page">
+      <div className="employees-header">
+        <h1 className="employees-title">Сотрудники</h1>
+        <button className="add-employee-btn" onClick={openAddModal} disabled={loading}>
           <i className="fas fa-plus"></i>
           Добавить сотрудника
         </button>
       </div>
-      {error && <div style={{ color: 'red', marginBottom: 16 }}>{error}</div>}
-      <div className="equipment-grid">
-        {employees.map((emp) => (
-          <div className="equipment-card" key={emp.id}>
-            {emp.photo && (
-              <img
-                src={getUserPhotoUrl(emp.photo)}
-                alt="avatar"
-                className="equipment-image"
-                style={{ objectFit: 'cover', height: 120, width: 120, borderRadius: '50%', margin: '0 auto 1rem auto' }}
-              />
-            )}
-            <div className="equipment-info">
-              <div className="equipment-name">{emp.fullName || emp.username}</div>
-              <div className="equipment-model">{emp.position}</div>
-              <div className="detail-item"><span className="detail-label">Логин:</span> {emp.username}</div>
-              <div className="detail-item"><span className="detail-label">Email:</span> {emp.email}</div>
-              <div className="detail-item"><span className="detail-label">Телефон:</span> {emp.phone}</div>
-              <div className="detail-item"><span className="detail-label">Подразделение:</span> {emp.organizationUnit?.name || '-'}</div>
-              <div className="detail-item"><span className="detail-label">Роль:</span> {emp.userRole?.name || '-'}</div>
-              <div className="detail-item"><span className="detail-label">Статус:</span> {Array.isArray(statuses) && statuses.find(s => s.value === emp.status)?.label || emp.status}</div>
-            </div>
-            <div className="equipment-actions">
-              <button className="edit-btn action-btn" onClick={() => openEditModal(emp)}>Редактировать</button>
-              <button className="delete-btn action-btn" onClick={() => handleDelete(emp.id)}>Удалить</button>
-            </div>
+
+      {/* Фильтры */}
+      <div className="filters-section">
+        <div className="filters-row">
+          <div className="filter-group">
+            <input
+              type="text"
+              placeholder="Поиск по имени, логину, email..."
+              name="search"
+              value={filters.search}
+              onChange={handleFilterChange}
+              className="filter-input"
+            />
           </div>
-        ))}
+          <div className="filter-group">
+            <select
+              name="status"
+              value={filters.status}
+              onChange={handleFilterChange}
+              className="filter-select"
+            >
+              <option value="">Все статусы</option>
+              {statuses.map(status => (
+                <option key={status.value} value={status.value}>{status.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-group">
+            <select
+              name="role"
+              value={filters.role}
+              onChange={handleFilterChange}
+              className="filter-select"
+            >
+              <option value="">Все роли</option>
+              {roles.map(role => (
+                <option key={role.id} value={role.id}>{role.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-group">
+            <select
+              name="organizationUnit"
+              value={filters.organizationUnit}
+              onChange={handleFilterChange}
+              className="filter-select"
+            >
+              <option value="">Все подразделения</option>
+              {units.map(unit => (
+                <option key={unit.id} value={unit.id}>{unit.name}</option>
+              ))}
+            </select>
+          </div>
+          <button className="clear-filters-btn" onClick={clearFilters}>
+            Очистить фильтры
+          </button>
+        </div>
       </div>
+
+      {error && <div className="error-message">{error}</div>}
+
+      {/* Список сотрудников */}
+      <div className="employees-list">
+        <div className="employees-table-header">
+          <div className="employee-cell">Фото</div>
+          <div className="employee-cell">ФИО</div>
+          <div className="employee-cell">Логин</div>
+          <div className="employee-cell">Email</div>
+          <div className="employee-cell">Должность</div>
+          <div className="employee-cell">Подразделение</div>
+          <div className="employee-cell">Роль</div>
+          <div className="employee-cell">Статус</div>
+          <div className="employee-cell">Действия</div>
+        </div>
+
+        {filteredEmployees.length === 0 ? (
+          <div className="no-employees">
+            {employees.length === 0 ? 'Сотрудники не найдены' : 'По вашему запросу ничего не найдено'}
+          </div>
+        ) : (
+          filteredEmployees.map((emp) => (
+            <div 
+              key={emp.id} 
+              className={`employee-row ${isAdmin(emp) ? 'admin-row' : ''}`}
+            >
+              <div className="employee-cell">
+                {emp.photo ? (
+                  <img
+                    src={getUserPhotoUrl(emp.photo)}
+                    alt="avatar"
+                    className="employee-avatar"
+                  />
+                ) : (
+                  <div className="employee-avatar-placeholder">
+                    <i className="fas fa-user"></i>
+                  </div>
+                )}
+              </div>
+              <div className="employee-cell">
+                <div className="employee-name">
+                  {emp.fullName || emp.username}
+                  {isAdmin(emp) && <span className="admin-badge">Admin</span>}
+                </div>
+              </div>
+              <div className="employee-cell">{emp.username}</div>
+              <div className="employee-cell">{emp.email || '-'}</div>
+              <div className="employee-cell">{emp.position || '-'}</div>
+              <div className="employee-cell">{emp.organizationUnit?.name || '-'}</div>
+              <div className="employee-cell">
+                <span className={`role-badge ${isAdmin(emp) ? 'admin-role' : ''}`}>
+                  {emp.userRole?.name || '-'}
+                </span>
+              </div>
+              <div className="employee-cell">
+                <span className={`status-badge status-${emp.status?.toLowerCase()}`}>
+                  {Array.isArray(statuses) && statuses.find(s => s.value === emp.status)?.label || emp.status || '-'}
+                </span>
+              </div>
+              <div className="employee-cell">
+                <div className="employee-actions">
+                  <button 
+                    className="edit-btn" 
+                    onClick={() => openEditModal(emp)}
+                    title="Редактировать"
+                  >
+                    <i className="fas fa-edit"></i>
+                  </button>
+                  <button 
+                    className="delete-btn" 
+                    onClick={() => handleDelete(emp.id)}
+                    title="Удалить"
+                  >
+                    <i className="fas fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Модальное окно */}
       {modalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
