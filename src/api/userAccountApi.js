@@ -118,9 +118,11 @@ export async function getAllUserRoles() {
 // Получить все статусы (захардкодим, если нет API)
 export function getAllStatuses() {
     return [
-        { value: 'ACTIVE', label: 'Активен' },
-        { value: 'INACTIVE', label: 'Неактивен' },
-        { value: 'BLOCKED', label: 'Заблокирован' },
+        { value: 'Active', label: 'Активен' },
+        { value: 'Inactive', label: 'Неактивен' },
+        { value: 'Blocked', label: 'Заблокирован' },
+        { value: 'Pending', label: 'Ожидает' },
+        { value: 'Deleted', label: 'Удален' },
     ];
 }
 
