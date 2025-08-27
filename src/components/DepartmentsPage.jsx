@@ -89,6 +89,8 @@ const DepartmentsPage = () => {
                 address: editData.address || '',
                 phone: editData.phone || '',
                 email: editData.email || '',
+                level: editData.level || 1,
+                parentDepartment: editData.parentDepartment ? { id: editData.parentDepartment } : null,
                 organization: {
                     id: 1 // Дефолтная организация
                 }
@@ -171,7 +173,7 @@ const DepartmentsPage = () => {
                                 {department.parentDepartment && (
                                     <div className="detail-item">
                                         <span className="detail-label">Родительское подразделение:</span>
-                                        {department.parentDepartment}
+                                        {department.parentDepartment.name}
                                     </div>
                                 )}
                                 {department.address && (
@@ -260,7 +262,7 @@ const DepartmentsPage = () => {
                                 <label className="form-label">Родительское подразделение</label>
                                 <select
                                     name="parentDepartment"
-                                    value={editData.parentDepartment || ''}
+                                    value={editData.parentDepartment?.id || ''}
                                     onChange={handleInputChange}
                                     className="form-input"
                                 >
@@ -268,7 +270,7 @@ const DepartmentsPage = () => {
                                     {departments
                                         .filter(dept => dept.level < 3 && dept.id !== editData.id)
                                         .map((dept) => (
-                                            <option key={dept.id} value={dept.name}>
+                                            <option key={dept.id} value={dept.id}>
                                                 {dept.name}
                                             </option>
                                         ))}
