@@ -83,15 +83,25 @@ const handleAuthResponse = async (response) => {
 export const api = {
     // Auth methods
     login: async (credentials) => {
-        // Мок: всегда успешный вход
-        return Promise.resolve({
-            token: "demo-token",
-            user: {
-                id: 1,
-                name: credentials.username || "Demo User",
-                role: "admin"
-            }
-        });
+        console.log('Attempting login with:', credentials);
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(credentials)
+            });
+            
+            console.log('Login response status:', response.status);
+            const data = await handleAuthResponse(response);
+            console.log('Login successful:', data);
+            return data;
+        } catch (error) {
+            console.error('Login failed:', error);
+            throw error;
+        }
     },
 
     register: async (userData) => {
