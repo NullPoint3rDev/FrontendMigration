@@ -127,9 +127,12 @@ const EmployeesPage = () => {
   const fetchEmployees = async () => {
     setLoading(true);
     try {
+      console.log('Fetching employees...');
       const data = await getAllEmployees();
+      console.log('Fetched employees:', data);
       setEmployees(data);
     } catch (e) {
+      console.error('Error fetching employees:', e);
       setError('Ошибка загрузки сотрудников');
     } finally {
       setLoading(false);
@@ -163,11 +166,13 @@ const EmployeesPage = () => {
   };
 
   const openEditModal = (employee) => {
+    console.log('Opening edit modal for employee:', employee);
     setEditData({
       ...employee,
       userRoleId: employee.userRole?.id || '',
       status: employee.status || '',
       organizationUnit: employee.organizationUnit || null,
+      employeeType: employee.employeeType || '',
       password: '',
     });
     setIsEdit(true);
@@ -226,20 +231,40 @@ const EmployeesPage = () => {
       }
       
       const payload = {
-        ...editData,
+        username: editData.username,
+        fullName: editData.fullName,
+        email: editData.email,
+        employeeType: editData.employeeType,
+        position: editData.position,
+        phone: editData.phone,
+        status: editData.status,
         photo: photoId,
+        organizationUnit: editData.organizationUnit,
+        userRoleId: editData.userRoleId
       };
       
+      // Добавляем пароль только если он указан (для создания или изменения)
+      if (editData.password) {
+        payload.password = editData.password;
+      }
+      
+      console.log('Saving employee with payload:', payload);
+      console.log('Is edit mode:', isEdit);
+      
       if (isEdit) {
+        console.log('Updating employee with ID:', editData.id);
         await updateEmployee(editData.id, payload);
       } else {
+        console.log('Creating new employee');
         await createEmployee(payload);
       }
       
+      console.log('Employee saved successfully, fetching updated list...');
       await fetchEmployees();
       closeModal();
     } catch (e) {
-      setError('Ошибка сохранения');
+      console.error('Error saving employee:', e);
+      setError('Ошибка сохранения: ' + (e.message || 'Неизвестная ошибка'));
     } finally {
       setLoading(false);
     }

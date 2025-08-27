@@ -34,7 +34,9 @@ export const createEmployee = async (employeeData) => {
 
 export const updateEmployee = async (id, employeeData) => {
     try {
+        console.log('API: Updating employee with ID:', id, 'Data:', employeeData);
         const response = await api.put(`${API_URL}/${id}`, employeeData);
+        console.log('API: Update response:', response);
         return response;
     } catch (error) {
         console.error('Error updating employee:', error);
