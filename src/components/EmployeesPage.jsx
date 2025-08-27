@@ -391,14 +391,14 @@ const EmployeesPage = () => {
                     onClick={() => openEditModal(emp)}
                     title="Редактировать"
                   >
-                    <i className="fas fa-pencil-alt"></i>
+                    ✏️
                   </button>
                   <button 
                     className="delete-btn" 
                     onClick={() => handleDelete(emp.id)}
                     title="Удалить"
                   >
-                    <i className="fas fa-trash-alt"></i>
+                    🗑️
                   </button>
                 </div>
               </div>
