@@ -412,7 +412,6 @@ const EmployeesPage = () => {
               <div className="employee-cell">
                 <div className="employee-name">
                   {emp.fullName || emp.username}
-                  {isAdmin(emp) && <span className="admin-badge">Admin</span>}
                 </div>
               </div>
                              <div className="employee-cell">{emp.username}</div>

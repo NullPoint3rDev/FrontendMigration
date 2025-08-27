@@ -206,16 +206,7 @@
   font-weight: 500;
 }
 
-.admin-badge {
-  background: linear-gradient(135deg, #ffc107, #ff8f00);
-  color: white;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+
 
 .role-badge {
   background: rgba(255, 255, 255, 0.1);
