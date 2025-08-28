@@ -3,7 +3,14 @@ import '../styles/equipmentPage.css';
 import { useNavigate } from 'react-router-dom';
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
-import { createWeldingMachine, updateWeldingMachine, deleteWeldingMachine, getAllWeldingMachines } from '../api/weldingMachineApi';
+import { 
+    createWeldingMachine, 
+    updateWeldingMachine, 
+    deleteWeldingMachine, 
+    getAllWeldingMachines,
+    getAllOrganizationUnits,
+    getAllWeldingMachineTypes
+} from '../api/weldingMachineApi';
 
 const initialEquipment = [
     {
@@ -152,6 +159,8 @@ function WeldingEquipmentPage() {
     const [dropdown, setDropdown] = useState(null);
     const [errors, setErrors] = useState({});
     const [welders, setWelders] = useState([]);
+    const [organizationUnits, setOrganizationUnits] = useState([]);
+    const [weldingMachineTypes, setWeldingMachineTypes] = useState([]);
     const currentYear = new Date().getFullYear();
     const navigate = useNavigate();
     const [deviceDataByMac, setDeviceDataByMac] = useState({});
@@ -252,7 +261,9 @@ function WeldingEquipmentPage() {
             lastService: '',
             serialNumber: '',
             inventoryNumber: '',
-            assignedWelders: []
+            assignedWelders: [],
+            organizationUnit: null,
+            weldingMachineType: null
         });
         setErrors({});
         setModalOpen(true);
@@ -270,8 +281,32 @@ function WeldingEquipmentPage() {
         }
     };
 
+    // Загрузка подразделений
+    const loadOrganizationUnits = async () => {
+        try {
+            const data = await getAllOrganizationUnits();
+            setOrganizationUnits(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Ошибка загрузки подразделений:', err);
+            setOrganizationUnits([]);
+        }
+    };
+
+    // Загрузка типов сварочных машин
+    const loadWeldingMachineTypes = async () => {
+        try {
+            const data = await getAllWeldingMachineTypes();
+            setWeldingMachineTypes(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Ошибка загрузки типов сварочных машин:', err);
+            setWeldingMachineTypes([]);
+        }
+    };
+
     useEffect(() => {
         loadEquipment();
+        loadOrganizationUnits();
+        loadWeldingMachineTypes();
     }, []);
 
     const handleSave = async (e) => {
@@ -284,7 +319,8 @@ function WeldingEquipmentPage() {
         if (!mac || mac.length !== 12) {
             newErrors.mac = 'MAC-адрес должен содержать 12 символов (только 0-9, A-F)';
         }
-        if (!editData.department) newErrors.department = 'Это поле обязательно';
+        if (!editData.organizationUnit) newErrors.organizationUnit = 'Выберите подразделение';
+        if (!editData.weldingMachineType) newErrors.weldingMachineType = 'Выберите тип сварочной машины';
 
         if (Object.keys(newErrors).length) {
             setErrors(newErrors);
@@ -292,10 +328,17 @@ function WeldingEquipmentPage() {
         }
 
         try {
+            const machineData = {
+                ...editData,
+                mac,
+                organizationUnit: editData.organizationUnit,
+                weldingMachineType: editData.weldingMachineType
+            };
+
             if (editData.id) {
-                await updateWeldingMachine(editData.id, { ...editData, mac });
+                await updateWeldingMachine(editData.id, machineData);
             } else {
-                await createWeldingMachine({ ...editData, mac });
+                await createWeldingMachine(machineData);
             }
             await loadEquipment();
             closeModal();
@@ -496,17 +539,48 @@ function WeldingEquipmentPage() {
                             </div>
 
                             <div className="form-group">
-                                <label className="form-label">Отдел</label>
-                                <input
-                                    type="text"
-                                    name="department"
-                                    value={editData.department || ''}
-                                    onChange={handleInputChange}
+                                <label className="form-label">Подразделение</label>
+                                <select
+                                    name="organizationUnit"
+                                    value={editData.organizationUnit?.id || ''}
+                                    onChange={(e) => {
+                                        const selectedUnit = organizationUnits.find(unit => unit.id === parseInt(e.target.value));
+                                        setEditData({ ...editData, organizationUnit: selectedUnit });
+                                    }}
                                     className="form-input"
-                                    placeholder="Введите отдел"
-                                />
-                                {errors.department && (
-                                    <p className="error-message">{errors.department}</p>
+                                >
+                                    <option value="">Выберите подразделение</option>
+                                    {organizationUnits.map(unit => (
+                                        <option key={unit.id} value={unit.id}>
+                                            {unit.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                {errors.organizationUnit && (
+                                    <p className="error-message">{errors.organizationUnit}</p>
+                                )}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Тип сварочной машины</label>
+                                <select
+                                    name="weldingMachineType"
+                                    value={editData.weldingMachineType?.id || ''}
+                                    onChange={(e) => {
+                                        const selectedType = weldingMachineTypes.find(type => type.id === parseInt(e.target.value));
+                                        setEditData({ ...editData, weldingMachineType: selectedType });
+                                    }}
+                                    className="form-input"
+                                >
+                                    <option value="">Выберите тип сварочной машины</option>
+                                    {weldingMachineTypes.map(type => (
+                                        <option key={type.id} value={type.id}>
+                                            {type.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                {errors.weldingMachineType && (
+                                    <p className="error-message">{errors.weldingMachineType}</p>
                                 )}
                             </div>
 
