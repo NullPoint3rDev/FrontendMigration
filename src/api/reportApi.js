@@ -119,7 +119,6 @@ export const reportApi = {
             'welders': `${BASE_URL}/welders`,
             'materials': `${BASE_URL}/materials`,
             'welds': `${BASE_URL}/welds`,
-            'notifications': `${BASE_URL}/notifications`,
             'errors': `${BASE_URL}/errors`,
             'violations': `${BASE_URL}/violations`,
             'tasks': `${BASE_URL}/tasks`
@@ -185,7 +184,6 @@ export const reportHelpers = {
             'welders': 'welders_work_report',
             'materials': 'materials_consumption_report',
             'welds': 'welds_quality_report',
-            'notifications': 'notifications_report',
             'errors': 'equipment_errors_report',
             'violations': 'welds_violations_report',
             'tasks': 'welding_tasks_report'

@@ -21,7 +21,7 @@ import EquipmentReportPage from './components/EquipmentReportPage';
 import WeldersReportPage from './components/WeldersReportPage';
 import MaterialsReportPage from './components/MaterialsReportPage';
 import WeldsReportPage from './components/WeldsReportPage';
-import NotificationsReportPage from './components/NotificationsReportPage';
+
 import ErrorsReportPage from './components/ErrorsReportPage';
 import ViolationsReportPage from './components/ViolationsReportPage';
 import TasksReportPage from './components/TasksReportPage';
@@ -82,7 +82,6 @@ function App() {
                                 <Route path="/reports/welders" element={<WeldersReportPage />} />
                                 <Route path="/reports/materials" element={<MaterialsReportPage />} />
                                 <Route path="/reports/welds" element={<WeldsReportPage />} />
-                                <Route path="/reports/notifications" element={<NotificationsReportPage />} />
                                 <Route path="/reports/errors" element={<ErrorsReportPage />} />
                                 <Route path="/reports/violations" element={<ViolationsReportPage />} />
                                 <Route path="/reports/tasks" element={<TasksReportPage />} />

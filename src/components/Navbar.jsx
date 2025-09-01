@@ -41,7 +41,6 @@ const Navbar = () => {
                 { label: 'По работе сварщиков', path: '/reports/welders' },
                 { label: 'По расходу материалов', path: '/reports/materials' },
                 { label: 'По сварочным швам', path: '/reports/welds' },
-                { label: 'Отправка уведомлений и отчетов по эл. почте', path: '/reports/notifications' },
                 { label: 'По ошибкам сварочного оборудования', path: '/reports/errors' },
                 { label: 'Перечень швов, выполненных с нарушением', path: '/reports/violations' },
                 { label: 'Отчет о выполнении сварочного задания', path: '/reports/tasks' },

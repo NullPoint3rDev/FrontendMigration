@@ -52,33 +52,6 @@ const BaseReportPage = ({ reportType, title, description, icon }) => {
             </div>
 
             <div className="report-content">
-                <div className="report-info-card">
-                    <h3>Информация об отчете</h3>
-                    <p>
-                        Данный отчет предоставляет детальную информацию по выбранному направлению 
-                        с возможностью экспорта в различные форматы (Excel, PDF, CSV).
-                    </p>
-                    
-                    <div className="report-features">
-                        <div className="feature">
-                            <span className="feature-icon">📊</span>
-                            <span>Детальная аналитика</span>
-                        </div>
-                        <div className="feature">
-                            <span className="feature-icon">📅</span>
-                            <span>Гибкий выбор периода</span>
-                        </div>
-                        <div className="feature">
-                            <span className="feature-icon">💾</span>
-                            <span>Экспорт в Excel/PDF/CSV</span>
-                        </div>
-                        <div className="feature">
-                            <span className="feature-icon">⚡</span>
-                            <span>Быстрая генерация</span>
-                        </div>
-                    </div>
-                </div>
-
                 <div className="report-actions">
                     <button 
                         className="create-report-button"
@@ -97,15 +70,6 @@ const BaseReportPage = ({ reportType, title, description, icon }) => {
                             </>
                         )}
                     </button>
-                </div>
-
-                <div className="report-preview">
-                    <h3>Предварительный просмотр</h3>
-                    <div className="preview-placeholder">
-                        <div className="preview-icon">📊</div>
-                        <p>Отчет будет сгенерирован после выбора параметров</p>
-                        <small>Выберите период и формат для создания отчета</small>
-                    </div>
                 </div>
             </div>
 
