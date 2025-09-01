@@ -17,6 +17,14 @@ import AboutPage from './components/AboutPage';
 import AuthPage from './components/AuthPage';
 import UserProfilePage from './pages/UserProfilePage';
 import ReportsPage from './components/ReportsPage';
+import EquipmentReportPage from './components/EquipmentReportPage';
+import WeldersReportPage from './components/WeldersReportPage';
+import MaterialsReportPage from './components/MaterialsReportPage';
+import WeldsReportPage from './components/WeldsReportPage';
+import NotificationsReportPage from './components/NotificationsReportPage';
+import ErrorsReportPage from './components/ErrorsReportPage';
+import ViolationsReportPage from './components/ViolationsReportPage';
+import TasksReportPage from './components/TasksReportPage';
 import EmployeesPage from './components/EmployeesPage';
 import DeviceMonitorPage from './components/DeviceMonitorPage';
 import './App.css';
@@ -70,14 +78,14 @@ function App() {
                                 <Route path="/equipment-list" element={<div className="main-content"><h2>Перечень оборудования</h2></div>} />
                                 
                                 {/* 4. Отчеты */}
-                                <Route path="/reports/equipment" element={<div className="main-content"><h2>Отчеты по работе оборудования</h2></div>} />
-                                <Route path="/reports/welders" element={<div className="main-content"><h2>Отчеты по работе сварщиков</h2></div>} />
-                                <Route path="/reports/materials" element={<div className="main-content"><h2>Отчеты по расходу материалов</h2></div>} />
-                                <Route path="/reports/welds" element={<div className="main-content"><h2>Отчеты по сварочным швам</h2></div>} />
-                                <Route path="/reports/notifications" element={<div className="main-content"><h2>Отправка уведомлений и отчетов по эл. почте</h2></div>} />
-                                <Route path="/reports/errors" element={<div className="main-content"><h2>Отчеты по ошибкам сварочного оборудования</h2></div>} />
-                                <Route path="/reports/violations" element={<div className="main-content"><h2>Перечень швов, выполненных с нарушением</h2></div>} />
-                                <Route path="/reports/tasks" element={<div className="main-content"><h2>Отчет о выполнении сварочного задания</h2></div>} />
+                                <Route path="/reports/equipment" element={<EquipmentReportPage />} />
+                                <Route path="/reports/welders" element={<WeldersReportPage />} />
+                                <Route path="/reports/materials" element={<MaterialsReportPage />} />
+                                <Route path="/reports/welds" element={<WeldsReportPage />} />
+                                <Route path="/reports/notifications" element={<NotificationsReportPage />} />
+                                <Route path="/reports/errors" element={<ErrorsReportPage />} />
+                                <Route path="/reports/violations" element={<ViolationsReportPage />} />
+                                <Route path="/reports/tasks" element={<TasksReportPage />} />
                                 
                                 {/* 5. Настройки */}
                                 <Route path="/settings/storage" element={<SettingsPage />} />

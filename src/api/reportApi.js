@@ -109,9 +109,20 @@ export const reportApi = {
     // Универсальный метод для генерации отчетов
     generateReport: async (reportType, requestData) => {
         const endpoints = {
+            // Старые типы отчетов
             'WIRE_CONSUMPTION': `${BASE_URL}/wire-consumption`,
             'WELDER_REPORT': `${BASE_URL}/welder`,
-            'WORK_REPORT': `${BASE_URL}/work`
+            'WORK_REPORT': `${BASE_URL}/work`,
+            
+            // Новые типы отчетов согласно требованиям
+            'equipment': `${BASE_URL}/equipment`,
+            'welders': `${BASE_URL}/welders`,
+            'materials': `${BASE_URL}/materials`,
+            'welds': `${BASE_URL}/welds`,
+            'notifications': `${BASE_URL}/notifications`,
+            'errors': `${BASE_URL}/errors`,
+            'violations': `${BASE_URL}/violations`,
+            'tasks': `${BASE_URL}/tasks`
         };
 
         const endpoint = endpoints[reportType];
@@ -159,13 +170,25 @@ export const reportHelpers = {
         const timestamp = new Date().toISOString().slice(0, 10);
         const extensions = {
             'EXCEL': '.xlsx',
-            'PDF': '.pdf'
+            'PDF': '.pdf',
+            'CSV': '.csv'
         };
         
         const reportNames = {
+            // Старые типы отчетов
             'WIRE_CONSUMPTION': 'wire_consumption_report',
             'WELDER_REPORT': 'welder_report',
-            'WORK_REPORT': 'work_report'
+            'WORK_REPORT': 'work_report',
+            
+            // Новые типы отчетов согласно требованиям
+            'equipment': 'equipment_work_report',
+            'welders': 'welders_work_report',
+            'materials': 'materials_consumption_report',
+            'welds': 'welds_quality_report',
+            'notifications': 'notifications_report',
+            'errors': 'equipment_errors_report',
+            'violations': 'welds_violations_report',
+            'tasks': 'welding_tasks_report'
         };
 
         return `${reportNames[reportType]}_${timestamp}${extensions[format]}`;
