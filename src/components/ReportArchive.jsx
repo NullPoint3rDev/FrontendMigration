@@ -16,14 +16,20 @@ const ReportArchive = ({ reportType, reportName }) => {
     const fetchReportHistory = async () => {
         try {
             setLoading(true);
+            console.log('ReportArchive: Загружаем историю для типа:', reportType);
             const response = await fetch(`/api/reports/history/${reportType}`);
+            console.log('ReportArchive: Ответ от сервера:', response.status, response.statusText);
+            
             if (response.ok) {
                 const data = await response.json();
+                console.log('ReportArchive: Получены данные:', data);
                 setReports(data);
             } else {
+                console.error('ReportArchive: Ошибка ответа:', response.status, response.statusText);
                 setError('Ошибка при загрузке истории отчетов');
             }
         } catch (err) {
+            console.error('ReportArchive: Ошибка сети:', err);
             setError('Ошибка сети при загрузке истории отчетов');
         } finally {
             setLoading(false);
