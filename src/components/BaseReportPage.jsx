@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ReportPeriodModal from './ReportPeriodModal';
+import ReportArchive from './ReportArchive';
 import { reportApi, reportHelpers } from '../api/reportApi';
 import '../styles/baseReportPage.css';
 
@@ -71,6 +72,12 @@ const BaseReportPage = ({ reportType, title, description, icon }) => {
                         )}
                     </button>
                 </div>
+                
+                {/* Архив отчетов */}
+                <ReportArchive 
+                    reportType={reportType} 
+                    reportName={title} 
+                />
             </div>
 
             <ReportPeriodModal
