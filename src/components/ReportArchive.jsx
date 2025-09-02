@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAuthHeaders } from '../api/api';
+import { getAuthHeaders } from '../api/api.js';
 import './ReportArchive.css';
 
 /**

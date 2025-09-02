@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { getAuthHeaders } from '../api/api';
+import { getAuthHeaders } from '../api/api.js';
 
 /**
  * Компонент для инициализации тестовых данных истории отчетов
