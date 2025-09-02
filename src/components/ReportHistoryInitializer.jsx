@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { getAuthHeaders } from '../api/api';
 
 /**
  * Компонент для инициализации тестовых данных истории отчетов
@@ -16,6 +17,7 @@ const ReportHistoryInitializer = () => {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        ...(await getAuthHeaders())
                     },
                 });
                 

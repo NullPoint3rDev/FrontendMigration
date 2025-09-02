@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAuthHeaders } from '../api/api';
 import './ReportArchive.css';
 
 /**
@@ -19,7 +20,9 @@ const ReportArchive = ({ reportType, reportName }) => {
             console.log('ReportArchive: Загружаем историю для типа:', reportType);
             const url = `/api/reports/history/${reportType}`;
             console.log('ReportArchive: Вызываем URL:', url);
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                headers: await getAuthHeaders()
+            });
             console.log('ReportArchive: Ответ от сервера:', response.status, response.statusText);
             
             if (response.ok) {
