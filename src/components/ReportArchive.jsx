@@ -88,6 +88,48 @@ const ReportArchive = ({ reportType, reportName }) => {
         }
     };
 
+    const handleDownload = async (report) => {
+        try {
+            console.log('ReportArchive: Попытка скачивания отчета:', report.fileName);
+            
+            // Генерируем отчет заново для скачивания
+            const response = await fetch(`/api/reports/${report.reportType}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(await getAuthHeaders())
+                },
+                body: JSON.stringify({
+                    reportType: report.reportType,
+                    format: report.format,
+                    period: report.period,
+                    dateFrom: null,
+                    dateTo: null
+                })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = report.fileName || `report_${report.reportType}_${report.format.toLowerCase()}`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                console.log('ReportArchive: Отчет успешно скачан:', report.fileName);
+            } else {
+                console.error('ReportArchive: Ошибка при скачивании:', response.status);
+                alert('Ошибка при скачивании отчета');
+            }
+        } catch (error) {
+            console.error('ReportArchive: Ошибка при скачивании:', error);
+            alert('Ошибка при скачивании отчета');
+        }
+    };
+
     if (loading) {
         return (
             <div className="report-archive">
@@ -164,7 +206,11 @@ const ReportArchive = ({ reportType, reportName }) => {
                             </div>
                             
                             <div className="report-actions">
-                                <button className="download-button">
+                                <button 
+                                    className="download-button"
+                                    onClick={() => handleDownload(report)}
+                                    title="Скачать отчет"
+                                >
                                     📥 Скачать
                                 </button>
                                 <button className="info-button" title="Подробная информация">
