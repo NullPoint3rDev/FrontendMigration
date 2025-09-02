@@ -17,13 +17,25 @@ const ReportArchive = ({ reportType, reportName }) => {
         try {
             setLoading(true);
             console.log('ReportArchive: Загружаем историю для типа:', reportType);
-            const response = await fetch(`/api/reports/history/${reportType}`);
+            const url = `/api/reports/history/${reportType}`;
+            console.log('ReportArchive: Вызываем URL:', url);
+            const response = await fetch(url);
             console.log('ReportArchive: Ответ от сервера:', response.status, response.statusText);
             
             if (response.ok) {
-                const data = await response.json();
-                console.log('ReportArchive: Получены данные:', data);
-                setReports(data);
+                // Сначала получаем текст ответа для диагностики
+                const responseText = await response.text();
+                console.log('ReportArchive: Текст ответа:', responseText);
+                
+                try {
+                    const data = JSON.parse(responseText);
+                    console.log('ReportArchive: Получены данные:', data);
+                    setReports(data);
+                } catch (parseError) {
+                    console.error('ReportArchive: Ошибка парсинга JSON:', parseError);
+                    console.error('ReportArchive: Неверный ответ от сервера:', responseText);
+                    setError('Ошибка парсинга ответа сервера');
+                }
             } else {
                 console.error('ReportArchive: Ошибка ответа:', response.status, response.statusText);
                 setError('Ошибка при загрузке истории отчетов');
