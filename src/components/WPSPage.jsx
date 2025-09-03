@@ -74,7 +74,18 @@ const WPSPage = () => {
     };
 
     const handleInputChange = (e) => {
-        setEditData({ ...editData, [e.target.name]: e.target.value });
+        let value = e.target.value;
+        
+        // Принудительно исправляем статус, если он некорректен
+        if (e.target.name === 'status') {
+            if (value === 'active') value = 'Active';
+            if (value === 'pending') value = 'Pending';
+            if (value === 'inactive') value = 'Inactive';
+            if (value === 'blocked') value = 'Blocked';
+            if (value === 'deleted') value = 'Deleted';
+        }
+        
+        setEditData({ ...editData, [e.target.name]: value });
     };
 
     const getStatusLabel = (status) => {
@@ -98,6 +109,11 @@ const WPSPage = () => {
         e.preventDefault();
         console.log('Начинаем сохранение WPS...');
         console.log('Данные для сохранения:', editData);
+        
+        // Принудительно исправляем статус перед отправкой
+        if (editData.status === 'active') {
+            editData.status = 'Active';
+        }
         
         const newErrors = {};
         if (!editData.name) newErrors.name = 'Это поле обязательно';
@@ -124,9 +140,15 @@ const WPSPage = () => {
                 await updateWPS(editData.id, editData);
                 console.log('WPS обновлен:', editData);
             } else {
-                console.log('Отправляем данные на сервер:', JSON.stringify(editData, null, 2));
-                await createWPS(editData);
-                console.log('WPS добавлен:', editData);
+                // Принудительно устанавливаем корректный статус для нового WPS
+                const dataToSend = {
+                    ...editData,
+                    status: editData.status === 'active' ? 'Active' : editData.status
+                };
+                
+                console.log('Отправляем данные на сервер:', JSON.stringify(dataToSend, null, 2));
+                await createWPS(dataToSend);
+                console.log('WPS добавлен:', dataToSend);
             }
             
             // Принудительно обновляем список WPS
