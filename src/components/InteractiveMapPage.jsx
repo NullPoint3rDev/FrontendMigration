@@ -367,6 +367,26 @@ const InteractiveMapPage = () => {
                             <i className="fas fa-trash"></i>
                             Тест удаления
                         </button>
+                        <button
+                            className="toolbar-btn delete-specific-btn"
+                            onClick={() => {
+                                if (workshops.length > 0) {
+                                    const specificWorkshop = workshops.find(w => w.name === 'Цех 1');
+                                    if (specificWorkshop) {
+                                        console.log('Тестируем удаление конкретного цеха:', specificWorkshop);
+                                        handleDelete(specificWorkshop.id, 'workshop');
+                                    } else {
+                                        console.log('Цех 1 не найден');
+                                    }
+                                } else {
+                                    console.log('Нет цехов для удаления');
+                                }
+                            }}
+                            title="Удалить Цех 1"
+                        >
+                            <i className="fas fa-trash"></i>
+                            Удалить Цех 1
+                        </button>
                     </div>
                 </div>
             )}
@@ -502,7 +522,7 @@ const InteractiveMapPage = () => {
                                             {editMode && (
                         <button
                             className="delete-workshop-btn"
-                            onClick={(e) => {
+                            onMouseUp={(e) => {
                                 console.log('=== КЛИК ПО КНОПКЕ УДАЛЕНИЯ ЦЕХА ===');
                                 console.log('ID цеха:', workshop.id);
                                 console.log('Название цеха:', workshop.name);
@@ -517,7 +537,6 @@ const InteractiveMapPage = () => {
                                 console.log('handleDelete вызван');
                             }}
                             onMouseDown={(e) => console.log('MouseDown по кнопке удаления цеха:', workshop.id)}
-                            onMouseUp={(e) => console.log('MouseUp по кнопке удаления цеха:', workshop.id)}
                             style={{ zIndex: 1000 }}
                             onMouseEnter={() => console.log('Мышь над кнопкой удаления цеха:', workshop.id)}
                             onMouseLeave={() => console.log('Мышь покинула кнопку удаления цеха:', workshop.id)}
@@ -571,7 +590,7 @@ const InteractiveMapPage = () => {
                         {editMode && (
                             <button
                                 className="delete-equipment-btn"
-                                onClick={(e) => {
+                                onMouseUp={(e) => {
                                     console.log('=== КЛИК ПО КНОПКЕ УДАЛЕНИЯ ОБОРУДОВАНИЯ ===');
                                     console.log('ID оборудования:', item.id);
                                     console.log('Название оборудования:', item.name);

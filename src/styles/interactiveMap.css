@@ -136,6 +136,17 @@
   transform: translateY(-1px);
 }
 
+.delete-specific-btn {
+  background: #FF5722;
+  border-color: #FF5722;
+  color: white;
+}
+
+.delete-specific-btn:hover {
+  background: #E64A19;
+  transform: translateY(-1px);
+}
+
 /* Map Container */
 .map-container {
   background: rgba(255, 255, 255, 0.05);
@@ -216,6 +227,12 @@
   transition: var(--transition);
   z-index: 1000;
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .delete-workshop-btn:hover {
@@ -300,6 +317,12 @@
   transition: var(--transition);
   z-index: 1000;
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .delete-equipment-btn:hover {
