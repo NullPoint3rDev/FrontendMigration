@@ -119,6 +119,8 @@ const NetworkEquipmentPage = () => {
             } else {
                 const newEquipment = await createNetworkEquipment(editData);
                 console.log('Создано новое оборудование:', newEquipment);
+                console.log('Тип ответа:', typeof newEquipment);
+                console.log('ID нового оборудования:', newEquipment?.id);
             }
             
             // Принудительно обновляем список оборудования
