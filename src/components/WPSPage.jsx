@@ -55,7 +55,7 @@ const WPSPage = () => {
             feedRate: '',
             gasConsumption: '',
             gostStandard: '',
-            status: 'active'
+            status: 'Active'
         });
         setErrors({});
         setModalOpen(true);
@@ -79,12 +79,16 @@ const WPSPage = () => {
 
     const getStatusLabel = (status) => {
         switch (status) {
-            case 'active':
+            case 'Active':
                 return 'Активна';
-            case 'draft':
-                return 'Черновик';
-            case 'archived':
-                return 'Архив';
+            case 'Pending':
+                return 'В ожидании';
+            case 'Inactive':
+                return 'Неактивна';
+            case 'Blocked':
+                return 'Заблокирована';
+            case 'Deleted':
+                return 'Удалена';
             default:
                 return 'Неизвестно';
         }
@@ -120,6 +124,7 @@ const WPSPage = () => {
                 await updateWPS(editData.id, editData);
                 console.log('WPS обновлен:', editData);
             } else {
+                console.log('Отправляем данные на сервер:', JSON.stringify(editData, null, 2));
                 await createWPS(editData);
                 console.log('WPS добавлен:', editData);
             }
@@ -427,13 +432,15 @@ const WPSPage = () => {
                                 <label className="form-label">Статус</label>
                                 <select
                                     name="status"
-                                    value={editData.status || 'active'}
+                                    value={editData.status || 'Active'}
                                     onChange={handleInputChange}
                                     className="form-input"
                                 >
-                                    <option value="active">Активна</option>
-                                    <option value="draft">Черновик</option>
-                                    <option value="archived">Архив</option>
+                                    <option value="Active">Активна</option>
+                                    <option value="Pending">В ожидании</option>
+                                    <option value="Inactive">Неактивна</option>
+                                    <option value="Blocked">Заблокирована</option>
+                                    <option value="Deleted">Удалена</option>
                                 </select>
                             </div>
 
