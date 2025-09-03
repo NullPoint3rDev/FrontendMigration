@@ -193,6 +193,7 @@ const InteractiveMapPage = () => {
 
     // Удаление элемента
     const handleDelete = (id, type) => {
+        console.log('=== НАЧАЛО УДАЛЕНИЯ ===');
         console.log('Удаляем элемент:', { id, type });
         console.log('Текущее состояние перед удалением:', { 
             equipmentCount: equipment.length, 
@@ -201,12 +202,14 @@ const InteractiveMapPage = () => {
         
         try {
             if (type === 'equipment') {
+                console.log('Удаляем оборудование с ID:', id);
                 setEquipment(prev => {
                     const filtered = prev.filter(item => item.id !== id);
                     console.log('Оборудование после удаления:', filtered);
                     return filtered;
                 });
             } else if (type === 'workshop') {
+                console.log('Удаляем цех с ID:', id);
                 setWorkshops(prev => {
                     const filtered = prev.filter(item => item.id !== id);
                     console.log('Цеха после удаления:', filtered);
@@ -220,6 +223,7 @@ const InteractiveMapPage = () => {
                 });
             }
             
+            console.log('Состояние обновлено, вызываем forceUpdate');
             // Принудительно обновляем состояние немедленно
             forceUpdate();
             
@@ -229,10 +233,12 @@ const InteractiveMapPage = () => {
                     equipmentCount: equipment.length, 
                     workshopsCount: workshops.length 
                 });
+                console.log('=== КОНЕЦ УДАЛЕНИЯ ===');
             }, 0);
             
         } catch (error) {
             console.error('Ошибка при удалении элемента:', error);
+            console.log('=== КОНЕЦ УДАЛЕНИЯ С ОШИБКОЙ ===');
         }
         
         // Закрываем модальное окно только если оно открыто
@@ -249,17 +255,26 @@ const InteractiveMapPage = () => {
 
     // Принудительное обновление состояния
     const forceUpdate = () => {
+        console.log('=== FORCE UPDATE ===');
         console.log('Принудительное обновление состояния');
+        console.log('Текущее состояние перед forceUpdate:', {
+            equipmentCount: equipment.length,
+            workshopsCount: workshops.length
+        });
+        
         setEquipment(prev => {
             const newArray = [...prev];
-            console.log('Новый массив оборудования:', newArray);
+            console.log('Создан новый массив оборудования:', newArray);
             return newArray;
         });
+        
         setWorkshops(prev => {
             const newArray = [...prev];
-            console.log('Новый массив цехов:', newArray);
+            console.log('Создан новый массив цехов:', newArray);
             return newArray;
         });
+        
+        console.log('=== FORCE UPDATE ЗАВЕРШЕН ===');
     };
 
     // Панель инструментов
@@ -292,7 +307,14 @@ const InteractiveMapPage = () => {
                     <div className="toolbar-buttons">
                         <button
                             className={`toolbar-btn ${editMode ? 'active' : ''}`}
-                            onClick={() => setEditMode(!editMode)}
+                            onClick={() => {
+                                const newEditMode = !editMode;
+                                console.log('Переключение режима редактирования:', { 
+                                    oldMode: editMode, 
+                                    newMode: newEditMode 
+                                });
+                                setEditMode(newEditMode);
+                            }}
                         >
                             <i className="fas fa-pencil-alt"></i>
                             {editMode ? 'Выключить' : 'Включить'} рисование
@@ -439,23 +461,25 @@ const InteractiveMapPage = () => {
                     selectedWorkshopId: selectedWorkshop?.id
                 });
                 return (
-                <div
-                    key={workshop.id}
-                    className={`map-workshop ${mapType === 'workshop' && selectedWorkshop?.id === workshop.id ? 'selected' : ''}`}
-                    style={{
-                        left: workshop.coordinates.x,
-                        top: workshop.coordinates.y,
-                        width: workshop.width,
-                        height: workshop.height
-                    }}
-                    onClick={() => handleWorkshopClick(workshop)}
-                    title={workshop.name}
-                >
-                    <div className="workshop-label">{workshop.name}</div>
-                    {editMode && (
+                    <div
+                        key={workshop.id}
+                        className={`map-workshop ${mapType === 'workshop' && selectedWorkshop?.id === workshop.id ? 'selected' : ''}`}
+                        style={{
+                            left: workshop.coordinates.x,
+                            top: workshop.coordinates.y,
+                            width: workshop.width,
+                            height: workshop.height
+                        }}
+                        onClick={() => handleWorkshopClick(workshop)}
+                        title={workshop.name}
+                    >
+                        <div className="workshop-label">{workshop.name}</div>
+                                            {editMode && (
                         <button
                             className="delete-workshop-btn"
                             onClick={(e) => {
+                                console.log('Клик по кнопке удаления цеха:', workshop.id);
+                                console.log('Режим редактирования включен:', editMode);
                                 e.stopPropagation();
                                 handleDelete(workshop.id, 'workshop');
                             }}
@@ -463,8 +487,8 @@ const InteractiveMapPage = () => {
                             <i className="fas fa-trash"></i>
                         </button>
                     )}
-                </div>
-            );
+                    </div>
+                );
             })}
 
             {/* Оборудование */}
@@ -503,6 +527,8 @@ const InteractiveMapPage = () => {
                             <button
                                 className="delete-equipment-btn"
                                 onClick={(e) => {
+                                    console.log('Клик по кнопке удаления оборудования:', item.id);
+                                    console.log('Режим редактирования включен:', editMode);
                                     e.stopPropagation();
                                     handleDelete(item.id, 'equipment');
                                 }}
@@ -511,8 +537,7 @@ const InteractiveMapPage = () => {
                             </button>
                         )}
                     </div>
-                ))
-            })
+                ))}
         </div>
     );
 
