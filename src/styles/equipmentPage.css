@@ -189,24 +189,42 @@
 
 .equipment-actions {
   display: flex;
-  gap: 0.5rem;
-  margin-top: auto;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
   flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+/* Responsive design for mobile devices */
+@media (max-width: 768px) {
+  .equipment-actions {
+    gap: 0.5rem;
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .action-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.8rem 1rem;
+  }
 }
 
 .action-btn {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
   font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
   transition: var(--transition);
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  flex: 1;
+  gap: 0.4rem;
+  min-width: fit-content;
+  white-space: nowrap;
   justify-content: center;
 }
 
@@ -215,19 +233,40 @@
   transform: translateY(-1px);
 }
 
+.edit-btn {
+  background: rgba(108, 99, 255, 0.1);
+  border-color: rgba(108, 99, 255, 0.3);
+  color: #6C63FF;
+}
+
 .edit-btn:hover {
   background: var(--primary);
   border-color: var(--primary);
+  color: white;
+}
+
+.control-btn {
+  background: rgba(76, 175, 80, 0.1);
+  border-color: rgba(76, 175, 80, 0.3);
+  color: #4CAF50;
 }
 
 .control-btn:hover {
   background: var(--accent);
   border-color: var(--accent);
+  color: white;
+}
+
+.delete-btn {
+  background: rgba(255, 101, 132, 0.1);
+  border-color: rgba(255, 101, 132, 0.3);
+  color: #FF6584;
 }
 
 .delete-btn:hover {
   background: var(--secondary);
   border-color: var(--secondary);
+  color: white;
 }
 
 /* Modal Styles */
