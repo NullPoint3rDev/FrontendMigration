@@ -194,6 +194,10 @@ const InteractiveMapPage = () => {
     // Удаление элемента
     const handleDelete = (id, type) => {
         console.log('=== НАЧАЛО УДАЛЕНИЯ ===');
+        console.log('Функция handleDelete вызвана!');
+        console.log('Параметры:', { id, type });
+        console.log('Тип id:', typeof id);
+        console.log('Значение id:', id);
         console.log('Удаляем элемент:', { id, type });
         console.log('Текущее состояние перед удалением:', { 
             equipmentCount: equipment.length, 
@@ -347,6 +351,22 @@ const InteractiveMapPage = () => {
                             <i className="fas fa-info-circle"></i>
                             Проверить состояние
                         </button>
+                        <button
+                            className="toolbar-btn delete-test-btn"
+                            onClick={() => {
+                                if (workshops.length > 0) {
+                                    const firstWorkshop = workshops[0];
+                                    console.log('Тестируем удаление первого цеха:', firstWorkshop);
+                                    handleDelete(firstWorkshop.id, 'workshop');
+                                } else {
+                                    console.log('Нет цехов для удаления');
+                                }
+                            }}
+                            title="Тест удаления"
+                        >
+                            <i className="fas fa-trash"></i>
+                            Тест удаления
+                        </button>
                     </div>
                 </div>
             )}
@@ -478,11 +498,18 @@ const InteractiveMapPage = () => {
                         <button
                             className="delete-workshop-btn"
                             onClick={(e) => {
-                                console.log('Клик по кнопке удаления цеха:', workshop.id);
+                                console.log('=== КЛИК ПО КНОПКЕ УДАЛЕНИЯ ЦЕХА ===');
+                                console.log('ID цеха:', workshop.id);
+                                console.log('Название цеха:', workshop.name);
                                 console.log('Режим редактирования включен:', editMode);
+                                console.log('Тип события:', e.type);
+                                console.log('Целевой элемент:', e.target);
                                 e.stopPropagation();
+                                console.log('Вызываем handleDelete...');
                                 handleDelete(workshop.id, 'workshop');
+                                console.log('handleDelete вызван');
                             }}
+                            style={{ zIndex: 1000 }}
                         >
                             <i className="fas fa-trash"></i>
                         </button>
@@ -527,11 +554,18 @@ const InteractiveMapPage = () => {
                             <button
                                 className="delete-equipment-btn"
                                 onClick={(e) => {
-                                    console.log('Клик по кнопке удаления оборудования:', item.id);
+                                    console.log('=== КЛИК ПО КНОПКЕ УДАЛЕНИЯ ОБОРУДОВАНИЯ ===');
+                                    console.log('ID оборудования:', item.id);
+                                    console.log('Название оборудования:', item.name);
                                     console.log('Режим редактирования включен:', editMode);
+                                    console.log('Тип события:', e.type);
+                                    console.log('Целевой элемент:', e.target);
                                     e.stopPropagation();
+                                    console.log('Вызываем handleDelete...');
                                     handleDelete(item.id, 'equipment');
+                                    console.log('handleDelete вызван');
                                 }}
+                                style={{ zIndex: 1000 }}
                             >
                                 <i className="fas fa-trash"></i>
                             </button>
