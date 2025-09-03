@@ -1,10 +1,25 @@
+/* eslint-disable no-undef */
 // Утилита для экспорта WPS в Excel формат
 // Требует установки: npm install xlsx file-saver
 
-export const exportWPSToExcel = (wps) => {
+// Функция для динамической загрузки библиотеки XLSX
+const loadXLSX = async () => {
     try {
-        // Проверяем, доступны ли необходимые библиотеки
-        if (typeof XLSX === 'undefined') {
+        // Пытаемся загрузить библиотеку динамически
+        const XLSX = await import('xlsx');
+        return XLSX.default || XLSX;
+    } catch (error) {
+        console.error('Не удалось загрузить библиотеку XLSX:', error);
+        return null;
+    }
+};
+
+export const exportWPSToExcel = async (wps) => {
+    try {
+        // Загружаем библиотеку XLSX
+        const XLSX = await loadXLSX();
+        
+        if (!XLSX) {
             console.error('Библиотека XLSX не установлена. Установите: npm install xlsx file-saver');
             alert('Для экспорта в Excel необходимо установить библиотеку XLSX. Обратитесь к разработчику.');
             return false;
@@ -140,10 +155,12 @@ export const exportWPSToCSV = (wps) => {
 };
 
 // Функция для экспорта всех WPS в Excel
-export const exportAllWPSToExcel = (wpsList) => {
+export const exportAllWPSToExcel = async (wpsList) => {
     try {
-        // Проверяем, доступны ли необходимые библиотеки
-        if (typeof XLSX === 'undefined') {
+        // Загружаем библиотеку XLSX
+        const XLSX = await loadXLSX();
+        
+        if (!XLSX) {
             console.error('Библиотека XLSX не установлена. Установите: npm install xlsx file-saver');
             alert('Для экспорта в Excel необходимо установить библиотеку XLSX. Обратитесь к разработчику.');
             return false;

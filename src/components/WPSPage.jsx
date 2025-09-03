@@ -201,7 +201,12 @@ const WPSPage = () => {
             
         } catch (error) {
             console.error('Ошибка при экспорте WPS:', error);
-            alert('Произошла ошибка при экспорте WPS: ' + error.message);
+            // Если произошла ошибка, пробуем экспортировать в CSV
+            try {
+                exportWPSToCSV(wps);
+            } catch (csvError) {
+                alert('Произошла ошибка при экспорте WPS: ' + error.message);
+            }
         }
     };
 
@@ -225,7 +230,12 @@ const WPSPage = () => {
             
         } catch (error) {
             console.error('Ошибка при экспорте всех WPS:', error);
-            alert('Произошла ошибка при экспорте всех WPS: ' + error.message);
+            // Если произошла ошибка, пробуем экспортировать в CSV
+            try {
+                exportAllWPSToCSV(wpsList);
+            } catch (csvError) {
+                alert('Произошла ошибка при экспорте всех WPS: ' + error.message);
+            }
         }
     };
 
