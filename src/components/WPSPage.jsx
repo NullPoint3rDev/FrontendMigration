@@ -1,24 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/equipmentPage.css';
+import { 
+    getAllWPS, 
+    createWPS, 
+    updateWPS, 
+    deleteWPS 
+} from '../api/wpsApi';
 
 const WPSPage = () => {
     const [wpsList, setWpsList] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
     const [editData, setEditData] = useState({});
     const [errors, setErrors] = useState({});
+    const [loading, setLoading] = useState(false); // Added loading state
 
-    // Load WPS from localStorage
+    // Load WPS from API
     useEffect(() => {
-        const savedWPS = localStorage.getItem('wpsList');
-        if (savedWPS) {
-            setWpsList(JSON.parse(savedWPS));
-        }
+        loadWPS();
     }, []);
 
-    // Save WPS to localStorage when it changes
-    useEffect(() => {
-        localStorage.setItem('wpsList', JSON.stringify(wpsList));
-    }, [wpsList]);
+    const loadWPS = async () => {
+        try {
+            setLoading(true);
+            console.log('Загружаем список WPS...');
+            const data = await getAllWPS();
+            console.log('Получены данные WPS:', data);
+            
+            if (Array.isArray(data)) {
+                setWpsList(data);
+                console.log('Список WPS обновлен, количество элементов:', data.length);
+            } else {
+                console.warn('Получены неверные данные WPS:', data);
+                setWpsList([]);
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки WPS:', error);
+            setWpsList([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const openAddModal = () => {
         setEditData({
@@ -69,8 +90,11 @@ const WPSPage = () => {
         }
     };
 
-    const handleSave = (e) => {
+    const handleSave = async (e) => {
         e.preventDefault();
+        console.log('Начинаем сохранение WPS...');
+        console.log('Данные для сохранения:', editData);
+        
         const newErrors = {};
         if (!editData.name) newErrors.name = 'Это поле обязательно';
         if (!editData.description) newErrors.description = 'Это поле обязательно';
@@ -90,25 +114,42 @@ const WPSPage = () => {
             return;
         }
 
-        if (editData.id) {
-            setWpsList(prev =>
-                prev.map(wps => wps.id === editData.id ? editData : wps)
-            );
-        } else {
-            const newWPS = {
-                ...editData,
-                id: Date.now().toString(),
-                createdAt: new Date().toLocaleDateString(),
-                updatedAt: new Date().toLocaleDateString()
-            };
-            setWpsList(prev => [...prev, newWPS]);
+        try {
+            setLoading(true);
+            if (editData.id) {
+                await updateWPS(editData.id, editData);
+                console.log('WPS обновлен:', editData);
+            } else {
+                await createWPS(editData);
+                console.log('WPS добавлен:', editData);
+            }
+            
+            // Принудительно обновляем список WPS
+            await loadWPS();
+            closeModal();
+        } catch (error) {
+            console.error('Ошибка сохранения WPS:', error);
+            alert('Произошла ошибка при сохранении WPS: ' + error.message);
+        } finally {
+            setLoading(false);
         }
-        closeModal();
     };
 
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (window.confirm('Вы уверены, что хотите удалить эту технологическую карту?')) {
-            setWpsList(prev => prev.filter(wps => wps.id !== id));
+            try {
+                setLoading(true);
+                await deleteWPS(id);
+                console.log('WPS удален:', id);
+                
+                // Принудительно обновляем список WPS
+                await loadWPS();
+            } catch (error) {
+                console.error('Ошибка удаления WPS:', error);
+                alert('Произошла ошибка при удалении WPS: ' + error.message);
+            } finally {
+                setLoading(false);
+            }
         }
     };
 
@@ -122,14 +163,23 @@ const WPSPage = () => {
         <div className="equipment-page">
             <div className="equipment-header">
                 <h1 className="equipment-title">Технологические карты сварки (WPS)</h1>
-                <button className="add-equipment-btn" onClick={openAddModal}>
+                <button className="add-equipment-btn" onClick={openAddModal} disabled={loading}>
                     <i className="fas fa-plus"></i>
-                    Добавить WPS
+                    {loading ? 'Загрузка...' : 'Добавить WPS'}
                 </button>
             </div>
 
             <div className="equipment-grid">
-                {wpsList.map((wps) => (
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: '2rem' }}>
+                        <p>Загрузка WPS...</p>
+                    </div>
+                ) : wpsList.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '2rem' }}>
+                        <p>Нет доступных технологических карт. Добавьте новые.</p>
+                    </div>
+                ) : (
+                    wpsList.map((wps) => (
                     <div key={wps.id} className="equipment-card">
                         <div className="equipment-info">
                             <h3 className="equipment-name">{wps.name}</h3>
@@ -197,7 +247,8 @@ const WPSPage = () => {
                             </div>
                         </div>
                     </div>
-                ))}
+                ))
+                )}
             </div>
 
             {modalOpen && (
@@ -387,11 +438,11 @@ const WPSPage = () => {
                             </div>
 
                             <div className="modal-actions">
-                                <button type="button" className="cancel-btn" onClick={closeModal}>
+                                <button type="button" className="cancel-btn" onClick={closeModal} disabled={loading}>
                                     Отмена
                                 </button>
-                                <button type="submit" className="save-btn">
-                                    {editData.id ? 'Сохранить' : 'Добавить'}
+                                <button type="submit" className="save-btn" disabled={loading}>
+                                    {loading ? 'Сохранение...' : (editData.id ? 'Сохранить' : 'Добавить')}
                                 </button>
                             </div>
                         </form>
