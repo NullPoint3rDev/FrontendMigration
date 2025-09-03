@@ -46,11 +46,13 @@ const InteractiveMapPage = () => {
     // Сохраняем данные в localStorage
     useEffect(() => {
         console.log('Сохраняем оборудование в localStorage:', equipment);
+        console.log('Количество элементов оборудования:', equipment.length);
         localStorage.setItem('interactiveMapEquipment', JSON.stringify(equipment));
     }, [equipment]);
 
     useEffect(() => {
         console.log('Сохраняем цеха в localStorage:', workshops);
+        console.log('Количество цехов:', workshops.length);
         localStorage.setItem('interactiveMapWorkshops', JSON.stringify(workshops));
     }, [workshops]);
 
@@ -192,6 +194,10 @@ const InteractiveMapPage = () => {
     // Удаление элемента
     const handleDelete = (id, type) => {
         console.log('Удаляем элемент:', { id, type });
+        console.log('Текущее состояние перед удалением:', { 
+            equipmentCount: equipment.length, 
+            workshopsCount: workshops.length 
+        });
         
         try {
             if (type === 'equipment') {
@@ -214,10 +220,16 @@ const InteractiveMapPage = () => {
                 });
             }
             
-            // Принудительно обновляем состояние
+            // Принудительно обновляем состояние немедленно
+            forceUpdate();
+            
+            // Проверяем состояние после обновления
             setTimeout(() => {
-                forceUpdate();
-            }, 100);
+                console.log('Состояние после удаления:', { 
+                    equipmentCount: equipment.length, 
+                    workshopsCount: workshops.length 
+                });
+            }, 0);
             
         } catch (error) {
             console.error('Ошибка при удалении элемента:', error);
@@ -237,8 +249,17 @@ const InteractiveMapPage = () => {
 
     // Принудительное обновление состояния
     const forceUpdate = () => {
-        setEquipment(prev => [...prev]);
-        setWorkshops(prev => [...prev]);
+        console.log('Принудительное обновление состояния');
+        setEquipment(prev => {
+            const newArray = [...prev];
+            console.log('Новый массив оборудования:', newArray);
+            return newArray;
+        });
+        setWorkshops(prev => {
+            const newArray = [...prev];
+            console.log('Новый массив цехов:', newArray);
+            return newArray;
+        });
     };
 
     // Панель инструментов
@@ -288,6 +309,21 @@ const InteractiveMapPage = () => {
                         >
                             <i className="fas fa-trash-alt"></i>
                             Очистить все
+                        </button>
+                        <button
+                            className="toolbar-btn test-btn"
+                            onClick={() => {
+                                console.log('Текущее состояние:', { 
+                                    equipment: equipment, 
+                                    workshops: workshops,
+                                    equipmentCount: equipment.length,
+                                    workshopsCount: workshops.length
+                                });
+                            }}
+                            title="Проверить состояние"
+                        >
+                            <i className="fas fa-info-circle"></i>
+                            Проверить состояние
                         </button>
                     </div>
                 </div>
@@ -393,6 +429,7 @@ const InteractiveMapPage = () => {
             />
             
             {/* Цеха */}
+            {console.log('Рендеринг цехов, количество:', workshops.length)}
             {workshops.map((workshop) => {
                 console.log('Рендеринг цеха:', { 
                     workshopId: workshop.id, 
@@ -431,6 +468,7 @@ const InteractiveMapPage = () => {
             })}
 
             {/* Оборудование */}
+            {console.log('Рендеринг оборудования, количество:', equipment.length)}
             {equipment
                 .filter(item => {
                     const shouldShow = mapType === 'enterprise' || 

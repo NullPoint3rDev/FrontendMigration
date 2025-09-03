@@ -114,6 +114,17 @@
   transform: translateY(-1px);
 }
 
+.test-btn {
+  background: #FF9800;
+  border-color: #FF9800;
+  color: white;
+}
+
+.test-btn:hover {
+  background: #F57C00;
+  transform: translateY(-1px);
+}
+
 /* Map Container */
 .map-container {
   background: rgba(255, 255, 255, 0.05);
