@@ -31,6 +31,7 @@ const Navbar = () => {
             label: 'Мониторинг',
             dropdown: [
                 { label: 'Карта предприятия', path: '/enterprise-map' },
+                { label: 'Интерактивная карта', path: '/interactive-map' },
                 { label: 'Перечень оборудования', path: '/equipment-list' },
             ],
         },

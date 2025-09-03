@@ -10,6 +10,7 @@ import NetworkEquipmentPage from './components/NetworkEquipmentPage';
 import WPSPage from './components/WPSPage';
 import SettingsPage from './components/SettingsPage';
 import EnterpriseMapPage from './components/EnterpriseMapPage';
+import InteractiveMapPage from './components/InteractiveMapPage';
 import OrganizationsPage from './pages/OrganizationsPage';
 import WeldersPage from './pages/WeldersPage';
 import WelderProfilePage from './pages/WelderProfilePage';
@@ -77,6 +78,7 @@ function App() {
                                 
                                 {/* 3. Мониторинг */}
                                 <Route path="/enterprise-map" element={<EnterpriseMapPage />} />
+                                <Route path="/interactive-map" element={<InteractiveMapPage />} />
                                 <Route path="/equipment-list" element={<div className="main-content"><h2>Перечень оборудования</h2></div>} />
                                 
                                 {/* 4. Отчеты */}
