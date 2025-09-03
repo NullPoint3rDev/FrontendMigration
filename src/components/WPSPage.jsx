@@ -6,6 +6,12 @@ import {
     updateWPS, 
     deleteWPS 
 } from '../api/wpsApi';
+import { 
+    exportWPSToExcel, 
+    exportWPSToCSV, 
+    exportAllWPSToExcel, 
+    exportAllWPSToCSV 
+} from '../utils/wpsExporter';
 
 const WPSPage = () => {
     const [wpsList, setWpsList] = useState([]);
@@ -180,20 +186,70 @@ const WPSPage = () => {
         }
     };
 
-    const handleDownload = (wps) => {
-        // TODO: Реализовать скачивание WPS в формате PDF
-        console.log('Скачивание WPS:', wps.name);
-        alert('Функция скачивания будет реализована позже');
+    const handleDownload = async (wps) => {
+        try {
+            console.log('Начинаем экспорт WPS:', wps.name);
+            
+            // Пытаемся экспортировать в Excel
+            const excelSuccess = await exportWPSToExcel(wps);
+            
+            if (!excelSuccess) {
+                // Если Excel не удался, экспортируем в CSV
+                console.log('Excel недоступен, экспортируем в CSV');
+                exportWPSToCSV(wps);
+            }
+            
+        } catch (error) {
+            console.error('Ошибка при экспорте WPS:', error);
+            alert('Произошла ошибка при экспорте WPS: ' + error.message);
+        }
+    };
+
+    const exportAllWPS = async () => {
+        try {
+            if (wpsList.length === 0) {
+                alert('Нет WPS для экспорта');
+                return;
+            }
+
+            console.log('Начинаем экспорт всех WPS, количество:', wpsList.length);
+            
+            // Пытаемся экспортировать в Excel
+            const excelSuccess = await exportAllWPSToExcel(wpsList);
+            
+            if (!excelSuccess) {
+                // Если Excel не удался, экспортируем в CSV
+                console.log('Excel недоступен, экспортируем все в CSV');
+                exportAllWPSToCSV(wpsList);
+            }
+            
+        } catch (error) {
+            console.error('Ошибка при экспорте всех WPS:', error);
+            alert('Произошла ошибка при экспорте всех WPS: ' + error.message);
+        }
     };
 
     return (
         <div className="equipment-page">
             <div className="equipment-header">
                 <h1 className="equipment-title">Технологические карты сварки (WPS)</h1>
-                <button className="add-equipment-btn" onClick={openAddModal} disabled={loading}>
-                    <i className="fas fa-plus"></i>
-                    {loading ? 'Загрузка...' : 'Добавить WPS'}
-                </button>
+                <div className="header-controls">
+                    {wpsList.length > 0 && (
+                        <button 
+                            className="export-all-btn" 
+                            onClick={() => exportAllWPS()}
+                            disabled={loading}
+                            title="Экспортировать все WPS в Excel"
+                        >
+                            <i className="fas fa-download"></i>
+                            Экспорт всех
+                        </button>
+                    )}
+                    <button className="add-equipment-btn" onClick={openAddModal} disabled={loading}>
+                        <i className="fas fa-plus"></i>
+                        {loading ? 'Загрузка...' : 'Добавить WPS'}
+                    </button>
+                </div>
             </div>
 
             <div className="equipment-grid">
@@ -260,9 +316,10 @@ const WPSPage = () => {
                                 <button
                                     className="action-btn control-btn"
                                     onClick={() => handleDownload(wps)}
+                                    title="Экспортировать в Excel"
                                 >
-                                    <i className="fas fa-download"></i>
-                                    Скачать
+                                    <i className="fas fa-file-excel"></i>
+                                    Excel
                                 </button>
                                 <button
                                     className="action-btn delete-btn"

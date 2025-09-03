@@ -62,6 +62,35 @@
   box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
 }
 
+.export-all-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 1rem;
+}
+
+.export-all-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+  background: #45a049;
+}
+
+.export-all-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .filter-select {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid var(--border-color);
