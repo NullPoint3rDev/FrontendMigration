@@ -182,7 +182,7 @@ export const reportHelpers = {
             // Новые типы отчетов согласно требованиям
             'equipment': 'equipment_work_report',
             'welders': 'welders_work_report',
-            'materials': 'materials_consumption_report',
+            'materials': 'wire_consumption_report',
             'welds': 'welds_quality_report',
             'errors': 'equipment_errors_report',
             'violations': 'welds_violations_report',

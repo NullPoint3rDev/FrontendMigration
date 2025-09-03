@@ -4,7 +4,7 @@ import ReportArchive from './ReportArchive';
 import { reportApi, reportHelpers } from '../api/reportApi';
 import '../styles/baseReportPage.css';
 
-const BaseReportPage = ({ reportType, title, description, icon }) => {
+const BaseReportPage = ({ reportType, title, description, icon, reportStructure, commonErrors }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -23,7 +23,8 @@ const BaseReportPage = ({ reportType, title, description, icon }) => {
                 format: reportData.format,
                 period: reportData.period,
                 dateFrom: reportData.dateFrom,
-                dateTo: reportData.dateTo
+                dateTo: reportData.dateTo,
+                equipmentId: reportData.equipmentId
             };
             
             // Генерируем отчет через API
@@ -53,6 +54,36 @@ const BaseReportPage = ({ reportType, title, description, icon }) => {
             </div>
 
             <div className="report-content">
+                {/* Структура отчета */}
+                {reportStructure && (
+                    <div className="report-structure">
+                        <h3>Структура отчета:</h3>
+                        <div className="structure-grid">
+                            {reportStructure.map((field, index) => (
+                                <div key={index} className="structure-field">
+                                    <div className="field-name">{field.field}</div>
+                                    <div className="field-description">{field.description}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Типичные неисправности для отчета о неисправностях */}
+                {commonErrors && (
+                    <div className="common-errors">
+                        <h3>Типичные неисправности:</h3>
+                        <div className="errors-list">
+                            {commonErrors.map((error, index) => (
+                                <div key={index} className="error-item">
+                                    <span className="error-icon">⚠️</span>
+                                    {error}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <div className="report-actions">
                     <button 
                         className="create-report-button"

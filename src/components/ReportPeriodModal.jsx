@@ -1,11 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../styles/reportPeriodModal.css';
+import { getAllWeldingMachines } from '../api/weldingMachineApi';
 
 const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
     const [selectedPeriod, setSelectedPeriod] = useState('day');
     const [customDateFrom, setCustomDateFrom] = useState('');
     const [customDateTo, setCustomDateTo] = useState('');
     const [format, setFormat] = useState('EXCEL');
+    const [equipment, setEquipment] = useState([]);
+    const [selectedEquipment, setSelectedEquipment] = useState('');
+    const [loadingEquipment, setLoadingEquipment] = useState(false);
+
+    // Загружаем список оборудования при открытии модального окна
+    useEffect(() => {
+        if (isOpen) {
+            loadEquipment();
+        }
+    }, [isOpen]);
+
+    const loadEquipment = async () => {
+        setLoadingEquipment(true);
+        try {
+            const equipmentData = await getAllWeldingMachines();
+            setEquipment(equipmentData);
+            if (equipmentData.length > 0) {
+                setSelectedEquipment(equipmentData[0].id.toString());
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки оборудования:', error);
+        } finally {
+            setLoadingEquipment(false);
+        }
+    };
 
     const periods = [
         { value: 'day', label: 'День', description: 'Отчет за текущий день' },
@@ -26,9 +52,9 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
         const titles = {
             'equipment': 'Отчет по работе оборудования',
             'welders': 'Отчет по работе сварщиков',
-            'materials': 'Отчет по расходу материалов',
+            'materials': 'Отчет по расходу проволоки',
             'welds': 'Отчет по сварочным швам',
-            'errors': 'Отчет по ошибкам сварочного оборудования',
+            'errors': 'Отчет о неисправностях',
             'violations': 'Перечень швов, выполненных с нарушением',
             'tasks': 'Отчет о выполнении сварочного задания'
         };
@@ -41,12 +67,18 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
             return;
         }
 
+        if (!selectedEquipment) {
+            alert('Выберите оборудование для отчета');
+            return;
+        }
+
         const reportData = {
             reportType,
             period: selectedPeriod,
             format,
             dateFrom: selectedPeriod === 'custom' ? customDateFrom : null,
-            dateTo: selectedPeriod === 'custom' ? customDateTo : null
+            dateTo: selectedPeriod === 'custom' ? customDateTo : null,
+            equipmentId: selectedEquipment
         };
 
         onGenerate(reportData);
@@ -72,6 +104,26 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
                 </div>
 
                 <div className="modal-body">
+                    {/* Выбор оборудования */}
+                    <div className="equipment-selection">
+                        <h3>Выберите оборудование:</h3>
+                        {loadingEquipment ? (
+                            <div className="loading-equipment">Загрузка оборудования...</div>
+                        ) : (
+                            <select 
+                                value={selectedEquipment} 
+                                onChange={(e) => setSelectedEquipment(e.target.value)}
+                                className="equipment-select"
+                            >
+                                {equipment.map((eq) => (
+                                    <option key={eq.id} value={eq.id}>
+                                        {eq.name} - {eq.model} (№{eq.serialNumber || eq.id})
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+
                     <div className="period-selection">
                         <h3>Выберите период формирования отчета:</h3>
                         <div className="period-options">
@@ -141,7 +193,7 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
                     <button 
                         className="generate-button" 
                         onClick={handleGenerate}
-                        disabled={selectedPeriod === 'custom' && (!customDateFrom || !customDateTo)}
+                        disabled={selectedPeriod === 'custom' && (!customDateFrom || !customDateTo) || !selectedEquipment}
                     >
                         Создать отчет
                     </button>

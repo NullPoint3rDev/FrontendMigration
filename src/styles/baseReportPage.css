@@ -52,6 +52,96 @@
     gap: 40px;
 }
 
+/* Стили для структуры отчета */
+.report-structure {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 40px;
+    border: 1px solid rgba(108, 99, 255, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+.report-structure h3 {
+    font-size: 1.5rem;
+    margin: 0 0 20px 0;
+    color: #6C63FF;
+    text-align: center;
+}
+
+.structure-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.structure-field {
+    background: rgba(108, 99, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(108, 99, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.structure-field:hover {
+    background: rgba(108, 99, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.field-name {
+    font-weight: 600;
+    color: #6C63FF;
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+}
+
+.field-description {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* Стили для типичных неисправностей */
+.common-errors {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 40px;
+    border: 1px solid rgba(255, 99, 99, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+.common-errors h3 {
+    font-size: 1.5rem;
+    margin: 0 0 20px 0;
+    color: #FF6584;
+    text-align: center;
+}
+
+.errors-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+}
+
+.error-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px;
+    background: rgba(255, 99, 99, 0.1);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 99, 99, 0.2);
+    transition: all 0.3s ease;
+}
+
+.error-item:hover {
+    background: rgba(255, 99, 99, 0.15);
+    transform: translateY(-2px);
+}
+
+.error-icon {
+    font-size: 1.2rem;
+}
+
 .report-info-card {
     background: rgba(255, 255, 255, 0.05);
     border-radius: 20px;
