@@ -103,6 +103,17 @@
   background: #e55a7a;
 }
 
+.clear-btn {
+  background: var(--secondary);
+  border-color: var(--secondary);
+  color: white;
+}
+
+.clear-btn:hover {
+  background: #e55a7a;
+  transform: translateY(-1px);
+}
+
 /* Map Container */
 .map-container {
   background: rgba(255, 255, 255, 0.05);

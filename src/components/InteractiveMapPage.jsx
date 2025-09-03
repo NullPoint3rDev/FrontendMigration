@@ -21,20 +21,36 @@ const InteractiveMapPage = () => {
         const savedEquipment = localStorage.getItem('interactiveMapEquipment');
         const savedWorkshops = localStorage.getItem('interactiveMapWorkshops');
         
+        console.log('Загружаем данные из localStorage:', { savedEquipment, savedWorkshops });
+        
         if (savedEquipment) {
-            setEquipment(JSON.parse(savedEquipment));
+            try {
+                const parsedEquipment = JSON.parse(savedEquipment);
+                console.log('Загружено оборудование:', parsedEquipment);
+                setEquipment(parsedEquipment);
+            } catch (error) {
+                console.error('Ошибка при загрузке оборудования:', error);
+            }
         }
         if (savedWorkshops) {
-            setWorkshops(JSON.parse(savedWorkshops));
+            try {
+                const parsedWorkshops = JSON.parse(savedWorkshops);
+                console.log('Загружены цеха:', parsedWorkshops);
+                setWorkshops(parsedWorkshops);
+            } catch (error) {
+                console.error('Ошибка при загрузке цехов:', error);
+            }
         }
     }, []);
 
     // Сохраняем данные в localStorage
     useEffect(() => {
+        console.log('Сохраняем оборудование в localStorage:', equipment);
         localStorage.setItem('interactiveMapEquipment', JSON.stringify(equipment));
     }, [equipment]);
 
     useEffect(() => {
+        console.log('Сохраняем цеха в localStorage:', workshops);
         localStorage.setItem('interactiveMapWorkshops', JSON.stringify(workshops));
     }, [workshops]);
 
@@ -175,20 +191,54 @@ const InteractiveMapPage = () => {
 
     // Удаление элемента
     const handleDelete = (id, type) => {
-        if (type === 'equipment') {
-            setEquipment(prev => prev.filter(item => item.id !== id));
-        } else if (type === 'workshop') {
-            setWorkshops(prev => prev.filter(item => item.id !== id));
-            // Удаляем оборудование из удаленного цеха
-            setEquipment(prev => prev.filter(item => item.workshopId !== id));
+        console.log('Удаляем элемент:', { id, type });
+        
+        try {
+            if (type === 'equipment') {
+                setEquipment(prev => {
+                    const filtered = prev.filter(item => item.id !== id);
+                    console.log('Оборудование после удаления:', filtered);
+                    return filtered;
+                });
+            } else if (type === 'workshop') {
+                setWorkshops(prev => {
+                    const filtered = prev.filter(item => item.id !== id);
+                    console.log('Цеха после удаления:', filtered);
+                    return filtered;
+                });
+                // Удаляем оборудование из удаленного цеха
+                setEquipment(prev => {
+                    const filtered = prev.filter(item => item.workshopId !== id);
+                    console.log('Оборудование после удаления цеха:', filtered);
+                    return filtered;
+                });
+            }
+            
+            // Принудительно обновляем состояние
+            setTimeout(() => {
+                forceUpdate();
+            }, 100);
+            
+        } catch (error) {
+            console.error('Ошибка при удалении элемента:', error);
         }
-        closeModal();
+        
+        // Закрываем модальное окно только если оно открыто
+        if (modalOpen) {
+            closeModal();
+        }
     };
 
     // Возврат к карте предприятия
     const handleBackToEnterprise = () => {
         setMapType('enterprise');
         setSelectedWorkshop(null);
+    };
+
+    // Принудительное обновление состояния
+    const forceUpdate = () => {
+        setEquipment(prev => [...prev]);
+        setWorkshops(prev => [...prev]);
     };
 
     // Панель инструментов
@@ -225,6 +275,19 @@ const InteractiveMapPage = () => {
                         >
                             <i className="fas fa-pencil-alt"></i>
                             {editMode ? 'Выключить' : 'Включить'} рисование
+                        </button>
+                        <button
+                            className="toolbar-btn clear-btn"
+                            onClick={() => {
+                                if (window.confirm('Очистить все элементы с карты?')) {
+                                    setEquipment([]);
+                                    setWorkshops([]);
+                                }
+                            }}
+                            title="Очистить все элементы"
+                        >
+                            <i className="fas fa-trash-alt"></i>
+                            Очистить все
                         </button>
                     </div>
                 </div>
@@ -330,7 +393,15 @@ const InteractiveMapPage = () => {
             />
             
             {/* Цеха */}
-            {workshops.map((workshop) => (
+            {workshops.map((workshop) => {
+                console.log('Рендеринг цеха:', { 
+                    workshopId: workshop.id, 
+                    workshopName: workshop.name,
+                    coordinates: workshop.coordinates,
+                    mapType,
+                    selectedWorkshopId: selectedWorkshop?.id
+                });
+                return (
                 <div
                     key={workshop.id}
                     className={`map-workshop ${mapType === 'workshop' && selectedWorkshop?.id === workshop.id ? 'selected' : ''}`}
@@ -356,14 +427,24 @@ const InteractiveMapPage = () => {
                         </button>
                     )}
                 </div>
-            ))}
+            );
+            })}
 
             {/* Оборудование */}
             {equipment
-                .filter(item => 
-                    mapType === 'enterprise' || 
-                    (mapType === 'workshop' && item.workshopId === selectedWorkshop?.id)
-                )
+                .filter(item => {
+                    const shouldShow = mapType === 'enterprise' || 
+                        (mapType === 'workshop' && item.workshopId === selectedWorkshop?.id);
+                    console.log('Фильтрация оборудования:', { 
+                        itemId: item.id, 
+                        itemName: item.name, 
+                        mapType, 
+                        workshopId: item.workshopId, 
+                        selectedWorkshopId: selectedWorkshop?.id,
+                        shouldShow 
+                    });
+                    return shouldShow;
+                })
                 .map((item) => (
                     <div
                         key={item.id}
@@ -392,7 +473,8 @@ const InteractiveMapPage = () => {
                             </button>
                         )}
                     </div>
-                ))}
+                ))
+            })
         </div>
     );
 
