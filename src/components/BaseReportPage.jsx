@@ -24,7 +24,7 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
                 period: reportData.period,
                 dateFrom: reportData.dateFrom,
                 dateTo: reportData.dateTo,
-                equipmentId: reportData.equipmentId
+                weldingMachineId: reportData.equipmentId
             };
             
             // Генерируем отчет через API
