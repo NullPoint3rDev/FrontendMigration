@@ -481,18 +481,23 @@ const InteractiveMapPage = () => {
                     selectedWorkshopId: selectedWorkshop?.id
                 });
                 return (
-                    <div
-                        key={workshop.id}
-                        className={`map-workshop ${mapType === 'workshop' && selectedWorkshop?.id === workshop.id ? 'selected' : ''}`}
-                        style={{
-                            left: workshop.coordinates.x,
-                            top: workshop.coordinates.y,
-                            width: workshop.width,
-                            height: workshop.height
-                        }}
-                        onClick={() => handleWorkshopClick(workshop)}
-                        title={workshop.name}
-                    >
+                                    <div
+                    key={workshop.id}
+                    className={`map-workshop ${mapType === 'workshop' && selectedWorkshop?.id === workshop.id ? 'selected' : ''}`}
+                    style={{
+                        left: workshop.coordinates.x,
+                        top: workshop.coordinates.y,
+                        width: workshop.width,
+                        height: workshop.height
+                    }}
+                    onClick={(e) => {
+                        console.log('Клик по цеху:', workshop.id, workshop.name);
+                        console.log('Целевой элемент:', e.target);
+                        console.log('Текущий элемент:', e.currentTarget);
+                        handleWorkshopClick(workshop);
+                    }}
+                    title={workshop.name}
+                >
                         <div className="workshop-label">{workshop.name}</div>
                                             {editMode && (
                         <button
@@ -504,16 +509,24 @@ const InteractiveMapPage = () => {
                                 console.log('Режим редактирования включен:', editMode);
                                 console.log('Тип события:', e.type);
                                 console.log('Целевой элемент:', e.target);
+                                console.log('Координаты клика:', { x: e.clientX, y: e.clientY });
+                                console.log('Координаты цеха:', workshop.coordinates);
                                 e.stopPropagation();
                                 console.log('Вызываем handleDelete...');
                                 handleDelete(workshop.id, 'workshop');
                                 console.log('handleDelete вызван');
                             }}
+                            onMouseDown={(e) => console.log('MouseDown по кнопке удаления цеха:', workshop.id)}
+                            onMouseUp={(e) => console.log('MouseUp по кнопке удаления цеха:', workshop.id)}
                             style={{ zIndex: 1000 }}
+                            onMouseEnter={() => console.log('Мышь над кнопкой удаления цеха:', workshop.id)}
+                            onMouseLeave={() => console.log('Мышь покинула кнопку удаления цеха:', workshop.id)}
+                            title={`Удалить цех "${workshop.name}"`}
                         >
                             <i className="fas fa-trash"></i>
                         </button>
                     )}
+                    {console.log('Кнопка удаления рендерится для цеха:', workshop.id, 'editMode:', editMode)}
                     </div>
                 );
             })}
@@ -542,7 +555,12 @@ const InteractiveMapPage = () => {
                             left: item.coordinates.x,
                             top: item.coordinates.y
                         }}
-                        onClick={() => handleEquipmentClick(item)}
+                        onClick={(e) => {
+                            console.log('Клик по оборудованию:', item.id, item.name);
+                            console.log('Целевой элемент:', e.target);
+                            console.log('Текущий элемент:', e.currentTarget);
+                            handleEquipmentClick(item);
+                        }}
                         title={`${item.name} - ${item.status}`}
                     >
                         <div className="equipment-icon">
@@ -560,16 +578,22 @@ const InteractiveMapPage = () => {
                                     console.log('Режим редактирования включен:', editMode);
                                     console.log('Тип события:', e.type);
                                     console.log('Целевой элемент:', e.target);
+                                    console.log('Координаты клика:', { x: e.clientX, y: e.clientY });
+                                    console.log('Координаты оборудования:', item.coordinates);
                                     e.stopPropagation();
                                     console.log('Вызываем handleDelete...');
                                     handleDelete(item.id, 'equipment');
                                     console.log('handleDelete вызван');
                                 }}
                                 style={{ zIndex: 1000 }}
+                                onMouseEnter={() => console.log('Мышь над кнопкой удаления оборудования:', item.id)}
+                                onMouseLeave={() => console.log('Мышь покинула кнопку удаления оборудования:', item.id)}
+                                title={`Удалить оборудование "${item.name}"`}
                             >
                                 <i className="fas fa-trash"></i>
                             </button>
                         )}
+                        {console.log('Кнопка удаления рендерится для оборудования:', item.id, 'editMode:', editMode)}
                     </div>
                 ))}
         </div>
