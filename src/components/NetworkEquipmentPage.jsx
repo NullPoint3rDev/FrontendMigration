@@ -22,8 +22,17 @@ const NetworkEquipmentPage = () => {
     const loadEquipment = async () => {
         try {
             setLoading(true);
+            console.log('Загружаем список сетевого оборудования...');
             const data = await getAllNetworkEquipment();
-            setEquipment(Array.isArray(data) ? data : []);
+            console.log('Получены данные:', data);
+            
+            if (Array.isArray(data)) {
+                setEquipment(data);
+                console.log('Список оборудования обновлен, количество элементов:', data.length);
+            } else {
+                console.warn('Получены неверные данные:', data);
+                setEquipment([]);
+            }
         } catch (error) {
             console.error('Ошибка загрузки оборудования:', error);
             setEquipment([]);
@@ -105,11 +114,19 @@ const NetworkEquipmentPage = () => {
         try {
             setLoading(true);
             if (editData.id) {
-                await updateNetworkEquipment(editData.id, editData);
+                const updatedEquipment = await updateNetworkEquipment(editData.id, editData);
+                console.log('Оборудование обновлено:', updatedEquipment);
             } else {
-                await createNetworkEquipment(editData);
+                const newEquipment = await createNetworkEquipment(editData);
+                console.log('Создано новое оборудование:', newEquipment);
             }
-            await loadEquipment();
+            
+            // Принудительно обновляем список оборудования
+            console.log('Обновляем список оборудования...');
+            setTimeout(async () => {
+                await loadEquipment();
+            }, 100);
+            
             closeModal();
         } catch (error) {
             console.error('Ошибка сохранения оборудования:', error);
@@ -158,62 +175,69 @@ const NetworkEquipmentPage = () => {
             </div>
 
             <div className="equipment-grid">
-                {equipment.map((item) => (
-                    <div key={item.id} className="equipment-card">
-                        <div className="equipment-info">
-                            <h3 className="equipment-name">{item.name}</h3>
-                            <p className="equipment-model">{getEquipmentTypeLabel(item.type)}</p>
-                            <div className="equipment-details">
-                                <div className="detail-item">
-                                    <span className="detail-label">IP адрес:</span>
-                                    {item.ipAddress}
-                                </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">MAC адрес:</span>
-                                    {item.macAddress}
-                                </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">Расположение:</span>
-                                    {item.location}
-                                </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">Статус:</span>
-                                    {getStatusLabel(item.status)}
-                                </div>
-                                {item.lastSeen && (
+                {equipment && equipment.length > 0 ? (
+                    equipment.map((item) => (
+                        <div key={item.id} className="equipment-card">
+                            <div className="equipment-info">
+                                <h3 className="equipment-name">{item.name}</h3>
+                                <p className="equipment-model">{getEquipmentTypeLabel(item.type)}</p>
+                                <div className="equipment-details">
                                     <div className="detail-item">
-                                        <span className="detail-label">Последняя активность:</span>
-                                        {new Date(item.lastSeen).toLocaleString()}
+                                        <span className="detail-label">IP адрес:</span>
+                                        {item.ipAddress}
+                                    </div>
+                                    <div className="detail-item">
+                                        <span className="detail-label">MAC адрес:</span>
+                                        {item.macAddress}
+                                    </div>
+                                    <div className="detail-item">
+                                        <span className="detail-label">Расположение:</span>
+                                        {item.location}
+                                    </div>
+                                    <div className="detail-item">
+                                        <span className="detail-label">Статус:</span>
+                                        {getStatusLabel(item.status)}
+                                    </div>
+                                    {item.lastSeen && (
+                                        <div className="detail-item">
+                                            <span className="detail-label">Последняя активность:</span>
+                                            {new Date(item.lastSeen).toLocaleString()}
+                                        </div>
+                                    )}
+                                </div>
+                                {item.description && (
+                                    <div className="equipment-description">
+                                        <span className="detail-label">Описание:</span>
+                                        {item.description}
                                     </div>
                                 )}
-                            </div>
-                            {item.description && (
-                                <div className="equipment-description">
-                                    <span className="detail-label">Описание:</span>
-                                    {item.description}
+                                <div className="equipment-actions">
+                                    <button
+                                        className="action-btn edit-btn"
+                                        onClick={() => openEditModal(item)}
+                                        disabled={loading}
+                                    >
+                                        <i className="fas fa-edit"></i>
+                                        Редактировать
+                                    </button>
+                                    <button
+                                        className="action-btn delete-btn"
+                                        onClick={() => handleDelete(item.id)}
+                                        disabled={loading}
+                                    >
+                                        <i className="fas fa-trash"></i>
+                                        Удалить
+                                    </button>
                                 </div>
-                            )}
-                            <div className="equipment-actions">
-                                <button
-                                    className="action-btn edit-btn"
-                                    onClick={() => openEditModal(item)}
-                                    disabled={loading}
-                                >
-                                    <i className="fas fa-edit"></i>
-                                    Редактировать
-                                </button>
-                                <button
-                                    className="action-btn delete-btn"
-                                    onClick={() => handleDelete(item.id)}
-                                    disabled={loading}
-                                >
-                                    <i className="fas fa-trash"></i>
-                                    Удалить
-                                </button>
                             </div>
                         </div>
+                    ))
+                ) : (
+                    <div className="no-equipment">
+                        <p>Сетевое оборудование не найдено</p>
+                        <p>Добавьте первое оборудование, нажав кнопку "Добавить оборудование"</p>
                     </div>
-                ))}
+                )}
             </div>
 
             {modalOpen && (
