@@ -114,38 +114,7 @@
   transform: translateY(-1px);
 }
 
-.test-btn {
-  background: #FF9800;
-  border-color: #FF9800;
-  color: white;
-}
 
-.test-btn:hover {
-  background: #F57C00;
-  transform: translateY(-1px);
-}
-
-.delete-test-btn {
-  background: #9C27B0;
-  border-color: #9C27B0;
-  color: white;
-}
-
-.delete-test-btn:hover {
-  background: #7B1FA2;
-  transform: translateY(-1px);
-}
-
-.delete-specific-btn {
-  background: #FF5722;
-  border-color: #FF5722;
-  color: white;
-}
-
-.delete-specific-btn:hover {
-  background: #E64A19;
-  transform: translateY(-1px);
-}
 
 /* Map Container */
 .map-container {
