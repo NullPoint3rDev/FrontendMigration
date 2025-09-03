@@ -279,13 +279,13 @@ const InteractiveMapPage = () => {
                         className="draggable-item equipment-item"
                         draggable
                         onDragStart={(e) => handleDragStart(e, {
-                            name: 'Контроллер',
+                            name: 'Роутер',
                             type: 'controller',
                             status: 'active'
                         }, 'equipment')}
                     >
                         <i className="fas fa-microchip"></i>
-                        <span>Контроллер</span>
+                        <span>Роутер</span>
                     </div>
                 </div>
             </div>
