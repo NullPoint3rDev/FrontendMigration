@@ -1,25 +1,147 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { plantMapApi } from '../api/plantMapApi';
 import '../styles/equipmentPage.css';
 
 const EnterpriseMapPage = () => {
     const [equipment, setEquipment] = useState([]);
+    const [availableEquipment, setAvailableEquipment] = useState([]);
+    const [workshops, setWorkshops] = useState([]);
+    const [currentPlantMap, setCurrentPlantMap] = useState(null);
+    const [organizations, setOrganizations] = useState([]);
+    const [selectedOrganizationId, setSelectedOrganizationId] = useState(1); // По умолчанию первая организация
+    
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedEquipment, setSelectedEquipment] = useState(null);
     const [viewMode, setViewMode] = useState('map'); // 'map' или 'list'
     const [filterStatus, setFilterStatus] = useState('all');
+    const [editMode, setEditMode] = useState(false);
+    const [drawingWorkshop, setDrawingWorkshop] = useState(false);
+    const [workshopModalOpen, setWorkshopModalOpen] = useState(false);
+    const [newWorkshop, setNewWorkshop] = useState({ name: '', description: '', color: '#4A90E2' });
+    const [draggedEquipment, setDraggedEquipment] = useState(null);
+    const [mapScale, setMapScale] = useState(1);
+    const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
+    const [isDraggingMap, setIsDraggingMap] = useState(false);
+    const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+    
+    // Состояния загрузки и ошибок
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [loadingEquipment, setLoadingEquipment] = useState(false);
+    const [loadingOrganizations, setLoadingOrganizations] = useState(false);
+    
+    const mapRef = useRef(null);
+    const drawingRef = useRef(null);
 
-    // Load equipment from localStorage
+    // Загрузка данных при монтировании компонента
     useEffect(() => {
-        const savedEquipment = localStorage.getItem('mapEquipment');
-        if (savedEquipment) {
-            setEquipment(JSON.parse(savedEquipment));
-        }
+        loadInitialData();
     }, []);
 
-    // Save equipment to localStorage when it changes
+    // Загрузка карты при изменении организации
     useEffect(() => {
-        localStorage.setItem('mapEquipment', JSON.stringify(equipment));
-    }, [equipment]);
+        if (selectedOrganizationId) {
+            loadPlantMap();
+        }
+    }, [selectedOrganizationId]);
+
+    const loadInitialData = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            
+            // Загружаем организации параллельно
+            await Promise.all([
+                loadOrganizations(),
+                loadAvailableEquipment(selectedOrganizationId)
+            ]);
+            
+            // Загружаем карту предприятия
+            await loadPlantMap();
+            
+        } catch (error) {
+            console.error('Ошибка загрузки начальных данных:', error);
+            setError('Не удалось загрузить данные. Проверьте подключение к серверу.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const loadOrganizations = async () => {
+        try {
+            setLoadingOrganizations(true);
+            const orgs = await plantMapApi.getOrganizations();
+            setOrganizations(orgs);
+            if (orgs.length > 0 && !selectedOrganizationId) {
+                setSelectedOrganizationId(orgs[0].id);
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки организаций:', error);
+            // Если не удалось загрузить организации, используем ID по умолчанию
+            setSelectedOrganizationId(1);
+        } finally {
+            setLoadingOrganizations(false);
+        }
+    };
+
+    const loadPlantMap = async () => {
+        if (!selectedOrganizationId) return;
+        
+        try {
+            setLoading(true);
+            const plantMap = await plantMapApi.getDefaultPlantMap(selectedOrganizationId);
+            
+            if (plantMap) {
+                setCurrentPlantMap(plantMap);
+                setEquipment(plantMap.elements || []);
+                setWorkshops(plantMap.workshops || []);
+            } else {
+                // Если карта не найдена, создаем новую
+                await createDefaultPlantMap();
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки карты предприятия:', error);
+            setError('Не удалось загрузить карту предприятия.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const createDefaultPlantMap = async () => {
+        try {
+            const newPlantMap = await plantMapApi.createPlantMap({
+                organizationId: selectedOrganizationId,
+                name: 'Основная карта предприятия',
+                description: 'Схематичная карта основного производственного комплекса',
+                width: 1200,
+                height: 800,
+                isDefault: true
+            });
+            
+            setCurrentPlantMap(newPlantMap);
+            setEquipment([]);
+            setWorkshops([]);
+        } catch (error) {
+            console.error('Ошибка создания карты предприятия:', error);
+            setError('Не удалось создать карту предприятия.');
+        }
+    };
+
+    const loadAvailableEquipment = async (organizationId) => {
+        if (!organizationId) return;
+        
+        try {
+            setLoadingEquipment(true);
+            const equipment = await plantMapApi.getAvailableWeldingMachines(organizationId);
+            setAvailableEquipment(equipment);
+        } catch (error) {
+            console.error('Ошибка загрузки доступного оборудования:', error);
+            // В случае ошибки используем пустой массив
+            setAvailableEquipment([]);
+        } finally {
+            setLoadingEquipment(false);
+        }
+    };
 
     const getStatusLabel = (status) => {
         switch (status) {
@@ -48,8 +170,10 @@ const EnterpriseMapPage = () => {
     };
 
     const handleEquipmentClick = (equipmentItem) => {
-        setSelectedEquipment(equipmentItem);
-        setModalOpen(true);
+        if (!editMode) {
+            setSelectedEquipment(equipmentItem);
+            setModalOpen(true);
+        }
     };
 
     const closeModal = () => {
@@ -57,22 +181,289 @@ const EnterpriseMapPage = () => {
         setSelectedEquipment(null);
     };
 
+    const closeWorkshopModal = () => {
+        setWorkshopModalOpen(false);
+        setNewWorkshop({ name: '', description: '', color: '#4A90E2' });
+    };
+
+    const handleDragStart = (e, equipment) => {
+        if (editMode) {
+            setDraggedEquipment(equipment);
+            e.dataTransfer.effectAllowed = 'move';
+        }
+    };
+
+    const handleDragOver = (e) => {
+        if (editMode) {
+            e.preventDefault();
+            e.dataTransfer.effectAllowed = 'move';
+        }
+    };
+
+    const handleDrop = async (e) => {
+        if (editMode && draggedEquipment) {
+            e.preventDefault();
+            const rect = mapRef.current.getBoundingClientRect();
+            const x = (e.clientX - rect.left - mapOffset.x) / mapScale;
+            const y = (e.clientY - rect.top - mapOffset.y) / mapScale;
+
+            try {
+                // Обновляем позицию через API
+                const updatedElement = await plantMapApi.updateElementPosition(
+                    draggedEquipment.id, 
+                    x, 
+                    y
+                );
+                
+                // Обновляем локальное состояние
+                const updatedEquipment = equipment.map(item => 
+                    item.id === draggedEquipment.id 
+                        ? { ...item, coordinates: { x, y } }
+                        : item
+                );
+                setEquipment(updatedEquipment);
+                
+            } catch (error) {
+                console.error('Ошибка обновления позиции:', error);
+                setError('Не удалось обновить позицию оборудования.');
+            }
+            
+            setDraggedEquipment(null);
+        }
+    };
+
+    const handleMapMouseDown = (e) => {
+        if (editMode && drawingWorkshop) {
+            const rect = mapRef.current.getBoundingClientRect();
+            const startX = (e.clientX - rect.left - mapOffset.x) / mapScale;
+            const startY = (e.clientY - rect.top - mapOffset.y) / mapScale;
+            
+            drawingRef.current = { startX, startY, endX: startX, endY: startY };
+        } else if (editMode) {
+            setIsDraggingMap(true);
+            setLastMousePos({ x: e.clientX, y: e.clientY });
+        }
+    };
+
+    const handleMapMouseMove = (e) => {
+        if (editMode && drawingWorkshop && drawingRef.current) {
+            const rect = mapRef.current.getBoundingClientRect();
+            const endX = (e.clientX - rect.left - mapOffset.x) / mapScale;
+            const endY = (e.clientY - rect.top - mapOffset.y) / mapScale;
+            
+            drawingRef.current.endX = endX;
+            drawingRef.current.endY = endY;
+        } else if (editMode && isDraggingMap) {
+            const deltaX = e.clientX - lastMousePos.x;
+            const deltaY = e.clientY - lastMousePos.y;
+            
+            setMapOffset(prev => ({
+                x: prev.x + deltaX,
+                y: prev.y + deltaY
+            }));
+            setLastMousePos({ x: e.clientX, y: e.clientY });
+        }
+    };
+
+    const handleMapMouseUp = async () => {
+        if (editMode && drawingWorkshop && drawingRef.current) {
+            const { startX, startY, endX, endY } = drawingRef.current;
+            
+            try {
+                const workshopData = {
+                    name: `Цех ${workshops.length + 1}`,
+                    description: 'Новый цех',
+                    positionX: Math.min(startX, endX),
+                    positionY: Math.min(startY, endY),
+                    width: Math.abs(endX - startX),
+                    height: Math.abs(endY - startY),
+                    color: newWorkshop.color,
+                    borderColor: '#2E5C8A',
+                    opacity: 0.3
+                };
+                
+                // Создаем цех через API
+                const newWorkshopData = await plantMapApi.addWorkshopToMap(
+                    currentPlantMap.id, 
+                    workshopData
+                );
+                
+                // Обновляем локальное состояние
+                setWorkshops(prev => [...prev, newWorkshopData]);
+                setNewWorkshop(workshopData);
+                setWorkshopModalOpen(true);
+                
+            } catch (error) {
+                console.error('Ошибка создания цеха:', error);
+                setError('Не удалось создать цех.');
+            }
+            
+            setDrawingWorkshop(false);
+            drawingRef.current = null;
+        }
+        
+        setIsDraggingMap(false);
+    };
+
+    const addEquipmentToMap = async (equipmentItem) => {
+        if (editMode && currentPlantMap) {
+            try {
+                const elementData = {
+                    elementType: 'WELDING_MACHINE',
+                    elementId: equipmentItem.id,
+                    positionX: 100,
+                    positionY: 100,
+                    width: 40,
+                    height: 40,
+                    rotation: 0,
+                    zIndex: 1
+                };
+                
+                // Добавляем элемент через API
+                const newElement = await plantMapApi.addElementToMap(
+                    currentPlantMap.id, 
+                    elementData
+                );
+                
+                // Обновляем локальное состояние
+                setEquipment(prev => [...prev, newElement]);
+                
+            } catch (error) {
+                console.error('Ошибка добавления оборудования:', error);
+                setError('Не удалось добавить оборудование на карту.');
+            }
+        }
+    };
+
+    const removeEquipmentFromMap = async (equipmentId) => {
+        if (editMode) {
+            try {
+                await plantMapApi.removeElementFromMap(equipmentId);
+                setEquipment(prev => prev.filter(item => item.id !== equipmentId));
+            } catch (error) {
+                console.error('Ошибка удаления оборудования:', error);
+                setError('Не удалось удалить оборудование с карты.');
+            }
+        }
+    };
+
+    const removeWorkshopFromMap = async (workshopId) => {
+        if (editMode) {
+            try {
+                await plantMapApi.removeWorkshopFromMap(workshopId);
+                setWorkshops(prev => prev.filter(workshop => workshop.id !== workshopId));
+            } catch (error) {
+                console.error('Ошибка удаления цеха:', error);
+                setError('Не удалось удалить цех с карты.');
+            }
+        }
+    };
+
+    const updateWorkshop = async (workshopId, updates) => {
+        try {
+            const updatedWorkshop = await plantMapApi.updateWorkshop(workshopId, updates);
+            setWorkshops(prev => prev.map(workshop => 
+                workshop.id === workshopId ? updatedWorkshop : workshop
+            ));
+        } catch (error) {
+            console.error('Ошибка обновления цеха:', error);
+            setError('Не удалось обновить цех.');
+        }
+    };
+
+    const handleOrganizationChange = (organizationId) => {
+        setSelectedOrganizationId(organizationId);
+        setEquipment([]);
+        setWorkshops([]);
+        setCurrentPlantMap(null);
+    };
+
     const filteredEquipment = equipment.filter(item => {
         if (filterStatus === 'all') return true;
         return item.status === filterStatus;
     });
 
+    // Обработка ошибок
+    if (error) {
+        return (
+            <div className="equipment-page">
+                <div className="error-container">
+                    <h2>Произошла ошибка</h2>
+                    <p>{error}</p>
+                    <button 
+                        className="retry-btn"
+                        onClick={() => {
+                            setError(null);
+                            loadInitialData();
+                        }}
+                    >
+                        Попробовать снова
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // Отображение загрузки
+    if (loading) {
+        return (
+            <div className="equipment-page">
+                <div className="loading-container">
+                    <div className="loading-spinner"></div>
+                    <p>Загрузка карты предприятия...</p>
+                </div>
+            </div>
+        );
+    }
+
     const MapView = () => (
         <div className="map-container">
-            <div className="map-grid">
-                {/* Зоны */}
-                <div className="map-zone" style={{ top: '50px', left: '50px', width: '200px', height: '150px' }}>
-                    <div className="zone-label">Цех №1</div>
-                </div>
-                
-                <div className="map-zone" style={{ top: '250px', left: '350px', width: '200px', height: '150px' }}>
-                    <div className="zone-label">Цех №2</div>
-                </div>
+            <div 
+                className="map-grid"
+                ref={mapRef}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onMouseDown={handleMapMouseDown}
+                onMouseMove={handleMapMouseMove}
+                onMouseUp={handleMapMouseUp}
+                style={{
+                    transform: `scale(${mapScale}) translate(${mapOffset.x}px, ${mapOffset.y}px)`,
+                    cursor: drawingWorkshop ? 'crosshair' : isDraggingMap ? 'grabbing' : 'grab'
+                }}
+            >
+                {/* Цеха */}
+                {workshops.map((workshop) => (
+                    <div
+                        key={workshop.id}
+                        className="map-workshop"
+                        style={{
+                            position: 'absolute',
+                            left: workshop.positionX,
+                            top: workshop.positionY,
+                            width: workshop.width,
+                            height: workshop.height,
+                            backgroundColor: workshop.color,
+                            border: `2px solid ${workshop.borderColor}`,
+                            opacity: workshop.opacity,
+                            cursor: editMode ? 'pointer' : 'default'
+                        }}
+                        onClick={() => editMode && setWorkshopModalOpen(true)}
+                        title={workshop.name}
+                    >
+                        <div className="workshop-label">{workshop.name}</div>
+                        {editMode && (
+                            <button 
+                                className="remove-workshop-btn"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeWorkshopFromMap(workshop.id);
+                                }}
+                            >
+                                ×
+                            </button>
+                        )}
+                    </div>
+                ))}
 
                 {/* Оборудование на карте */}
                 {filteredEquipment.map((item) => (
@@ -80,11 +471,15 @@ const EnterpriseMapPage = () => {
                         key={item.id}
                         className={`map-equipment ${item.status}`}
                         style={{
-                            left: item.coordinates?.x || 100,
-                            top: item.coordinates?.y || 100
+                            position: 'absolute',
+                            left: item.coordinates?.x || item.positionX || 100,
+                            top: item.coordinates?.y || item.positionY || 100,
+                            cursor: editMode ? 'move' : 'pointer'
                         }}
+                        draggable={editMode}
+                        onDragStart={(e) => handleDragStart(e, item)}
                         onClick={() => handleEquipmentClick(item)}
-                        title={`${item.name} - ${getStatusLabel(item.status)}`}
+                        title={`${item.elementName || item.name} - ${getStatusLabel(item.status)}`}
                     >
                         <div className="equipment-icon">
                             {item.status === 'active' && <i className="fas fa-check-circle"></i>}
@@ -92,8 +487,95 @@ const EnterpriseMapPage = () => {
                             {item.status === 'error' && <i className="fas fa-exclamation-triangle"></i>}
                             {item.status === 'inactive' && <i className="fas fa-circle"></i>}
                         </div>
+                        {editMode && (
+                            <button 
+                                className="remove-equipment-btn"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeEquipmentFromMap(item.id);
+                                }}
+                            >
+                                ×
+                            </button>
+                        )}
                     </div>
                 ))}
+
+                {/* Индикатор рисования цеха */}
+                {drawingWorkshop && drawingRef.current && (
+                    <div
+                        className="drawing-preview"
+                        style={{
+                            position: 'absolute',
+                            left: Math.min(drawingRef.current.startX, drawingRef.current.endX),
+                            top: Math.min(drawingRef.current.startY, drawingRef.current.endY),
+                            width: Math.abs(drawingRef.current.endX - drawingRef.current.startX),
+                            height: Math.abs(drawingRef.current.endY - drawingRef.current.startY),
+                            border: '2px dashed #4A90E2',
+                            backgroundColor: 'rgba(74, 144, 226, 0.1)',
+                            pointerEvents: 'none'
+                        }}
+                    />
+                )}
+            </div>
+
+            {/* Панель с доступным оборудованием */}
+            {editMode && (
+                <div className="equipment-panel">
+                    <h3>Доступное оборудование</h3>
+                    {loadingEquipment ? (
+                        <div className="loading-text">Загрузка...</div>
+                    ) : (
+                        <div className="equipment-list">
+                            {availableEquipment.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className="available-equipment-item"
+                                    draggable
+                                    onDragStart={(e) => {
+                                        e.dataTransfer.setData('text/plain', JSON.stringify(item));
+                                    }}
+                                >
+                                    <div className="equipment-icon">
+                                        <i className="fas fa-cog"></i>
+                                    </div>
+                                    <div className="equipment-info">
+                                        <div className="equipment-name">{item.name}</div>
+                                        <div className="equipment-type">{getEquipmentTypeLabel(item.type)}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Элементы управления картой */}
+            <div className="map-controls">
+                <button 
+                    className="map-control-btn"
+                    onClick={() => setMapScale(prev => Math.min(prev + 0.1, 2))}
+                    title="Увеличить"
+                >
+                    <i className="fas fa-plus"></i>
+                </button>
+                <button 
+                    className="map-control-btn"
+                    onClick={() => setMapScale(prev => Math.max(prev - 0.1, 0.5))}
+                    title="Уменьшить"
+                >
+                    <i className="fas fa-minus"></i>
+                </button>
+                <button 
+                    className="map-control-btn"
+                    onClick={() => {
+                        setMapScale(1);
+                        setMapOffset({ x: 0, y: 0 });
+                    }}
+                    title="Сбросить масштаб"
+                >
+                    <i className="fas fa-home"></i>
+                </button>
             </div>
         </div>
     );
@@ -103,7 +585,7 @@ const EnterpriseMapPage = () => {
             {filteredEquipment.map((item) => (
                 <div key={item.id} className="equipment-card">
                     <div className="equipment-info">
-                        <h3 className="equipment-name">{item.name}</h3>
+                        <h3 className="equipment-name">{item.elementName || item.name}</h3>
                         <p className="equipment-model">{getEquipmentTypeLabel(item.type)}</p>
                         <div className="equipment-details">
                             <div className="detail-item">
@@ -155,6 +637,20 @@ const EnterpriseMapPage = () => {
             <div className="equipment-header">
                 <h1 className="equipment-title">Карта предприятия</h1>
                 <div className="header-controls">
+                    {/* Выбор организации */}
+                    <select
+                        className="organization-select"
+                        value={selectedOrganizationId}
+                        onChange={(e) => handleOrganizationChange(parseInt(e.target.value))}
+                        disabled={loadingOrganizations}
+                    >
+                        {organizations.map(org => (
+                            <option key={org.id} value={org.id}>
+                                {org.name}
+                            </option>
+                        ))}
+                    </select>
+
                     <select
                         className="filter-select"
                         value={filterStatus}
@@ -166,6 +662,26 @@ const EnterpriseMapPage = () => {
                         <option value="error">Ошибки</option>
                         <option value="inactive">Неактивные</option>
                     </select>
+                    
+                    <button
+                        className={`edit-mode-btn ${editMode ? 'active' : ''}`}
+                        onClick={() => setEditMode(!editMode)}
+                        title={editMode ? 'Выйти из режима редактирования' : 'Войти в режим редактирования'}
+                    >
+                        <i className="fas fa-edit"></i>
+                        {editMode ? 'Режим просмотра' : 'Режим редактирования'}
+                    </button>
+
+                    {editMode && (
+                        <button
+                            className={`drawing-btn ${drawingWorkshop ? 'active' : ''}`}
+                            onClick={() => setDrawingWorkshop(!drawingWorkshop)}
+                            title={drawingWorkshop ? 'Отменить рисование цеха' : 'Нарисовать цех'}
+                        >
+                            <i className="fas fa-vector-square"></i>
+                            {drawingWorkshop ? 'Отменить' : 'Цех'}
+                        </button>
+                    )}
                     
                     <button
                         className={`view-btn ${viewMode === 'map' ? 'active' : ''}`}
@@ -186,12 +702,13 @@ const EnterpriseMapPage = () => {
 
             {viewMode === 'map' ? <MapView /> : <ListView />}
 
+            {/* Модальное окно для оборудования */}
             {modalOpen && selectedEquipment && (
                 <div className="modal-overlay" onClick={closeModal}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <h2 className="modal-title">
-                                {selectedEquipment.name}
+                                {selectedEquipment.elementName || selectedEquipment.name}
                             </h2>
                             <button className="close-btn" onClick={closeModal}>
                                 <i className="fas fa-times"></i>
@@ -213,7 +730,7 @@ const EnterpriseMapPage = () => {
                                 </div>
                                 <div className="detail-row">
                                     <span className="detail-label">Координаты:</span>
-                                    <span>X: {selectedEquipment.coordinates?.x}, Y: {selectedEquipment.coordinates?.y}</span>
+                                    <span>X: {selectedEquipment.coordinates?.x || selectedEquipment.positionX}, Y: {selectedEquipment.coordinates?.y || selectedEquipment.positionY}</span>
                                 </div>
                                 <div className="detail-row">
                                     <span className="detail-label">Отдел:</span>
@@ -238,6 +755,55 @@ const EnterpriseMapPage = () => {
                             <button className="save-btn">
                                 <i className="fas fa-cog"></i>
                                 Настройки
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Модальное окно для редактирования цеха */}
+            {workshopModalOpen && (
+                <div className="modal-overlay" onClick={closeWorkshopModal}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">Редактировать цех</h2>
+                            <button className="close-btn" onClick={closeWorkshopModal}>
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="form-group">
+                                <label>Название цеха:</label>
+                                <input
+                                    type="text"
+                                    value={newWorkshop.name}
+                                    onChange={(e) => setNewWorkshop(prev => ({ ...prev, name: e.target.value }))}
+                                    placeholder="Введите название цеха"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Описание:</label>
+                                <textarea
+                                    value={newWorkshop.description}
+                                    onChange={(e) => setNewWorkshop(prev => ({ ...prev, description: e.target.value }))}
+                                    placeholder="Введите описание цеха"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Цвет:</label>
+                                <input
+                                    type="color"
+                                    value={newWorkshop.color}
+                                    onChange={(e) => setNewWorkshop(prev => ({ ...prev, color: e.target.value }))}
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-actions">
+                            <button className="cancel-btn" onClick={closeWorkshopModal}>
+                                Отмена
+                            </button>
+                            <button className="save-btn" onClick={closeWorkshopModal}>
+                                Сохранить
                             </button>
                         </div>
                     </div>
