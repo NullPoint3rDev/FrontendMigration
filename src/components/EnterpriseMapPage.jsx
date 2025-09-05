@@ -103,7 +103,7 @@ const EnterpriseMapPage = () => {
     const createDefaultPlantMap = async () => {
         try {
             const newPlantMap = await plantMapApi.createPlantMap({
-                organizationId: selectedOrganizationId,
+                organizationId: 1,
                 name: 'Основная карта предприятия',
                 description: 'Схематичная карта основного производственного комплекса',
                 width: 1200,
