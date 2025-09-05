@@ -136,8 +136,20 @@ const EnterpriseMapPage = () => {
             setAvailableEquipment(equipment);
         } catch (error) {
             console.error('Ошибка загрузки доступного оборудования:', error);
-            // В случае ошибки используем пустой массив
-            setAvailableEquipment([]);
+            
+            // Временное решение: если backend не готов, используем моковые данные
+            if (error.message === 'Something went wrong' || error.message.includes('404')) {
+                console.log('Backend API для доступного оборудования еще не готов, используем моковые данные');
+                const mockEquipment = [
+                    { id: 1, name: 'Сварочный аппарат T2', type: 'welding_machine', status: 'active' },
+                    { id: 2, name: 'Сварочный аппарат MC-500', type: 'welding_machine', status: 'active' },
+                    { id: 3, name: 'Сварочный аппарат MX Pulse', type: 'welding_machine', status: 'maintenance' },
+                ];
+                setAvailableEquipment(mockEquipment);
+            } else {
+                // В случае других ошибок используем пустой массив
+                setAvailableEquipment([]);
+            }
         } finally {
             setLoadingEquipment(false);
         }

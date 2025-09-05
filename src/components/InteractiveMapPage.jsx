@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../styles/interactiveMap.css';
+import { plantMapApi } from '../api/plantMapApi';
 
 const InteractiveMapPage = () => {
     const [mapType, setMapType] = useState('enterprise'); // 'enterprise' или 'workshop'
@@ -182,11 +183,15 @@ const InteractiveMapPage = () => {
     };
 
     // Удаление элемента
-    const handleDelete = (id, type) => {
+    const handleDelete = async (id, type) => {
         try {
             if (type === 'equipment') {
+                // Удаляем оборудование через API
+                await plantMapApi.removeElementFromMap(id);
                 setEquipment(prev => prev.filter(item => item.id !== id));
             } else if (type === 'workshop') {
+                // Удаляем цех через API
+                await plantMapApi.removeWorkshopFromMap(id);
                 setWorkshops(prev => prev.filter(item => item.id !== id));
                 // Удаляем оборудование из удаленного цеха
                 setEquipment(prev => prev.filter(item => item.workshopId !== id));
@@ -197,6 +202,8 @@ const InteractiveMapPage = () => {
             
         } catch (error) {
             console.error('Ошибка при удалении элемента:', error);
+            // Показываем пользователю ошибку
+            alert('Не удалось удалить элемент. Попробуйте еще раз.');
         }
         
         // Закрываем модальное окно только если оно открыто
