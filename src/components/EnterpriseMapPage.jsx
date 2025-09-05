@@ -451,10 +451,13 @@ const EnterpriseMapPage = () => {
     };
 
     const removeWorkshopFromMap = async (workshopId) => {
+        console.log('removeWorkshopFromMap вызвана, workshopId:', workshopId, 'editMode:', editMode);
         if (editMode) {
             // Находим цех для отображения названия в подтверждении
             const workshop = workshops.find(w => w.id === workshopId);
             const workshopName = workshop ? workshop.name : 'цех';
+            
+            console.log('Найден цех для удаления:', workshop);
             
             // Подтверждение удаления
             if (window.confirm(`Вы уверены, что хотите удалить "${workshopName}" с карты?`)) {
@@ -467,7 +470,11 @@ const EnterpriseMapPage = () => {
                     console.error('Ошибка удаления цеха:', error);
                     setError('Не удалось удалить цех с карты.');
                 }
+            } else {
+                console.log('Пользователь отменил удаление');
             }
+        } else {
+            console.log('Режим редактирования не включен, удаление невозможно');
         }
     };
 
@@ -554,7 +561,12 @@ const EnterpriseMapPage = () => {
                             opacity: workshop.opacity,
                             cursor: editMode ? 'pointer' : 'default'
                         }}
-                        onClick={() => editMode && setWorkshopModalOpen(true)}
+                        onClick={() => {
+                            console.log('Цех кликнут, editMode:', editMode);
+                            if (editMode) {
+                                setWorkshopModalOpen(true);
+                            }
+                        }}
                         title={workshop.name}
                     >
                         <div className="workshop-label">{workshop.name}</div>
@@ -562,6 +574,7 @@ const EnterpriseMapPage = () => {
                             <button 
                                 className="remove-workshop-btn"
                                 onClick={(e) => {
+                                    console.log('Кнопка удаления кликнута, workshop.id:', workshop.id);
                                     e.stopPropagation();
                                     removeWorkshopFromMap(workshop.id);
                                 }}

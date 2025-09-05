@@ -857,6 +857,7 @@
   padding: 2rem;
   min-height: 600px;
   overflow: hidden;
+  z-index: 0;
 }
 
 .map-grid {
@@ -872,6 +873,7 @@
   border: 2px solid var(--border-color);
   border-radius: 8px;
   transition: var(--transition);
+  z-index: 1;
 }
 
 .map-workshop {
@@ -882,6 +884,8 @@
   justify-content: center;
   transition: var(--transition);
   user-select: none;
+  z-index: 10;
+  pointer-events: auto;
 }
 
 .map-workshop:hover {
@@ -913,6 +917,8 @@
   align-items: center;
   justify-content: center;
   transition: var(--transition);
+  z-index: 20;
+  pointer-events: auto;
 }
 
 .remove-workshop-btn:hover {
