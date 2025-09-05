@@ -41,22 +41,28 @@ const EnterpriseMapPage = () => {
     // Загрузка карты при изменении организации
     useEffect(() => {
         if (selectedOrganizationId) {
+            console.log('useEffect: selectedOrganizationId изменился на:', selectedOrganizationId);
             loadPlantMap();
+            loadAvailableEquipment(selectedOrganizationId);
         }
     }, [selectedOrganizationId]);
 
     const loadInitialData = async () => {
         try {
+            console.log('loadInitialData: Начинаем загрузку данных, selectedOrganizationId:', selectedOrganizationId);
             setLoading(true);
             setError(null);
             
-            // Загружаем организации параллельно
-            await Promise.all([
-                loadOrganizations(),
-                loadAvailableEquipment(selectedOrganizationId)
-            ]);
+            // Сначала загружаем организации
+            console.log('loadInitialData: Загружаем организации');
+            await loadOrganizations();
+            
+            // Затем загружаем оборудование для выбранной организации
+            console.log('loadInitialData: Загружаем оборудование для организации:', selectedOrganizationId);
+            await loadAvailableEquipment(selectedOrganizationId);
             
             // Загружаем карту предприятия
+            console.log('loadInitialData: Загружаем карту предприятия');
             await loadPlantMap();
             
         } catch (error) {
@@ -69,15 +75,19 @@ const EnterpriseMapPage = () => {
 
     const loadOrganizations = async () => {
         try {
+            console.log('loadOrganizations: Начинаем загрузку организаций');
             setLoadingOrganizations(true);
             const orgs = await plantMapApi.getOrganizations();
+            console.log('loadOrganizations: Получены организации:', orgs);
             setOrganizations(orgs);
             if (orgs.length > 0 && !selectedOrganizationId) {
+                console.log('loadOrganizations: Устанавливаем selectedOrganizationId:', orgs[0].id);
                 setSelectedOrganizationId(orgs[0].id);
             }
         } catch (error) {
             console.error('Ошибка загрузки организаций:', error);
             // Если не удалось загрузить организации, используем ID по умолчанию
+            console.log('loadOrganizations: Используем ID по умолчанию: 1');
             setSelectedOrganizationId(1);
         } finally {
             setLoadingOrganizations(false);
@@ -85,18 +95,26 @@ const EnterpriseMapPage = () => {
     };
 
     const loadPlantMap = async () => {
-        if (!selectedOrganizationId) return;
+        console.log('loadPlantMap: selectedOrganizationId:', selectedOrganizationId);
+        if (!selectedOrganizationId) {
+            console.log('loadPlantMap: selectedOrganizationId не задан, пропускаем загрузку карты');
+            return;
+        }
         
         try {
+            console.log('loadPlantMap: Загружаем карту для организации:', selectedOrganizationId);
             setLoading(true);
             const plantMap = await plantMapApi.getDefaultPlantMap(selectedOrganizationId);
+            console.log('loadPlantMap: Получена карта:', plantMap);
             
             if (plantMap) {
                 setCurrentPlantMap(plantMap);
                 setEquipment(plantMap.elements || []);
                 setWorkshops(plantMap.workshops || []);
+                console.log('loadPlantMap: Карта установлена, элементов:', plantMap.elements?.length || 0, 'цехов:', plantMap.workshops?.length || 0);
             } else {
                 // Если карта не найдена, создаем новую
+                console.log('loadPlantMap: Карта не найдена, создаем новую');
                 await createDefaultPlantMap();
             }
         } catch (error) {
