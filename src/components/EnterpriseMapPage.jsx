@@ -452,12 +452,21 @@ const EnterpriseMapPage = () => {
 
     const removeWorkshopFromMap = async (workshopId) => {
         if (editMode) {
-            try {
-                await plantMapApi.removeWorkshopFromMap(workshopId);
-                setWorkshops(prev => prev.filter(workshop => workshop.id !== workshopId));
-            } catch (error) {
-                console.error('Ошибка удаления цеха:', error);
-                setError('Не удалось удалить цех с карты.');
+            // Находим цех для отображения названия в подтверждении
+            const workshop = workshops.find(w => w.id === workshopId);
+            const workshopName = workshop ? workshop.name : 'цех';
+            
+            // Подтверждение удаления
+            if (window.confirm(`Вы уверены, что хотите удалить "${workshopName}" с карты?`)) {
+                try {
+                    console.log('removeWorkshopFromMap: Удаляем цех с ID:', workshopId);
+                    await plantMapApi.removeWorkshopFromMap(workshopId);
+                    setWorkshops(prev => prev.filter(workshop => workshop.id !== workshopId));
+                    console.log('removeWorkshopFromMap: Цех успешно удален');
+                } catch (error) {
+                    console.error('Ошибка удаления цеха:', error);
+                    setError('Не удалось удалить цех с карты.');
+                }
             }
         }
     };
@@ -473,6 +482,7 @@ const EnterpriseMapPage = () => {
             setError('Не удалось обновить цех.');
         }
     };
+
 
 
     const filteredEquipment = equipment.filter(item => {

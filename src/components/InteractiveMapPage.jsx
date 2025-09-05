@@ -257,6 +257,23 @@ const InteractiveMapPage = () => {
     // Удаление элемента
     const handleDelete = async (id, type) => {
         console.log('handleDelete вызвана с id:', id, 'type:', type);
+        
+        // Подтверждение удаления
+        let confirmMessage = '';
+        if (type === 'equipment') {
+            const equipmentItem = equipment.find(item => item.id === id);
+            const equipmentName = equipmentItem ? equipmentItem.name : 'оборудование';
+            confirmMessage = `Вы уверены, что хотите удалить "${equipmentName}" с карты?`;
+        } else if (type === 'workshop') {
+            const workshopItem = workshops.find(item => item.id === id);
+            const workshopName = workshopItem ? workshopItem.name : 'цех';
+            confirmMessage = `Вы уверены, что хотите удалить "${workshopName}" с карты?`;
+        }
+        
+        if (!window.confirm(confirmMessage)) {
+            return; // Пользователь отменил удаление
+        }
+        
         try {
             if (type === 'equipment') {
                 console.log('Удаляем оборудование через API, id:', id);
