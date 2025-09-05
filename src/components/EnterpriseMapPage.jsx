@@ -128,11 +128,17 @@ const EnterpriseMapPage = () => {
     };
 
     const loadAvailableEquipment = async (organizationId) => {
-        if (!organizationId) return;
+        console.log('loadAvailableEquipment вызвана с organizationId:', organizationId);
+        if (!organizationId) {
+            console.log('organizationId не задан, пропускаем загрузку оборудования');
+            return;
+        }
         
         try {
+            console.log('Начинаем загрузку доступного оборудования для организации:', organizationId);
             setLoadingEquipment(true);
             const equipment = await plantMapApi.getAvailableWeldingMachines(organizationId);
+            console.log('Получено оборудование:', equipment);
             setAvailableEquipment(equipment);
         } catch (error) {
             console.error('Ошибка загрузки доступного оборудования:', error);
@@ -148,6 +154,7 @@ const EnterpriseMapPage = () => {
                 setAvailableEquipment(mockEquipment);
             } else {
                 // В случае других ошибок используем пустой массив
+                console.log('Используем пустой массив из-за ошибки:', error.message);
                 setAvailableEquipment([]);
             }
         } finally {

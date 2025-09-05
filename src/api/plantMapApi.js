@@ -95,9 +95,12 @@ export const plantMapApi = {
   // Удалить цех с карты
   async removeWorkshopFromMap(workshopId) {
     try {
-      return await api.delete(`/plant-map/workshops/${workshopId}`);
+      console.log('API: Удаление цеха с ID:', workshopId);
+      const result = await api.delete(`/plant-map/workshops/${workshopId}`);
+      console.log('API: Цех успешно удален, ответ:', result);
+      return result;
     } catch (error) {
-      console.error('Ошибка удаления цеха с карты:', error);
+      console.error('API: Ошибка удаления цеха с карты:', error);
       throw error;
     }
   },
@@ -105,9 +108,12 @@ export const plantMapApi = {
   // Получить список доступного сварочного оборудования для организации
   async getAvailableWeldingMachines(organizationId) {
     try {
-      return await api.get(`/plant-map/available-equipment/${organizationId}`);
+      console.log('API: Запрос доступного оборудования для организации:', organizationId);
+      const result = await api.get(`/plant-map/available-equipment/${organizationId}`);
+      console.log('API: Получен ответ:', result);
+      return result;
     } catch (error) {
-      console.error('Ошибка получения доступного оборудования:', error);
+      console.error('API: Ошибка получения доступного оборудования:', error);
       throw error;
     }
   },

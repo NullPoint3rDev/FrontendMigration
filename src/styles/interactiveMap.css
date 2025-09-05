@@ -148,14 +148,14 @@
   position: absolute;
   border: 2px solid var(--primary);
   border-radius: 8px;
-  background: rgba(108, 99, 255, 0.1);
+  background: rgba(108, 99, 255, 0.3);
   cursor: pointer;
   transition: var(--transition);
   z-index: 2;
 }
 
 .map-workshop:hover {
-  background: rgba(108, 99, 255, 0.2);
+  background: rgba(108, 99, 255, 0.4);
   transform: scale(1.02);
 }
 

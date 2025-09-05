@@ -184,17 +184,22 @@ const InteractiveMapPage = () => {
 
     // Удаление элемента
     const handleDelete = async (id, type) => {
+        console.log('handleDelete вызвана с id:', id, 'type:', type);
         try {
             if (type === 'equipment') {
+                console.log('Удаляем оборудование через API, id:', id);
                 // Удаляем оборудование через API
                 await plantMapApi.removeElementFromMap(id);
                 setEquipment(prev => prev.filter(item => item.id !== id));
+                console.log('Оборудование успешно удалено');
             } else if (type === 'workshop') {
+                console.log('Удаляем цех через API, id:', id);
                 // Удаляем цех через API
                 await plantMapApi.removeWorkshopFromMap(id);
                 setWorkshops(prev => prev.filter(item => item.id !== id));
                 // Удаляем оборудование из удаленного цеха
                 setEquipment(prev => prev.filter(item => item.workshopId !== id));
+                console.log('Цех успешно удален');
             }
             
             // Принудительно обновляем состояние немедленно
