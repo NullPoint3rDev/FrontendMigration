@@ -856,7 +856,7 @@
   border-radius: 12px;
   padding: 2rem;
   min-height: 600px;
-  overflow: hidden;
+  overflow: visible;
   z-index: 0;
 }
 
@@ -903,27 +903,41 @@
 
 .remove-workshop-btn {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  background: var(--secondary);
+  top: -10px;
+  right: -10px;
+  background: #e74c3c;
   color: white;
-  border: none;
+  border: 2px solid white;
   border-radius: 50%;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: var(--transition);
   z-index: 20;
   pointer-events: auto;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .remove-workshop-btn:hover {
-  background: #e74c3c;
-  transform: scale(1.1);
+  background: #c0392b;
+  transform: scale(1.2);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+.remove-workshop-btn:active {
+  background: #a93226;
+  transform: scale(0.95);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.remove-workshop-btn:focus {
+  outline: 2px solid #f39c12;
+  outline-offset: 2px;
 }
 
 .map-equipment {

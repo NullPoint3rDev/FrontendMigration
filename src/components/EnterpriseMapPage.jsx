@@ -571,16 +571,50 @@ const EnterpriseMapPage = () => {
                     >
                         <div className="workshop-label">{workshop.name}</div>
                         {editMode && (
-                            <button 
-                                className="remove-workshop-btn"
-                                onClick={(e) => {
-                                    console.log('Кнопка удаления кликнута, workshop.id:', workshop.id);
-                                    e.stopPropagation();
-                                    removeWorkshopFromMap(workshop.id);
-                                }}
-                            >
-                                ×
-                            </button>
+                            <>
+                                <button 
+                                    className="remove-workshop-btn"
+                                    tabIndex={0}
+                                    onMouseDown={(e) => {
+                                        console.log('Кнопка удаления mousedown, workshop.id:', workshop.id);
+                                        e.stopPropagation();
+                                    }}
+                                    onClick={(e) => {
+                                        console.log('Кнопка удаления кликнута, workshop.id:', workshop.id);
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        removeWorkshopFromMap(workshop.id);
+                                    }}
+                                    onTouchStart={(e) => {
+                                        console.log('Кнопка удаления touchstart, workshop.id:', workshop.id);
+                                        e.stopPropagation();
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            console.log('Кнопка удаления нажата с клавиатуры, workshop.id:', workshop.id);
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            removeWorkshopFromMap(workshop.id);
+                                        }
+                                    }}
+                                >
+                                    ×
+                                </button>
+                                {/* Временный индикатор для отладки */}
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '-30px',
+                                    right: '-10px',
+                                    background: 'yellow',
+                                    color: 'black',
+                                    padding: '2px 4px',
+                                    fontSize: '10px',
+                                    borderRadius: '3px',
+                                    zIndex: 30
+                                }}>
+                                    DEL
+                                </div>
+                            </>
                         )}
                     </div>
                 ))}
