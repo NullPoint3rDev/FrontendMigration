@@ -6,6 +6,7 @@ const InteractiveMapPage = () => {
     const [mapType, setMapType] = useState('enterprise'); // 'enterprise' или 'workshop'
     const [equipment, setEquipment] = useState([]);
     const [workshops, setWorkshops] = useState([]);
+    const [availableUnits, setAvailableUnits] = useState([]);
     const [selectedWorkshop, setSelectedWorkshop] = useState(null);
     const [draggedItem, setDraggedItem] = useState(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -29,6 +30,11 @@ const InteractiveMapPage = () => {
                     setEquipment(plantMap.elements || []);
                     setWorkshops(plantMap.workshops || []);
                 }
+                
+                // Загружаем подразделения
+                const units = await plantMapApi.getAvailableOrganizationUnits(1);
+                console.log('InteractiveMapPage: Получены подразделения:', units);
+                setAvailableUnits(units);
             } catch (error) {
                 console.error('Ошибка загрузки данных из API:', error);
                 // Fallback к localStorage

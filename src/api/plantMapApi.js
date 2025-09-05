@@ -105,6 +105,19 @@ export const plantMapApi = {
     }
   },
 
+  // Получить список подразделений организации для размещения на карте
+  async getAvailableOrganizationUnits(organizationId) {
+    try {
+      console.log('API: Запрос подразделений для организации:', organizationId);
+      const result = await api.get(`/plant-map/available-units/${organizationId}`);
+      console.log('API: Получены подразделения:', result);
+      return result;
+    } catch (error) {
+      console.error('API: Ошибка получения подразделений:', error);
+      throw error;
+    }
+  },
+
   // Получить список доступного сварочного оборудования для организации
   async getAvailableWeldingMachines(organizationId) {
     try {

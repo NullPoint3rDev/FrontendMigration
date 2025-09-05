@@ -5,6 +5,7 @@ import '../styles/equipmentPage.css';
 const EnterpriseMapPage = () => {
     const [equipment, setEquipment] = useState([]);
     const [availableEquipment, setAvailableEquipment] = useState([]);
+    const [availableUnits, setAvailableUnits] = useState([]);
     const [workshops, setWorkshops] = useState([]);
     const [currentPlantMap, setCurrentPlantMap] = useState(null);
     const [organizations, setOrganizations] = useState([]);
@@ -43,6 +44,7 @@ const EnterpriseMapPage = () => {
         if (selectedOrganizationId) {
             console.log('useEffect: selectedOrganizationId изменился на:', selectedOrganizationId);
             loadPlantMap();
+            loadAvailableUnits(selectedOrganizationId);
             loadAvailableEquipment(selectedOrganizationId);
         }
     }, [selectedOrganizationId]);
@@ -57,9 +59,12 @@ const EnterpriseMapPage = () => {
             console.log('loadInitialData: Загружаем организации');
             await loadOrganizations();
             
-            // Затем загружаем оборудование для выбранной организации
-            console.log('loadInitialData: Загружаем оборудование для организации:', selectedOrganizationId);
-            await loadAvailableEquipment(selectedOrganizationId);
+            // Затем загружаем подразделения и оборудование для выбранной организации
+            console.log('loadInitialData: Загружаем подразделения и оборудование для организации:', selectedOrganizationId);
+            await Promise.all([
+                loadAvailableUnits(selectedOrganizationId),
+                loadAvailableEquipment(selectedOrganizationId)
+            ]);
             
             // Загружаем карту предприятия
             console.log('loadInitialData: Загружаем карту предприятия');
@@ -142,6 +147,24 @@ const EnterpriseMapPage = () => {
         } catch (error) {
             console.error('Ошибка создания карты предприятия:', error);
             setError('Не удалось создать карту предприятия.');
+        }
+    };
+
+    const loadAvailableUnits = async (organizationId) => {
+        console.log('loadAvailableUnits вызвана с organizationId:', organizationId);
+        if (!organizationId) {
+            console.log('organizationId не задан, пропускаем загрузку подразделений');
+            return;
+        }
+        
+        try {
+            console.log('Начинаем загрузку подразделений для организации:', organizationId);
+            const units = await plantMapApi.getAvailableOrganizationUnits(organizationId);
+            console.log('Получены подразделения:', units);
+            setAvailableUnits(units);
+        } catch (error) {
+            console.error('Ошибка загрузки подразделений:', error);
+            setAvailableUnits([]);
         }
     };
 
@@ -556,9 +579,40 @@ const EnterpriseMapPage = () => {
                 )}
             </div>
 
-            {/* Панель с доступным оборудованием */}
+            {/* Панель с доступными элементами */}
             {editMode && (
                 <div className="equipment-panel">
+                    <h3>Доступные подразделения</h3>
+                    <div className="equipment-list">
+                        {availableUnits.map((unit) => (
+                            <div
+                                key={unit.id}
+                                className="available-equipment-item"
+                                draggable
+                                onDragStart={(e) => {
+                                    e.dataTransfer.setData('text/plain', JSON.stringify({
+                                        id: unit.id,
+                                        name: unit.name,
+                                        type: 'organization_unit',
+                                        description: unit.description,
+                                        level: unit.level
+                                    }));
+                                }}
+                            >
+                                <div className="equipment-icon">
+                                    <i className="fas fa-building"></i>
+                                </div>
+                                <div className="equipment-info">
+                                    <div className="equipment-name">{unit.name}</div>
+                                    <div className="equipment-type">Уровень {unit.level || 1}</div>
+                                    {unit.description && (
+                                        <div className="equipment-description">{unit.description}</div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    
                     <h3>Доступное оборудование</h3>
                     {loadingEquipment ? (
                         <div className="loading-text">Загрузка...</div>
