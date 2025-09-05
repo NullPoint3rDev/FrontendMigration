@@ -8,8 +8,6 @@ const EnterpriseMapPage = () => {
     const [availableUnits, setAvailableUnits] = useState([]);
     const [workshops, setWorkshops] = useState([]);
     const [currentPlantMap, setCurrentPlantMap] = useState(null);
-    const [organizations, setOrganizations] = useState([]);
-    const [selectedOrganizationId, setSelectedOrganizationId] = useState(1); // По умолчанию первая организация
     const [parentUnits, setParentUnits] = useState([]); // Родительские подразделения
     const [selectedParentUnitId, setSelectedParentUnitId] = useState(null); // Выбранное родительское подразделение
     
@@ -31,7 +29,6 @@ const EnterpriseMapPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [loadingEquipment, setLoadingEquipment] = useState(false);
-    const [loadingOrganizations, setLoadingOrganizations] = useState(false);
     
     const mapRef = useRef(null);
     const drawingRef = useRef(null);
@@ -41,43 +38,28 @@ const EnterpriseMapPage = () => {
         loadInitialData();
     }, []);
 
-    // Загрузка данных при изменении организации
-    useEffect(() => {
-        if (selectedOrganizationId) {
-            console.log('useEffect: selectedOrganizationId изменился на:', selectedOrganizationId);
-            loadPlantMap();
-            loadParentUnits(selectedOrganizationId);
-            loadAvailableUnits(selectedOrganizationId, selectedParentUnitId);
-            loadAvailableEquipment(selectedOrganizationId);
-        }
-    }, [selectedOrganizationId]);
-
     // Загрузка дочерних подразделений при изменении родительского подразделения
     useEffect(() => {
-        if (selectedOrganizationId && selectedParentUnitId) {
+        if (selectedParentUnitId) {
             console.log('useEffect: selectedParentUnitId изменился на:', selectedParentUnitId);
-            loadAvailableUnits(selectedOrganizationId, selectedParentUnitId);
+            loadAvailableUnits(1, selectedParentUnitId);
         }
     }, [selectedParentUnitId]);
 
     const loadInitialData = async () => {
         try {
-            console.log('loadInitialData: Начинаем загрузку данных, selectedOrganizationId:', selectedOrganizationId);
+            console.log('loadInitialData: Начинаем загрузку данных');
             setLoading(true);
             setError(null);
             
-            // Сначала загружаем организации
-            console.log('loadInitialData: Загружаем организации');
-            await loadOrganizations();
-            
-            // Затем загружаем родительские подразделения, дочерние подразделения и оборудование
-            console.log('loadInitialData: Загружаем родительские подразделения для организации:', selectedOrganizationId);
-            await loadParentUnits(selectedOrganizationId);
+            // Загружаем родительские подразделения для организации ID = 1
+            console.log('loadInitialData: Загружаем родительские подразделения');
+            await loadParentUnits(1);
             
             console.log('loadInitialData: Загружаем дочерние подразделения и оборудование');
             await Promise.all([
-                loadAvailableUnits(selectedOrganizationId, selectedParentUnitId),
-                loadAvailableEquipment(selectedOrganizationId)
+                loadAvailableUnits(1, selectedParentUnitId),
+                loadAvailableEquipment(1)
             ]);
             
             // Загружаем карту предприятия
@@ -92,38 +74,12 @@ const EnterpriseMapPage = () => {
         }
     };
 
-    const loadOrganizations = async () => {
-        try {
-            console.log('loadOrganizations: Начинаем загрузку организаций');
-            setLoadingOrganizations(true);
-            const orgs = await plantMapApi.getOrganizations();
-            console.log('loadOrganizations: Получены организации:', orgs);
-            setOrganizations(orgs);
-            if (orgs.length > 0 && !selectedOrganizationId) {
-                console.log('loadOrganizations: Устанавливаем selectedOrganizationId:', orgs[0].id);
-                setSelectedOrganizationId(orgs[0].id);
-            }
-        } catch (error) {
-            console.error('Ошибка загрузки организаций:', error);
-            // Если не удалось загрузить организации, используем ID по умолчанию
-            console.log('loadOrganizations: Используем ID по умолчанию: 1');
-            setSelectedOrganizationId(1);
-        } finally {
-            setLoadingOrganizations(false);
-        }
-    };
 
     const loadPlantMap = async () => {
-        console.log('loadPlantMap: selectedOrganizationId:', selectedOrganizationId);
-        if (!selectedOrganizationId) {
-            console.log('loadPlantMap: selectedOrganizationId не задан, пропускаем загрузку карты');
-            return;
-        }
-        
         try {
-            console.log('loadPlantMap: Загружаем карту для организации:', selectedOrganizationId);
+            console.log('loadPlantMap: Загружаем карту для организации: 1');
             setLoading(true);
-            const plantMap = await plantMapApi.getDefaultPlantMap(selectedOrganizationId);
+            const plantMap = await plantMapApi.getDefaultPlantMap(1);
             console.log('loadPlantMap: Получена карта:', plantMap);
             
             if (plantMap) {
@@ -514,13 +470,6 @@ const EnterpriseMapPage = () => {
         }
     };
 
-    const handleOrganizationChange = (organizationId) => {
-        setSelectedOrganizationId(organizationId);
-        setSelectedParentUnitId(null); // Сбрасываем выбор родительского подразделения
-        setEquipment([]);
-        setWorkshops([]);
-        setCurrentPlantMap(null);
-    };
 
     const filteredEquipment = equipment.filter(item => {
         if (filterStatus === 'all') return true;
@@ -817,20 +766,6 @@ const EnterpriseMapPage = () => {
             <div className="equipment-header">
                 <h1 className="equipment-title">Карта предприятия</h1>
                 <div className="header-controls">
-                    {/* Выбор организации */}
-                    <select
-                        className="organization-select"
-                        value={selectedOrganizationId}
-                        onChange={(e) => handleOrganizationChange(parseInt(e.target.value))}
-                        disabled={loadingOrganizations}
-                    >
-                        {organizations.map(org => (
-                            <option key={org.id} value={org.id}>
-                                {org.name}
-                            </option>
-                        ))}
-                    </select>
-                    
                     {/* Выбор родительского подразделения */}
                     <select
                         className="parent-unit-select"
