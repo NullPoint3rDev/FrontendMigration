@@ -56,11 +56,8 @@ const EnterpriseMapPage = () => {
             console.log('loadInitialData: Загружаем родительские подразделения');
             await loadParentUnits(1);
             
-            console.log('loadInitialData: Загружаем дочерние подразделения и оборудование');
-            await Promise.all([
-                loadAvailableUnits(1, selectedParentUnitId),
-                loadAvailableEquipment(1)
-            ]);
+            console.log('loadInitialData: Загружаем оборудование');
+            await loadAvailableEquipment(1);
             
             // Загружаем карту предприятия
             console.log('loadInitialData: Загружаем карту предприятия');
@@ -139,8 +136,14 @@ const EnterpriseMapPage = () => {
             
             // Автоматически выбираем первое родительское подразделение
             if (parentUnits.length > 0 && !selectedParentUnitId) {
-                setSelectedParentUnitId(parentUnits[0].id);
+                const firstParentId = parentUnits[0].id;
+                setSelectedParentUnitId(firstParentId);
                 console.log('Автоматически выбрано родительское подразделение:', parentUnits[0].name);
+                
+                // Сразу загружаем дочерние подразделения для выбранного родителя
+                const childUnits = units.filter(unit => unit.parentId === firstParentId);
+                console.log('Автоматически загружены дочерние подразделения:', childUnits);
+                setAvailableUnits(childUnits);
             }
         } catch (error) {
             console.error('Ошибка загрузки родительских подразделений:', error);
@@ -166,8 +169,9 @@ const EnterpriseMapPage = () => {
                 console.log('Дочерние подразделения для родителя', parentUnitId, ':', childUnits);
                 setAvailableUnits(childUnits);
             } else {
-                // Если родитель не выбран, показываем все подразделения
-                setAvailableUnits(units);
+                // Если родитель не выбран, показываем пустой список
+                console.log('Родительское подразделение не выбрано, показываем пустой список');
+                setAvailableUnits([]);
             }
         } catch (error) {
             console.error('Ошибка загрузки подразделений:', error);
@@ -618,7 +622,7 @@ const EnterpriseMapPage = () => {
                     <h3>
                         {selectedParentUnitId 
                             ? `Подразделения (${parentUnits.find(p => p.id === selectedParentUnitId)?.name || 'Выбранное'})`
-                            : 'Доступные подразделения'
+                            : 'Выберите подразделение'
                         }
                     </h3>
                     <div className="equipment-list">
