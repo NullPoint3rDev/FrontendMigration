@@ -17,25 +17,43 @@ const InteractiveMapPage = () => {
     const mapRef = useRef(null);
     const canvasRef = useRef(null);
 
-    // Загружаем данные из localStorage
+    // Загружаем данные из API и localStorage
     useEffect(() => {
-        const savedEquipment = localStorage.getItem('interactiveMapEquipment');
-        const savedWorkshops = localStorage.getItem('interactiveMapWorkshops');
+        const loadData = async () => {
+            try {
+                console.log('InteractiveMapPage: Загружаем данные из API');
+                // Загружаем карту предприятия из API
+                const plantMap = await plantMapApi.getDefaultPlantMap(1);
+                if (plantMap) {
+                    console.log('InteractiveMapPage: Получена карта из API:', plantMap);
+                    setEquipment(plantMap.elements || []);
+                    setWorkshops(plantMap.workshops || []);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки данных из API:', error);
+                // Fallback к localStorage
+                const savedEquipment = localStorage.getItem('interactiveMapEquipment');
+                const savedWorkshops = localStorage.getItem('interactiveMapWorkshops');
+                
+                if (savedEquipment) {
+                    try {
+                        setEquipment(JSON.parse(savedEquipment));
+                    } catch (error) {
+                        console.error('Ошибка при загрузке оборудования из localStorage:', error);
+                    }
+                }
+                
+                if (savedWorkshops) {
+                    try {
+                        setWorkshops(JSON.parse(savedWorkshops));
+                    } catch (error) {
+                        console.error('Ошибка при загрузке цехов из localStorage:', error);
+                    }
+                }
+            }
+        };
         
-        if (savedEquipment) {
-            try {
-                setEquipment(JSON.parse(savedEquipment));
-            } catch (error) {
-                console.error('Ошибка при загрузке оборудования:', error);
-            }
-        }
-        if (savedWorkshops) {
-            try {
-                setWorkshops(JSON.parse(savedWorkshops));
-            } catch (error) {
-                console.error('Ошибка при загрузке цехов:', error);
-            }
-        }
+        loadData();
     }, []);
 
     // Сохраняем данные в localStorage
@@ -388,10 +406,13 @@ const InteractiveMapPage = () => {
                     key={workshop.id}
                     className={`map-workshop ${mapType === 'workshop' && selectedWorkshop?.id === workshop.id ? 'selected' : ''}`}
                     style={{
-                        left: workshop.coordinates.x,
-                        top: workshop.coordinates.y,
+                        left: workshop.positionX || workshop.coordinates?.x || 0,
+                        top: workshop.positionY || workshop.coordinates?.y || 0,
                         width: workshop.width,
-                        height: workshop.height
+                        height: workshop.height,
+                        backgroundColor: workshop.color || '#4A90E2',
+                        opacity: workshop.opacity || 0.3,
+                        borderColor: workshop.borderColor || '#2E5C8A'
                     }}
                     onClick={() => handleWorkshopClick(workshop)}
                     title={workshop.name}
