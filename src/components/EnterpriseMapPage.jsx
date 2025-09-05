@@ -10,6 +10,8 @@ const EnterpriseMapPage = () => {
     const [currentPlantMap, setCurrentPlantMap] = useState(null);
     const [organizations, setOrganizations] = useState([]);
     const [selectedOrganizationId, setSelectedOrganizationId] = useState(1); // По умолчанию первая организация
+    const [parentUnits, setParentUnits] = useState([]); // Родительские подразделения
+    const [selectedParentUnitId, setSelectedParentUnitId] = useState(null); // Выбранное родительское подразделение
     
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedEquipment, setSelectedEquipment] = useState(null);
@@ -39,15 +41,24 @@ const EnterpriseMapPage = () => {
         loadInitialData();
     }, []);
 
-    // Загрузка карты при изменении организации
+    // Загрузка данных при изменении организации
     useEffect(() => {
         if (selectedOrganizationId) {
             console.log('useEffect: selectedOrganizationId изменился на:', selectedOrganizationId);
             loadPlantMap();
-            loadAvailableUnits(selectedOrganizationId);
+            loadParentUnits(selectedOrganizationId);
+            loadAvailableUnits(selectedOrganizationId, selectedParentUnitId);
             loadAvailableEquipment(selectedOrganizationId);
         }
     }, [selectedOrganizationId]);
+
+    // Загрузка дочерних подразделений при изменении родительского подразделения
+    useEffect(() => {
+        if (selectedOrganizationId && selectedParentUnitId) {
+            console.log('useEffect: selectedParentUnitId изменился на:', selectedParentUnitId);
+            loadAvailableUnits(selectedOrganizationId, selectedParentUnitId);
+        }
+    }, [selectedParentUnitId]);
 
     const loadInitialData = async () => {
         try {
@@ -59,10 +70,13 @@ const EnterpriseMapPage = () => {
             console.log('loadInitialData: Загружаем организации');
             await loadOrganizations();
             
-            // Затем загружаем подразделения и оборудование для выбранной организации
-            console.log('loadInitialData: Загружаем подразделения и оборудование для организации:', selectedOrganizationId);
+            // Затем загружаем родительские подразделения, дочерние подразделения и оборудование
+            console.log('loadInitialData: Загружаем родительские подразделения для организации:', selectedOrganizationId);
+            await loadParentUnits(selectedOrganizationId);
+            
+            console.log('loadInitialData: Загружаем дочерние подразделения и оборудование');
             await Promise.all([
-                loadAvailableUnits(selectedOrganizationId),
+                loadAvailableUnits(selectedOrganizationId, selectedParentUnitId),
                 loadAvailableEquipment(selectedOrganizationId)
             ]);
             
@@ -150,8 +164,36 @@ const EnterpriseMapPage = () => {
         }
     };
 
-    const loadAvailableUnits = async (organizationId) => {
-        console.log('loadAvailableUnits вызвана с organizationId:', organizationId);
+    const loadParentUnits = async (organizationId) => {
+        console.log('loadParentUnits вызвана с organizationId:', organizationId);
+        if (!organizationId) {
+            console.log('organizationId не задан, пропускаем загрузку родительских подразделений');
+            return;
+        }
+        
+        try {
+            console.log('Начинаем загрузку родительских подразделений для организации:', organizationId);
+            const units = await plantMapApi.getAvailableOrganizationUnits(organizationId);
+            console.log('Получены все подразделения:', units);
+            
+            // Фильтруем только родительские подразделения (без parentId или с parentId = null)
+            const parentUnits = units.filter(unit => !unit.parentId);
+            console.log('Родительские подразделения:', parentUnits);
+            setParentUnits(parentUnits);
+            
+            // Автоматически выбираем первое родительское подразделение
+            if (parentUnits.length > 0 && !selectedParentUnitId) {
+                setSelectedParentUnitId(parentUnits[0].id);
+                console.log('Автоматически выбрано родительское подразделение:', parentUnits[0].name);
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки родительских подразделений:', error);
+            setParentUnits([]);
+        }
+    };
+
+    const loadAvailableUnits = async (organizationId, parentUnitId) => {
+        console.log('loadAvailableUnits вызвана с organizationId:', organizationId, 'parentUnitId:', parentUnitId);
         if (!organizationId) {
             console.log('organizationId не задан, пропускаем загрузку подразделений');
             return;
@@ -160,8 +202,17 @@ const EnterpriseMapPage = () => {
         try {
             console.log('Начинаем загрузку подразделений для организации:', organizationId);
             const units = await plantMapApi.getAvailableOrganizationUnits(organizationId);
-            console.log('Получены подразделения:', units);
-            setAvailableUnits(units);
+            console.log('Получены все подразделения:', units);
+            
+            // Если выбран родитель, показываем только его дочерние подразделения
+            if (parentUnitId) {
+                const childUnits = units.filter(unit => unit.parentId === parentUnitId);
+                console.log('Дочерние подразделения для родителя', parentUnitId, ':', childUnits);
+                setAvailableUnits(childUnits);
+            } else {
+                // Если родитель не выбран, показываем все подразделения
+                setAvailableUnits(units);
+            }
         } catch (error) {
             console.error('Ошибка загрузки подразделений:', error);
             setAvailableUnits([]);
@@ -465,6 +516,7 @@ const EnterpriseMapPage = () => {
 
     const handleOrganizationChange = (organizationId) => {
         setSelectedOrganizationId(organizationId);
+        setSelectedParentUnitId(null); // Сбрасываем выбор родительского подразделения
         setEquipment([]);
         setWorkshops([]);
         setCurrentPlantMap(null);
@@ -614,7 +666,12 @@ const EnterpriseMapPage = () => {
             {/* Панель с доступными элементами */}
             {editMode && (
                 <div className="equipment-panel">
-                    <h3>Доступные подразделения</h3>
+                    <h3>
+                        {selectedParentUnitId 
+                            ? `Подразделения (${parentUnits.find(p => p.id === selectedParentUnitId)?.name || 'Выбранное'})`
+                            : 'Доступные подразделения'
+                        }
+                    </h3>
                     <div className="equipment-list">
                         {availableUnits.map((unit) => (
                             <div
@@ -771,6 +828,19 @@ const EnterpriseMapPage = () => {
                             <option key={org.id} value={org.id}>
                                 {org.name}
                             </option>
+                        ))}
+                    </select>
+                    
+                    {/* Выбор родительского подразделения */}
+                    <select
+                        className="parent-unit-select"
+                        value={selectedParentUnitId || ''}
+                        onChange={(e) => setSelectedParentUnitId(e.target.value ? parseInt(e.target.value) : null)}
+                        disabled={parentUnits.length === 0}
+                    >
+                        <option value="">Выберите подразделение</option>
+                        {parentUnits.map(unit => (
+                            <option key={unit.id} value={unit.id}>{unit.name}</option>
                         ))}
                     </select>
 

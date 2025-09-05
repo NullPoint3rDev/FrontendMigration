@@ -7,6 +7,8 @@ const InteractiveMapPage = () => {
     const [equipment, setEquipment] = useState([]);
     const [workshops, setWorkshops] = useState([]);
     const [availableUnits, setAvailableUnits] = useState([]);
+    const [parentUnits, setParentUnits] = useState([]);
+    const [selectedParentUnitId, setSelectedParentUnitId] = useState(null);
     const [selectedWorkshop, setSelectedWorkshop] = useState(null);
     const [draggedItem, setDraggedItem] = useState(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -34,7 +36,20 @@ const InteractiveMapPage = () => {
                 // Загружаем подразделения
                 const units = await plantMapApi.getAvailableOrganizationUnits(1);
                 console.log('InteractiveMapPage: Получены подразделения:', units);
-                setAvailableUnits(units);
+                
+                // Фильтруем родительские подразделения
+                const parentUnits = units.filter(unit => !unit.parentId);
+                setParentUnits(parentUnits);
+                
+                // Автоматически выбираем первое родительское подразделение
+                if (parentUnits.length > 0) {
+                    setSelectedParentUnitId(parentUnits[0].id);
+                    // Показываем дочерние подразделения
+                    const childUnits = units.filter(unit => unit.parentId === parentUnits[0].id);
+                    setAvailableUnits(childUnits);
+                } else {
+                    setAvailableUnits(units);
+                }
             } catch (error) {
                 console.error('Ошибка загрузки данных из API:', error);
                 // Fallback к localStorage
@@ -358,7 +373,12 @@ const InteractiveMapPage = () => {
     const DraggablePanel = () => (
         <div className="draggable-panel">
             <div className="panel-section">
-                <h3>Подразделения</h3>
+                <h3>
+                    {selectedParentUnitId 
+                        ? `Подразделения (${parentUnits.find(p => p.id === selectedParentUnitId)?.name || 'Выбранное'})`
+                        : 'Подразделения'
+                    }
+                </h3>
                 <div className="draggable-items">
                     {availableUnits.map((unit) => (
                         <div
