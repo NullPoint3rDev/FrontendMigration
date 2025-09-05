@@ -85,37 +85,70 @@ const InteractiveMapPage = () => {
     };
 
     // Обработчик сброса элемента на карту
-    const handleDrop = (e) => {
+    const handleDrop = async (e) => {
         e.preventDefault();
-        if (!draggedItem) return;
+        
+        // Получаем данные из dataTransfer
+        const data = e.dataTransfer.getData('text/plain');
+        if (!data) return;
 
-        const rect = mapRef.current.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        try {
+            const itemData = JSON.parse(data);
+            console.log('InteractiveMapPage handleDrop: Получены данные:', itemData);
 
-        if (draggedItem.type === 'equipment') {
-            // Размещаем оборудование
-            const newEquipment = {
-                ...draggedItem,
-                id: Date.now(),
-                coordinates: { x, y },
-                workshopId: mapType === 'workshop' ? selectedWorkshop?.id : null
-            };
-            setEquipment(prev => [...prev, newEquipment]);
-        } else if (draggedItem.type === 'workshop') {
-            // Создаем новый цех
-            const newWorkshop = {
-                ...draggedItem,
-                id: Date.now(),
-                coordinates: { x, y },
-                width: 200,
-                height: 150,
-                name: `Цех ${workshops.length + 1}`
-            };
-            setWorkshops(prev => [...prev, newWorkshop]);
+            const rect = mapRef.current.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (itemData.type === 'organization_unit') {
+                // Создаем новый цех на основе подразделения
+                const newWorkshop = {
+                    name: itemData.name,
+                    description: itemData.description || `Подразделение: ${itemData.name}`,
+                    positionX: x,
+                    positionY: y,
+                    width: 200,
+                    height: 100,
+                    color: '#4A90E2',
+                    borderColor: '#2E5C8A',
+                    opacity: 0.3,
+                    organizationUnitId: itemData.id
+                };
+
+                console.log('InteractiveMapPage: Создаем цех из подразделения:', newWorkshop);
+                
+                // Добавляем цех через API
+                const createdWorkshop = await plantMapApi.addWorkshopToMap(1, newWorkshop);
+                console.log('InteractiveMapPage: Цех создан:', createdWorkshop);
+                
+                // Обновляем локальное состояние
+                setWorkshops(prev => [...prev, createdWorkshop]);
+                
+            } else if (itemData.type === 'equipment') {
+                // Размещаем оборудование
+                const newEquipment = {
+                    ...itemData,
+                    id: Date.now(),
+                    coordinates: { x, y },
+                    workshopId: mapType === 'workshop' ? selectedWorkshop?.id : null
+                };
+                setEquipment(prev => [...prev, newEquipment]);
+            } else if (itemData.type === 'workshop') {
+                // Создаем новый цех (старая логика)
+                const newWorkshop = {
+                    ...itemData,
+                    id: Date.now(),
+                    coordinates: { x, y },
+                    width: 200,
+                    height: 150,
+                    name: `Цех ${workshops.length + 1}`
+                };
+                setWorkshops(prev => [...prev, newWorkshop]);
+            }
+            
+        } catch (error) {
+            console.error('Ошибка при размещении элемента:', error);
         }
-
-        setDraggedItem(null);
     };
 
     // Обработчик клика по оборудованию
@@ -324,6 +357,32 @@ const InteractiveMapPage = () => {
     // Панель элементов для перетаскивания
     const DraggablePanel = () => (
         <div className="draggable-panel">
+            <div className="panel-section">
+                <h3>Подразделения</h3>
+                <div className="draggable-items">
+                    {availableUnits.map((unit) => (
+                        <div
+                            key={unit.id}
+                            className="draggable-item organization-unit-item"
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', JSON.stringify({
+                                    id: unit.id,
+                                    name: unit.name,
+                                    type: 'organization_unit',
+                                    description: unit.description,
+                                    level: unit.level
+                                }));
+                            }}
+                        >
+                            <i className="fas fa-building"></i>
+                            <span>{unit.name}</span>
+                            <small>Уровень {unit.level || 1}</small>
+                        </div>
+                    ))}
+                </div>
+            </div>
+            
             <div className="panel-section">
                 <h3>Оборудование</h3>
                 <div className="draggable-items">

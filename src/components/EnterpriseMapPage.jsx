@@ -261,31 +261,63 @@ const EnterpriseMapPage = () => {
     };
 
     const handleDrop = async (e) => {
-        if (editMode && draggedEquipment) {
+        if (editMode) {
             e.preventDefault();
             const rect = mapRef.current.getBoundingClientRect();
             const x = (e.clientX - rect.left - mapOffset.x) / mapScale;
             const y = (e.clientY - rect.top - mapOffset.y) / mapScale;
 
+            // Получаем данные из dataTransfer
+            const data = e.dataTransfer.getData('text/plain');
+            if (!data) return;
+
             try {
-                // Обновляем позицию через API
-                const updatedElement = await plantMapApi.updateElementPosition(
-                    draggedEquipment.id, 
-                    x, 
-                    y
-                );
-                
-                // Обновляем локальное состояние
-                const updatedEquipment = equipment.map(item => 
-                    item.id === draggedEquipment.id 
-                        ? { ...item, coordinates: { x, y } }
-                        : item
-                );
-                setEquipment(updatedEquipment);
+                const itemData = JSON.parse(data);
+                console.log('handleDrop: Получены данные для размещения:', itemData);
+
+                if (itemData.type === 'organization_unit') {
+                    // Создаем новый цех на основе подразделения
+                    const newWorkshop = {
+                        name: itemData.name,
+                        description: itemData.description || `Подразделение: ${itemData.name}`,
+                        positionX: x,
+                        positionY: y,
+                        width: 200,
+                        height: 100,
+                        color: '#4A90E2',
+                        borderColor: '#2E5C8A',
+                        opacity: 0.3,
+                        organizationUnitId: itemData.id
+                    };
+
+                    console.log('handleDrop: Создаем цех из подразделения:', newWorkshop);
+                    
+                    // Добавляем цех через API
+                    const createdWorkshop = await plantMapApi.addWorkshopToMap(1, newWorkshop);
+                    console.log('handleDrop: Цех создан:', createdWorkshop);
+                    
+                    // Обновляем локальное состояние
+                    setWorkshops(prev => [...prev, createdWorkshop]);
+                    
+                } else if (draggedEquipment) {
+                    // Обработка оборудования (существующая логика)
+                    const updatedElement = await plantMapApi.updateElementPosition(
+                        draggedEquipment.id, 
+                        x, 
+                        y
+                    );
+                    
+                    const updatedEquipment = equipment.map(item => 
+                        item.id === draggedEquipment.id 
+                            ? { ...item, coordinates: { x, y } }
+                            : item
+                    );
+                    setEquipment(updatedEquipment);
+                }
                 
             } catch (error) {
-                console.error('Ошибка обновления позиции:', error);
-                setError('Не удалось обновить позицию оборудования.');
+                console.error('Ошибка при размещении элемента:', error);
+                setError('Не удалось разместить элемент на карте.');
             }
             
             setDraggedEquipment(null);
