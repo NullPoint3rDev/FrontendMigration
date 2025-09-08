@@ -125,8 +125,8 @@ const ReportViewer = ({ data, template, onClose }) => {
     };
 
     return (
-        <div className="report-viewer-overlay">
-            <div className="report-viewer">
+        <div className="report-viewer-overlay" onClick={onClose}>
+            <div className="report-viewer" onClick={(e) => e.stopPropagation()}>
                 <div className="report-viewer-header">
                     <div className="report-title-section">
                         <h2>{template.name}</h2>

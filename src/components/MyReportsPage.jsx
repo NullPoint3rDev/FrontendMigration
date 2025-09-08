@@ -61,8 +61,6 @@ const MyReportsPage = () => {
             // Здесь будет логика генерации отчета на основе шаблона
             // Пока что создаем тестовые данные
             const mockData = generateMockReportData(template);
-            console.log('Generated mock data:', mockData);
-            console.log('Template:', template);
             
             setReportData(mockData);
             setSelectedTemplate(template);
@@ -248,14 +246,6 @@ const MyReportsPage = () => {
                 />
             )}
             
-            {/* Отладочная информация */}
-            {process.env.NODE_ENV === 'development' && (
-                <div style={{ position: 'fixed', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.8)', color: 'white', padding: '10px', fontSize: '12px', zIndex: 9999 }}>
-                    <div>reportData: {reportData ? 'exists' : 'null'}</div>
-                    <div>selectedTemplate: {selectedTemplate ? 'exists' : 'null'}</div>
-                    <div>reportData length: {reportData ? reportData.length : 0}</div>
-                </div>
-            )}
         </div>
     );
 };
