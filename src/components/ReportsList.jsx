@@ -63,7 +63,11 @@ const ReportsList = ({ reportType, reportName, onViewReport }) => {
             console.log('Формат отчета:', report.format);
             console.log('Данные отчета:', reportData.length, 'строк');
             
-            if (report.format === 'xlsx') {
+            // Преобразуем формат для совместимости
+            const format = report.format === 'EXCEL' ? 'xlsx' : report.format.toLowerCase();
+            console.log('Преобразованный формат:', format);
+            
+            if (format === 'xlsx') {
                 // Создаем XLSX файл
                 const worksheet = XLSX.utils.json_to_sheet(reportData);
                 const workbook = XLSX.utils.book_new();
@@ -82,7 +86,7 @@ const ReportsList = ({ reportType, reportName, onViewReport }) => {
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-            } else {
+            } else if (format === 'csv') {
                 // Создаем CSV файл
                 const columns = Object.keys(reportData[0] || {});
                 const csvContent = [
@@ -137,7 +141,8 @@ const ReportsList = ({ reportType, reportName, onViewReport }) => {
     };
 
     const getFormatIcon = (format) => {
-        return format === 'xlsx' ? '📊' : '📋';
+        const normalizedFormat = format === 'EXCEL' ? 'xlsx' : format.toLowerCase();
+        return normalizedFormat === 'xlsx' ? '📊' : '📋';
     };
 
     if (loading) {
