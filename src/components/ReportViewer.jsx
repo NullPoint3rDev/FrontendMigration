@@ -66,11 +66,13 @@ const ReportViewer = ({ data, template, onClose }) => {
             )
         ].join('\n');
 
-        const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        const blob = new Blob([csvContent], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8;' 
+        });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', `${template.name}_${new Date().toISOString().slice(0, 10)}.xls`);
+        link.setAttribute('download', `${template.name}_${new Date().toISOString().slice(0, 10)}.xlsx`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
