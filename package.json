@@ -16,7 +16,8 @@
     "react-icons": "^5.5.0",
     "react-router-dom": "^6.11.1",
     "react-scripts": "5.0.1",
-    "sockjs-client": "^1.6.1"
+    "sockjs-client": "^1.6.1",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "start": "cross-env REACT_APP_API_URL=http://95.172.58.219:8084/api react-scripts start",

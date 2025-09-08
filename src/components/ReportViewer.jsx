@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import '../styles/reportViewer.css';
 
 const ReportViewer = ({ data, template, onClose }) => {
@@ -57,22 +58,21 @@ const ReportViewer = ({ data, template, onClose }) => {
     };
 
     const exportToExcel = () => {
-        // Создаем CSV файл, который Excel может открыть
-        const csvContent = [
-            '\uFEFF', // BOM для UTF-8 для правильного отображения кириллицы
-            columns.join(','), // Используем запятые для CSV
-            ...processedData.map(row => 
-                columns.map(column => `"${(row[column] || '').toString().replace(/"/g, '""')}"`).join(',')
-            )
-        ].join('\n');
-
-        const blob = new Blob([csvContent], { 
-            type: 'text/csv;charset=utf-8;' 
+        // Создаем настоящий XLSX файл
+        const worksheet = XLSX.utils.json_to_sheet(processedData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Отчет');
+        
+        // Генерируем файл
+        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([excelBuffer], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
         });
+        
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', `${template.name}_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute('download', `${template.name}_${new Date().toISOString().slice(0, 10)}.xlsx`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
