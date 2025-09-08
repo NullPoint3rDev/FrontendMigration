@@ -55,7 +55,7 @@ const MyReportsPage = () => {
         }
     };
 
-    const handleGenerateReport = async (template) => {
+    const handleOpenReport = async (template) => {
         setLoading(true);
         try {
             // Здесь будет логика генерации отчета на основе шаблона
@@ -73,8 +73,8 @@ const MyReportsPage = () => {
             );
             saveTemplates(updatedTemplates);
         } catch (error) {
-            console.error('Ошибка генерации отчета:', error);
-            alert('Ошибка при генерации отчета');
+            console.error('Ошибка открытия отчета:', error);
+            alert('Ошибка при открытии отчета');
         } finally {
             setLoading(false);
         }
@@ -155,6 +155,55 @@ const MyReportsPage = () => {
         setSelectedTemplate(null);
     };
 
+    const handleDownloadReport = async (template) => {
+        try {
+            // Генерируем данные для скачивания
+            const mockData = generateMockReportData(template);
+            
+            if (template.format === 'xlsx') {
+                // Экспорт в Excel
+                const csvContent = [
+                    '\uFEFF', // BOM для UTF-8
+                    template.columns.join('\t'), // Используем табуляцию для Excel
+                    ...mockData.map(row => 
+                        template.columns.map(column => `"${row[column] || ''}"`).join('\t')
+                    )
+                ].join('\n');
+
+                const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `${template.name}_${new Date().toISOString().slice(0, 10)}.xls`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                // Экспорт в CSV
+                const csvContent = [
+                    template.columns.join(','),
+                    ...mockData.map(row => 
+                        template.columns.map(column => `"${row[column] || ''}"`).join(',')
+                    )
+                ].join('\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `${template.name}_${new Date().toISOString().slice(0, 10)}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        } catch (error) {
+            console.error('Ошибка скачивания отчета:', error);
+            alert('Ошибка при скачивании отчета');
+        }
+    };
+
     return (
         <div className="my-reports-page">
             <div className="my-reports-container">
@@ -193,7 +242,11 @@ const MyReportsPage = () => {
                         ) : (
                             <div className="templates-list">
                                 {templates.map(template => (
-                                    <div key={template.id} className="template-item">
+                                    <div 
+                                        key={template.id} 
+                                        className="template-item clickable"
+                                        onClick={() => handleOpenReport(template)}
+                                    >
                                         <div className="template-info">
                                             <h3 className="template-name">{template.name}</h3>
                                             <p className="template-details">
@@ -209,15 +262,21 @@ const MyReportsPage = () => {
                                         </div>
                                         <div className="template-actions">
                                             <button 
-                                                className="generate-button"
-                                                onClick={() => handleGenerateReport(template)}
+                                                className="download-button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDownloadReport(template);
+                                                }}
                                                 disabled={loading}
                                             >
-                                                {loading ? 'Генерация...' : 'Сгенерировать'}
+                                                📥 Скачать
                                             </button>
                                             <button 
                                                 className="delete-button"
-                                                onClick={() => handleDeleteTemplate(template.id)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteTemplate(template.id);
+                                                }}
                                             >
                                                 Удалить
                                             </button>

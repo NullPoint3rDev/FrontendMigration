@@ -109,111 +109,9 @@
 }
 
 .report-controls {
-    padding: 20px 30px;
-    background: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
+    display: none;
 }
 
-.search-section {
-    display: flex;
-    justify-content: center;
-}
-
-.search-input {
-    width: 100%;
-    max-width: 400px;
-    padding: 12px 16px;
-    border: 2px solid #e9ecef;
-    border-radius: 8px;
-    font-size: 1rem;
-    transition: border-color 0.3s ease;
-}
-
-.search-input:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.filters-section {
-    display: flex;
-    gap: 15px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.filter-input {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    min-width: 150px;
-}
-
-.filter-input label {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #495057;
-}
-
-.filter-input input {
-    padding: 8px 12px;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    transition: border-color 0.3s ease;
-}
-
-.filter-input input:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
-}
-
-.clear-filters {
-    padding: 8px 16px;
-    border: 1px solid #dc3545;
-    background: white;
-    color: #dc3545;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    align-self: flex-end;
-}
-
-.clear-filters:hover {
-    background: #dc3545;
-    color: white;
-}
-
-.pagination-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.items-per-page {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.items-per-page label {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #495057;
-}
-
-.items-per-page select {
-    padding: 6px 10px;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    font-size: 0.9rem;
-}
 
 .report-table-container {
     flex: 1;
@@ -302,78 +200,6 @@
     font-size: 1rem;
 }
 
-.pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 10px;
-    padding: 20px;
-    background: #f8f9fa;
-    border-top: 1px solid #e9ecef;
-}
-
-.page-button {
-    padding: 8px 16px;
-    border: 1px solid #dee2e6;
-    background: white;
-    color: #495057;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.page-button:hover:not(:disabled) {
-    background: #667eea;
-    color: white;
-    border-color: #667eea;
-}
-
-.page-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.page-numbers {
-    display: flex;
-    gap: 5px;
-}
-
-.page-number {
-    padding: 8px 12px;
-    border: 1px solid #dee2e6;
-    background: white;
-    color: #495057;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    min-width: 40px;
-}
-
-.page-number:hover {
-    background: #e9ecef;
-}
-
-.page-number.active {
-    background: #667eea;
-    color: white;
-    border-color: #667eea;
-}
-
-.report-footer {
-    padding: 15px 30px;
-    background: #f8f9fa;
-    border-top: 1px solid #e9ecef;
-    text-align: center;
-    border-radius: 0 0 12px 12px;
-}
-
-.report-footer p {
-    margin: 0;
-    font-size: 0.9rem;
-    color: #6c757d;
-}
 
 /* Адаптивность */
 @media (max-width: 768px) {
@@ -392,24 +218,6 @@
         justify-content: center;
     }
     
-    .report-controls {
-        padding: 15px 20px;
-    }
-    
-    .filters-section {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .filter-input {
-        min-width: auto;
-    }
-    
-    .pagination-controls {
-        flex-direction: column;
-        gap: 15px;
-        align-items: stretch;
-    }
     
     .report-table-container {
         min-height: 0;
@@ -425,23 +233,4 @@
         padding: 8px 6px;
     }
     
-    .pagination {
-        flex-wrap: wrap;
-        gap: 5px;
-    }
-    
-    .page-button {
-        padding: 6px 12px;
-        font-size: 0.8rem;
-    }
-    
-    .page-number {
-        padding: 6px 10px;
-        font-size: 0.8rem;
-        min-width: 35px;
-    }
-    
-    .report-footer {
-        padding: 10px 20px;
-    }
 }
