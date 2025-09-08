@@ -73,7 +73,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
 
     // Форматы отчетов
     const formats = [
-        { value: 'xlsx', label: 'Excel (.xlsx)', icon: '📊' },
+        { value: 'xlsx', label: 'Excel (.csv)', icon: '📊' },
         { value: 'csv', label: 'CSV (.csv)', icon: '📋' }
     ];
 

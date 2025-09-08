@@ -161,22 +161,22 @@ const MyReportsPage = () => {
             const mockData = generateMockReportData(template);
             
             if (template.format === 'xlsx') {
-                // Экспорт в Excel (создаем Excel-совместимый файл)
+                // Экспорт в Excel (создаем CSV файл, который Excel может открыть)
                 const csvContent = [
-                    '\uFEFF', // BOM для UTF-8
-                    template.columns.join('\t'), // Используем табуляцию для Excel
+                    '\uFEFF', // BOM для UTF-8 для правильного отображения кириллицы
+                    template.columns.join(','), // Используем запятые для CSV
                     ...mockData.map(row => 
-                        template.columns.map(column => `"${row[column] || ''}"`).join('\t')
+                        template.columns.map(column => `"${(row[column] || '').toString().replace(/"/g, '""')}"`).join(',')
                     )
                 ].join('\n');
 
                 const blob = new Blob([csvContent], { 
-                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8;' 
+                    type: 'text/csv;charset=utf-8;' 
                 });
                 const link = document.createElement('a');
                 const url = URL.createObjectURL(blob);
                 link.setAttribute('href', url);
-                link.setAttribute('download', `${template.name}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                link.setAttribute('download', `${template.name}_${new Date().toISOString().slice(0, 10)}.csv`);
                 link.style.visibility = 'hidden';
                 document.body.appendChild(link);
                 link.click();
