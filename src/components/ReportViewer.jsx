@@ -5,11 +5,34 @@ import '../styles/reportViewer.css';
 const ReportViewer = ({ data, template, onClose }) => {
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
-    // Получаем столбцы из шаблона
-    const columns = template.columns;
+    // Получаем столбцы из шаблона с защитой от undefined
+    const columns = template?.columns || [];
+    
+    // Защита от пустых данных
+    if (!data || !Array.isArray(data) || data.length === 0) {
+        return (
+            <div className="report-viewer-overlay" onClick={onClose}>
+                <div className="report-viewer" onClick={(e) => e.stopPropagation()}>
+                    <div className="report-viewer-header">
+                        <div className="report-title-section">
+                            <h2>{template?.name || 'Отчет'}</h2>
+                        </div>
+                        <div className="report-actions">
+                            <button className="close-button" onClick={onClose}>✕</button>
+                        </div>
+                    </div>
+                    <div className="no-data">
+                        <div className="no-data-icon">📊</div>
+                        <h3>Нет данных для отображения</h3>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     // Сортировка данных
     const processedData = useMemo(() => {
+        if (!data || !Array.isArray(data)) return [];
         let sorted = [...data];
 
         // Применяем сортировку

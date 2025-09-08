@@ -43,9 +43,16 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
             savedReports.push(report);
             localStorage.setItem('savedReports', JSON.stringify(savedReports));
             
+            // Создаем template для ReportViewer
+            const template = {
+                name: report.name,
+                columns: Object.keys(data[0] || {}),
+                format: report.format
+            };
+            
             // Показываем отчет онлайн
             setReportData(data);
-            setSelectedReport(report);
+            setSelectedReport(template);
             
         } catch (error) {
             console.error('Ошибка генерации отчета:', error);
@@ -113,8 +120,13 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
                     reportType={reportType} 
                     reportName={title}
                     onViewReport={(report) => {
+                        const template = {
+                            name: report.name,
+                            columns: Object.keys(report.data[0] || {}),
+                            format: report.format
+                        };
                         setReportData(report.data);
-                        setSelectedReport(report);
+                        setSelectedReport(template);
                     }}
                 />
             </div>
