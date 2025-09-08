@@ -19,6 +19,7 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
         setLoading(true);
         try {
             console.log('Генерируем отчет:', reportData);
+            console.log('Формат из модального окна:', reportData.format);
             
             // Генерируем данные отчета
             const data = reportHelpers.generateReportData(reportType, 50);
@@ -28,7 +29,7 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
                 id: `report_${reportType}_${Date.now()}`,
                 name: `${title} - ${new Date().toLocaleDateString('ru-RU')}`,
                 reportType: reportType,
-                format: reportData.format,
+                format: reportData.format === 'EXCEL' ? 'xlsx' : reportData.format.toLowerCase(),
                 period: reportData.period,
                 dateFrom: reportData.dateFrom,
                 dateTo: reportData.dateTo,

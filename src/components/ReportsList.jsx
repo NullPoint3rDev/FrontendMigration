@@ -56,8 +56,12 @@ const ReportsList = ({ reportType, reportName, onViewReport }) => {
 
     const handleDownloadReport = async (report) => {
         try {
-            // Генерируем данные для скачивания
-            const reportData = reportHelpers.generateReportData(report.reportType, report.rowCount);
+            // Используем уже сохраненные данные отчета
+            const reportData = report.data || [];
+            
+            console.log('Скачиваем отчет:', report);
+            console.log('Формат отчета:', report.format);
+            console.log('Данные отчета:', reportData.length, 'строк');
             
             if (report.format === 'xlsx') {
                 // Создаем XLSX файл
