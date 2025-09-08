@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import ReportPeriodModal from './ReportPeriodModal';
-import ReportArchive from './ReportArchive';
+import ReportsList from './ReportsList';
+import ReportViewer from './ReportViewer';
 import { reportApi, reportHelpers } from '../api/reportApi';
 import '../styles/baseReportPage.css';
 
 const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [selectedReport, setSelectedReport] = useState(null);
+    const [reportData, setReportData] = useState(null);
 
     const handleCreateReport = () => {
         setIsModalOpen(true);
@@ -17,26 +20,44 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
         try {
             console.log('Генерируем отчет:', reportData);
             
-            // Преобразуем данные для API
-            const apiRequestData = {
-                reportType: reportData.reportType,
+            // Генерируем данные отчета
+            const data = reportHelpers.generateReportData(reportType, 50);
+            
+            // Создаем объект отчета для сохранения
+            const report = {
+                id: `report_${reportType}_${Date.now()}`,
+                name: `${title} - ${new Date().toLocaleDateString('ru-RU')}`,
+                reportType: reportType,
                 format: reportData.format,
                 period: reportData.period,
                 dateFrom: reportData.dateFrom,
                 dateTo: reportData.dateTo,
-                weldingMachineId: reportData.equipmentId
+                equipmentId: reportData.equipmentId,
+                data: data,
+                createdAt: new Date().toISOString(),
+                rowCount: data.length
             };
             
-            // Генерируем отчет через API
-            const blob = await reportApi.generateReport(reportData.reportType, apiRequestData);
-            const filename = reportHelpers.getReportFilename(reportData.reportType, reportData.format);
-            reportHelpers.downloadReport(blob, filename);
+            // Сохраняем отчет (пока в localStorage, потом можно на сервер)
+            const savedReports = JSON.parse(localStorage.getItem('savedReports') || '[]');
+            savedReports.push(report);
+            localStorage.setItem('savedReports', JSON.stringify(savedReports));
+            
+            // Показываем отчет онлайн
+            setReportData(data);
+            setSelectedReport(report);
+            
         } catch (error) {
             console.error('Ошибка генерации отчета:', error);
             alert('Ошибка при генерации отчета: ' + error.message);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleCloseReport = () => {
+        setReportData(null);
+        setSelectedReport(null);
     };
 
     return (
@@ -87,10 +108,14 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
                     </button>
                 </div>
                 
-                {/* Архив отчетов */}
-                <ReportArchive 
+                {/* Список отчетов */}
+                <ReportsList 
                     reportType={reportType} 
-                    reportName={title} 
+                    reportName={title}
+                    onViewReport={(report) => {
+                        setReportData(report.data);
+                        setSelectedReport(report);
+                    }}
                 />
             </div>
 
@@ -100,6 +125,15 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
                 onGenerate={handleGenerateReport}
                 reportType={reportType}
             />
+
+            {/* Компонент просмотра отчета */}
+            {reportData && selectedReport && (
+                <ReportViewer
+                    data={reportData}
+                    template={selectedReport}
+                    onClose={handleCloseReport}
+                />
+            )}
         </div>
     );
 };
