@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getAllWeldingMachines } from '../api/weldingMachineApi';
 import '../styles/createTemplateModal.css';
 
 const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
@@ -9,6 +10,28 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
     const [customDateFrom, setCustomDateFrom] = useState('');
     const [customDateTo, setCustomDateTo] = useState('');
     const [selectedShift, setSelectedShift] = useState('');
+    const [equipment, setEquipment] = useState([]);
+    const [selectedEquipment, setSelectedEquipment] = useState([]);
+    const [loadingEquipment, setLoadingEquipment] = useState(false);
+
+    // Загружаем список оборудования при открытии модального окна
+    useEffect(() => {
+        if (isOpen) {
+            loadEquipment();
+        }
+    }, [isOpen]);
+
+    const loadEquipment = async () => {
+        setLoadingEquipment(true);
+        try {
+            const equipmentData = await getAllWeldingMachines();
+            setEquipment(equipmentData);
+        } catch (error) {
+            console.error('Ошибка загрузки оборудования:', error);
+        } finally {
+            setLoadingEquipment(false);
+        }
+    };
 
     // Доступные столбцы для выбора
     const availableColumns = [
@@ -70,6 +93,22 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
         setSelectedColumns([]);
     };
 
+    const handleEquipmentToggle = (equipmentId) => {
+        setSelectedEquipment(prev => 
+            prev.includes(equipmentId) 
+                ? prev.filter(id => id !== equipmentId)
+                : [...prev, equipmentId]
+        );
+    };
+
+    const handleSelectAllEquipment = () => {
+        setSelectedEquipment(equipment.map(eq => eq.id));
+    };
+
+    const handleDeselectAllEquipment = () => {
+        setSelectedEquipment([]);
+    };
+
     const handlePeriodChange = (period) => {
         setSelectedPeriod(period);
         if (period !== 'custom') {
@@ -102,6 +141,11 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
             return;
         }
 
+        if (selectedEquipment.length === 0) {
+            alert('Выберите хотя бы один аппарат для отчета');
+            return;
+        }
+
         const templateData = {
             name: templateName.trim(),
             columns: selectedColumns,
@@ -109,7 +153,8 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
             format: selectedFormat,
             customDateFrom: selectedPeriod === 'custom' ? customDateFrom : null,
             customDateTo: selectedPeriod === 'custom' ? customDateTo : null,
-            shift: selectedPeriod === 'shift' ? selectedShift : null
+            shift: selectedPeriod === 'shift' ? selectedShift : null,
+            equipment: selectedEquipment
         };
 
         onCreate(templateData);
@@ -122,6 +167,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
         setCustomDateFrom('');
         setCustomDateTo('');
         setSelectedShift('');
+        setSelectedEquipment([]);
     };
 
     const handleClose = () => {
@@ -133,6 +179,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
         setCustomDateFrom('');
         setCustomDateTo('');
         setSelectedShift('');
+        setSelectedEquipment([]);
         onClose();
     };
 
@@ -194,6 +241,53 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
                         </div>
                         <div className="selected-count">
                             Выбрано столбцов: {selectedColumns.length} из {availableColumns.length}
+                        </div>
+                    </div>
+
+                    {/* Выбор оборудования */}
+                    <div className="form-section">
+                        <div className="section-header">
+                            <h3>Выберите аппараты для отчета</h3>
+                            <div className="equipment-controls">
+                                <button 
+                                    type="button"
+                                    className="control-button select-all"
+                                    onClick={handleSelectAllEquipment}
+                                >
+                                    Выбрать все
+                                </button>
+                                <button 
+                                    type="button"
+                                    className="control-button deselect-all"
+                                    onClick={handleDeselectAllEquipment}
+                                >
+                                    Снять все
+                                </button>
+                            </div>
+                        </div>
+                        {loadingEquipment ? (
+                            <div className="loading-equipment">Загрузка оборудования...</div>
+                        ) : (
+                            <div className="equipment-grid">
+                                {equipment.map(eq => (
+                                    <label key={eq.id} className="equipment-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedEquipment.includes(eq.id)}
+                                            onChange={() => handleEquipmentToggle(eq.id)}
+                                        />
+                                        <div className="equipment-info">
+                                            <span className="equipment-name">{eq.name}</span>
+                                            <span className="equipment-details">
+                                                {eq.model} (№{eq.serialNumber || eq.id})
+                                            </span>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                        <div className="selected-count">
+                            Выбрано аппаратов: {selectedEquipment.length} из {equipment.length}
                         </div>
                     </div>
 
@@ -293,7 +387,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
                     <button 
                         className="create-button" 
                         onClick={handleCreate}
-                        disabled={!templateName.trim() || selectedColumns.length === 0}
+                        disabled={!templateName.trim() || selectedColumns.length === 0 || selectedEquipment.length === 0}
                     >
                         Создать шаблон
                     </button>

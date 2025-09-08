@@ -99,9 +99,24 @@ const ReportViewer = ({ data, template, onClose }) => {
     };
 
     const exportToExcel = () => {
-        // Простая реализация экспорта в Excel через CSV
-        // В реальном проекте можно использовать библиотеку типа xlsx
-        exportToCSV();
+        // Создаем Excel-совместимый CSV с BOM для правильного отображения в Excel
+        const csvContent = [
+            '\uFEFF', // BOM для UTF-8
+            columns.join('\t'), // Используем табуляцию вместо запятых для Excel
+            ...processedData.map(row => 
+                columns.map(column => `"${row[column] || ''}"`).join('\t')
+            )
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${template.name}_${new Date().toISOString().slice(0, 10)}.xls`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const getSortIcon = (column) => {
