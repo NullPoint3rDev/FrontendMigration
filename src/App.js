@@ -18,6 +18,7 @@ import AboutPage from './components/AboutPage';
 import AuthPage from './components/AuthPage';
 import UserProfilePage from './pages/UserProfilePage';
 import ReportsPage from './components/ReportsPage';
+import MyReportsPage from './components/MyReportsPage';
 import EquipmentReportPage from './components/EquipmentReportPage';
 import WeldersReportPage from './components/WeldersReportPage';
 import MaterialsReportPage from './components/MaterialsReportPage';
@@ -82,6 +83,7 @@ function App() {
                                 <Route path="/equipment-list" element={<div className="main-content"><h2>Перечень оборудования</h2></div>} />
                                 
                                 {/* 4. Отчеты */}
+                                <Route path="/my-reports" element={<MyReportsPage />} />
                                 <Route path="/reports/equipment" element={<EquipmentReportPage />} />
                                 <Route path="/reports/welders" element={<WeldersReportPage />} />
                                 <Route path="/reports/materials" element={<MaterialsReportPage />} />

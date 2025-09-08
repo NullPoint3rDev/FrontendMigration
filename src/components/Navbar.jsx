@@ -38,6 +38,7 @@ const Navbar = () => {
         {
             label: 'Отчеты',
             dropdown: [
+                { label: 'Мои отчеты', path: '/my-reports' },
                 { label: 'По работе оборудования', path: '/reports/equipment' },
                 { label: 'По работе сварщиков', path: '/reports/welders' },
                 { label: 'По расходу материалов', path: '/reports/materials' },

@@ -31,8 +31,6 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
             const blob = await reportApi.generateReport(reportData.reportType, apiRequestData);
             const filename = reportHelpers.getReportFilename(reportData.reportType, reportData.format);
             reportHelpers.downloadReport(blob, filename);
-            
-            alert('Отчет успешно сгенерирован!');
         } catch (error) {
             console.error('Ошибка генерации отчета:', error);
             alert('Ошибка при генерации отчета: ' + error.message);
