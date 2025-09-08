@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { reportApi } from '../api/reportApi';
+import { reportApi, reportHelpers } from '../api/reportApi';
+import * as XLSX from 'xlsx';
 import '../styles/reportsList.css';
 
 const ReportsList = ({ reportType, reportName, onViewReport }) => {
@@ -56,11 +57,10 @@ const ReportsList = ({ reportType, reportName, onViewReport }) => {
     const handleDownloadReport = async (report) => {
         try {
             // Генерируем данные для скачивания
-            const reportData = reportApi.reportHelpers.generateReportData(report.reportType, report.rowCount);
+            const reportData = reportHelpers.generateReportData(report.reportType, report.rowCount);
             
             if (report.format === 'xlsx') {
                 // Создаем XLSX файл
-                const XLSX = require('xlsx');
                 const worksheet = XLSX.utils.json_to_sheet(reportData);
                 const workbook = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(workbook, worksheet, 'Отчет');
