@@ -296,69 +296,72 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                         </div>
                     </div>
 
-                    {/* Выбор оборудования */}
-                    <div className="form-section">
-                        <div className="section-header">
-                            <h3>Выберите аппараты для отчета</h3>
-                            <div className="equipment-controls">
-                                <button 
-                                    type="button"
-                                    className="control-button select-all"
-                                    onClick={handleSelectAllEquipment}
-                                >
-                                    Выбрать все
-                                </button>
-                                <button 
-                                    type="button"
-                                    className="control-button deselect-all"
-                                    onClick={handleDeselectAllEquipment}
-                                >
-                                    Снять все
-                                </button>
-                            </div>
-                        </div>
-                        {loadingEquipment ? (
-                            <div className="loading-equipment">Загрузка оборудования...</div>
-                        ) : (
-                            <div className="equipment-grid">
-                                {equipment.map(eq => (
-                                    <label key={eq.id} className="equipment-checkbox">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedEquipment.includes(eq.id)}
-                                            onChange={() => handleEquipmentToggle(eq.id)}
-                                        />
-                                        <div className="equipment-info">
-                                            <span className="equipment-name">{eq.name}</span>
-                                            <span className="equipment-details">
-                                                {eq.model} (№{eq.serialNumber || eq.id})
-                                            </span>
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-                        <div className="selected-count">
-                            Выбрано аппаратов: {selectedEquipment.length} из {equipment.length}
-                        </div>
-                    </div>
-
-                    {/* Выбор формата */}
-                    <div className="form-section">
-                        <h3>Формат отчета</h3>
-                        <div className="format-options">
-                            {formats.map(format => (
-                                <div
-                                    key={format.value}
-                                    className={`format-option ${selectedFormat === format.value ? 'selected' : ''}`}
-                                    onClick={() => setSelectedFormat(format.value)}
-                                >
-                                    <span className="format-icon">{format.icon}</span>
-                                    <span className="format-label">{format.label}</span>
+                        {/* Вторая строка: Оборудование и Формат */}
+                        <div className="form-section-row">
+                            {/* Выбор оборудования */}
+                            <div className="form-section">
+                                <div className="section-header">
+                                    <h3>Выберите аппараты для отчета</h3>
+                                    <div className="equipment-controls">
+                                        <button 
+                                            type="button"
+                                            className="control-button select-all"
+                                            onClick={handleSelectAllEquipment}
+                                        >
+                                            Выбрать все
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            className="control-button deselect-all"
+                                            onClick={handleDeselectAllEquipment}
+                                        >
+                                            Снять все
+                                        </button>
+                                    </div>
                                 </div>
-                            ))}
+                                {loadingEquipment ? (
+                                    <div className="loading-equipment">Загрузка оборудования...</div>
+                                ) : (
+                                    <div className="equipment-grid">
+                                        {equipment.map(eq => (
+                                            <label key={eq.id} className="equipment-checkbox">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedEquipment.includes(eq.id)}
+                                                    onChange={() => handleEquipmentToggle(eq.id)}
+                                                />
+                                                <div className="equipment-info">
+                                                    <span className="equipment-name">{eq.name}</span>
+                                                    <span className="equipment-details">
+                                                        {eq.model} (№{eq.serialNumber || eq.id})
+                                                    </span>
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="selected-count">
+                                    Выбрано аппаратов: {selectedEquipment.length} из {equipment.length}
+                                </div>
+                            </div>
+
+                            {/* Выбор формата */}
+                            <div className="form-section">
+                                <h3>Формат отчета</h3>
+                                <div className="format-options">
+                                    {formats.map(format => (
+                                        <div
+                                            key={format.value}
+                                            className={`format-option ${selectedFormat === format.value ? 'selected' : ''}`}
+                                            onClick={() => setSelectedFormat(format.value)}
+                                        >
+                                            <span className="format-icon">{format.icon}</span>
+                                            <span className="format-label">{format.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
-                    </div>
                     </div>
                 </div>
 

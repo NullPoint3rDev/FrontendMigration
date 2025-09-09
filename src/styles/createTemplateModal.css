@@ -16,8 +16,8 @@
     background: white;
     border-radius: 12px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    max-width: 1200px;
-    width: 95%;
+    max-width: 95vw;
+    width: 95vw;
     max-height: 95vh;
     overflow-y: auto;
     animation: modalSlideIn 0.3s ease-out;
@@ -80,20 +80,32 @@
     margin-bottom: 25px;
 }
 
-/* Улучшенное распределение для широкого модального окна */
+/* Улучшенное распределение для очень широкого модального окна */
 .form-sections-container {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 25px;
 }
 
 .form-section-row {
     display: flex;
-    gap: 20px;
+    gap: 30px;
     align-items: flex-start;
 }
 
 .form-section-row .form-section {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+/* Трехколоночная раскладка для очень широких экранов */
+.form-section-row-three {
+    display: flex;
+    gap: 25px;
+    align-items: flex-start;
+}
+
+.form-section-row-three .form-section {
     flex: 1;
     margin-bottom: 0;
 }
@@ -187,10 +199,10 @@
 
 .columns-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
     margin-bottom: 15px;
-    max-height: 350px;
+    max-height: 300px;
     overflow-y: auto;
     padding: 15px;
     border: 1px solid #e9ecef;
