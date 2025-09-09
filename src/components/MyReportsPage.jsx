@@ -91,6 +91,13 @@ const MyReportsPage = () => {
         }
     };
 
+    const handleDeleteReport = (reportId) => {
+        if (window.confirm('Вы уверены, что хотите удалить этот отчет?')) {
+            const updatedReports = generatedReports.filter(r => r.id !== reportId);
+            saveGeneratedReports(updatedReports);
+        }
+    };
+
     const handleEditTemplate = (template) => {
         setEditingTemplate(template);
         setIsCreateModalOpen(true);
@@ -451,6 +458,13 @@ const MyReportsPage = () => {
                                                 title="Скачать отчет"
                                             >
                                                 📥 Скачать
+                                            </button>
+                                            <button 
+                                                className="delete-button"
+                                                onClick={() => handleDeleteReport(report.id)}
+                                                title="Удалить отчет"
+                                            >
+                                                🗑️ Удалить
                                             </button>
                                         </div>
                                     </div>
