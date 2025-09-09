@@ -36,9 +36,20 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
     // Автоматически выбираем столбцы при выборе типа отчета
     useEffect(() => {
         if (selectedReportType && reportTypeColumns[selectedReportType]) {
-            setSelectedColumns(reportTypeColumns[selectedReportType]);
+            // Если это редактирование, сохраняем только доступные столбцы
+            if (editingTemplate) {
+                const availableColumns = reportTypeColumns[selectedReportType];
+                const filteredColumns = selectedColumns.filter(col => availableColumns.includes(col));
+                setSelectedColumns(filteredColumns.length > 0 ? filteredColumns : availableColumns);
+            } else {
+                // При создании нового шаблона выбираем все доступные столбцы
+                setSelectedColumns(reportTypeColumns[selectedReportType]);
+            }
+        } else if (!selectedReportType) {
+            // Если тип отчета не выбран, очищаем выбор столбцов
+            setSelectedColumns([]);
         }
-    }, [selectedReportType]);
+    }, [selectedReportType, editingTemplate]);
 
     const loadEquipment = async () => {
         setLoadingEquipment(true);
@@ -213,43 +224,48 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                     {/* Выбор типа отчета */}
                     <div className="form-section">
                         <h3>Тип отчета</h3>
-                        <div className="report-type-selector">
+                        <select
+                            value={selectedReportType}
+                            onChange={(e) => setSelectedReportType(e.target.value)}
+                            className="report-type-select"
+                        >
+                            <option value="">Выберите тип отчета</option>
                             {reportTypes.map(type => (
-                                <label key={type.value} className="report-type-option">
-                                    <input
-                                        type="radio"
-                                        name="reportType"
-                                        value={type.value}
-                                        checked={selectedReportType === type.value}
-                                        onChange={(e) => setSelectedReportType(e.target.value)}
-                                    />
-                                    <span className="radio-label">{type.label}</span>
-                                </label>
+                                <option key={type.value} value={type.value}>
+                                    {type.label}
+                                </option>
                             ))}
-                        </div>
+                        </select>
                     </div>
 
                     {/* Выбор столбцов */}
                     <div className="form-section">
                         <div className="section-header">
                             <h3>Выберите столбцы для отчета</h3>
-                            <div className="column-controls">
-                                <button 
-                                    type="button"
-                                    className="control-button select-all"
-                                    onClick={handleSelectAllColumns}
-                                >
-                                    Выбрать все
-                                </button>
-                                <button 
-                                    type="button"
-                                    className="control-button deselect-all"
-                                    onClick={handleDeselectAllColumns}
-                                >
-                                    Снять все
-                                </button>
-                            </div>
+                            {selectedReportType && (
+                                <div className="column-controls">
+                                    <button 
+                                        type="button"
+                                        className="control-button select-all"
+                                        onClick={handleSelectAllColumns}
+                                    >
+                                        Выбрать все
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        className="control-button deselect-all"
+                                        onClick={handleDeselectAllColumns}
+                                    >
+                                        Снять все
+                                    </button>
+                                </div>
+                            )}
                         </div>
+                        {!selectedReportType && (
+                            <div className="no-report-type-message">
+                                <p>⚠️ Сначала выберите тип отчета, чтобы увидеть доступные столбцы</p>
+                            </div>
+                        )}
                         <div className="columns-grid">
                             {allColumns.map(column => {
                                 const isAvailable = selectedReportType && reportTypeColumns[selectedReportType]?.includes(column);

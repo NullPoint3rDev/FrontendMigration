@@ -101,6 +101,29 @@
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
+/* Стили для выпадающего списка типа отчета */
+.report-type-select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 1rem;
+    background-color: white;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+.report-type-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.report-type-select option {
+    padding: 8px;
+    font-size: 1rem;
+}
+
 .section-header {
     display: flex;
     justify-content: space-between;
@@ -178,6 +201,46 @@
     font-size: 0.95rem;
     color: #495057;
     user-select: none;
+}
+
+/* Стили для недоступных столбцов */
+.column-checkbox.disabled {
+    background: #f8f9fa;
+    border-color: #dee2e6;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.column-checkbox.disabled:hover {
+    background: #f8f9fa;
+    border-color: #dee2e6;
+}
+
+.column-checkbox.disabled input[type="checkbox"] {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.checkbox-label.disabled {
+    color: #6c757d;
+    text-decoration: line-through;
+}
+
+/* Стили для сообщения о необходимости выбора типа отчета */
+.no-report-type-message {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.no-report-type-message p {
+    margin: 0;
+    color: #856404;
+    font-size: 0.95rem;
+    font-weight: 500;
 }
 
 .selected-count {
