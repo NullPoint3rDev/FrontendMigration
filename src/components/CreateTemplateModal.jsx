@@ -209,34 +209,36 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                 </div>
 
                 <div className="modal-body">
-                    {/* Название шаблона */}
-                    <div className="form-section">
-                        <h3>Название шаблона</h3>
-                        <input
-                            type="text"
-                            value={templateName}
-                            onChange={(e) => setTemplateName(e.target.value)}
-                            placeholder="Введите название шаблона"
-                            className="template-name-input"
-                        />
-                    </div>
+                    <div className="form-sections-container">
+                        {/* Первая строка: Название и Тип отчета */}
+                        <div className="form-section-row">
+                            <div className="form-section">
+                                <h3>Название шаблона</h3>
+                                <input
+                                    type="text"
+                                    value={templateName}
+                                    onChange={(e) => setTemplateName(e.target.value)}
+                                    placeholder="Введите название шаблона"
+                                    className="template-name-input"
+                                />
+                            </div>
 
-                    {/* Выбор типа отчета */}
-                    <div className="form-section">
-                        <h3>Тип отчета</h3>
-                        <select
-                            value={selectedReportType}
-                            onChange={(e) => setSelectedReportType(e.target.value)}
-                            className="report-type-select"
-                        >
-                            <option value="">Выберите тип отчета</option>
-                            {reportTypes.map(type => (
-                                <option key={type.value} value={type.value}>
-                                    {type.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                            <div className="form-section">
+                                <h3>Тип отчета</h3>
+                                <select
+                                    value={selectedReportType}
+                                    onChange={(e) => setSelectedReportType(e.target.value)}
+                                    className="report-type-select"
+                                >
+                                    <option value="">Выберите тип отчета</option>
+                                    {reportTypes.map(type => (
+                                        <option key={type.value} value={type.value}>
+                                            {type.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
 
                     {/* Выбор столбцов */}
                     <div className="form-section">
@@ -356,6 +358,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                                 </div>
                             ))}
                         </div>
+                    </div>
                     </div>
                 </div>
 

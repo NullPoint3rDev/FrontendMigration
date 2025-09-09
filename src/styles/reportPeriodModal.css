@@ -65,23 +65,24 @@
     padding: 30px;
 }
 
-/* Двухколоночная раскладка для широких экранов */
-@media (min-width: 1024px) {
-    .modal-body {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 30px;
-        align-items: start;
-    }
-    
-    .form-section {
-        margin-bottom: 0;
-    }
-    
-    .form-section:last-child {
-        grid-column: 1 / -1;
-    }
+/* Улучшенное распределение для широкого модального окна */
+.form-sections-container {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
 }
+
+.form-section-row {
+    display: flex;
+    gap: 25px;
+    align-items: flex-start;
+}
+
+.form-section-row .form-section {
+    flex: 1;
+    margin-bottom: 0;
+}
+
 
 .modal-body h3 {
     color: white;
