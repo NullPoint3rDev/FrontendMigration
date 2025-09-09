@@ -2,14 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { getAllWeldingMachines } from '../api/weldingMachineApi';
 import '../styles/createTemplateModal.css';
 
-const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
+const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null }) => {
     const [templateName, setTemplateName] = useState('');
+    const [selectedReportType, setSelectedReportType] = useState('');
     const [selectedColumns, setSelectedColumns] = useState([]);
-    const [selectedPeriod, setSelectedPeriod] = useState('day');
     const [selectedFormat, setSelectedFormat] = useState('xlsx');
-    const [customDateFrom, setCustomDateFrom] = useState('');
-    const [customDateTo, setCustomDateTo] = useState('');
-    const [selectedShift, setSelectedShift] = useState('');
     const [equipment, setEquipment] = useState([]);
     const [selectedEquipment, setSelectedEquipment] = useState([]);
     const [loadingEquipment, setLoadingEquipment] = useState(false);
@@ -18,8 +15,30 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
     useEffect(() => {
         if (isOpen) {
             loadEquipment();
+            // Если редактируем шаблон, заполняем поля
+            if (editingTemplate) {
+                setTemplateName(editingTemplate.name);
+                setSelectedReportType(editingTemplate.reportType);
+                setSelectedColumns(editingTemplate.columns);
+                setSelectedFormat(editingTemplate.format);
+                setSelectedEquipment(editingTemplate.selectedEquipment || []);
+            } else {
+                // Сбрасываем поля при создании нового шаблона
+                setTemplateName('');
+                setSelectedReportType('');
+                setSelectedColumns([]);
+                setSelectedFormat('xlsx');
+                setSelectedEquipment([]);
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, editingTemplate]);
+
+    // Автоматически выбираем столбцы при выборе типа отчета
+    useEffect(() => {
+        if (selectedReportType && reportTypeColumns[selectedReportType]) {
+            setSelectedColumns(reportTypeColumns[selectedReportType]);
+        }
+    }, [selectedReportType]);
 
     const loadEquipment = async () => {
         setLoadingEquipment(true);
@@ -33,42 +52,52 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
         }
     };
 
-    // Доступные столбцы для выбора
-    const availableColumns = [
-        'Дата',
-        'Время', 
-        'Сварщик',
-        'Режим',
-        'Сила тока',
-        'Масса проволоки',
-        'Напряжение',
-        'Проволока',
-        'Газ л/мин',
-        'Время сварки (с)',
-        'Подразделение',
-        'Количество выполненных швов',
-        'Качество работы (%)',
-        'Оборудование',
-        'Тип неисправности',
-        'Описание',
-        'Статус'
+    // Типы отчетов
+    const reportTypes = [
+        { value: 'equipment', label: 'По работе оборудования' },
+        { value: 'welders', label: 'По работе сварщиков' },
+        { value: 'materials', label: 'По расходу материалов' },
+        { value: 'welds', label: 'По сварочным швам' },
+        { value: 'errors', label: 'По ошибкам сварочного оборудования' },
+        { value: 'violations', label: 'По нарушениям' }
     ];
 
-    // Периоды отчетов
-    const periods = [
-        { value: 'day', label: 'День', description: 'Отчет за текущий день' },
-        { value: 'week', label: 'Неделя', description: 'Отчет за текущую неделю' },
-        { value: 'month', label: 'Месяц', description: 'Отчет за текущий месяц' },
-        { value: 'year', label: 'Год', description: 'Отчет за текущий год' },
-        { value: 'shift', label: 'Смена', description: 'Отчет за выбранную смену' },
-        { value: 'custom', label: 'Кастомный интервал', description: 'Выберите произвольный период' }
-    ];
+    // Столбцы для каждого типа отчета
+    const reportTypeColumns = {
+        equipment: [
+            'Сварщик', 'Режим', 'Сила тока', 'Масса проволоки', 'Напряжение', 
+            'Проволока', 'Газ л/мин', 'Время сварки (с)'
+        ],
+        welders: [
+            'ID сварщика', 'ФИО', 'Подразделение', 'Квалификация', 'Время работы (часы)',
+            'Количество выполненных швов', 'Расход проволоки (кг)', 'Средний ток (А)',
+            'Среднее напряжение (В)', 'Качество работы (%)', 'Дата последней работы'
+        ],
+        materials: [
+            'Сварщик', 'Должность', 'Время в сети', 'Время горения дуги', 'С превышением тока 340А',
+            'Эффективность работы', 'Энергия (кВт*ч)', 'Проволока', 'Расход (кг)'
+        ],
+        welds: [
+            'ID шва', 'Тип шва', 'Сварщик', 'Оборудование', 'Материал', 'Длина (мм)',
+            'Толщина (мм)', 'Ток (А)', 'Напряжение (В)', 'Скорость (мм/мин)', 'Качество (%)'
+        ],
+        errors: [
+            'Оборудование', 'Тип неисправности', 'Описание', 'Статус', 'Общее количество неисправностей'
+        ],
+        violations: [
+            'Сварщик', 'Тип нарушения', 'Описание', 'Статус', 'Дата нарушения'
+        ]
+    };
 
-    // Смены
-    const shifts = [
-        { value: '1', label: '1-я смена', description: '8:00 - 16:00' },
-        { value: '2', label: '2-я смена', description: '16:00 - 0:00' },
-        { value: '3', label: '3-я смена', description: '0:00 - 8:00' }
+    // Все доступные столбцы (для определения недоступных)
+    const allColumns = [
+        'Сварщик', 'Режим', 'Сила тока', 'Масса проволоки', 'Напряжение', 'Проволока', 'Газ л/мин', 'Время сварки (с)',
+        'ID сварщика', 'ФИО', 'Подразделение', 'Квалификация', 'Время работы (часы)', 'Количество выполненных швов',
+        'Расход проволоки (кг)', 'Средний ток (А)', 'Среднее напряжение (В)', 'Качество работы (%)', 'Дата последней работы',
+        'Должность', 'Время в сети', 'Время горения дуги', 'С превышением тока 340А', 'Эффективность работы',
+        'Энергия (кВт*ч)', 'Расход (кг)', 'ID шва', 'Тип шва', 'Оборудование', 'Материал', 'Длина (мм)',
+        'Толщина (мм)', 'Ток (А)', 'Скорость (мм/мин)', 'Качество (%)', 'Тип неисправности', 'Описание', 'Статус',
+        'Общее количество неисправностей', 'Тип нарушения', 'Дата нарушения'
     ];
 
     // Форматы отчетов
@@ -86,7 +115,9 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
     };
 
     const handleSelectAllColumns = () => {
-        setSelectedColumns(availableColumns);
+        if (selectedReportType && reportTypeColumns[selectedReportType]) {
+            setSelectedColumns(reportTypeColumns[selectedReportType]);
+        }
     };
 
     const handleDeselectAllColumns = () => {
@@ -109,16 +140,6 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
         setSelectedEquipment([]);
     };
 
-    const handlePeriodChange = (period) => {
-        setSelectedPeriod(period);
-        if (period !== 'custom') {
-            setCustomDateFrom('');
-            setCustomDateTo('');
-        }
-        if (period !== 'shift') {
-            setSelectedShift('');
-        }
-    };
 
     const handleCreate = () => {
         if (!templateName.trim()) {
@@ -126,18 +147,13 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
             return;
         }
 
+        if (!selectedReportType) {
+            alert('Выберите тип отчета');
+            return;
+        }
+
         if (selectedColumns.length === 0) {
             alert('Выберите хотя бы один столбец для отчета');
-            return;
-        }
-
-        if (selectedPeriod === 'custom' && (!customDateFrom || !customDateTo)) {
-            alert('Для кастомного периода выберите даты начала и окончания');
-            return;
-        }
-
-        if (selectedPeriod === 'shift' && !selectedShift) {
-            alert('Выберите смену для отчета');
             return;
         }
 
@@ -147,38 +163,26 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
         }
 
         const templateData = {
+            id: editingTemplate ? editingTemplate.id : Date.now().toString(),
             name: templateName.trim(),
+            reportType: selectedReportType,
             columns: selectedColumns,
-            period: selectedPeriod,
             format: selectedFormat,
-            customDateFrom: selectedPeriod === 'custom' ? customDateFrom : null,
-            customDateTo: selectedPeriod === 'custom' ? customDateTo : null,
-            shift: selectedPeriod === 'shift' ? selectedShift : null,
-            equipment: selectedEquipment
+            selectedEquipment,
+            createdAt: editingTemplate ? editingTemplate.createdAt : new Date().toISOString(),
+            lastUsed: null
         };
 
         onCreate(templateData);
-        
-        // Сброс формы
-        setTemplateName('');
-        setSelectedColumns([]);
-        setSelectedPeriod('day');
-        setSelectedFormat('xlsx');
-        setCustomDateFrom('');
-        setCustomDateTo('');
-        setSelectedShift('');
-        setSelectedEquipment([]);
+        handleClose();
     };
 
     const handleClose = () => {
         // Сброс формы при закрытии
         setTemplateName('');
+        setSelectedReportType('');
         setSelectedColumns([]);
-        setSelectedPeriod('day');
         setSelectedFormat('xlsx');
-        setCustomDateFrom('');
-        setCustomDateTo('');
-        setSelectedShift('');
         setSelectedEquipment([]);
         onClose();
     };
@@ -189,7 +193,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
         <div className="modal-overlay" onClick={handleClose}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h2>Создать шаблон отчета</h2>
+                    <h2>{editingTemplate ? 'Редактировать шаблон отчета' : 'Создать шаблон отчета'}</h2>
                     <button className="close-button" onClick={handleClose}>×</button>
                 </div>
 
@@ -204,6 +208,25 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
                             placeholder="Введите название шаблона"
                             className="template-name-input"
                         />
+                    </div>
+
+                    {/* Выбор типа отчета */}
+                    <div className="form-section">
+                        <h3>Тип отчета</h3>
+                        <div className="report-type-selector">
+                            {reportTypes.map(type => (
+                                <label key={type.value} className="report-type-option">
+                                    <input
+                                        type="radio"
+                                        name="reportType"
+                                        value={type.value}
+                                        checked={selectedReportType === type.value}
+                                        onChange={(e) => setSelectedReportType(e.target.value)}
+                                    />
+                                    <span className="radio-label">{type.label}</span>
+                                </label>
+                            ))}
+                        </div>
                     </div>
 
                     {/* Выбор столбцов */}
@@ -228,19 +251,30 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
                             </div>
                         </div>
                         <div className="columns-grid">
-                            {availableColumns.map(column => (
-                                <label key={column} className="column-checkbox">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedColumns.includes(column)}
-                                        onChange={() => handleColumnToggle(column)}
-                                    />
-                                    <span className="checkbox-label">{column}</span>
-                                </label>
-                            ))}
+                            {allColumns.map(column => {
+                                const isAvailable = selectedReportType && reportTypeColumns[selectedReportType]?.includes(column);
+                                const isSelected = selectedColumns.includes(column);
+                                
+                                return (
+                                    <label 
+                                        key={column} 
+                                        className={`column-checkbox ${!isAvailable ? 'disabled' : ''}`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => handleColumnToggle(column)}
+                                            disabled={!isAvailable}
+                                        />
+                                        <span className={`checkbox-label ${!isAvailable ? 'disabled' : ''}`}>
+                                            {column}
+                                        </span>
+                                    </label>
+                                );
+                            })}
                         </div>
                         <div className="selected-count">
-                            Выбрано столбцов: {selectedColumns.length} из {availableColumns.length}
+                            Выбрано столбцов: {selectedColumns.length} из {selectedReportType ? reportTypeColumns[selectedReportType]?.length || 0 : 0}
                         </div>
                     </div>
 
@@ -291,77 +325,6 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
                         </div>
                     </div>
 
-                    {/* Выбор периода */}
-                    <div className="form-section">
-                        <h3>Временной интервал</h3>
-                        <div className="period-options">
-                            {periods.map(period => (
-                                <div
-                                    key={period.value}
-                                    className={`period-option ${selectedPeriod === period.value ? 'selected' : ''}`}
-                                    onClick={() => handlePeriodChange(period.value)}
-                                >
-                                    <div className="period-radio">
-                                        <div className={`radio-circle ${selectedPeriod === period.value ? 'checked' : ''}`}></div>
-                                    </div>
-                                    <div className="period-info">
-                                        <div className="period-label">{period.label}</div>
-                                        <div className="period-description">{period.description}</div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Выбор смены (если выбран период "смена") */}
-                    {selectedPeriod === 'shift' && (
-                        <div className="form-section">
-                            <h3>Выберите смену</h3>
-                            <div className="shift-options">
-                                {shifts.map(shift => (
-                                    <div
-                                        key={shift.value}
-                                        className={`shift-option ${selectedShift === shift.value ? 'selected' : ''}`}
-                                        onClick={() => setSelectedShift(shift.value)}
-                                    >
-                                        <div className="shift-radio">
-                                            <div className={`radio-circle ${selectedShift === shift.value ? 'checked' : ''}`}></div>
-                                        </div>
-                                        <div className="shift-info">
-                                            <div className="shift-label">{shift.label}</div>
-                                            <div className="shift-description">{shift.description}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Кастомный период */}
-                    {selectedPeriod === 'custom' && (
-                        <div className="form-section">
-                            <h3>Выберите период</h3>
-                            <div className="custom-dates">
-                                <div className="date-input">
-                                    <label>Дата начала:</label>
-                                    <input
-                                        type="date"
-                                        value={customDateFrom}
-                                        onChange={(e) => setCustomDateFrom(e.target.value)}
-                                    />
-                                </div>
-                                <div className="date-input">
-                                    <label>Дата окончания:</label>
-                                    <input
-                                        type="date"
-                                        value={customDateTo}
-                                        onChange={(e) => setCustomDateTo(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Выбор формата */}
                     <div className="form-section">
                         <h3>Формат отчета</h3>
@@ -387,9 +350,9 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate }) => {
                     <button 
                         className="create-button" 
                         onClick={handleCreate}
-                        disabled={!templateName.trim() || selectedColumns.length === 0 || selectedEquipment.length === 0}
+                        disabled={!templateName.trim() || !selectedReportType || selectedColumns.length === 0 || selectedEquipment.length === 0}
                     >
-                        Создать шаблон
+                        {editingTemplate ? 'Сохранить изменения' : 'Создать шаблон'}
                     </button>
                 </div>
             </div>
