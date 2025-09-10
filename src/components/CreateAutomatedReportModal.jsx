@@ -1,38 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    TextField,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    Grid,
-    Typography,
-    Box,
-    Chip,
-    IconButton,
-    Alert,
-    Divider,
-    FormControlLabel,
-    Switch,
-    Accordion,
-    AccordionSummary,
-    AccordionDetails
-} from '@mui/material';
-import {
-    Add as AddIcon,
-    Delete as DeleteIcon,
-    ExpandMore as ExpandMoreIcon,
-    Schedule as ScheduleIcon,
-    Warning as WarningIcon,
-    CheckCircle as CheckCircleIcon,
-    Settings as SettingsIcon
-} from '@mui/icons-material';
-import { reportApi } from '../api/reportApi';
 import '../styles/createAutomatedReportModal.css';
 
 const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
@@ -180,16 +146,16 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
         }));
     };
 
-    const getTriggerIcon = (type) => {
+    const getTriggerIconClass = (type) => {
         switch (type) {
             case 'TIME':
-                return <ScheduleIcon />;
+                return 'fa-clock';
             case 'EQUIPMENT_ERROR':
-                return <WarningIcon />;
+                return 'fa-exclamation-triangle';
             case 'VALUE_THRESHOLD':
-                return <CheckCircleIcon />;
+                return 'fa-check-circle';
             default:
-                return <SettingsIcon />;
+                return 'fa-cog';
         }
     };
 
@@ -310,254 +276,224 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
         onClose();
     };
 
+    if (!open) return null;
+
     return (
-        <Dialog
-            open={open}
-            onClose={onClose}
-            maxWidth="md"
-            fullWidth
-            className="create-automated-report-modal"
-        >
-            <DialogTitle>
-                <Typography variant="h6" component="div" fontWeight="bold">
-                    Создать автоматизированный отчет
-                </Typography>
-            </DialogTitle>
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="create-automated-report-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2>Создать автоматизированный отчет</h2>
+                    <button className="close-btn" onClick={onClose}>
+                        <i className="fas fa-times"></i>
+                    </button>
+                </div>
 
-            <DialogContent>
-                {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                        {error}
-                    </Alert>
-                )}
+                <div className="modal-content">
+                    {error && (
+                        <div className="error-message">
+                            <i className="fas fa-exclamation-triangle"></i>
+                            {error}
+                        </div>
+                    )}
 
-                <Grid container spacing={3}>
                     {/* Основная информация */}
-                    <Grid item xs={12}>
-                        <Typography variant="h6" gutterBottom>
-                            Основная информация
-                        </Typography>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Название автоматизированного отчета"
-                                    value={formData.name}
-                                    onChange={(e) => handleInputChange('name', e.target.value)}
-                                    placeholder="Например: Еженедельный отчет по оборудованию"
-                                    required
+                    <div className="form-section">
+                        <h3>Основная информация</h3>
+                        <div className="form-group">
+                            <label>Название автоматизированного отчета *</label>
+                            <input
+                                type="text"
+                                value={formData.name}
+                                onChange={(e) => handleInputChange('name', e.target.value)}
+                                placeholder="Например: Еженедельный отчет по оборудованию"
+                                required
+                            />
+                        </div>
+                        
+                        <div className="form-group">
+                            <label>Шаблон отчета *</label>
+                            <select
+                                value={formData.templateId}
+                                onChange={(e) => handleTemplateChange(e.target.value)}
+                                required
+                            >
+                                <option value="">Выберите шаблон</option>
+                                {templates.map((template) => (
+                                    <option key={template.id} value={template.id}>
+                                        {template.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        <div className="form-group">
+                            <label className="checkbox-label">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.isActive}
+                                    onChange={(e) => handleInputChange('isActive', e.target.checked)}
                                 />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <FormControl fullWidth required>
-                                    <InputLabel>Шаблон отчета</InputLabel>
-                                    <Select
-                                        value={formData.templateId}
-                                        label="Шаблон отчета"
-                                        onChange={(e) => handleTemplateChange(e.target.value)}
-                                    >
-                                        {templates.map((template) => (
-                                            <MenuItem key={template.id} value={template.id}>
-                                                {template.name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12}>
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={formData.isActive}
-                                            onChange={(e) => handleInputChange('isActive', e.target.checked)}
-                                            color="primary"
-                                        />
-                                    }
-                                    label="Активировать автоматический отчет сразу после создания"
-                                />
-                            </Grid>
-                        </Grid>
-                    </Grid>
-
-                    <Grid item xs={12}>
-                        <Divider />
-                    </Grid>
+                                <span className="checkmark"></span>
+                                Активировать автоматический отчет сразу после создания
+                            </label>
+                        </div>
+                    </div>
 
                     {/* Триггеры */}
-                    <Grid item xs={12}>
-                        <Typography variant="h6" gutterBottom>
-                            Триггеры запуска
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" paragraph>
+                    <div className="form-section">
+                        <h3>Триггеры запуска</h3>
+                        <p className="section-description">
                             Настройте условия, при которых будет автоматически создаваться отчет
-                        </Typography>
+                        </p>
 
                         {/* Добавление нового триггера */}
-                        <Accordion>
-                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                <Typography variant="subtitle1">
-                                    Добавить триггер
-                                </Typography>
-                            </AccordionSummary>
-                            <AccordionDetails>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12} md={4}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Тип триггера</InputLabel>
-                                            <Select
-                                                value={triggerType}
-                                                label="Тип триггера"
-                                                onChange={(e) => setTriggerType(e.target.value)}
-                                            >
-                                                {getTriggerTypeOptions().map((option) => (
-                                                    <MenuItem key={option.value} value={option.value}>
-                                                        <Box display="flex" alignItems="center" gap={1}>
-                                                            {getTriggerIcon(option.value)}
-                                                            {option.label}
-                                                        </Box>
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Grid>
-                                    <Grid item xs={12} md={4}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Значение</InputLabel>
-                                            <Select
-                                                value={triggerValue}
-                                                label="Значение"
-                                                onChange={(e) => setTriggerValue(e.target.value)}
-                                            >
-                                                {getTriggerValueOptions().map((option) => (
-                                                    <MenuItem key={option.value} value={option.value}>
-                                                        {option.label}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Grid>
+                        <div className="trigger-form">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Тип триггера</label>
+                                    <select
+                                        value={triggerType}
+                                        onChange={(e) => setTriggerType(e.target.value)}
+                                    >
+                                        {getTriggerTypeOptions().map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label>Значение</label>
+                                    <select
+                                        value={triggerValue}
+                                        onChange={(e) => setTriggerValue(e.target.value)}
+                                    >
+                                        {getTriggerValueOptions().map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Дополнительные поля для временных триггеров */}
+                            {triggerType === 'TIME' && (
+                                <>
+                                    <div className="form-row">
+                                        <div className="form-group">
+                                            <label>Время выполнения</label>
+                                            <input
+                                                type="time"
+                                                value={triggerTime}
+                                                onChange={(e) => setTriggerTime(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
                                     
-                                    {/* Дополнительные поля для временных триггеров */}
-                                    {triggerType === 'TIME' && (
-                                        <>
-                                            <Grid item xs={12} md={4}>
-                                                <TextField
-                                                    fullWidth
-                                                    label="Время выполнения"
-                                                    type="time"
-                                                    value={triggerTime}
-                                                    onChange={(e) => setTriggerTime(e.target.value)}
-                                                    InputLabelProps={{
-                                                        shrink: true,
-                                                    }}
-                                                />
-                                            </Grid>
-                                            
-                                            {triggerValue === 'weekly' && (
-                                                <Grid item xs={12}>
-                                                    <Typography variant="subtitle2" gutterBottom>
-                                                        Дни недели:
-                                                    </Typography>
-                                                    <Box display="flex" flexWrap="wrap" gap={1}>
-                                                        {getDaysOfWeekOptions().map((day) => (
-                                                            <Chip
-                                                                key={day.value}
-                                                                label={day.label}
-                                                                onClick={() => handleDayToggle(day.value)}
-                                                                color={triggerDays.includes(day.value) ? "primary" : "default"}
-                                                                variant={triggerDays.includes(day.value) ? "filled" : "outlined"}
-                                                            />
-                                                        ))}
-                                                    </Box>
-                                                </Grid>
-                                            )}
-                                            
-                                            {triggerValue === 'monthly' && (
-                                                <Grid item xs={12} md={4}>
-                                                    <TextField
-                                                        fullWidth
-                                                        label="День месяца"
-                                                        type="number"
-                                                        value={triggerDayOfMonth}
-                                                        onChange={(e) => setTriggerDayOfMonth(parseInt(e.target.value) || 1)}
-                                                        inputProps={{
-                                                            min: 1,
-                                                            max: 31
-                                                        }}
-                                                    />
-                                                </Grid>
-                                            )}
-                                        </>
+                                    {triggerValue === 'weekly' && (
+                                        <div className="form-group">
+                                            <label>Дни недели:</label>
+                                            <div className="days-selector">
+                                                {getDaysOfWeekOptions().map((day) => (
+                                                    <button
+                                                        key={day.value}
+                                                        type="button"
+                                                        className={`day-chip ${triggerDays.includes(day.value) ? 'selected' : ''}`}
+                                                        onClick={() => handleDayToggle(day.value)}
+                                                    >
+                                                        {day.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
                                     )}
                                     
-                                    <Grid item xs={12} md={triggerType === 'TIME' ? 12 : 4}>
-                                        <TextField
-                                            fullWidth
-                                            label="Описание"
-                                            value={triggerType === 'TIME' ? generateTimeTriggerDescription() : triggerDescription}
-                                            onChange={(e) => setTriggerDescription(e.target.value)}
-                                            placeholder="Например: Каждую неделю в понедельник в 09:00"
-                                            disabled={triggerType === 'TIME' && !!generateTimeTriggerDescription()}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <Button
-                                            variant="outlined"
-                                            startIcon={<AddIcon />}
-                                            onClick={addTrigger}
-                                            disabled={
-                                                !triggerValue || 
-                                                (triggerType === 'TIME' && !triggerTime) ||
-                                                (triggerType === 'TIME' && triggerValue === 'weekly' && triggerDays.length === 0) ||
-                                                (triggerType === 'TIME' && triggerValue === 'monthly' && !triggerDayOfMonth) ||
-                                                (triggerType !== 'TIME' && !triggerDescription)
-                                            }
-                                        >
-                                            Добавить триггер
-                                        </Button>
-                                    </Grid>
-                                </Grid>
-                            </AccordionDetails>
-                        </Accordion>
+                                    {triggerValue === 'monthly' && (
+                                        <div className="form-row">
+                                            <div className="form-group">
+                                                <label>День месяца</label>
+                                                <input
+                                                    type="number"
+                                                    value={triggerDayOfMonth}
+                                                    onChange={(e) => setTriggerDayOfMonth(parseInt(e.target.value) || 1)}
+                                                    min="1"
+                                                    max="31"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            
+                            <div className="form-group">
+                                <label>Описание</label>
+                                <input
+                                    type="text"
+                                    value={triggerType === 'TIME' ? generateTimeTriggerDescription() : triggerDescription}
+                                    onChange={(e) => setTriggerDescription(e.target.value)}
+                                    placeholder="Например: Каждую неделю в понедельник в 09:00"
+                                    disabled={triggerType === 'TIME' && !!generateTimeTriggerDescription()}
+                                />
+                            </div>
+                            
+                            <button
+                                type="button"
+                                className="add-trigger-btn"
+                                onClick={addTrigger}
+                                disabled={
+                                    !triggerValue || 
+                                    (triggerType === 'TIME' && !triggerTime) ||
+                                    (triggerType === 'TIME' && triggerValue === 'weekly' && triggerDays.length === 0) ||
+                                    (triggerType === 'TIME' && triggerValue === 'monthly' && !triggerDayOfMonth) ||
+                                    (triggerType !== 'TIME' && !triggerDescription)
+                                }
+                            >
+                                <i className="fas fa-plus"></i>
+                                Добавить триггер
+                            </button>
+                        </div>
 
                         {/* Список добавленных триггеров */}
                         {formData.triggers.length > 0 && (
-                            <Box mt={2}>
-                                <Typography variant="subtitle2" gutterBottom>
-                                    Добавленные триггеры:
-                                </Typography>
-                                <Box display="flex" flexWrap="wrap" gap={1}>
+                            <div className="triggers-list">
+                                <h4>Добавленные триггеры:</h4>
+                                <div className="triggers-chips">
                                     {formData.triggers.map((trigger, index) => (
-                                        <Chip
-                                            key={index}
-                                            icon={getTriggerIcon(trigger.type)}
-                                            label={trigger.description}
-                                            onDelete={() => removeTrigger(index)}
-                                            deleteIcon={<DeleteIcon />}
-                                            color="primary"
-                                            variant="outlined"
-                                        />
+                                        <div key={index} className="trigger-chip">
+                                            <i className={`fas ${getTriggerIconClass(trigger.type)}`}></i>
+                                            <span>{trigger.description}</span>
+                                            <button 
+                                                type="button"
+                                                className="remove-trigger-btn"
+                                                onClick={() => removeTrigger(index)}
+                                            >
+                                                <i className="fas fa-times"></i>
+                                            </button>
+                                        </div>
                                     ))}
-                                </Box>
-                            </Box>
+                                </div>
+                            </div>
                         )}
-                    </Grid>
-                </Grid>
-            </DialogContent>
+                    </div>
+                </div>
 
-            <DialogActions>
-                <Button onClick={onClose}>
-                    Отмена
-                </Button>
-                <Button
-                    onClick={handleSave}
-                    variant="contained"
-                    disabled={!formData.name || !formData.templateId || formData.triggers.length === 0}
-                >
-                    Создать отчет
-                </Button>
-            </DialogActions>
-        </Dialog>
+                <div className="modal-actions">
+                    <button type="button" className="cancel-btn" onClick={onClose}>
+                        Отмена
+                    </button>
+                    <button
+                        type="button"
+                        className="create-btn"
+                        onClick={handleSave}
+                        disabled={!formData.name || !formData.templateId || formData.triggers.length === 0}
+                    >
+                        Создать отчет
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 };
 

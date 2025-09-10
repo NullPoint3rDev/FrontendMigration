@@ -1,363 +1,378 @@
-.create-automated-report-modal .MuiDialog-paper {
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-    max-height: 90vh;
-    overflow: hidden;
+/* Create Automated Report Modal Styles */
+:root {
+  --primary: #6C63FF;
+  --secondary: #FF6584;
+  --accent: #4CAF50;
+  --background: #1A1A2E;
+  --surface: #16213E;
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.create-automated-report-modal .MuiDialogTitle-root {
-    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
-    color: white;
-    padding: 24px;
-    border-bottom: 1px solid #e0e0e0;
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
 }
 
-.create-automated-report-modal .MuiDialogTitle-root .MuiTypography-root {
-    color: white;
-    font-weight: 600;
+.create-automated-report-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
-.create-automated-report-modal .MuiDialogContent-root {
-    padding: 24px;
-    background-color: #fafafa;
-    max-height: 60vh;
-    overflow-y: auto;
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.create-automated-report-modal .MuiDialogActions-root {
-    padding: 16px 24px;
-    background-color: #fff;
-    border-top: 1px solid #e0e0e0;
-    gap: 12px;
+.modal-header h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 600;
 }
 
-/* Form sections */
-.create-automated-report-modal .MuiTypography-h6 {
-    color: #1976d2;
-    font-weight: 600;
-    margin-bottom: 16px;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #e3f2fd;
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 4px;
+  transition: var(--transition);
+  font-size: 1.2rem;
 }
 
-.create-automated-report-modal .MuiTypography-subtitle1 {
-    font-weight: 500;
-    color: #424242;
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
-.create-automated-report-modal .MuiTypography-subtitle2 {
-    font-weight: 500;
-    color: #666;
-    margin-bottom: 8px;
+.modal-content {
+  padding: 1.5rem;
+  flex: 1;
+  overflow-y: auto;
 }
 
-.create-automated-report-modal .MuiTypography-body2 {
-    color: #666;
-    line-height: 1.6;
+.error-message {
+  background: rgba(255, 101, 132, 0.1);
+  border: 1px solid var(--secondary);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  color: var(--secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-/* Form controls */
-.create-automated-report-modal .MuiTextField-root {
-    background-color: #fff;
-    border-radius: 8px;
+.form-section {
+  margin-bottom: 2rem;
 }
 
-.create-automated-report-modal .MuiFormControl-root {
-    background-color: #fff;
-    border-radius: 8px;
+.form-section h3 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  font-weight: 600;
 }
 
-.create-automated-report-modal .MuiInputBase-root {
-    border-radius: 8px;
+.section-description {
+  margin: 0 0 1.5rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
-.create-automated-report-modal .MuiInputLabel-root {
-    color: #666;
+.form-group {
+  margin-bottom: 1.5rem;
 }
 
-.create-automated-report-modal .MuiInputLabel-root.Mui-focused {
-    color: #1976d2;
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
 }
 
-/* Switch styles */
-.create-automated-report-modal .MuiSwitch-root {
-    margin: 0 8px;
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 0.9rem;
 }
 
-.create-automated-report-modal .MuiSwitch-track {
-    background-color: #e0e0e0;
-    border-radius: 12px;
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: var(--background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition: var(--transition);
 }
 
-.create-automated-report-modal .MuiSwitch-thumb {
-    background-color: #fff;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(108, 99, 255, 0.2);
 }
 
-.create-automated-report-modal .MuiSwitch-root.Mui-checked .MuiSwitch-track {
-    background-color: #1976d2;
+.form-group input::placeholder {
+  color: var(--text-secondary);
 }
 
-.create-automated-report-modal .MuiSwitch-root.Mui-checked .MuiSwitch-thumb {
-    background-color: #fff;
+.form-group input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-.create-automated-report-modal .MuiFormControlLabel-label {
-    font-size: 0.875rem;
-    color: #424242;
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  cursor: pointer;
+  margin-bottom: 0 !important;
 }
 
-/* Accordion styles */
-.create-automated-report-modal .MuiAccordion-root {
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    margin-bottom: 16px;
+.checkbox-label input[type="checkbox"] {
+  width: auto !important;
+  margin-right: 0.75rem;
+  cursor: pointer;
 }
 
-.create-automated-report-modal .MuiAccordion-root:before {
-    display: none;
+.checkmark {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
-.create-automated-report-modal .MuiAccordionSummary-root {
-    background-color: #f8f9fa;
-    border-radius: 8px 8px 0 0;
-    padding: 16px 24px;
+.trigger-form {
+  background: var(--background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
 }
 
-.create-automated-report-modal .MuiAccordionSummary-root.Mui-expanded {
-    border-radius: 8px 8px 0 0;
+.days-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
-.create-automated-report-modal .MuiAccordionDetails-root {
-    background-color: #fff;
-    border-radius: 0 0 8px 8px;
-    padding: 24px;
+.day-chip {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: var(--transition);
+  font-size: 0.875rem;
 }
 
-.create-automated-report-modal .MuiAccordionSummary-content {
-    margin: 0;
+.day-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
-.create-automated-report-modal .MuiAccordionSummary-expandIconWrapper {
-    color: #1976d2;
+.day-chip.selected {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
 }
 
-/* Chip styles for triggers */
-.create-automated-report-modal .MuiChip-root {
-    font-weight: 500;
-    border-radius: 16px;
-    margin: 4px;
+.add-trigger-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
 }
 
-.create-automated-report-modal .MuiChip-root.MuiChip-colorPrimary {
-    background-color: #e3f2fd;
-    color: #1976d2;
-    border: 1px solid #bbdefb;
+.add-trigger-btn:hover:not(:disabled) {
+  background: var(--secondary);
+  transform: translateY(-2px);
 }
 
-.create-automated-report-modal .MuiChip-root .MuiChip-icon {
-    color: #1976d2;
+.add-trigger-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
-.create-automated-report-modal .MuiChip-root .MuiChip-deleteIcon {
-    color: #1976d2;
+.triggers-list {
+  margin-top: 1.5rem;
 }
 
-.create-automated-report-modal .MuiChip-root .MuiChip-deleteIcon:hover {
-    color: #1565c0;
+.triggers-list h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
 }
 
-/* Button styles */
-.create-automated-report-modal .MuiButton-root {
-    border-radius: 8px;
-    text-transform: none;
-    font-weight: 500;
-    padding: 8px 16px;
+.triggers-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
-.create-automated-report-modal .MuiButton-contained {
-    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
-    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3);
+.trigger-chip {
+  background: var(--background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
 }
 
-.create-automated-report-modal .MuiButton-contained:hover {
-    background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%);
-    box-shadow: 0 4px 16px rgba(25, 118, 210, 0.4);
+.trigger-chip i {
+  color: var(--primary);
+  font-size: 0.875rem;
 }
 
-.create-automated-report-modal .MuiButton-outlined {
-    border-color: #1976d2;
-    color: #1976d2;
+.remove-trigger-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: var(--transition);
+  margin-left: 0.5rem;
 }
 
-.create-automated-report-modal .MuiButton-outlined:hover {
-    background-color: rgba(25, 118, 210, 0.08);
-    border-color: #1565c0;
+.remove-trigger-btn:hover {
+  background: rgba(255, 101, 132, 0.1);
+  color: var(--secondary);
 }
 
-.create-automated-report-modal .MuiButton-root:disabled {
-    background-color: #f5f5f5;
-    color: #bdbdbd;
-    border-color: #e0e0e0;
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border-color);
 }
 
-/* Alert styles */
-.create-automated-report-modal .MuiAlert-root {
-    border-radius: 8px;
-    margin-bottom: 16px;
+.cancel-btn {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
 }
 
-.create-automated-report-modal .MuiAlert-standardError {
-    background-color: #ffebee;
-    color: #c62828;
+.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
-/* Divider styles */
-.create-automated-report-modal .MuiDivider-root {
-    margin: 24px 0;
-    background-color: #e0e0e0;
+.create-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
 }
 
-/* Grid spacing */
-.create-automated-report-modal .MuiGrid-container {
-    margin-top: 0;
+.create-btn:hover:not(:disabled) {
+  background: var(--secondary);
+  transform: translateY(-2px);
 }
 
-.create-automated-report-modal .MuiGrid-item {
-    padding-top: 0;
-}
-
-/* Icon styles */
-.create-automated-report-modal .MuiSvgIcon-root {
-    color: #666;
-}
-
-.create-automated-report-modal .MuiBox-root .MuiSvgIcon-root {
-    color: #1976d2;
+.create-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Responsive design */
 @media (max-width: 768px) {
-    .create-automated-report-modal .MuiDialog-paper {
-        margin: 16px;
-        max-height: calc(100vh - 32px);
-    }
-    
-    .create-automated-report-modal .MuiDialogTitle-root {
-        padding: 16px;
-    }
-    
-    .create-automated-report-modal .MuiDialogContent-root {
-        padding: 16px;
-        max-height: 50vh;
-    }
-    
-    .create-automated-report-modal .MuiDialogActions-root {
-        padding: 12px 16px;
-        flex-direction: column;
-    }
-    
-    .create-automated-report-modal .MuiAccordionDetails-root {
-        padding: 16px;
-    }
-    
-    .create-automated-report-modal .MuiGrid-container {
-        flex-direction: column;
-    }
-    
-    .create-automated-report-modal .MuiGrid-item {
-        width: 100% !important;
-    }
+  .modal-overlay {
+    padding: 0.5rem;
+  }
+  
+  .create-automated-report-modal {
+    max-height: 95vh;
+  }
+  
+  .modal-header,
+  .modal-content,
+  .modal-actions {
+    padding: 1rem;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .cancel-btn,
+  .create-btn {
+    width: 100%;
+  }
 }
 
 @media (max-width: 480px) {
-    .create-automated-report-modal .MuiDialog-paper {
-        margin: 8px;
-        max-height: calc(100vh - 16px);
-    }
-    
-    .create-automated-report-modal .MuiDialogTitle-root {
-        padding: 12px;
-    }
-    
-    .create-automated-report-modal .MuiDialogContent-root {
-        padding: 12px;
-    }
-    
-    .create-automated-report-modal .MuiDialogActions-root {
-        padding: 8px 12px;
-    }
-    
-    .create-automated-report-modal .MuiAccordionSummary-root {
-        padding: 12px 16px;
-    }
-    
-    .create-automated-report-modal .MuiAccordionDetails-root {
-        padding: 12px;
-    }
-}
-
-/* Custom scrollbar for dialog content */
-.create-automated-report-modal .MuiDialogContent-root::-webkit-scrollbar {
-    width: 6px;
-}
-
-.create-automated-report-modal .MuiDialogContent-root::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-}
-
-.create-automated-report-modal .MuiDialogContent-root::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
-}
-
-.create-automated-report-modal .MuiDialogContent-root::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
-
-/* Animation for modal */
-@keyframes modalSlideIn {
-    from {
-        opacity: 0;
-        transform: scale(0.9) translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
-}
-
-.create-automated-report-modal .MuiDialog-paper {
-    animation: modalSlideIn 0.3s ease-out;
-}
-
-/* Focus styles for accessibility */
-.create-automated-report-modal .MuiButton-root:focus,
-.create-automated-report-modal .MuiIconButton-root:focus {
-    outline: 2px solid #1976d2;
-    outline-offset: 2px;
-}
-
-/* Loading state */
-.create-automated-report-modal .MuiCircularProgress-root {
-    color: #1976d2;
-}
-
-/* Empty state for triggers */
-.create-automated-report-modal .MuiBox-root[style*="display: flex"] {
-    min-height: 40px;
-    align-items: center;
-}
-
-/* Trigger type icons */
-.create-automated-report-modal .MuiMenuItem-root .MuiBox-root {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.create-automated-report-modal .MuiMenuItem-root .MuiSvgIcon-root {
-    font-size: 18px;
-    color: #1976d2;
+  .modal-header h2 {
+    font-size: 1.25rem;
+  }
+  
+  .form-group input,
+  .form-group select {
+    padding: 0.75rem;
+  }
+  
+  .day-chip {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
 }
