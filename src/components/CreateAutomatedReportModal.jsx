@@ -121,8 +121,8 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
     };
 
     const addTrigger = () => {
-        if (!triggerValue || !triggerDescription) {
-            setError('Заполните все поля триггера');
+        if (!triggerValue) {
+            setError('Выберите значение триггера');
             return;
         }
 
@@ -142,10 +142,20 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
             }
         }
 
+        // Для временных триггеров используем автоматически сгенерированное описание
+        const finalDescription = triggerType === 'TIME' 
+            ? generateTimeTriggerDescription() 
+            : triggerDescription;
+
+        if (!finalDescription) {
+            setError('Заполните описание триггера');
+            return;
+        }
+
         const newTrigger = {
             type: triggerType,
             value: triggerValue,
-            description: triggerDescription,
+            description: finalDescription,
             time: triggerType === 'TIME' ? triggerTime : undefined,
             daysOfWeek: triggerType === 'TIME' && triggerValue === 'weekly' ? triggerDays.join(',') : undefined,
             dayOfMonth: triggerType === 'TIME' && triggerValue === 'monthly' ? triggerDayOfMonth : undefined
@@ -484,7 +494,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                                         <TextField
                                             fullWidth
                                             label="Описание"
-                                            value={triggerDescription || generateTimeTriggerDescription()}
+                                            value={triggerType === 'TIME' ? generateTimeTriggerDescription() : triggerDescription}
                                             onChange={(e) => setTriggerDescription(e.target.value)}
                                             placeholder="Например: Каждую неделю в понедельник в 09:00"
                                             disabled={triggerType === 'TIME' && !!generateTimeTriggerDescription()}
@@ -499,7 +509,8 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                                                 !triggerValue || 
                                                 (triggerType === 'TIME' && !triggerTime) ||
                                                 (triggerType === 'TIME' && triggerValue === 'weekly' && triggerDays.length === 0) ||
-                                                (triggerType === 'TIME' && triggerValue === 'monthly' && !triggerDayOfMonth)
+                                                (triggerType === 'TIME' && triggerValue === 'monthly' && !triggerDayOfMonth) ||
+                                                (triggerType !== 'TIME' && !triggerDescription)
                                             }
                                         >
                                             Добавить триггер
