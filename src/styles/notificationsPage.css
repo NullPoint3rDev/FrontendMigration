@@ -1,0 +1,107 @@
+.notifications-page {
+    padding: 20px;
+    min-height: 100vh;
+    background-color: #f5f5f5;
+}
+
+.notifications-page .MuiPaper-root {
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.notifications-page .MuiTabs-root {
+    background-color: #fff;
+    border-radius: 12px 12px 0 0;
+}
+
+.notifications-page .MuiTab-root {
+    text-transform: none;
+    font-weight: 500;
+    font-size: 16px;
+    min-height: 60px;
+    color: #666;
+    transition: all 0.3s ease;
+}
+
+.notifications-page .MuiTab-root.Mui-selected {
+    color: #1976d2;
+    background-color: #f0f7ff;
+}
+
+.notifications-page .MuiTab-root:hover {
+    background-color: #f8f9fa;
+}
+
+.notifications-page .MuiTab-root .MuiSvgIcon-root {
+    margin-right: 8px;
+    font-size: 20px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .notifications-page {
+        padding: 10px;
+    }
+    
+    .notifications-page .MuiTab-root {
+        font-size: 14px;
+        min-height: 50px;
+    }
+    
+    .notifications-page .MuiTab-root .MuiSvgIcon-root {
+        font-size: 18px;
+    }
+}
+
+/* Animation for tab content */
+.notifications-page .MuiBox-root {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Loading and error states */
+.notifications-page .MuiAlert-root {
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.notifications-page .MuiCircularProgress-root {
+    color: #1976d2;
+}
+
+/* Tab panel content */
+.notifications-page .MuiBox-root[role="tabpanel"] {
+    background-color: #fff;
+    border-radius: 0 0 12px 12px;
+    min-height: 600px;
+    padding: 24px !important;
+}
+
+/* Custom scrollbar for tab content */
+.notifications-page .MuiBox-root[role="tabpanel"]::-webkit-scrollbar {
+    width: 6px;
+}
+
+.notifications-page .MuiBox-root[role="tabpanel"]::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.notifications-page .MuiBox-root[role="tabpanel"]::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.notifications-page .MuiBox-root[role="tabpanel"]::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}

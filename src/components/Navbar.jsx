@@ -48,6 +48,7 @@ const Navbar = () => {
                 { label: 'Отчет о выполнении сварочного задания', path: '/reports/tasks' },
             ],
         },
+        { label: 'Уведомления', path: '/notifications' },
         {
             label: 'Настройки',
             dropdown: [

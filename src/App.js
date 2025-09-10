@@ -23,6 +23,7 @@ import EquipmentReportPage from './components/EquipmentReportPage';
 import WeldersReportPage from './components/WeldersReportPage';
 import MaterialsReportPage from './components/MaterialsReportPage';
 import WeldsReportPage from './components/WeldsReportPage';
+import NotificationsPage from './components/NotificationsPage';
 
 import ErrorsReportPage from './components/ErrorsReportPage';
 import ViolationsReportPage from './components/ViolationsReportPage';
@@ -92,7 +93,10 @@ function App() {
                                 <Route path="/reports/violations" element={<ViolationsReportPage />} />
                                 <Route path="/reports/tasks" element={<TasksReportPage />} />
                                 
-                                {/* 5. Настройки */}
+                                {/* 5. Уведомления */}
+                                <Route path="/notifications" element={<NotificationsPage />} />
+                                
+                                {/* 6. Настройки */}
                                 <Route path="/settings/storage" element={<SettingsPage />} />
                                 <Route path="/settings/inactivity" element={<SettingsPage />} />
                                 

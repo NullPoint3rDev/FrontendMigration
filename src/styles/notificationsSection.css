@@ -1,0 +1,239 @@
+.notifications-section {
+    width: 100%;
+}
+
+.notifications-section .MuiCard-root {
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    margin-bottom: 16px;
+}
+
+.notifications-section .MuiCard-root:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.notifications-section .MuiCard-root:last-child {
+    margin-bottom: 0;
+}
+
+/* Notification card with unread status */
+.notifications-section .MuiCard-root[style*="border-left: 4px solid #1976d2"] {
+    background: linear-gradient(90deg, rgba(25, 118, 210, 0.05) 0%, transparent 100%);
+}
+
+/* Chip styles */
+.notifications-section .MuiChip-root {
+    font-weight: 500;
+    border-radius: 16px;
+}
+
+.notifications-section .MuiChip-root.MuiChip-colorSuccess {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+}
+
+.notifications-section .MuiChip-root.MuiChip-colorError {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+.notifications-section .MuiChip-root.MuiChip-colorWarning {
+    background-color: #fff3e0;
+    color: #ef6c00;
+}
+
+.notifications-section .MuiChip-root.MuiChip-colorInfo {
+    background-color: #e3f2fd;
+    color: #1565c0;
+}
+
+.notifications-section .MuiChip-root.MuiChip-colorDefault {
+    background-color: #f5f5f5;
+    color: #424242;
+}
+
+/* Typography styles */
+.notifications-section .MuiTypography-h6 {
+    font-weight: 600;
+    color: #1976d2;
+    margin-bottom: 8px;
+}
+
+.notifications-section .MuiTypography-body2 {
+    line-height: 1.6;
+    color: #666;
+}
+
+.notifications-section .MuiTypography-caption {
+    font-size: 0.75rem;
+    color: #999;
+}
+
+/* Filter section */
+.notifications-section .MuiCard-root:first-of-type {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+}
+
+.notifications-section .MuiTextField-root {
+    background-color: #fff;
+}
+
+.notifications-section .MuiFormControl-root {
+    background-color: #fff;
+}
+
+/* Search input */
+.notifications-section .MuiInputBase-root {
+    border-radius: 8px;
+}
+
+.notifications-section .MuiInputAdornment-root .MuiSvgIcon-root {
+    color: #666;
+}
+
+/* Pagination */
+.notifications-section .MuiPagination-root {
+    margin-top: 24px;
+}
+
+.notifications-section .MuiPaginationItem-root {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.notifications-section .MuiPaginationItem-root.Mui-selected {
+    background-color: #1976d2;
+    color: #fff;
+}
+
+/* Menu styles */
+.notifications-section .MuiMenu-paper {
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.notifications-section .MuiMenuItem-root {
+    border-radius: 4px;
+    margin: 4px 8px;
+    padding: 8px 12px;
+}
+
+.notifications-section .MuiMenuItem-root:hover {
+    background-color: #f0f7ff;
+}
+
+.notifications-section .MuiListItemIcon-root {
+    min-width: 36px;
+}
+
+.notifications-section .MuiListItemIcon-root .MuiSvgIcon-root {
+    color: #666;
+}
+
+/* Loading and empty states */
+.notifications-section .MuiCircularProgress-root {
+    color: #1976d2;
+}
+
+.notifications-section .MuiAlert-root {
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .notifications-section .MuiBox-root[style*="display: flex"] {
+        flex-direction: column;
+        gap: 16px;
+    }
+    
+    .notifications-section .MuiTextField-root {
+        min-width: 100% !important;
+    }
+    
+    .notifications-section .MuiFormControl-root {
+        min-width: 100% !important;
+    }
+    
+    .notifications-section .MuiCardContent-root {
+        padding: 16px;
+    }
+    
+    .notifications-section .MuiTypography-h6 {
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .notifications-section .MuiCardContent-root {
+        padding: 12px;
+    }
+    
+    .notifications-section .MuiChip-root {
+        font-size: 0.7rem;
+        height: 24px;
+    }
+    
+    .notifications-section .MuiTypography-h6 {
+        font-size: 1rem;
+    }
+}
+
+/* Animation for new notifications */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.notifications-section .MuiCard-root {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Hover effects for interactive elements */
+.notifications-section .MuiIconButton-root:hover {
+    background-color: rgba(25, 118, 210, 0.08);
+}
+
+.notifications-section .MuiButton-root:hover {
+    background-color: rgba(25, 118, 210, 0.08);
+}
+
+/* Focus styles for accessibility */
+.notifications-section .MuiButton-root:focus,
+.notifications-section .MuiIconButton-root:focus {
+    outline: 2px solid #1976d2;
+    outline-offset: 2px;
+}
+
+/* Custom scrollbar for long content */
+.notifications-section .MuiCardContent-root {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.notifications-section .MuiCardContent-root::-webkit-scrollbar {
+    width: 4px;
+}
+
+.notifications-section .MuiCardContent-root::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 2px;
+}
+
+.notifications-section .MuiCardContent-root::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 2px;
+}
+
+.notifications-section .MuiCardContent-root::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}

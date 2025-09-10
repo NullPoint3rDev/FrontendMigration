@@ -43,6 +43,40 @@ export async function getUserNotifications(userId) {
     return res.json();
 }
 
+// Получить непрочитанные уведомления пользователя
+export async function getUnreadNotificationsByUser(userId) {
+    const res = await fetch(`${API_URL}/user/${userId}/unread`, {
+        headers: getAuthHeaders()
+    });
+    return res.json();
+}
+
+// Получить количество непрочитанных уведомлений пользователя
+export async function getUnreadNotificationsCountByUser(userId) {
+    const res = await fetch(`${API_URL}/user/${userId}/unread/count`, {
+        headers: getAuthHeaders()
+    });
+    return res.json();
+}
+
+// Отметить все уведомления пользователя как прочитанные
+export async function markAllNotificationsAsReadByUser(userId) {
+    const res = await fetch(`${API_URL}/user/${userId}/read-all`, {
+        method: 'PUT',
+        headers: getAuthHeaders()
+    });
+    return res.status === 200;
+}
+
+// Удалить все уведомления пользователя
+export async function deleteAllNotificationsByUser(userId) {
+    const res = await fetch(`${API_URL}/user/${userId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+    });
+    return res.status === 200;
+}
+
 // Получить уведомления по дате
 export async function getNotificationsByDate(startDate, endDate) {
     const res = await fetch(`${API_URL}/date-range?start=${startDate}&end=${endDate}`, {

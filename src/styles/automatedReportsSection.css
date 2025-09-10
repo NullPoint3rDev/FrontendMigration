@@ -1,0 +1,337 @@
+.automated-reports-section {
+    width: 100%;
+}
+
+.automated-reports-section .MuiCard-root {
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    margin-bottom: 16px;
+}
+
+.automated-reports-section .MuiCard-root:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.automated-reports-section .MuiCard-root:last-child {
+    margin-bottom: 0;
+}
+
+/* Chip styles */
+.automated-reports-section .MuiChip-root {
+    font-weight: 500;
+    border-radius: 16px;
+}
+
+.automated-reports-section .MuiChip-root.MuiChip-colorSuccess {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+}
+
+.automated-reports-section .MuiChip-root.MuiChip-colorDefault {
+    background-color: #f5f5f5;
+    color: #424242;
+}
+
+/* Typography styles */
+.automated-reports-section .MuiTypography-h6 {
+    font-weight: 600;
+    color: #1976d2;
+    margin-bottom: 8px;
+}
+
+.automated-reports-section .MuiTypography-body2 {
+    line-height: 1.6;
+    color: #666;
+}
+
+.automated-reports-section .MuiTypography-caption {
+    font-size: 0.75rem;
+    color: #999;
+}
+
+/* Filter section */
+.automated-reports-section .MuiCard-root:first-of-type {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+}
+
+.automated-reports-section .MuiTextField-root {
+    background-color: #fff;
+}
+
+.automated-reports-section .MuiFormControl-root {
+    background-color: #fff;
+}
+
+/* Search input */
+.automated-reports-section .MuiInputBase-root {
+    border-radius: 8px;
+}
+
+.automated-reports-section .MuiInputAdornment-root .MuiSvgIcon-root {
+    color: #666;
+}
+
+/* Switch styles */
+.automated-reports-section .MuiSwitch-root {
+    margin: 0 8px;
+}
+
+.automated-reports-section .MuiSwitch-track {
+    background-color: #e0e0e0;
+    border-radius: 12px;
+}
+
+.automated-reports-section .MuiSwitch-thumb {
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.automated-reports-section .MuiSwitch-root.Mui-checked .MuiSwitch-track {
+    background-color: #1976d2;
+}
+
+.automated-reports-section .MuiSwitch-root.Mui-checked .MuiSwitch-thumb {
+    background-color: #fff;
+}
+
+/* Grid layout for report details */
+.automated-reports-section .MuiGrid-container {
+    margin-top: 8px;
+}
+
+.automated-reports-section .MuiGrid-item {
+    padding-top: 8px;
+}
+
+/* Trigger icons */
+.automated-reports-section .MuiSvgIcon-root {
+    color: #666;
+    font-size: 16px;
+}
+
+/* Pagination */
+.automated-reports-section .MuiPagination-root {
+    margin-top: 24px;
+}
+
+.automated-reports-section .MuiPaginationItem-root {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.automated-reports-section .MuiPaginationItem-root.Mui-selected {
+    background-color: #1976d2;
+    color: #fff;
+}
+
+/* Menu styles */
+.automated-reports-section .MuiMenu-paper {
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.automated-reports-section .MuiMenuItem-root {
+    border-radius: 4px;
+    margin: 4px 8px;
+    padding: 8px 12px;
+}
+
+.automated-reports-section .MuiMenuItem-root:hover {
+    background-color: #f0f7ff;
+}
+
+.automated-reports-section .MuiListItemIcon-root {
+    min-width: 36px;
+}
+
+.automated-reports-section .MuiListItemIcon-root .MuiSvgIcon-root {
+    color: #666;
+}
+
+/* Dialog styles */
+.automated-reports-section .MuiDialog-paper {
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.automated-reports-section .MuiDialogTitle-root {
+    font-weight: 600;
+    color: #1976d2;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 16px;
+}
+
+.automated-reports-section .MuiDialogContent-root {
+    padding: 24px;
+}
+
+.automated-reports-section .MuiDialogActions-root {
+    padding: 16px 24px;
+    border-top: 1px solid #e0e0e0;
+    gap: 8px;
+}
+
+/* Loading and empty states */
+.automated-reports-section .MuiCircularProgress-root {
+    color: #1976d2;
+}
+
+.automated-reports-section .MuiAlert-root {
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+/* Button styles */
+.automated-reports-section .MuiButton-root {
+    border-radius: 8px;
+    text-transform: none;
+    font-weight: 500;
+}
+
+.automated-reports-section .MuiButton-contained {
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3);
+}
+
+.automated-reports-section .MuiButton-contained:hover {
+    box-shadow: 0 4px 16px rgba(25, 118, 210, 0.4);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .automated-reports-section .MuiBox-root[style*="display: flex"] {
+        flex-direction: column;
+        gap: 16px;
+    }
+    
+    .automated-reports-section .MuiTextField-root {
+        min-width: 100% !important;
+    }
+    
+    .automated-reports-section .MuiFormControl-root {
+        min-width: 100% !important;
+    }
+    
+    .automated-reports-section .MuiCardContent-root {
+        padding: 16px;
+    }
+    
+    .automated-reports-section .MuiTypography-h6 {
+        font-size: 1.1rem;
+    }
+    
+    .automated-reports-section .MuiGrid-container {
+        flex-direction: column;
+    }
+    
+    .automated-reports-section .MuiGrid-item {
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .automated-reports-section .MuiCardContent-root {
+        padding: 12px;
+    }
+    
+    .automated-reports-section .MuiChip-root {
+        font-size: 0.7rem;
+        height: 24px;
+    }
+    
+    .automated-reports-section .MuiTypography-h6 {
+        font-size: 1rem;
+    }
+    
+    .automated-reports-section .MuiDialogContent-root {
+        padding: 16px;
+    }
+    
+    .automated-reports-section .MuiDialogActions-root {
+        padding: 12px 16px;
+        flex-direction: column;
+    }
+}
+
+/* Animation for new reports */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.automated-reports-section .MuiCard-root {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Hover effects for interactive elements */
+.automated-reports-section .MuiIconButton-root:hover {
+    background-color: rgba(25, 118, 210, 0.08);
+}
+
+.automated-reports-section .MuiButton-root:hover {
+    background-color: rgba(25, 118, 210, 0.08);
+}
+
+/* Focus styles for accessibility */
+.automated-reports-section .MuiButton-root:focus,
+.automated-reports-section .MuiIconButton-root:focus {
+    outline: 2px solid #1976d2;
+    outline-offset: 2px;
+}
+
+/* Custom scrollbar for long content */
+.automated-reports-section .MuiCardContent-root {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.automated-reports-section .MuiCardContent-root::-webkit-scrollbar {
+    width: 4px;
+}
+
+.automated-reports-section .MuiCardContent-root::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 2px;
+}
+
+.automated-reports-section .MuiCardContent-root::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 2px;
+}
+
+.automated-reports-section .MuiCardContent-root::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Status indicator styles */
+.automated-reports-section .MuiFormControlLabel-root {
+    margin: 0;
+}
+
+.automated-reports-section .MuiFormControlLabel-label {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+/* Empty state styles */
+.automated-reports-section .MuiBox-root[style*="textAlign: center"] {
+    padding: 48px 24px;
+}
+
+.automated-reports-section .MuiBox-root[style*="textAlign: center"] .MuiTypography-h6 {
+    margin-bottom: 8px;
+    color: #666;
+}
+
+.automated-reports-section .MuiBox-root[style*="textAlign: center"] .MuiTypography-body2 {
+    margin-bottom: 24px;
+    color: #999;
+}
