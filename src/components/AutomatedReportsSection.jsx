@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import CreateAutomatedReportModal from './CreateAutomatedReportModal';
-import { automatedReportsApi } from '../api/automatedReportsApi';
+import { getUserAutomatedReports, toggleAutomatedReportStatus, deleteAutomatedReport } from '../api/automatedReportsApi';
 import '../styles/automatedReportsSection.css';
 
 const AutomatedReportsSection = () => {
@@ -35,7 +35,7 @@ const AutomatedReportsSection = () => {
             // Получаем ID пользователя из localStorage
             const user = JSON.parse(localStorage.getItem('user'));
             if (user && user.id) {
-                const data = await automatedReportsApi.getAutomatedReportsByUser(user.id);
+                const data = await getUserAutomatedReports(user.id);
                 setAutomatedReports(data);
             } else {
                 setAutomatedReports([]);
@@ -71,8 +71,7 @@ const AutomatedReportsSection = () => {
 
     const handleToggleStatus = async (reportId) => {
         try {
-            // В реальном приложении здесь будет вызов API
-            // await toggleAutomatedReportStatus(reportId);
+            await toggleAutomatedReportStatus(reportId);
             
             setAutomatedReports(prev =>
                 prev.map(report =>
@@ -86,14 +85,14 @@ const AutomatedReportsSection = () => {
                 )
             );
         } catch (err) {
+            setError('Ошибка при изменении статуса отчета');
             console.error('Error toggling report status:', err);
         }
     };
 
     const handleDelete = async (reportId) => {
         try {
-            // В реальном приложении здесь будет вызов API
-            // await deleteAutomatedReport(reportId);
+            await deleteAutomatedReport(reportId);
             
             setAutomatedReports(prev =>
                 prev.filter(report => report.id !== reportId)
@@ -101,6 +100,7 @@ const AutomatedReportsSection = () => {
             setDeleteDialogOpen(false);
             setReportToDelete(null);
         } catch (err) {
+            setError('Ошибка при удалении отчета');
             console.error('Error deleting report:', err);
         }
     };
