@@ -16,7 +16,7 @@ import {
 } from '@mui/icons-material';
 import NotificationsSection from './NotificationsSection';
 import AutomatedReportsSection from './AutomatedReportsSection';
-import './styles/notificationsPage.css';
+import '../styles/notificationsPage.css';
 
 function TabPanel({ children, value, index, ...other }) {
     return (

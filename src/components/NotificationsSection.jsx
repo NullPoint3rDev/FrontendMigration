@@ -35,7 +35,7 @@ import {
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { getUserNotifications, markNotificationAsRead, deleteNotification } from '../api/notificationApi';
-import './styles/notificationsSection.css';
+import '../styles/notificationsSection.css';
 
 const NotificationsSection = () => {
     const [notifications, setNotifications] = useState([]);

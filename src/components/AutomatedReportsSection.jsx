@@ -46,7 +46,7 @@ import {
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import CreateAutomatedReportModal from './CreateAutomatedReportModal';
-import './styles/automatedReportsSection.css';
+import '../styles/automatedReportsSection.css';
 
 const AutomatedReportsSection = () => {
     const [automatedReports, setAutomatedReports] = useState([]);

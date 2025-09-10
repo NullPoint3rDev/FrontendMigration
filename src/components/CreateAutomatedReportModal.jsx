@@ -33,7 +33,7 @@ import {
     Settings as SettingsIcon
 } from '@mui/icons-material';
 import { reportApi } from '../api/reportApi';
-import './styles/createAutomatedReportModal.css';
+import '../styles/createAutomatedReportModal.css';
 
 const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
     const [formData, setFormData] = useState({
