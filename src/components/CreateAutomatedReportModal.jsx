@@ -53,16 +53,6 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
     const [triggerDays, setTriggerDays] = useState([]);
     const [triggerDayOfMonth, setTriggerDayOfMonth] = useState(1);
 
-    // Mock templates data
-    const mockTemplates = [
-        { id: 1, name: 'Отчет по работе оборудования', type: 'equipment' },
-        { id: 2, name: 'Отчет по работе сварщиков', type: 'welders' },
-        { id: 3, name: 'Отчет по расходу материалов', type: 'materials' },
-        { id: 4, name: 'Отчет по сварочным швам', type: 'welds' },
-        { id: 5, name: 'Отчет по ошибкам оборудования', type: 'errors' },
-        { id: 6, name: 'Отчет по нарушениям', type: 'violations' },
-        { id: 7, name: 'Отчет по заданиям', type: 'tasks' }
-    ];
 
     useEffect(() => {
         if (open) {
@@ -74,15 +64,24 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
     const loadTemplates = async () => {
         setLoading(true);
         try {
-            // В реальном приложении здесь будет вызов API
-            // const data = await reportApi.getReportTemplates();
-            // setTemplates(data);
-            
-            // Пока используем mock данные
-            setTemplates(mockTemplates);
+            // Загружаем шаблоны пользователя из localStorage
+            const savedTemplates = localStorage.getItem('reportTemplates');
+            if (savedTemplates) {
+                const userTemplates = JSON.parse(savedTemplates);
+                // Преобразуем шаблоны в формат, ожидаемый компонентом
+                const formattedTemplates = userTemplates.map(template => ({
+                    id: template.id,
+                    name: template.name,
+                    type: template.reportType
+                }));
+                setTemplates(formattedTemplates);
+            } else {
+                setTemplates([]);
+            }
         } catch (err) {
             setError('Ошибка при загрузке шаблонов отчетов');
             console.error('Error loading templates:', err);
+            setTemplates([]);
         } finally {
             setLoading(false);
         }
@@ -488,7 +487,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                                             value={triggerDescription || generateTimeTriggerDescription()}
                                             onChange={(e) => setTriggerDescription(e.target.value)}
                                             placeholder="Например: Каждую неделю в понедельник в 09:00"
-                                            disabled={triggerType === 'TIME' && generateTimeTriggerDescription()}
+                                            disabled={triggerType === 'TIME' && !!generateTimeTriggerDescription()}
                                         />
                                     </Grid>
                                     <Grid item xs={12}>
@@ -498,7 +497,6 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                                             onClick={addTrigger}
                                             disabled={
                                                 !triggerValue || 
-                                                !triggerDescription && !generateTimeTriggerDescription() ||
                                                 (triggerType === 'TIME' && !triggerTime) ||
                                                 (triggerType === 'TIME' && triggerValue === 'weekly' && triggerDays.length === 0) ||
                                                 (triggerType === 'TIME' && triggerValue === 'monthly' && !triggerDayOfMonth)
