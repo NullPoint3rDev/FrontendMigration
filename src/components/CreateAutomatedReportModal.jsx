@@ -420,7 +420,17 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                         <button
                             type="button"
                             className="add-trigger-btn"
-                            onClick={addTrigger}
+                            onClick={() => {
+                                console.log('Debug add trigger:', {
+                                    triggerValue,
+                                    triggerType,
+                                    triggerTime,
+                                    triggerDays,
+                                    triggerDayOfMonth,
+                                    triggerDescription
+                                });
+                                addTrigger();
+                            }}
                             disabled={
                                 !triggerValue || 
                                 (triggerType === 'TIME' && !triggerTime) ||
@@ -475,6 +485,14 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                         <button 
                             type="submit" 
                             className="save-btn"
+                            onClick={() => {
+                                console.log('Debug create report:', {
+                                    name: formData.name,
+                                    templateId: formData.templateId,
+                                    triggersLength: formData.triggers.length,
+                                    triggers: formData.triggers
+                                });
+                            }}
                             disabled={!formData.name || !formData.templateId || formData.triggers.length === 0}
                         >
                             Создать отчет
