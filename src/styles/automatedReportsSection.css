@@ -602,3 +602,219 @@ input:checked + .slider:before {
     flex-direction: column;
   }
 }
+
+/* Table Styles - copied from welders.css */
+.automated-reports-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background: var(--surface);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.automated-reports-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.automated-reports-table th {
+  background-color: rgba(255, 255, 255, 0.1);
+  font-weight: bold;
+  color: var(--text-primary);
+  padding: 12px;
+  text-align: left;
+}
+
+.automated-reports-table tr:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Table cell specific styles */
+.report-name-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.report-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.template-name {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.triggers-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.trigger-tag {
+  background: rgba(108, 99, 255, 0.1);
+  border: 1px solid rgba(108, 99, 255, 0.3);
+  color: var(--primary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.trigger-tag i {
+  font-size: 0.7rem;
+}
+
+.date-value {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.active {
+  background: rgba(76, 175, 80, 0.2);
+  color: var(--accent);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.status-badge.inactive {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.actions-cell {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.action-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  font-weight: 500;
+  transition: var(--transition);
+}
+
+.action-btn.edit-btn {
+  background-color: var(--primary);
+}
+
+.action-btn.edit-btn:hover {
+  background-color: #5750FF;
+}
+
+.action-btn.delete-btn {
+  background-color: var(--secondary);
+}
+
+.action-btn.delete-btn:hover {
+  background-color: #ff4f72;
+}
+
+/* Toggle Switch Styles */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-label {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.2);
+  transition: var(--transition);
+  border-radius: 24px;
+}
+
+.toggle-label:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: var(--transition);
+  border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-label {
+  background-color: var(--primary);
+}
+
+.toggle-switch input:checked + .toggle-label:before {
+  transform: translateX(26px);
+}
+
+/* Table responsive styles */
+@media (max-width: 768px) {
+  .automated-reports-table {
+    font-size: 14px;
+  }
+  
+  .automated-reports-table th,
+  .automated-reports-table td {
+    padding: 8px;
+  }
+  
+  .action-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    min-width: 32px;
+  }
+  
+  .triggers-cell {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .trigger-tag {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+  }
+  
+  .status-cell {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+}

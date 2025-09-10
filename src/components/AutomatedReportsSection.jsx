@@ -90,6 +90,12 @@ const AutomatedReportsSection = () => {
         }
     };
 
+    const handleEdit = (report) => {
+        // TODO: Implement edit functionality
+        console.log('Edit report:', report);
+        // Можно открыть модальное окно редактирования или перейти на страницу редактирования
+    };
+
     const handleDelete = async (reportId) => {
         try {
             await deleteAutomatedReport(reportId);
@@ -218,7 +224,7 @@ const AutomatedReportsSection = () => {
                 </div>
             )}
 
-            {/* Список автоматизированных отчетов */}
+            {/* Таблица автоматизированных отчетов */}
             {paginatedReports.length === 0 ? (
                 <div className="no-reports">
                     <i className="fas fa-file-alt"></i>
@@ -234,70 +240,89 @@ const AutomatedReportsSection = () => {
                 </div>
             ) : (
                 <>
-                    <div className="reports-list">
-                        {paginatedReports.map((report) => (
-                            <div
-                                key={report.id}
-                                className={`report-item ${report.status === 'ACTIVE' ? 'active' : 'inactive'}`}
-                            >
-                                <div className="report-content">
-                                    <div className="report-header">
-                                        <div className="report-badges">
+                    <table className="automated-reports-table">
+                        <thead>
+                            <tr>
+                                <th>Название</th>
+                                <th>Шаблон</th>
+                                <th>Триггеры</th>
+                                <th>Последний запуск</th>
+                                <th>Следующий запуск</th>
+                                <th>Статус</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {paginatedReports.map((report) => (
+                                <tr key={report.id}>
+                                    <td>
+                                        <div className="report-name-cell">
+                                            <span className="report-name">{report.name}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span className="template-name">{report.templateName}</span>
+                                    </td>
+                                    <td>
+                                        <div className="triggers-cell">
+                                            {report.triggers.map((trigger, index) => (
+                                                <span key={index} className="trigger-tag">
+                                                    <i className={`fas ${getTriggerIcon(trigger.type)}`}></i>
+                                                    {trigger.description}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span className="date-value">
+                                            {report.lastRun ? format(report.lastRun, 'dd.MM.yyyy HH:mm', { locale: ru }) : 'Никогда'}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span className="date-value">
+                                            {report.nextRun ? format(report.nextRun, 'dd.MM.yyyy HH:mm', { locale: ru }) : 'Не запланирован'}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div className="status-cell">
                                             <span className={`status-badge ${report.status.toLowerCase()}`}>
                                                 {getStatusLabel(report.status)}
                                             </span>
-                                        </div>
-                                        <div className="report-actions">
-                                            <label className="toggle-switch">
+                                            <div className="toggle-switch">
                                                 <input
                                                     type="checkbox"
+                                                    id={`toggle-${report.id}`}
                                                     checked={report.status === 'ACTIVE'}
                                                     onChange={() => handleToggleStatus(report.id)}
                                                 />
-                                                <span className="slider"></span>
-                                            </label>
-                                            <button 
-                                                className="report-menu-btn"
-                                                onClick={(e) => handleMenuOpen(e, report)}
+                                                <label htmlFor={`toggle-${report.id}`} className="toggle-label">
+                                                    <span className="toggle-slider"></span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div className="actions-cell">
+                                            <button
+                                                className="action-btn edit-btn"
+                                                onClick={() => handleEdit(report)}
+                                                title="Редактировать"
                                             >
-                                                <i className="fas fa-ellipsis-v"></i>
+                                                <i className="fas fa-edit"></i>
+                                            </button>
+                                            <button
+                                                className="action-btn delete-btn"
+                                                onClick={() => handleDelete(report.id)}
+                                                title="Удалить"
+                                            >
+                                                <i className="fas fa-trash"></i>
                                             </button>
                                         </div>
-                                    </div>
-                                    
-                                    <h4 className="report-title">{report.name}</h4>
-                                    <p className="report-template">Шаблон: {report.templateName}</p>
-
-                                    <div className="report-details">
-                                        <div className="triggers-section">
-                                            <h5>Триггеры:</h5>
-                                            {report.triggers.map((trigger, index) => (
-                                                <div key={index} className="trigger-item">
-                                                    <i className={`fas ${getTriggerIcon(trigger.type)}`}></i>
-                                                    <span>{trigger.description}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        
-                                        <div className="timing-section">
-                                            <div className="timing-item">
-                                                <strong>Последний запуск:</strong> 
-                                                {report.lastRun ? format(report.lastRun, 'dd.MM.yyyy HH:mm', { locale: ru }) : 'Никогда'}
-                                            </div>
-                                            <div className="timing-item">
-                                                <strong>Следующий запуск:</strong> 
-                                                {report.nextRun ? format(report.nextRun, 'dd.MM.yyyy HH:mm', { locale: ru }) : 'Не запланирован'}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="report-meta">
-                                        Создан: {format(report.createdAt, 'dd.MM.yyyy HH:mm', { locale: ru })} пользователем {report.createdBy}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
 
                     {/* Пагинация */}
                     {filteredReports.length > itemsPerPage && (
