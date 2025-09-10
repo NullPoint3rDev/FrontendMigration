@@ -1,4 +1,4 @@
-/* Create Automated Report Modal Styles */
+/* Create Automated Report Modal Styles - Using same styles as Departments modal */
 :root {
   --primary: #6C63FF;
   --secondary: #FF6584;
@@ -12,57 +12,58 @@
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Modal Styles - copied from equipmentPage.css */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   z-index: 1000;
-  padding: 1rem;
+  padding: 2rem;
 }
 
-.create-automated-report-modal {
+.modal-content {
   background: var(--surface);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: var(--card-shadow);
-  max-width: 800px;
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 600px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+  border: 1px solid var(--border-color);
+  position: relative;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
   border-bottom: 1px solid var(--border-color);
 }
 
-.modal-header h2 {
-  margin: 0;
-  color: var(--text-primary);
+.modal-title {
   font-size: 1.5rem;
   font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .close-btn {
   background: none;
   border: none;
   color: var(--text-secondary);
+  font-size: 1.5rem;
   cursor: pointer;
   padding: 0.5rem;
-  border-radius: 4px;
+  border-radius: 50%;
   transition: var(--transition);
-  font-size: 1.2rem;
 }
 
 .close-btn:hover {
@@ -70,88 +71,104 @@
   color: var(--text-primary);
 }
 
-.modal-content {
-  padding: 1.5rem;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.error-message {
-  background: rgba(255, 101, 132, 0.1);
-  border: 1px solid var(--secondary);
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
-  color: var(--secondary);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.form-section {
-  margin-bottom: 2rem;
-}
-
-.form-section h3 {
-  margin: 0 0 1rem 0;
-  color: var(--text-primary);
-  font-size: 1.2rem;
-  font-weight: 600;
-}
-
-.section-description {
-  margin: 0 0 1.5rem 0;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
 .form-group {
   margin-bottom: 1.5rem;
 }
 
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.form-group label {
+.form-label {
   display: block;
   margin-bottom: 0.5rem;
   color: var(--text-primary);
   font-weight: 500;
-  font-size: 0.9rem;
 }
 
-.form-group input,
-.form-group select {
+.form-input {
   width: 100%;
-  padding: 0.8rem 1rem;
-  background: var(--background);
+  padding: 0.8rem;
   border: 1px solid var(--border-color);
   border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
   font-size: 1rem;
   transition: var(--transition);
 }
 
-.form-group input:focus,
-.form-group select:focus {
+.form-input:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 2px rgba(108, 99, 255, 0.2);
 }
 
-.form-group input::placeholder {
+.form-input::placeholder {
   color: var(--text-secondary);
 }
 
-.form-group input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.error-message {
+  color: var(--secondary);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  background: rgba(255, 101, 132, 0.1);
+  border: 1px solid var(--secondary);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.cancel-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.save-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.save-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
+}
+
+.save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Custom styles for automated report modal */
 .checkbox-label {
   display: flex !important;
   align-items: center;
@@ -168,14 +185,6 @@
 .checkmark {
   color: var(--text-secondary);
   font-size: 0.9rem;
-}
-
-.trigger-form {
-  background: var(--background);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
 }
 
 .days-selector {
@@ -234,21 +243,11 @@
   transform: none;
 }
 
-.triggers-list {
-  margin-top: 1.5rem;
-}
-
-.triggers-list h4 {
-  margin: 0 0 1rem 0;
-  color: var(--text-primary);
-  font-size: 1rem;
-  font-weight: 600;
-}
-
 .triggers-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  margin-top: 0.5rem;
 }
 
 .trigger-chip {
@@ -284,90 +283,28 @@
   color: var(--secondary);
 }
 
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  padding: 1.5rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.cancel-btn {
-  background: var(--surface);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.cancel-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.create-btn {
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.create-btn:hover:not(:disabled) {
-  background: var(--secondary);
-  transform: translateY(-2px);
-}
-
-.create-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Responsive design */
+/* Responsive Design */
 @media (max-width: 768px) {
-  .modal-overlay {
-    padding: 0.5rem;
-  }
-  
-  .create-automated-report-modal {
-    max-height: 95vh;
-  }
-  
-  .modal-header,
-  .modal-content,
-  .modal-actions {
+  .modal-content {
+    margin: 1rem;
     padding: 1rem;
-  }
-  
-  .form-row {
-    grid-template-columns: 1fr;
   }
   
   .modal-actions {
     flex-direction: column;
   }
   
-  .cancel-btn,
-  .create-btn {
+  .save-btn, .cancel-btn {
     width: 100%;
   }
 }
 
 @media (max-width: 480px) {
-  .modal-header h2 {
+  .modal-title {
     font-size: 1.25rem;
   }
   
-  .form-group input,
-  .form-group select {
+  .form-input {
     padding: 0.75rem;
   }
   

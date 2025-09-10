@@ -253,7 +253,9 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
         }
     };
 
-    const handleSave = () => {
+    const handleSave = (e) => {
+        e.preventDefault();
+        
         if (!formData.name || !formData.templateId || formData.triggers.length === 0) {
             setError('Заполните все обязательные поля');
             return;
@@ -280,15 +282,15 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="create-automated-report-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h2>Создать автоматизированный отчет</h2>
+                    <h2 className="modal-title">Создать автоматизированный отчет</h2>
                     <button className="close-btn" onClick={onClose}>
                         <i className="fas fa-times"></i>
                     </button>
                 </div>
-
-                <div className="modal-content">
+                
+                <form onSubmit={handleSave}>
                     {error && (
                         <div className="error-message">
                             <i className="fas fa-exclamation-triangle"></i>
@@ -296,202 +298,189 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                         </div>
                     )}
 
-                    {/* Основная информация */}
-                    <div className="form-section">
-                        <h3>Основная информация</h3>
+                    <div className="form-group">
+                        <label className="form-label">Название автоматизированного отчета</label>
+                        <input
+                            type="text"
+                            name="name"
+                            value={formData.name}
+                            onChange={(e) => handleInputChange('name', e.target.value)}
+                            className="form-input"
+                            placeholder="Например: Еженедельный отчет по оборудованию"
+                            required
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Шаблон отчета</label>
+                        <select
+                            name="templateId"
+                            value={formData.templateId}
+                            onChange={(e) => handleTemplateChange(e.target.value)}
+                            className="form-input"
+                            required
+                        >
+                            <option value="">Выберите шаблон</option>
+                            {templates.map((template) => (
+                                <option key={template.id} value={template.id}>
+                                    {template.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Тип триггера</label>
+                        <select
+                            value={triggerType}
+                            onChange={(e) => setTriggerType(e.target.value)}
+                            className="form-input"
+                        >
+                            {getTriggerTypeOptions().map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Значение триггера</label>
+                        <select
+                            value={triggerValue}
+                            onChange={(e) => setTriggerValue(e.target.value)}
+                            className="form-input"
+                        >
+                            {getTriggerValueOptions().map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Дополнительные поля для временных триггеров */}
+                    {triggerType === 'TIME' && (
                         <div className="form-group">
-                            <label>Название автоматизированного отчета *</label>
+                            <label className="form-label">Время выполнения</label>
                             <input
-                                type="text"
-                                value={formData.name}
-                                onChange={(e) => handleInputChange('name', e.target.value)}
-                                placeholder="Например: Еженедельный отчет по оборудованию"
-                                required
+                                type="time"
+                                value={triggerTime}
+                                onChange={(e) => setTriggerTime(e.target.value)}
+                                className="form-input"
                             />
                         </div>
-                        
+                    )}
+
+                    {triggerType === 'TIME' && triggerValue === 'weekly' && (
                         <div className="form-group">
-                            <label>Шаблон отчета *</label>
-                            <select
-                                value={formData.templateId}
-                                onChange={(e) => handleTemplateChange(e.target.value)}
-                                required
-                            >
-                                <option value="">Выберите шаблон</option>
-                                {templates.map((template) => (
-                                    <option key={template.id} value={template.id}>
-                                        {template.name}
-                                    </option>
+                            <label className="form-label">Дни недели</label>
+                            <div className="days-selector">
+                                {getDaysOfWeekOptions().map((day) => (
+                                    <button
+                                        key={day.value}
+                                        type="button"
+                                        className={`day-chip ${triggerDays.includes(day.value) ? 'selected' : ''}`}
+                                        onClick={() => handleDayToggle(day.value)}
+                                    >
+                                        {day.label}
+                                    </button>
                                 ))}
-                            </select>
+                            </div>
                         </div>
-                        
+                    )}
+
+                    {triggerType === 'TIME' && triggerValue === 'monthly' && (
                         <div className="form-group">
-                            <label className="checkbox-label">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.isActive}
-                                    onChange={(e) => handleInputChange('isActive', e.target.checked)}
-                                />
-                                <span className="checkmark"></span>
-                                Активировать автоматический отчет сразу после создания
-                            </label>
+                            <label className="form-label">День месяца</label>
+                            <input
+                                type="number"
+                                value={triggerDayOfMonth}
+                                onChange={(e) => setTriggerDayOfMonth(parseInt(e.target.value) || 1)}
+                                className="form-input"
+                                min="1"
+                                max="31"
+                            />
                         </div>
+                    )}
+
+                    <div className="form-group">
+                        <label className="form-label">Описание триггера</label>
+                        <input
+                            type="text"
+                            value={triggerType === 'TIME' ? generateTimeTriggerDescription() : triggerDescription}
+                            onChange={(e) => setTriggerDescription(e.target.value)}
+                            className="form-input"
+                            placeholder="Например: Каждую неделю в понедельник в 09:00"
+                            disabled={triggerType === 'TIME' && !!generateTimeTriggerDescription()}
+                        />
                     </div>
 
-                    {/* Триггеры */}
-                    <div className="form-section">
-                        <h3>Триггеры запуска</h3>
-                        <p className="section-description">
-                            Настройте условия, при которых будет автоматически создаваться отчет
-                        </p>
+                    <div className="form-group">
+                        <button
+                            type="button"
+                            className="add-trigger-btn"
+                            onClick={addTrigger}
+                            disabled={
+                                !triggerValue || 
+                                (triggerType === 'TIME' && !triggerTime) ||
+                                (triggerType === 'TIME' && triggerValue === 'weekly' && triggerDays.length === 0) ||
+                                (triggerType === 'TIME' && triggerValue === 'monthly' && !triggerDayOfMonth) ||
+                                (triggerType !== 'TIME' && !triggerDescription)
+                            }
+                        >
+                            <i className="fas fa-plus"></i>
+                            Добавить триггер
+                        </button>
+                    </div>
 
-                        {/* Добавление нового триггера */}
-                        <div className="trigger-form">
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Тип триггера</label>
-                                    <select
-                                        value={triggerType}
-                                        onChange={(e) => setTriggerType(e.target.value)}
-                                    >
-                                        {getTriggerTypeOptions().map((option) => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                
-                                <div className="form-group">
-                                    <label>Значение</label>
-                                    <select
-                                        value={triggerValue}
-                                        onChange={(e) => setTriggerValue(e.target.value)}
-                                    >
-                                        {getTriggerValueOptions().map((option) => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Дополнительные поля для временных триггеров */}
-                            {triggerType === 'TIME' && (
-                                <>
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label>Время выполнения</label>
-                                            <input
-                                                type="time"
-                                                value={triggerTime}
-                                                onChange={(e) => setTriggerTime(e.target.value)}
-                                            />
-                                        </div>
+                    {/* Список добавленных триггеров */}
+                    {formData.triggers.length > 0 && (
+                        <div className="form-group">
+                            <label className="form-label">Добавленные триггеры:</label>
+                            <div className="triggers-chips">
+                                {formData.triggers.map((trigger, index) => (
+                                    <div key={index} className="trigger-chip">
+                                        <i className={`fas ${getTriggerIconClass(trigger.type)}`}></i>
+                                        <span>{trigger.description}</span>
+                                        <button 
+                                            type="button"
+                                            className="remove-trigger-btn"
+                                            onClick={() => removeTrigger(index)}
+                                        >
+                                            <i className="fas fa-times"></i>
+                                        </button>
                                     </div>
-                                    
-                                    {triggerValue === 'weekly' && (
-                                        <div className="form-group">
-                                            <label>Дни недели:</label>
-                                            <div className="days-selector">
-                                                {getDaysOfWeekOptions().map((day) => (
-                                                    <button
-                                                        key={day.value}
-                                                        type="button"
-                                                        className={`day-chip ${triggerDays.includes(day.value) ? 'selected' : ''}`}
-                                                        onClick={() => handleDayToggle(day.value)}
-                                                    >
-                                                        {day.label}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                    
-                                    {triggerValue === 'monthly' && (
-                                        <div className="form-row">
-                                            <div className="form-group">
-                                                <label>День месяца</label>
-                                                <input
-                                                    type="number"
-                                                    value={triggerDayOfMonth}
-                                                    onChange={(e) => setTriggerDayOfMonth(parseInt(e.target.value) || 1)}
-                                                    min="1"
-                                                    max="31"
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                            
-                            <div className="form-group">
-                                <label>Описание</label>
-                                <input
-                                    type="text"
-                                    value={triggerType === 'TIME' ? generateTimeTriggerDescription() : triggerDescription}
-                                    onChange={(e) => setTriggerDescription(e.target.value)}
-                                    placeholder="Например: Каждую неделю в понедельник в 09:00"
-                                    disabled={triggerType === 'TIME' && !!generateTimeTriggerDescription()}
-                                />
+                                ))}
                             </div>
-                            
-                            <button
-                                type="button"
-                                className="add-trigger-btn"
-                                onClick={addTrigger}
-                                disabled={
-                                    !triggerValue || 
-                                    (triggerType === 'TIME' && !triggerTime) ||
-                                    (triggerType === 'TIME' && triggerValue === 'weekly' && triggerDays.length === 0) ||
-                                    (triggerType === 'TIME' && triggerValue === 'monthly' && !triggerDayOfMonth) ||
-                                    (triggerType !== 'TIME' && !triggerDescription)
-                                }
-                            >
-                                <i className="fas fa-plus"></i>
-                                Добавить триггер
-                            </button>
                         </div>
+                    )}
 
-                        {/* Список добавленных триггеров */}
-                        {formData.triggers.length > 0 && (
-                            <div className="triggers-list">
-                                <h4>Добавленные триггеры:</h4>
-                                <div className="triggers-chips">
-                                    {formData.triggers.map((trigger, index) => (
-                                        <div key={index} className="trigger-chip">
-                                            <i className={`fas ${getTriggerIconClass(trigger.type)}`}></i>
-                                            <span>{trigger.description}</span>
-                                            <button 
-                                                type="button"
-                                                className="remove-trigger-btn"
-                                                onClick={() => removeTrigger(index)}
-                                            >
-                                                <i className="fas fa-times"></i>
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                    <div className="form-group">
+                        <label className="checkbox-label">
+                            <input
+                                type="checkbox"
+                                checked={formData.isActive}
+                                onChange={(e) => handleInputChange('isActive', e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            Активировать автоматический отчет сразу после создания
+                        </label>
                     </div>
-                </div>
 
-                <div className="modal-actions">
-                    <button type="button" className="cancel-btn" onClick={onClose}>
-                        Отмена
-                    </button>
-                    <button
-                        type="button"
-                        className="create-btn"
-                        onClick={handleSave}
-                        disabled={!formData.name || !formData.templateId || formData.triggers.length === 0}
-                    >
-                        Создать отчет
-                    </button>
-                </div>
+                    <div className="modal-actions">
+                        <button type="button" className="cancel-btn" onClick={onClose}>
+                            Отмена
+                        </button>
+                        <button 
+                            type="submit" 
+                            className="save-btn"
+                            disabled={!formData.name || !formData.templateId || formData.triggers.length === 0}
+                        >
+                            Создать отчет
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );
