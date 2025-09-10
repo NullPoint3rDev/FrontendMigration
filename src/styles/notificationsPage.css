@@ -1,107 +1,141 @@
+/* Notifications Page Styles */
+:root {
+  --primary: #6C63FF;
+  --secondary: #FF6584;
+  --accent: #4CAF50;
+  --background: #1A1A2E;
+  --surface: #16213E;
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .notifications-page {
-    padding: 20px;
-    min-height: 100vh;
-    background-color: #f5f5f5;
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  margin-top: 70px; /* Add margin to account for fixed navbar */
+  background: var(--background);
+  min-height: 100vh;
 }
 
-.notifications-page .MuiPaper-root {
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.notifications-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
 }
 
-.notifications-page .MuiTabs-root {
-    background-color: #fff;
-    border-radius: 12px 12px 0 0;
+.notifications-title {
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.notifications-page .MuiTab-root {
-    text-transform: none;
-    font-weight: 500;
-    font-size: 16px;
-    min-height: 60px;
-    color: #666;
-    transition: all 0.3s ease;
+.notifications-tabs {
+  background: var(--surface);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--card-shadow);
 }
 
-.notifications-page .MuiTab-root.Mui-selected {
-    color: #1976d2;
-    background-color: #f0f7ff;
+.tab-buttons {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-color);
 }
 
-.notifications-page .MuiTab-root:hover {
-    background-color: #f8f9fa;
+.tab-button {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  position: relative;
 }
 
-.notifications-page .MuiTab-root .MuiSvgIcon-root {
-    margin-right: 8px;
-    font-size: 20px;
+.tab-button:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.tab-button.active {
+  color: var(--primary);
+  background: rgba(108, 99, 255, 0.1);
+}
+
+.tab-button.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+}
+
+.tab-button i {
+  font-size: 1.1rem;
+}
+
+.tab-content {
+  padding: 2rem;
+  min-height: 600px;
 }
 
 /* Responsive design */
 @media (max-width: 768px) {
-    .notifications-page {
-        padding: 10px;
-    }
-    
-    .notifications-page .MuiTab-root {
-        font-size: 14px;
-        min-height: 50px;
-    }
-    
-    .notifications-page .MuiTab-root .MuiSvgIcon-root {
-        font-size: 18px;
-    }
+  .notifications-page {
+    padding: 1rem;
+    margin-top: 60px;
+  }
+  
+  .notifications-title {
+    font-size: 2rem;
+  }
+  
+  .tab-button {
+    padding: 0.8rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .tab-content {
+    padding: 1rem;
+  }
 }
 
-/* Animation for tab content */
-.notifications-page .MuiBox-root {
-    animation: fadeIn 0.3s ease-in-out;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Loading and error states */
-.notifications-page .MuiAlert-root {
-    border-radius: 8px;
-    margin-bottom: 16px;
-}
-
-.notifications-page .MuiCircularProgress-root {
-    color: #1976d2;
-}
-
-/* Tab panel content */
-.notifications-page .MuiBox-root[role="tabpanel"] {
-    background-color: #fff;
-    border-radius: 0 0 12px 12px;
-    min-height: 600px;
-    padding: 24px !important;
-}
-
-/* Custom scrollbar for tab content */
-.notifications-page .MuiBox-root[role="tabpanel"]::-webkit-scrollbar {
-    width: 6px;
-}
-
-.notifications-page .MuiBox-root[role="tabpanel"]::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-}
-
-.notifications-page .MuiBox-root[role="tabpanel"]::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
-}
-
-.notifications-page .MuiBox-root[role="tabpanel"]::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+@media (max-width: 480px) {
+  .notifications-page {
+    padding: 0.5rem;
+  }
+  
+  .notifications-title {
+    font-size: 1.8rem;
+  }
+  
+  .tab-buttons {
+    flex-direction: column;
+  }
+  
+  .tab-button {
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .tab-button:last-child {
+    border-bottom: none;
+  }
 }

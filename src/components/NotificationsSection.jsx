@@ -1,39 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Box,
-    Typography,
-    Card,
-    CardContent,
-    CardActions,
-    Button,
-    Chip,
-    IconButton,
-    TextField,
-    InputAdornment,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    Pagination,
-    Alert,
-    CircularProgress,
-    Tooltip,
-    Menu,
-    ListItemIcon,
-    ListItemText
-} from '@mui/material';
-import {
-    Search as SearchIcon,
-    FilterList as FilterIcon,
-    MoreVert as MoreVertIcon,
-    MarkEmailRead as MarkReadIcon,
-    Delete as DeleteIcon,
-    Refresh as RefreshIcon,
-    NotificationsActive as ActiveIcon,
-    NotificationsOff as InactiveIcon
-} from '@mui/icons-material';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
 import { getUserNotifications, markNotificationAsRead, deleteNotification } from '../api/notificationApi';
 import '../styles/notificationsSection.css';
 
@@ -50,54 +15,6 @@ const NotificationsSection = () => {
     const [anchorEl, setAnchorEl] = useState(null);
     const [selectedNotification, setSelectedNotification] = useState(null);
 
-    // Mock data for development
-    const mockNotifications = [
-        {
-            id: 1,
-            title: 'Отчет успешно создан',
-            content: 'Отчет по работе оборудования за период 01.01.2024 - 31.01.2024 был успешно сгенерирован и сохранен.',
-            type: 'SUCCESS',
-            status: 'UNREAD',
-            createdAt: new Date('2024-01-15T10:30:00'),
-            userAccountId: 1
-        },
-        {
-            id: 2,
-            title: 'Ошибка при создании отчета',
-            content: 'Не удалось создать отчет по сварщикам. Проверьте настройки и попробуйте снова.',
-            type: 'ERROR',
-            status: 'UNREAD',
-            createdAt: new Date('2024-01-15T09:15:00'),
-            userAccountId: 1
-        },
-        {
-            id: 3,
-            title: 'Автоматический отчет готов',
-            content: 'Еженедельный отчет по расходу материалов готов к просмотру.',
-            type: 'INFO',
-            status: 'READ',
-            createdAt: new Date('2024-01-14T16:45:00'),
-            userAccountId: 1
-        },
-        {
-            id: 4,
-            title: 'Системное уведомление',
-            content: 'Обновление системы запланировано на 20.01.2024 в 02:00. Система будет недоступна в течение 30 минут.',
-            type: 'SYSTEM',
-            status: 'READ',
-            createdAt: new Date('2024-01-13T14:20:00'),
-            userAccountId: 1
-        },
-        {
-            id: 5,
-            title: 'Превышение лимита ошибок',
-            content: 'Обнаружено превышение допустимого количества ошибок на сварочном аппарате №3.',
-            type: 'WARNING',
-            status: 'UNREAD',
-            createdAt: new Date('2024-01-12T11:30:00'),
-            userAccountId: 1
-        }
-    ];
 
     useEffect(() => {
         loadNotifications();
@@ -110,16 +27,18 @@ const NotificationsSection = () => {
     const loadNotifications = async () => {
         setLoading(true);
         try {
-            // В реальном приложении здесь будет вызов API
-            // const userId = JSON.parse(localStorage.getItem('user')).id;
-            // const data = await getUserNotifications(userId);
-            // setNotifications(data);
-            
-            // Пока используем mock данные
-            setNotifications(mockNotifications);
+            // Получаем ID пользователя из localStorage
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (user && user.id) {
+                const data = await getUserNotifications(user.id);
+                setNotifications(data);
+            } else {
+                setNotifications([]);
+            }
         } catch (err) {
             setError('Ошибка при загрузке уведомлений');
             console.error('Error loading notifications:', err);
+            setNotifications([]);
         } finally {
             setLoading(false);
         }
@@ -222,192 +141,168 @@ const NotificationsSection = () => {
 
     if (loading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-                <CircularProgress />
-            </Box>
+            <div className="notifications-loading">
+                <div className="loading-spinner"></div>
+                <p>Загрузка уведомлений...</p>
+            </div>
         );
     }
 
     return (
-        <Box className="notifications-section">
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h5" component="h2" fontWeight="bold">
-                    Уведомления
-                </Typography>
-                <Button
-                    variant="outlined"
-                    startIcon={<RefreshIcon />}
-                    onClick={loadNotifications}
-                    disabled={loading}
-                >
-                    Обновить
-                </Button>
-            </Box>
-
-            {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                    {error}
-                </Alert>
-            )}
-
-            {/* Фильтры и поиск */}
-            <Card sx={{ mb: 3 }}>
-                <CardContent>
-                    <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-                        <TextField
+        <div className="notifications-section">
+            <div className="notifications-controls">
+                <div className="search-filters">
+                    <div className="search-box">
+                        <i className="fas fa-search"></i>
+                        <input
+                            type="text"
                             placeholder="Поиск уведомлений..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon />
-                                    </InputAdornment>
-                                ),
-                            }}
-                            sx={{ minWidth: 300 }}
                         />
-                        
-                        <FormControl sx={{ minWidth: 150 }}>
-                            <InputLabel>Статус</InputLabel>
-                            <Select
-                                value={statusFilter}
-                                label="Статус"
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                            >
-                                <MenuItem value="all">Все</MenuItem>
-                                <MenuItem value="UNREAD">Непрочитанные</MenuItem>
-                                <MenuItem value="READ">Прочитанные</MenuItem>
-                            </Select>
-                        </FormControl>
+                    </div>
+                    
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="filter-select"
+                    >
+                        <option value="all">Все статусы</option>
+                        <option value="UNREAD">Непрочитанные</option>
+                        <option value="READ">Прочитанные</option>
+                    </select>
 
-                        <FormControl sx={{ minWidth: 150 }}>
-                            <InputLabel>Тип</InputLabel>
-                            <Select
-                                value={typeFilter}
-                                label="Тип"
-                                onChange={(e) => setTypeFilter(e.target.value)}
-                            >
-                                <MenuItem value="all">Все</MenuItem>
-                                <MenuItem value="SUCCESS">Успех</MenuItem>
-                                <MenuItem value="ERROR">Ошибка</MenuItem>
-                                <MenuItem value="WARNING">Предупреждение</MenuItem>
-                                <MenuItem value="INFO">Информация</MenuItem>
-                                <MenuItem value="SYSTEM">Система</MenuItem>
-                            </Select>
-                        </FormControl>
-                    </Box>
-                </CardContent>
-            </Card>
+                    <select
+                        value={typeFilter}
+                        onChange={(e) => setTypeFilter(e.target.value)}
+                        className="filter-select"
+                    >
+                        <option value="all">Все типы</option>
+                        <option value="SUCCESS">Успех</option>
+                        <option value="ERROR">Ошибка</option>
+                        <option value="WARNING">Предупреждение</option>
+                        <option value="INFO">Информация</option>
+                        <option value="SYSTEM">Система</option>
+                    </select>
+                </div>
+                
+                <button 
+                    className="refresh-btn"
+                    onClick={loadNotifications}
+                    disabled={loading}
+                >
+                    <i className="fas fa-sync-alt"></i>
+                    Обновить
+                </button>
+            </div>
+
+            {error && (
+                <div className="error-message">
+                    <i className="fas fa-exclamation-triangle"></i>
+                    {error}
+                </div>
+            )}
 
             {/* Список уведомлений */}
             {paginatedNotifications.length === 0 ? (
-                <Card>
-                    <CardContent>
-                        <Box textAlign="center" py={4}>
-                            <Typography variant="h6" color="text.secondary">
-                                Уведомления не найдены
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Попробуйте изменить фильтры или поисковый запрос
-                            </Typography>
-                        </Box>
-                    </CardContent>
-                </Card>
+                <div className="no-notifications">
+                    <i className="fas fa-bell-slash"></i>
+                    <h3>Уведомления не найдены</h3>
+                    <p>Попробуйте изменить фильтры или поисковый запрос</p>
+                </div>
             ) : (
                 <>
-                    {paginatedNotifications.map((notification) => (
-                        <Card
-                            key={notification.id}
-                            sx={{
-                                mb: 2,
-                                borderLeft: notification.status === 'UNREAD' ? '4px solid #1976d2' : '4px solid transparent',
-                                opacity: notification.status === 'READ' ? 0.8 : 1
-                            }}
-                        >
-                            <CardContent>
-                                <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                                    <Box flex={1}>
-                                        <Box display="flex" alignItems="center" gap={1} mb={1}>
-                                            <Chip
-                                                label={getTypeLabel(notification.type)}
-                                                color={getTypeColor(notification.type)}
-                                                size="small"
-                                            />
-                                            <Chip
-                                                icon={getStatusIcon(notification.status)}
-                                                label={notification.status === 'UNREAD' ? 'Новое' : 'Прочитано'}
-                                                variant={notification.status === 'UNREAD' ? 'filled' : 'outlined'}
-                                                size="small"
-                                            />
-                                        </Box>
-                                        
-                                        <Typography variant="h6" component="h3" gutterBottom>
-                                            {notification.title}
-                                        </Typography>
-                                        
-                                        <Typography variant="body2" color="text.secondary" paragraph>
-                                            {notification.content}
-                                        </Typography>
-                                        
-                                        <Typography variant="caption" color="text.secondary">
-                                            {format(notification.createdAt, 'dd.MM.yyyy HH:mm', { locale: ru })}
-                                        </Typography>
-                                    </Box>
+                    <div className="notifications-list">
+                        {paginatedNotifications.map((notification) => (
+                            <div
+                                key={notification.id}
+                                className={`notification-item ${notification.status === 'UNREAD' ? 'unread' : 'read'}`}
+                            >
+                                <div className="notification-content">
+                                    <div className="notification-header">
+                                        <div className="notification-badges">
+                                            <span className={`type-badge ${notification.type.toLowerCase()}`}>
+                                                {getTypeLabel(notification.type)}
+                                            </span>
+                                            <span className={`status-badge ${notification.status.toLowerCase()}`}>
+                                                {notification.status === 'UNREAD' ? 'Новое' : 'Прочитано'}
+                                            </span>
+                                        </div>
+                                        <button 
+                                            className="notification-menu-btn"
+                                            onClick={(e) => handleMenuOpen(e, notification)}
+                                        >
+                                            <i className="fas fa-ellipsis-v"></i>
+                                        </button>
+                                    </div>
                                     
-                                    <IconButton
-                                        onClick={(e) => handleMenuOpen(e, notification)}
-                                        size="small"
-                                    >
-                                        <MoreVertIcon />
-                                    </IconButton>
-                                </Box>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                    <h4 className="notification-title">{notification.title}</h4>
+                                    <p className="notification-text">{notification.content}</p>
+                                    <span className="notification-time">
+                                        {new Date(notification.createdAt).toLocaleString('ru-RU')}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
 
                     {/* Пагинация */}
                     {filteredNotifications.length > itemsPerPage && (
-                        <Box display="flex" justifyContent="center" mt={3}>
-                            <Pagination
-                                count={Math.ceil(filteredNotifications.length / itemsPerPage)}
-                                page={page}
-                                onChange={handlePageChange}
-                                color="primary"
-                            />
-                        </Box>
+                        <div className="pagination">
+                            <button 
+                                className="pagination-btn"
+                                onClick={() => handlePageChange(null, page - 1)}
+                                disabled={page === 1}
+                            >
+                                <i className="fas fa-chevron-left"></i>
+                            </button>
+                            
+                            <span className="pagination-info">
+                                Страница {page} из {Math.ceil(filteredNotifications.length / itemsPerPage)}
+                            </span>
+                            
+                            <button 
+                                className="pagination-btn"
+                                onClick={() => handlePageChange(null, page + 1)}
+                                disabled={page === Math.ceil(filteredNotifications.length / itemsPerPage)}
+                            >
+                                <i className="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
                     )}
                 </>
             )}
 
             {/* Контекстное меню */}
-            <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-            >
-                {selectedNotification?.status === 'UNREAD' && (
-                    <MenuItem onClick={() => {
-                        handleMarkAsRead(selectedNotification.id);
-                        handleMenuClose();
-                    }}>
-                        <ListItemIcon>
-                            <MarkReadIcon fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText>Отметить как прочитанное</ListItemText>
-                    </MenuItem>
-                )}
-                <MenuItem onClick={() => {
-                    handleDelete(selectedNotification.id);
-                    handleMenuClose();
-                }}>
-                    <ListItemIcon>
-                        <DeleteIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Удалить</ListItemText>
-                </MenuItem>
-            </Menu>
-        </Box>
+            {anchorEl && (
+                <div className="context-menu-overlay" onClick={handleMenuClose}>
+                    <div className="context-menu" onClick={(e) => e.stopPropagation()}>
+                        {selectedNotification?.status === 'UNREAD' && (
+                            <button 
+                                className="context-menu-item"
+                                onClick={() => {
+                                    handleMarkAsRead(selectedNotification.id);
+                                    handleMenuClose();
+                                }}
+                            >
+                                <i className="fas fa-check"></i>
+                                Отметить как прочитанное
+                            </button>
+                        )}
+                        <button 
+                            className="context-menu-item delete"
+                            onClick={() => {
+                                handleDelete(selectedNotification.id);
+                                handleMenuClose();
+                            }}
+                        >
+                            <i className="fas fa-trash"></i>
+                            Удалить
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 
