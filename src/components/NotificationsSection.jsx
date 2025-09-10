@@ -105,16 +105,6 @@ const NotificationsSection = () => {
         setSelectedNotification(null);
     };
 
-    const getTypeColor = (type) => {
-        const colors = {
-            SUCCESS: 'success',
-            ERROR: 'error',
-            WARNING: 'warning',
-            INFO: 'info',
-            SYSTEM: 'default'
-        };
-        return colors[type] || 'default';
-    };
 
     const getTypeLabel = (type) => {
         const labels = {
@@ -127,9 +117,6 @@ const NotificationsSection = () => {
         return labels[type] || type;
     };
 
-    const getStatusIcon = (status) => {
-        return status === 'UNREAD' ? <ActiveIcon /> : <InactiveIcon />;
-    };
 
     const handlePageChange = (event, value) => {
         setPage(value);
