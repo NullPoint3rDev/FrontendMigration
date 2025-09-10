@@ -1,337 +1,604 @@
+/* Automated Reports Section Styles */
 .automated-reports-section {
-    width: 100%;
+  width: 100%;
 }
 
-.automated-reports-section .MuiCard-root {
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-    margin-bottom: 16px;
+.automated-reports-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
-.automated-reports-section .MuiCard-root:hover {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    transform: translateY(-2px);
+.search-filters {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-.automated-reports-section .MuiCard-root:last-child {
-    margin-bottom: 0;
+.search-box {
+  position: relative;
+  min-width: 300px;
 }
 
-/* Chip styles */
-.automated-reports-section .MuiChip-root {
-    font-weight: 500;
-    border-radius: 16px;
+.search-box i {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  z-index: 1;
 }
 
-.automated-reports-section .MuiChip-root.MuiChip-colorSuccess {
-    background-color: #e8f5e8;
-    color: #2e7d32;
+.search-box input {
+  width: 100%;
+  padding: 0.8rem 1rem 0.8rem 2.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition: var(--transition);
 }
 
-.automated-reports-section .MuiChip-root.MuiChip-colorDefault {
-    background-color: #f5f5f5;
-    color: #424242;
+.search-box input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(108, 99, 255, 0.2);
 }
 
-/* Typography styles */
-.automated-reports-section .MuiTypography-h6 {
-    font-weight: 600;
-    color: #1976d2;
-    margin-bottom: 8px;
+.search-box input::placeholder {
+  color: var(--text-secondary);
 }
 
-.automated-reports-section .MuiTypography-body2 {
-    line-height: 1.6;
-    color: #666;
+.filter-select {
+  padding: 0.8rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+  min-width: 150px;
 }
 
-.automated-reports-section .MuiTypography-caption {
-    font-size: 0.75rem;
-    color: #999;
+.filter-select:focus {
+  outline: none;
+  border-color: var(--primary);
 }
 
-/* Filter section */
-.automated-reports-section .MuiCard-root:first-of-type {
-    background-color: #f8f9fa;
-    border: 1px solid #e9ecef;
+.filter-select option {
+  background: var(--surface);
+  color: var(--text-primary);
 }
 
-.automated-reports-section .MuiTextField-root {
-    background-color: #fff;
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
 }
 
-.automated-reports-section .MuiFormControl-root {
-    background-color: #fff;
+.refresh-btn {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-/* Search input */
-.automated-reports-section .MuiInputBase-root {
-    border-radius: 8px;
+.refresh-btn:hover:not(:disabled) {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
 }
 
-.automated-reports-section .MuiInputAdornment-root .MuiSvgIcon-root {
-    color: #666;
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-/* Switch styles */
-.automated-reports-section .MuiSwitch-root {
-    margin: 0 8px;
+.create-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.automated-reports-section .MuiSwitch-track {
-    background-color: #e0e0e0;
-    border-radius: 12px;
+.create-btn:hover {
+  background: var(--secondary);
+  transform: translateY(-2px);
 }
 
-.automated-reports-section .MuiSwitch-thumb {
-    background-color: #fff;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+.automated-reports-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  color: var(--text-secondary);
 }
 
-.automated-reports-section .MuiSwitch-root.Mui-checked .MuiSwitch-track {
-    background-color: #1976d2;
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
+  border-top: 3px solid var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
 }
 
-.automated-reports-section .MuiSwitch-root.Mui-checked .MuiSwitch-thumb {
-    background-color: #fff;
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-/* Grid layout for report details */
-.automated-reports-section .MuiGrid-container {
-    margin-top: 8px;
+.error-message {
+  background: rgba(255, 101, 132, 0.1);
+  border: 1px solid var(--secondary);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 2rem;
+  color: var(--secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.automated-reports-section .MuiGrid-item {
-    padding-top: 8px;
+.no-reports {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--text-secondary);
 }
 
-/* Trigger icons */
-.automated-reports-section .MuiSvgIcon-root {
-    color: #666;
-    font-size: 16px;
+.no-reports i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
 }
 
-/* Pagination */
-.automated-reports-section .MuiPagination-root {
-    margin-top: 24px;
+.no-reports h3 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
 }
 
-.automated-reports-section .MuiPaginationItem-root {
-    border-radius: 8px;
-    font-weight: 500;
+.reports-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.automated-reports-section .MuiPaginationItem-root.Mui-selected {
-    background-color: #1976d2;
-    color: #fff;
+.report-item {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: var(--transition);
+  position: relative;
 }
 
-/* Menu styles */
-.automated-reports-section .MuiMenu-paper {
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+.report-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 20px rgba(108, 99, 255, 0.1);
 }
 
-.automated-reports-section .MuiMenuItem-root {
-    border-radius: 4px;
-    margin: 4px 8px;
-    padding: 8px 12px;
+.report-item.active {
+  border-left: 4px solid var(--accent);
+  background: rgba(76, 175, 80, 0.05);
 }
 
-.automated-reports-section .MuiMenuItem-root:hover {
-    background-color: #f0f7ff;
+.report-item.inactive {
+  opacity: 0.8;
+  border-left: 4px solid #9e9e9e;
 }
 
-.automated-reports-section .MuiListItemIcon-root {
-    min-width: 36px;
+.report-content {
+  width: 100%;
 }
 
-.automated-reports-section .MuiListItemIcon-root .MuiSvgIcon-root {
-    color: #666;
+.report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
 }
 
-/* Dialog styles */
-.automated-reports-section .MuiDialog-paper {
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+.report-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-.automated-reports-section .MuiDialogTitle-root {
-    font-weight: 600;
-    color: #1976d2;
-    border-bottom: 1px solid #e0e0e0;
-    padding-bottom: 16px;
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.automated-reports-section .MuiDialogContent-root {
-    padding: 24px;
+.status-badge.active {
+  background: rgba(76, 175, 80, 0.2);
+  color: var(--accent);
 }
 
-.automated-reports-section .MuiDialogActions-root {
-    padding: 16px 24px;
-    border-top: 1px solid #e0e0e0;
-    gap: 8px;
+.status-badge.inactive {
+  background: rgba(158, 158, 158, 0.2);
+  color: #9e9e9e;
 }
 
-/* Loading and empty states */
-.automated-reports-section .MuiCircularProgress-root {
-    color: #1976d2;
+.report-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
-.automated-reports-section .MuiAlert-root {
-    border-radius: 8px;
-    margin-bottom: 16px;
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
 }
 
-/* Button styles */
-.automated-reports-section .MuiButton-root {
-    border-radius: 8px;
-    text-transform: none;
-    font-weight: 500;
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
 
-.automated-reports-section .MuiButton-contained {
-    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3);
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: var(--transition);
+  border-radius: 24px;
 }
 
-.automated-reports-section .MuiButton-contained:hover {
-    box-shadow: 0 4px 16px rgba(25, 118, 210, 0.4);
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: var(--transition);
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--primary);
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.report-menu-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 4px;
+  transition: var(--transition);
+}
+
+.report-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.report-title {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.report-template {
+  margin: 0 0 1rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.report-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 1rem;
+}
+
+.triggers-section h5,
+.timing-section h5 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.trigger-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.trigger-item i {
+  color: var(--primary);
+  width: 16px;
+}
+
+.timing-item {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.report-meta {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  opacity: 0.8;
+  border-top: 1px solid var(--border-color);
+  padding-top: 0.75rem;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: 1rem;
+}
+
+.pagination-btn {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.context-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.context-menu {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0.5rem;
+  box-shadow: var(--card-shadow);
+  min-width: 200px;
+}
+
+.context-menu-item {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.context-menu-item.delete {
+  color: var(--secondary);
+}
+
+.context-menu-item.delete:hover {
+  background: rgba(255, 101, 132, 0.1);
+}
+
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  min-width: 400px;
+  max-width: 500px;
+}
+
+.dialog-header {
+  padding: 1.5rem 1.5rem 0 1.5rem;
+}
+
+.dialog-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.dialog-content {
+  padding: 1rem 1.5rem;
+}
+
+.dialog-content p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  padding: 0 1.5rem 1.5rem 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.cancel-btn {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.delete-btn {
+  background: var(--secondary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.delete-btn:hover {
+  background: #e91e63;
 }
 
 /* Responsive design */
 @media (max-width: 768px) {
-    .automated-reports-section .MuiBox-root[style*="display: flex"] {
-        flex-direction: column;
-        gap: 16px;
-    }
-    
-    .automated-reports-section .MuiTextField-root {
-        min-width: 100% !important;
-    }
-    
-    .automated-reports-section .MuiFormControl-root {
-        min-width: 100% !important;
-    }
-    
-    .automated-reports-section .MuiCardContent-root {
-        padding: 16px;
-    }
-    
-    .automated-reports-section .MuiTypography-h6 {
-        font-size: 1.1rem;
-    }
-    
-    .automated-reports-section .MuiGrid-container {
-        flex-direction: column;
-    }
-    
-    .automated-reports-section .MuiGrid-item {
-        width: 100% !important;
-    }
+  .automated-reports-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-filters {
+    flex-direction: column;
+  }
+  
+  .search-box {
+    min-width: 100%;
+  }
+  
+  .filter-select {
+    min-width: 100%;
+  }
+  
+  .action-buttons {
+    justify-content: center;
+  }
+  
+  .report-item {
+    padding: 1rem;
+  }
+  
+  .report-header {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .report-actions {
+    justify-content: space-between;
+  }
+  
+  .report-details {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
 }
 
 @media (max-width: 480px) {
-    .automated-reports-section .MuiCardContent-root {
-        padding: 12px;
-    }
-    
-    .automated-reports-section .MuiChip-root {
-        font-size: 0.7rem;
-        height: 24px;
-    }
-    
-    .automated-reports-section .MuiTypography-h6 {
-        font-size: 1rem;
-    }
-    
-    .automated-reports-section .MuiDialogContent-root {
-        padding: 16px;
-    }
-    
-    .automated-reports-section .MuiDialogActions-root {
-        padding: 12px 16px;
-        flex-direction: column;
-    }
-}
-
-/* Animation for new reports */
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateX(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-.automated-reports-section .MuiCard-root {
-    animation: slideIn 0.3s ease-out;
-}
-
-/* Hover effects for interactive elements */
-.automated-reports-section .MuiIconButton-root:hover {
-    background-color: rgba(25, 118, 210, 0.08);
-}
-
-.automated-reports-section .MuiButton-root:hover {
-    background-color: rgba(25, 118, 210, 0.08);
-}
-
-/* Focus styles for accessibility */
-.automated-reports-section .MuiButton-root:focus,
-.automated-reports-section .MuiIconButton-root:focus {
-    outline: 2px solid #1976d2;
-    outline-offset: 2px;
-}
-
-/* Custom scrollbar for long content */
-.automated-reports-section .MuiCardContent-root {
-    max-height: 500px;
-    overflow-y: auto;
-}
-
-.automated-reports-section .MuiCardContent-root::-webkit-scrollbar {
-    width: 4px;
-}
-
-.automated-reports-section .MuiCardContent-root::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 2px;
-}
-
-.automated-reports-section .MuiCardContent-root::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 2px;
-}
-
-.automated-reports-section .MuiCardContent-root::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
-
-/* Status indicator styles */
-.automated-reports-section .MuiFormControlLabel-root {
-    margin: 0;
-}
-
-.automated-reports-section .MuiFormControlLabel-label {
-    font-size: 0.875rem;
-    color: #666;
-}
-
-/* Empty state styles */
-.automated-reports-section .MuiBox-root[style*="textAlign: center"] {
-    padding: 48px 24px;
-}
-
-.automated-reports-section .MuiBox-root[style*="textAlign: center"] .MuiTypography-h6 {
-    margin-bottom: 8px;
-    color: #666;
-}
-
-.automated-reports-section .MuiBox-root[style*="textAlign: center"] .MuiTypography-body2 {
-    margin-bottom: 24px;
-    color: #999;
+  .automated-reports-section {
+    padding: 0;
+  }
+  
+  .report-item {
+    padding: 0.75rem;
+  }
+  
+  .report-title {
+    font-size: 1rem;
+  }
+  
+  .dialog {
+    min-width: 300px;
+    margin: 1rem;
+  }
+  
+  .dialog-actions {
+    flex-direction: column;
+  }
 }

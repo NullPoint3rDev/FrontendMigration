@@ -1,51 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Box,
-    Typography,
-    Card,
-    CardContent,
-    CardActions,
-    Button,
-    Chip,
-    IconButton,
-    TextField,
-    InputAdornment,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    Pagination,
-    Alert,
-    CircularProgress,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Switch,
-    FormControlLabel,
-    Grid,
-    Tooltip,
-    Menu,
-    ListItemIcon,
-    ListItemText
-} from '@mui/material';
-import {
-    Search as SearchIcon,
-    Add as AddIcon,
-    MoreVert as MoreVertIcon,
-    Edit as EditIcon,
-    Delete as DeleteIcon,
-    PlayArrow as PlayIcon,
-    Pause as PauseIcon,
-    Schedule as ScheduleIcon,
-    Refresh as RefreshIcon,
-    Settings as SettingsIcon,
-    Warning as WarningIcon,
-    CheckCircle as CheckCircleIcon
-} from '@mui/icons-material';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import CreateAutomatedReportModal from './CreateAutomatedReportModal';
+import { automatedReportsApi } from '../api/automatedReportsApi';
 import '../styles/automatedReportsSection.css';
 
 const AutomatedReportsSection = () => {
@@ -63,79 +20,6 @@ const AutomatedReportsSection = () => {
     const [anchorEl, setAnchorEl] = useState(null);
     const [selectedReport, setSelectedReport] = useState(null);
 
-    // Mock data for development
-    const mockAutomatedReports = [
-        {
-            id: 1,
-            name: 'Еженедельный отчет по оборудованию',
-            templateId: 1,
-            templateName: 'Отчет по работе оборудования',
-            triggers: [
-                { type: 'TIME', value: 'weekly', description: 'Каждую неделю в понедельник в 09:00', time: '09:00', daysOfWeek: 'MONDAY' }
-            ],
-            status: 'ACTIVE',
-            lastRun: new Date('2024-01-15T09:00:00'),
-            nextRun: new Date('2024-01-22T09:00:00'),
-            createdAt: new Date('2024-01-01T10:00:00'),
-            createdBy: 'Администратор'
-        },
-        {
-            id: 2,
-            name: 'Ежедневный отчет по сварщикам',
-            templateId: 2,
-            templateName: 'Отчет по работе сварщиков',
-            triggers: [
-                { type: 'TIME', value: 'daily', description: 'Каждый день в 18:00', time: '18:00' }
-            ],
-            status: 'ACTIVE',
-            lastRun: new Date('2024-01-15T18:00:00'),
-            nextRun: new Date('2024-01-16T18:00:00'),
-            createdAt: new Date('2024-01-05T14:30:00'),
-            createdBy: 'Менеджер'
-        },
-        {
-            id: 3,
-            name: 'Отчет при ошибках оборудования',
-            templateId: 3,
-            templateName: 'Отчет по ошибкам оборудования',
-            triggers: [
-                { type: 'EQUIPMENT_ERROR', value: 'threshold', description: 'При превышении 5 ошибок в час' }
-            ],
-            status: 'INACTIVE',
-            lastRun: null,
-            nextRun: null,
-            createdAt: new Date('2024-01-10T11:20:00'),
-            createdBy: 'Техник'
-        },
-        {
-            id: 4,
-            name: 'Месячный отчет по материалам',
-            templateId: 4,
-            templateName: 'Отчет по расходу материалов',
-            triggers: [
-                { type: 'TIME', value: 'monthly', description: 'Каждый месяц 1 числа в 08:00', time: '08:00', dayOfMonth: 1 }
-            ],
-            status: 'ACTIVE',
-            lastRun: new Date('2024-01-01T08:00:00'),
-            nextRun: new Date('2024-02-01T08:00:00'),
-            createdAt: new Date('2023-12-15T16:45:00'),
-            createdBy: 'Администратор'
-        },
-        {
-            id: 5,
-            name: 'Рабочие дни отчет по сварщикам',
-            templateId: 2,
-            templateName: 'Отчет по работе сварщиков',
-            triggers: [
-                { type: 'TIME', value: 'weekly', description: 'Каждую неделю в понедельник, среду, пятницу в 07:00', time: '07:00', daysOfWeek: 'MONDAY,WEDNESDAY,FRIDAY' }
-            ],
-            status: 'ACTIVE',
-            lastRun: new Date('2024-01-15T07:00:00'),
-            nextRun: new Date('2024-01-17T07:00:00'),
-            createdAt: new Date('2024-01-10T12:00:00'),
-            createdBy: 'Менеджер'
-        }
-    ];
 
     useEffect(() => {
         loadAutomatedReports();
@@ -148,15 +32,18 @@ const AutomatedReportsSection = () => {
     const loadAutomatedReports = async () => {
         setLoading(true);
         try {
-            // В реальном приложении здесь будет вызов API
-            // const data = await getAutomatedReports();
-            // setAutomatedReports(data);
-            
-            // Пока используем mock данные
-            setAutomatedReports(mockAutomatedReports);
+            // Получаем ID пользователя из localStorage
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (user && user.id) {
+                const data = await automatedReportsApi.getAutomatedReportsByUser(user.id);
+                setAutomatedReports(data);
+            } else {
+                setAutomatedReports([]);
+            }
         } catch (err) {
             setError('Ошибка при загрузке автоматизированных отчетов');
             console.error('Error loading automated reports:', err);
+            setAutomatedReports([]);
         } finally {
             setLoading(false);
         }
@@ -245,9 +132,6 @@ const AutomatedReportsSection = () => {
         return null;
     };
 
-    const getStatusColor = (status) => {
-        return status === 'ACTIVE' ? 'success' : 'default';
-    };
 
     const getStatusLabel = (status) => {
         return status === 'ACTIVE' ? 'Активен' : 'Неактивен';
@@ -256,13 +140,13 @@ const AutomatedReportsSection = () => {
     const getTriggerIcon = (triggerType) => {
         switch (triggerType) {
             case 'TIME':
-                return <ScheduleIcon />;
+                return 'fa-clock';
             case 'EQUIPMENT_ERROR':
-                return <WarningIcon />;
+                return 'fa-exclamation-triangle';
             case 'VALUE_THRESHOLD':
-                return <CheckCircleIcon />;
+                return 'fa-check-circle';
             default:
-                return <SettingsIcon />;
+                return 'fa-cog';
         }
     };
 
@@ -276,239 +160,231 @@ const AutomatedReportsSection = () => {
 
     if (loading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-                <CircularProgress />
-            </Box>
+            <div className="automated-reports-loading">
+                <div className="loading-spinner"></div>
+                <p>Загрузка автоматизированных отчетов...</p>
+            </div>
         );
     }
 
     return (
-        <Box className="automated-reports-section">
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h5" component="h2" fontWeight="bold">
-                    Автоматизированные отчеты
-                </Typography>
-                <Box display="flex" gap={2}>
-                    <Button
-                        variant="outlined"
-                        startIcon={<RefreshIcon />}
-                        onClick={loadAutomatedReports}
-                        disabled={loading}
-                    >
-                        Обновить
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={() => setCreateModalOpen(true)}
-                    >
-                        Создать отчет
-                    </Button>
-                </Box>
-            </Box>
-
-            {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                    {error}
-                </Alert>
-            )}
-
-            {/* Фильтры и поиск */}
-            <Card sx={{ mb: 3 }}>
-                <CardContent>
-                    <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-                        <TextField
+        <div className="automated-reports-section">
+            <div className="automated-reports-controls">
+                <div className="search-filters">
+                    <div className="search-box">
+                        <i className="fas fa-search"></i>
+                        <input
+                            type="text"
                             placeholder="Поиск автоматизированных отчетов..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon />
-                                    </InputAdornment>
-                                ),
-                            }}
-                            sx={{ minWidth: 300 }}
                         />
-                        
-                        <FormControl sx={{ minWidth: 150 }}>
-                            <InputLabel>Статус</InputLabel>
-                            <Select
-                                value={statusFilter}
-                                label="Статус"
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                            >
-                                <MenuItem value="all">Все</MenuItem>
-                                <MenuItem value="ACTIVE">Активные</MenuItem>
-                                <MenuItem value="INACTIVE">Неактивные</MenuItem>
-                            </Select>
-                        </FormControl>
-                    </Box>
-                </CardContent>
-            </Card>
+                    </div>
+                    
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="filter-select"
+                    >
+                        <option value="all">Все статусы</option>
+                        <option value="ACTIVE">Активные</option>
+                        <option value="INACTIVE">Неактивные</option>
+                    </select>
+                </div>
+                
+                <div className="action-buttons">
+                    <button 
+                        className="refresh-btn"
+                        onClick={loadAutomatedReports}
+                        disabled={loading}
+                    >
+                        <i className="fas fa-sync-alt"></i>
+                        Обновить
+                    </button>
+                    <button 
+                        className="create-btn"
+                        onClick={() => setCreateModalOpen(true)}
+                    >
+                        <i className="fas fa-plus"></i>
+                        Создать отчет
+                    </button>
+                </div>
+            </div>
+
+            {error && (
+                <div className="error-message">
+                    <i className="fas fa-exclamation-triangle"></i>
+                    {error}
+                </div>
+            )}
 
             {/* Список автоматизированных отчетов */}
             {paginatedReports.length === 0 ? (
-                <Card>
-                    <CardContent>
-                        <Box textAlign="center" py={4}>
-                            <Typography variant="h6" color="text.secondary">
-                                Автоматизированные отчеты не найдены
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" mb={2}>
-                                Создайте первый автоматизированный отчет для автоматической генерации отчетов
-                            </Typography>
-                            <Button
-                                variant="contained"
-                                startIcon={<AddIcon />}
-                                onClick={() => setCreateModalOpen(true)}
-                            >
-                                Создать отчет
-                            </Button>
-                        </Box>
-                    </CardContent>
-                </Card>
+                <div className="no-reports">
+                    <i className="fas fa-file-alt"></i>
+                    <h3>Автоматизированные отчеты не найдены</h3>
+                    <p>Создайте первый автоматизированный отчет для автоматической генерации отчетов</p>
+                    <button 
+                        className="create-btn"
+                        onClick={() => setCreateModalOpen(true)}
+                    >
+                        <i className="fas fa-plus"></i>
+                        Создать отчет
+                    </button>
+                </div>
             ) : (
                 <>
-                    {paginatedReports.map((report) => (
-                        <Card key={report.id} sx={{ mb: 2 }}>
-                            <CardContent>
-                                <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                                    <Box flex={1}>
-                                        <Box display="flex" alignItems="center" gap={1} mb={1}>
-                                            <Chip
-                                                label={getStatusLabel(report.status)}
-                                                color={getStatusColor(report.status)}
-                                                size="small"
-                                            />
-                                        </Box>
-                                        
-                                        <Typography variant="h6" component="h3" gutterBottom>
-                                            {report.name}
-                                        </Typography>
-                                        
-                                        <Typography variant="body2" color="text.secondary" paragraph>
-                                            Шаблон: {report.templateName}
-                                        </Typography>
-
-                                        <Grid container spacing={2} mb={2}>
-                                            <Grid item xs={12} md={6}>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    <strong>Триггеры:</strong>
-                                                </Typography>
-                                                {report.triggers.map((trigger, index) => (
-                                                    <Box key={index} display="flex" alignItems="center" gap={1} mt={0.5}>
-                                                        {getTriggerIcon(trigger.type)}
-                                                        <Typography variant="caption">
-                                                            {trigger.description}
-                                                        </Typography>
-                                                    </Box>
-                                                ))}
-                                            </Grid>
-                                            <Grid item xs={12} md={6}>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    <strong>Последний запуск:</strong> {report.lastRun ? format(report.lastRun, 'dd.MM.yyyy HH:mm', { locale: ru }) : 'Никогда'}
-                                                </Typography>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    <strong>Следующий запуск:</strong> {report.nextRun ? format(report.nextRun, 'dd.MM.yyyy HH:mm', { locale: ru }) : 'Не запланирован'}
-                                                </Typography>
-                                            </Grid>
-                                        </Grid>
-                                        
-                                        <Typography variant="caption" color="text.secondary">
-                                            Создан: {format(report.createdAt, 'dd.MM.yyyy HH:mm', { locale: ru })} пользователем {report.createdBy}
-                                        </Typography>
-                                    </Box>
-                                    
-                                    <Box display="flex" alignItems="center" gap={1}>
-                                        <FormControlLabel
-                                            control={
-                                                <Switch
+                    <div className="reports-list">
+                        {paginatedReports.map((report) => (
+                            <div
+                                key={report.id}
+                                className={`report-item ${report.status === 'ACTIVE' ? 'active' : 'inactive'}`}
+                            >
+                                <div className="report-content">
+                                    <div className="report-header">
+                                        <div className="report-badges">
+                                            <span className={`status-badge ${report.status.toLowerCase()}`}>
+                                                {getStatusLabel(report.status)}
+                                            </span>
+                                        </div>
+                                        <div className="report-actions">
+                                            <label className="toggle-switch">
+                                                <input
+                                                    type="checkbox"
                                                     checked={report.status === 'ACTIVE'}
                                                     onChange={() => handleToggleStatus(report.id)}
-                                                    color="primary"
                                                 />
-                                            }
-                                            label=""
-                                        />
-                                        <IconButton
-                                            onClick={(e) => handleMenuOpen(e, report)}
-                                            size="small"
-                                        >
-                                            <MoreVertIcon />
-                                        </IconButton>
-                                    </Box>
-                                </Box>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                                <span className="slider"></span>
+                                            </label>
+                                            <button 
+                                                className="report-menu-btn"
+                                                onClick={(e) => handleMenuOpen(e, report)}
+                                            >
+                                                <i className="fas fa-ellipsis-v"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <h4 className="report-title">{report.name}</h4>
+                                    <p className="report-template">Шаблон: {report.templateName}</p>
+
+                                    <div className="report-details">
+                                        <div className="triggers-section">
+                                            <h5>Триггеры:</h5>
+                                            {report.triggers.map((trigger, index) => (
+                                                <div key={index} className="trigger-item">
+                                                    <i className={`fas ${getTriggerIcon(trigger.type)}`}></i>
+                                                    <span>{trigger.description}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        
+                                        <div className="timing-section">
+                                            <div className="timing-item">
+                                                <strong>Последний запуск:</strong> 
+                                                {report.lastRun ? format(report.lastRun, 'dd.MM.yyyy HH:mm', { locale: ru }) : 'Никогда'}
+                                            </div>
+                                            <div className="timing-item">
+                                                <strong>Следующий запуск:</strong> 
+                                                {report.nextRun ? format(report.nextRun, 'dd.MM.yyyy HH:mm', { locale: ru }) : 'Не запланирован'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="report-meta">
+                                        Создан: {format(report.createdAt, 'dd.MM.yyyy HH:mm', { locale: ru })} пользователем {report.createdBy}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
 
                     {/* Пагинация */}
                     {filteredReports.length > itemsPerPage && (
-                        <Box display="flex" justifyContent="center" mt={3}>
-                            <Pagination
-                                count={Math.ceil(filteredReports.length / itemsPerPage)}
-                                page={page}
-                                onChange={handlePageChange}
-                                color="primary"
-                            />
-                        </Box>
+                        <div className="pagination">
+                            <button 
+                                className="pagination-btn"
+                                onClick={() => handlePageChange(null, page - 1)}
+                                disabled={page === 1}
+                            >
+                                <i className="fas fa-chevron-left"></i>
+                            </button>
+                            
+                            <span className="pagination-info">
+                                Страница {page} из {Math.ceil(filteredReports.length / itemsPerPage)}
+                            </span>
+                            
+                            <button 
+                                className="pagination-btn"
+                                onClick={() => handlePageChange(null, page + 1)}
+                                disabled={page === Math.ceil(filteredReports.length / itemsPerPage)}
+                            >
+                                <i className="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
                     )}
                 </>
             )}
 
             {/* Контекстное меню */}
-            <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-            >
-                <MenuItem onClick={() => {
-                    // TODO: Implement edit functionality
-                    handleMenuClose();
-                }}>
-                    <ListItemIcon>
-                        <EditIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Редактировать</ListItemText>
-                </MenuItem>
-                <MenuItem onClick={() => {
-                    setReportToDelete(selectedReport);
-                    setDeleteDialogOpen(true);
-                    handleMenuClose();
-                }}>
-                    <ListItemIcon>
-                        <DeleteIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Удалить</ListItemText>
-                </MenuItem>
-            </Menu>
+            {anchorEl && (
+                <div className="context-menu-overlay" onClick={handleMenuClose}>
+                    <div className="context-menu" onClick={(e) => e.stopPropagation()}>
+                        <button 
+                            className="context-menu-item"
+                            onClick={() => {
+                                // TODO: Implement edit functionality
+                                handleMenuClose();
+                            }}
+                        >
+                            <i className="fas fa-edit"></i>
+                            Редактировать
+                        </button>
+                        <button 
+                            className="context-menu-item delete"
+                            onClick={() => {
+                                setReportToDelete(selectedReport);
+                                setDeleteDialogOpen(true);
+                                handleMenuClose();
+                            }}
+                        >
+                            <i className="fas fa-trash"></i>
+                            Удалить
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Диалог подтверждения удаления */}
-            <Dialog
-                open={deleteDialogOpen}
-                onClose={() => setDeleteDialogOpen(false)}
-            >
-                <DialogTitle>Подтверждение удаления</DialogTitle>
-                <DialogContent>
-                    <Typography>
-                        Вы уверены, что хотите удалить автоматизированный отчет "{reportToDelete?.name}"?
-                        Это действие нельзя отменить.
-                    </Typography>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteDialogOpen(false)}>
-                        Отмена
-                    </Button>
-                    <Button 
-                        onClick={() => handleDelete(reportToDelete?.id)} 
-                        color="error"
-                        variant="contained"
-                    >
-                        Удалить
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            {deleteDialogOpen && (
+                <div className="dialog-overlay" onClick={() => setDeleteDialogOpen(false)}>
+                    <div className="dialog" onClick={(e) => e.stopPropagation()}>
+                        <div className="dialog-header">
+                            <h3>Подтверждение удаления</h3>
+                        </div>
+                        <div className="dialog-content">
+                            <p>
+                                Вы уверены, что хотите удалить автоматизированный отчет "{reportToDelete?.name}"?
+                                Это действие нельзя отменить.
+                            </p>
+                        </div>
+                        <div className="dialog-actions">
+                            <button 
+                                className="cancel-btn"
+                                onClick={() => setDeleteDialogOpen(false)}
+                            >
+                                Отмена
+                            </button>
+                            <button 
+                                className="delete-btn"
+                                onClick={() => handleDelete(reportToDelete?.id)}
+                            >
+                                Удалить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Модальное окно создания автоматизированного отчета */}
             <CreateAutomatedReportModal
@@ -519,7 +395,7 @@ const AutomatedReportsSection = () => {
                     setCreateModalOpen(false);
                 }}
             />
-        </Box>
+        </div>
     );
 };
 
