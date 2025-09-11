@@ -80,6 +80,11 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
 
     const handleTemplateChange = (templateId) => {
         const template = templates.find(t => t.id === templateId);
+        console.log('Debug template change:', {
+            templateId,
+            template,
+            templateName: template ? template.name : 'NOT_FOUND'
+        });
         setFormData(prev => ({
             ...prev,
             templateId: parseInt(templateId), // Преобразуем в число
@@ -577,12 +582,13 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                             type="submit" 
                             className="save-btn"
                             onClick={() => {
-                                console.log('Debug create report:', {
-                                    name: formData.name,
-                                    templateId: formData.templateId,
-                                    triggersLength: formData.triggers.length,
-                                    triggers: formData.triggers
-                                });
+        console.log('Debug create report:', {
+            name: formData.name,
+            templateId: formData.templateId,
+            templateName: formData.templateName,
+            triggersLength: formData.triggers.length,
+            triggers: formData.triggers
+        });
                             }}
                             disabled={!formData.name || !formData.templateId || formData.triggers.length === 0}
                         >

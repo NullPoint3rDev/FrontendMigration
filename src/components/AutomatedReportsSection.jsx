@@ -36,10 +36,12 @@ const AutomatedReportsSection = () => {
             const user = JSON.parse(localStorage.getItem('user'));
             if (user && user.id) {
                 const data = await getUserAutomatedReports(user.id);
+                console.log('Debug loaded user reports:', data);
                 setAutomatedReports(data);
             } else {
                 // Если пользователь не найден, загружаем все отчеты (для админа)
                 const data = await getAllAutomatedReports();
+                console.log('Debug loaded all reports:', data);
                 setAutomatedReports(data);
             }
         } catch (err) {
