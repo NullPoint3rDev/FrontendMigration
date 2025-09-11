@@ -81,7 +81,7 @@ const AutomatedReportsSection = () => {
                         ? { 
                             ...report, 
                             status: report.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
-                            nextRun: report.status === 'ACTIVE' ? null : calculateNextRun(report.triggers[0])
+                            nextRun: report.status === 'ACTIVE' ? null : (report.triggers && report.triggers.length > 0 ? calculateNextRun(report.triggers[0]) : null)
                         }
                         : report
                 )
@@ -124,6 +124,11 @@ const AutomatedReportsSection = () => {
     };
 
     const calculateNextRun = (trigger) => {
+        if (!trigger || !trigger.type) {
+            console.log('Debug calculateNextRun: trigger is undefined or missing type', trigger);
+            return null;
+        }
+        
         if (trigger.type === 'TIME' && trigger.time) {
             const now = new Date();
             const [hours, minutes] = trigger.time.split(':').map(Number);

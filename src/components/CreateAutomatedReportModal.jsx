@@ -253,6 +253,11 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
     };
 
     const calculateNextRun = (trigger) => {
+        if (!trigger || !trigger.type) {
+            console.log('Debug calculateNextRun: trigger is undefined or missing type', trigger);
+            return null;
+        }
+        
         if (trigger.type === 'TIME' && trigger.time) {
             const now = new Date();
             const [hours, minutes] = trigger.time.split(':').map(Number);
