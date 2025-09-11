@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import CreateAutomatedReportModal from './CreateAutomatedReportModal';
-import { getUserAutomatedReports, toggleAutomatedReportStatus, deleteAutomatedReport } from '../api/automatedReportsApi';
+import { getUserAutomatedReports, toggleAutomatedReportStatus, deleteAutomatedReport, createAutomatedReport, getAllAutomatedReports } from '../api/automatedReportsApi';
 import '../styles/automatedReportsSection.css';
 
 const AutomatedReportsSection = () => {
@@ -38,7 +38,9 @@ const AutomatedReportsSection = () => {
                 const data = await getUserAutomatedReports(user.id);
                 setAutomatedReports(data);
             } else {
-                setAutomatedReports([]);
+                // Если пользователь не найден, загружаем все отчеты (для админа)
+                const data = await getAllAutomatedReports();
+                setAutomatedReports(data);
             }
         } catch (err) {
             setError('Ошибка при загрузке автоматизированных отчетов');
@@ -486,9 +488,16 @@ const AutomatedReportsSection = () => {
             <CreateAutomatedReportModal
                 open={createModalOpen}
                 onClose={() => setCreateModalOpen(false)}
-                onSave={(newReport) => {
-                    setAutomatedReports(prev => [newReport, ...prev]);
-                    setCreateModalOpen(false);
+                onSave={async (newReport) => {
+                    try {
+                        // Отправляем отчет на сервер
+                        const createdReport = await createAutomatedReport(newReport);
+                        setAutomatedReports(prev => [createdReport, ...prev]);
+                        setCreateModalOpen(false);
+                    } catch (error) {
+                        console.error('Error creating automated report:', error);
+                        setError('Ошибка при создании автоматизированного отчета');
+                    }
                 }}
             />
         </div>

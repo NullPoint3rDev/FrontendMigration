@@ -341,16 +341,15 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
         });
 
         const newReport = {
-            id: Date.now(), // Временный ID для mock данных
             name: formData.name,
             templateId: formData.templateId,
             templateName: formData.templateName,
-            triggers: formData.triggers,
-            status: formData.isActive ? 'ACTIVE' : 'INACTIVE',
+            triggersConfig: JSON.stringify(formData.triggers), // Преобразуем триггеры в JSON строку
+            isActive: formData.isActive,
             lastRun: null,
             nextRun: nextRun,
             createdAt: new Date(),
-            createdBy: 'Текущий пользователь'
+            createdBy: 1 // Временное значение, должно быть ID текущего пользователя
         };
 
         onSave(newReport);
