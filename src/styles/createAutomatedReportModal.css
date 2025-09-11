@@ -124,6 +124,19 @@
   gap: 0.5rem;
 }
 
+.info-message {
+  color: var(--primary);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  background: rgba(108, 99, 255, 0.1);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .modal-actions {
   display: flex;
   gap: 1rem;

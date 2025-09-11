@@ -29,34 +29,22 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
     const loadTemplates = async () => {
         setLoading(true);
         try {
-            // Загружаем шаблоны с сервера
-            const response = await fetch('/api/automated-reports/available-templates', {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-            });
-            
-            if (response.ok) {
-                const serverTemplates = await response.json();
-                console.log('Loaded templates from server:', serverTemplates);
-                setTemplates(serverTemplates);
+            // Загружаем пользовательские шаблоны из localStorage
+            const savedTemplates = localStorage.getItem('reportTemplates');
+            if (savedTemplates) {
+                const userTemplates = JSON.parse(savedTemplates);
+                console.log('Loaded user templates from localStorage:', userTemplates);
+                
+                // Преобразуем шаблоны в формат, ожидаемый компонентом
+                const formattedTemplates = userTemplates.map(template => ({
+                    id: parseInt(template.id), // Преобразуем в число
+                    name: template.name,
+                    type: template.reportType
+                }));
+                setTemplates(formattedTemplates);
             } else {
-                // Fallback: загружаем шаблоны из localStorage
-                const savedTemplates = localStorage.getItem('reportTemplates');
-                if (savedTemplates) {
-                    const userTemplates = JSON.parse(savedTemplates);
-                    // Преобразуем шаблоны в формат, ожидаемый компонентом
-                    const formattedTemplates = userTemplates.map(template => ({
-                        id: parseInt(template.id), // Преобразуем в число
-                        name: template.name,
-                        type: template.reportType
-                    }));
-                    setTemplates(formattedTemplates);
-                } else {
-                    setTemplates([]);
-                }
+                console.log('No user templates found in localStorage');
+                setTemplates([]);
             }
         } catch (err) {
             setError('Ошибка при загрузке шаблонов отчетов');
@@ -414,14 +402,23 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                             onChange={(e) => handleTemplateChange(e.target.value)}
                             className="form-input"
                             required
+                            disabled={templates.length === 0}
                         >
-                            <option value="">Выберите шаблон</option>
+                            <option value="">
+                                {templates.length === 0 ? 'Нет доступных шаблонов' : 'Выберите шаблон'}
+                            </option>
                             {templates.map((template) => (
                                 <option key={template.id} value={template.id}>
                                     {template.name}
                                 </option>
                             ))}
                         </select>
+                        {templates.length === 0 && (
+                            <div className="info-message">
+                                <i className="fas fa-info-circle"></i>
+                                Сначала создайте шаблон отчета на странице "Мои отчеты"
+                            </div>
+                        )}
                     </div>
 
                     <div className="form-group">
