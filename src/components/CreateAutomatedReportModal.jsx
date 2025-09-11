@@ -340,6 +340,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
         console.log('Debug nextRun calculation:', {
             trigger: formData.triggers[0],
             nextRun: nextRun,
+            nextRunFormatted: nextRun ? nextRun.toISOString().replace('Z', '').replace(/\.\d{3}$/, '') : null,
             currentTime: new Date(),
             templateId: formData.templateId,
             templateIdType: typeof formData.templateId
@@ -352,8 +353,8 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
             triggersConfig: JSON.stringify(formData.triggers), // Преобразуем триггеры в JSON строку
             isActive: formData.isActive,
             lastRun: null,
-            nextRun: nextRun ? nextRun.toISOString().replace('Z', '') : null, // Убираем Z для Java LocalDateTime
-            createdAt: new Date().toISOString().replace('Z', ''), // Убираем Z для Java LocalDateTime
+            nextRun: nextRun ? nextRun.toISOString().replace('Z', '').replace(/\.\d{3}$/, '') : null, // Убираем Z и миллисекунды для Java LocalDateTime
+            createdAt: new Date().toISOString().replace('Z', '').replace(/\.\d{3}$/, ''), // Убираем Z и миллисекунды для Java LocalDateTime
             createdBy: 1 // Временное значение, должно быть ID текущего пользователя
         };
 
