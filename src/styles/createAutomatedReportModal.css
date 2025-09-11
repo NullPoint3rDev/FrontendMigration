@@ -103,6 +103,13 @@
   color: var(--text-secondary);
 }
 
+.form-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+}
+
 .error-message {
   color: var(--secondary);
   font-size: 0.85rem;

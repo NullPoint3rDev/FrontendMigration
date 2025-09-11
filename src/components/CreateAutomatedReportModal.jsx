@@ -12,7 +12,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [triggerType, setTriggerType] = useState('TIME');
+    const [triggerType, setTriggerType] = useState('');
     const [triggerValue, setTriggerValue] = useState('');
     const [triggerTime, setTriggerTime] = useState('09:00');
     const [triggerDays, setTriggerDays] = useState([]);
@@ -60,7 +60,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
             triggers: [],
             isActive: true
         });
-        setTriggerType('TIME');
+        setTriggerType('');
         setTriggerValue('');
         setTriggerTime('09:00');
         setTriggerDays([]);
@@ -85,6 +85,10 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
     };
 
     const addTrigger = () => {
+        if (!triggerType) {
+            setError('Выберите тип триггера');
+            return;
+        }
         if (!triggerValue) {
             setError('Выберите значение триггера');
             return;
@@ -325,9 +329,13 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                         <label className="form-label">Тип триггера</label>
                         <select
                             value={triggerType}
-                            onChange={(e) => setTriggerType(e.target.value)}
+                            onChange={(e) => {
+                                setTriggerType(e.target.value);
+                                setTriggerValue(''); // Сбрасываем значение при изменении типа
+                            }}
                             className="form-input"
                         >
+                            <option value="">Выберите тип</option>
                             {getTriggerTypeOptions().map((option) => (
                                 <option key={option.value} value={option.value}>
                                     {option.label}
@@ -342,7 +350,9 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                             value={triggerValue}
                             onChange={(e) => setTriggerValue(e.target.value)}
                             className="form-input"
+                            disabled={!triggerType}
                         >
+                            <option value="">Выберите значение</option>
                             {getTriggerValueOptions().map((option) => (
                                 <option key={option.value} value={option.value}>
                                     {option.label}
@@ -412,7 +422,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                                 addTrigger();
                             }}
                             disabled={
-                                !triggerValue || 
+                                !triggerType || !triggerValue || 
                                 (triggerType === 'TIME' && !triggerTime) ||
                                 (triggerType === 'TIME' && triggerValue === 'weekly' && triggerDays.length === 0) ||
                                 (triggerType === 'TIME' && triggerValue === 'monthly' && !triggerDayOfMonth)
