@@ -29,19 +29,34 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
     const loadTemplates = async () => {
         setLoading(true);
         try {
-            // Загружаем шаблоны пользователя из localStorage
-            const savedTemplates = localStorage.getItem('reportTemplates');
-            if (savedTemplates) {
-                const userTemplates = JSON.parse(savedTemplates);
-                // Преобразуем шаблоны в формат, ожидаемый компонентом
-                const formattedTemplates = userTemplates.map(template => ({
-                    id: parseInt(template.id), // Преобразуем в число
-                    name: template.name,
-                    type: template.reportType
-                }));
-                setTemplates(formattedTemplates);
+            // Загружаем шаблоны с сервера
+            const response = await fetch('/api/automated-reports/available-templates', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const serverTemplates = await response.json();
+                console.log('Loaded templates from server:', serverTemplates);
+                setTemplates(serverTemplates);
             } else {
-                setTemplates([]);
+                // Fallback: загружаем шаблоны из localStorage
+                const savedTemplates = localStorage.getItem('reportTemplates');
+                if (savedTemplates) {
+                    const userTemplates = JSON.parse(savedTemplates);
+                    // Преобразуем шаблоны в формат, ожидаемый компонентом
+                    const formattedTemplates = userTemplates.map(template => ({
+                        id: parseInt(template.id), // Преобразуем в число
+                        name: template.name,
+                        type: template.reportType
+                    }));
+                    setTemplates(formattedTemplates);
+                } else {
+                    setTemplates([]);
+                }
             }
         } catch (err) {
             setError('Ошибка при загрузке шаблонов отчетов');

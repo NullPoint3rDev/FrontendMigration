@@ -213,7 +213,10 @@ const AutomatedReportsSection = () => {
 
 
     const getStatusLabel = (status) => {
-        return status === 'ACTIVE' ? 'Активен' : 'Неактивен';
+        if (status === 'ACTIVE' || status === true) {
+            return 'Активен';
+        }
+        return 'Неактивен';
     };
 
     const getTriggerIcon = (triggerType) => {
@@ -358,14 +361,14 @@ const AutomatedReportsSection = () => {
                                     </td>
                                     <td>
                                         <div className="status-cell">
-                                            <span className={`status-badge ${report.status.toLowerCase()}`}>
+                                            <span className={`status-badge ${report.status && typeof report.status === 'string' ? report.status.toLowerCase() : 'inactive'}`}>
                                                 {getStatusLabel(report.status)}
                                             </span>
                                             <div className="toggle-switch">
                                                 <input
                                                     type="checkbox"
                                                     id={`toggle-${report.id}`}
-                                                    checked={report.status === 'ACTIVE'}
+                                                    checked={report.status === 'ACTIVE' || report.isActive === true}
                                                     onChange={() => handleToggleStatus(report.id)}
                                                 />
                                                 <label htmlFor={`toggle-${report.id}`} className="toggle-label">
