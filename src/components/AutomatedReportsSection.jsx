@@ -329,8 +329,8 @@ const AutomatedReportsSection = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {paginatedReports && paginatedReports.map((report) => (
-                                <tr key={report.id}>
+                            {paginatedReports && paginatedReports.map((report, index) => (
+                                <tr key={report.id || `report-${index}`}>
                                     <td>
                                         <div className="report-name-cell">
                                             <span className="report-name">{report.name}</span>
@@ -342,7 +342,7 @@ const AutomatedReportsSection = () => {
                                     <td>
                                         <div className="triggers-cell">
                                             {report.triggers && report.triggers.map((trigger, index) => (
-                                                <span key={index} className="trigger-tag">
+                                                <span key={`${report.id || 'report'}-trigger-${index}`} className="trigger-tag">
                                                     <i className={`fas ${getTriggerIcon(trigger.type)}`}></i>
                                                     {trigger.description}
                                                 </span>

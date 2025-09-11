@@ -364,8 +364,8 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
             triggersConfig: JSON.stringify(formData.triggers), // Преобразуем триггеры в JSON строку
             isActive: formData.isActive,
             lastRun: null,
-            nextRun: nextRun,
-            createdAt: new Date(),
+            nextRun: nextRun ? nextRun.toISOString().replace('Z', '') : null, // Убираем Z для Java LocalDateTime
+            createdAt: new Date().toISOString().replace('Z', ''), // Убираем Z для Java LocalDateTime
             createdBy: 1 // Временное значение, должно быть ID текущего пользователя
         };
 
