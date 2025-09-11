@@ -14,7 +14,6 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
     const [error, setError] = useState(null);
     const [triggerType, setTriggerType] = useState('TIME');
     const [triggerValue, setTriggerValue] = useState('');
-    const [triggerDescription, setTriggerDescription] = useState('');
     const [triggerTime, setTriggerTime] = useState('09:00');
     const [triggerDays, setTriggerDays] = useState([]);
     const [triggerDayOfMonth, setTriggerDayOfMonth] = useState(1);
@@ -63,7 +62,6 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
         });
         setTriggerType('TIME');
         setTriggerValue('');
-        setTriggerDescription('');
         setTriggerTime('09:00');
         setTriggerDays([]);
         setTriggerDayOfMonth(1);
@@ -108,15 +106,10 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
             }
         }
 
-        // Для временных триггеров используем автоматически сгенерированное описание
+        // Генерируем описание автоматически
         const finalDescription = triggerType === 'TIME' 
             ? generateTimeTriggerDescription() 
-            : triggerDescription;
-
-        if (!finalDescription) {
-            setError('Заполните описание триггера');
-            return;
-        }
+            : `${triggerType}: ${triggerValue}`;
 
         const newTrigger = {
             type: triggerType,
@@ -133,7 +126,6 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
         }));
 
         setTriggerValue('');
-        setTriggerDescription('');
         setTriggerTime('09:00');
         setTriggerDays([]);
         setTriggerDayOfMonth(1);
@@ -404,17 +396,6 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                         </div>
                     )}
 
-                    <div className="form-group">
-                        <label className="form-label">Описание триггера</label>
-                        <input
-                            type="text"
-                            value={triggerType === 'TIME' ? generateTimeTriggerDescription() : triggerDescription}
-                            onChange={(e) => setTriggerDescription(e.target.value)}
-                            className="form-input"
-                            placeholder="Например: Каждую неделю в понедельник в 09:00"
-                            disabled={triggerType === 'TIME' && !!generateTimeTriggerDescription()}
-                        />
-                    </div>
 
                     <div className="form-group">
                         <button
@@ -426,8 +407,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                                     triggerType,
                                     triggerTime,
                                     triggerDays,
-                                    triggerDayOfMonth,
-                                    triggerDescription
+                                    triggerDayOfMonth
                                 });
                                 addTrigger();
                             }}
@@ -435,8 +415,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                                 !triggerValue || 
                                 (triggerType === 'TIME' && !triggerTime) ||
                                 (triggerType === 'TIME' && triggerValue === 'weekly' && triggerDays.length === 0) ||
-                                (triggerType === 'TIME' && triggerValue === 'monthly' && !triggerDayOfMonth) ||
-                                (triggerType !== 'TIME' && !triggerDescription)
+                                (triggerType === 'TIME' && triggerValue === 'monthly' && !triggerDayOfMonth)
                             }
                         >
                             <i className="fas fa-plus"></i>
