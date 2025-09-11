@@ -359,11 +359,24 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
             templateIdType: typeof formData.templateId
         });
 
+        // Очищаем триггеры от лишних полей перед отправкой
+        const cleanTriggers = formData.triggers.map(trigger => ({
+            type: trigger.type,
+            value: trigger.value,
+            description: trigger.description,
+            time: trigger.time,
+            daysOfWeek: trigger.daysOfWeek,
+            dayOfMonth: trigger.dayOfMonth,
+            isActive: true,
+            priority: 5,
+            timezone: 'UTC'
+        }));
+
         const newReport = {
             name: formData.name,
             templateId: parseInt(formData.templateId), // Убеждаемся, что это число
             templateName: formData.templateName,
-            triggers: formData.triggers, // Отправляем триггеры как массив объектов
+            triggers: cleanTriggers, // Отправляем очищенные триггеры
             isActive: formData.isActive,
             lastRun: null,
             nextRun: nextRun ? nextRun.toISOString().replace('Z', '').replace(/\.\d{3}$/, '') : null, // Убираем Z и миллисекунды для Java LocalDateTime
@@ -590,7 +603,8 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
             templateId: formData.templateId,
             templateName: formData.templateName,
             triggersLength: formData.triggers.length,
-            triggers: formData.triggers
+            originalTriggers: formData.triggers,
+            cleanTriggers: cleanTriggers
         });
                             }}
                             disabled={!formData.name || !formData.templateId || formData.triggers.length === 0}
