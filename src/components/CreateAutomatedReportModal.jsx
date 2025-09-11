@@ -597,16 +597,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                         <button 
                             type="submit" 
                             className="save-btn"
-                            onClick={() => {
-        console.log('Debug create report:', {
-            name: formData.name,
-            templateId: formData.templateId,
-            templateName: formData.templateName,
-            triggersLength: formData.triggers.length,
-            originalTriggers: formData.triggers,
-            cleanTriggers: cleanTriggers
-        });
-                            }}
+                            onClick={handleSave}
                             disabled={!formData.name || !formData.templateId || formData.triggers.length === 0}
                         >
                             Создать отчет
