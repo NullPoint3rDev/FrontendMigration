@@ -249,6 +249,78 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
         }
     };
 
+    const calculateNextRun = (trigger) => {
+        if (trigger.type === 'TIME' && trigger.time) {
+            const now = new Date();
+            const [hours, minutes] = trigger.time.split(':').map(Number);
+            
+            // Создаем дату на сегодня с указанным временем
+            const todayAtTime = new Date(now);
+            todayAtTime.setHours(hours, minutes, 0, 0);
+            
+            switch (trigger.value) {
+                case 'daily':
+                    // Если время уже прошло сегодня, планируем на завтра
+                    if (todayAtTime <= now) {
+                        todayAtTime.setDate(todayAtTime.getDate() + 1);
+                    }
+                    return todayAtTime;
+                    
+                case 'weekly':
+                    if (trigger.daysOfWeek) {
+                        const days = trigger.daysOfWeek.split(',');
+                        const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+                        
+                        // Находим ближайший день недели
+                        let nextRun = new Date(todayAtTime);
+                        let found = false;
+                        
+                        // Проверяем оставшиеся дни этой недели
+                        for (let i = 0; i < 7 && !found; i++) {
+                            const checkDate = new Date(todayAtTime);
+                            checkDate.setDate(todayAtTime.getDate() + i);
+                            const dayName = dayNames[checkDate.getDay()];
+                            
+                            if (days.includes(dayName)) {
+                                if (i === 0 && todayAtTime > now) {
+                                    // Сегодня и время еще не прошло
+                                    nextRun = todayAtTime;
+                                    found = true;
+                                } else if (i > 0) {
+                                    // Ближайший день в будущем
+                                    nextRun = checkDate;
+                                    found = true;
+                                }
+                            }
+                        }
+                        
+                        return nextRun;
+                    }
+                    return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                    
+                case 'monthly':
+                    if (trigger.dayOfMonth) {
+                        const dayOfMonth = parseInt(trigger.dayOfMonth);
+                        const nextRun = new Date(now);
+                        nextRun.setDate(dayOfMonth);
+                        nextRun.setHours(hours, minutes, 0, 0);
+                        
+                        // Если день уже прошел в этом месяце, планируем на следующий месяц
+                        if (nextRun <= now) {
+                            nextRun.setMonth(nextRun.getMonth() + 1);
+                        }
+                        
+                        return nextRun;
+                    }
+                    return new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                    
+                default:
+                    return null;
+            }
+        }
+        return null;
+    };
+
     const handleSave = (e) => {
         e.preventDefault();
         
@@ -256,6 +328,17 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
             setError('Заполните все обязательные поля');
             return;
         }
+
+        // Рассчитываем следующий запуск на основе первого триггера
+        const nextRun = formData.isActive && formData.triggers.length > 0 
+            ? calculateNextRun(formData.triggers[0]) 
+            : null;
+        
+        console.log('Debug nextRun calculation:', {
+            trigger: formData.triggers[0],
+            nextRun: nextRun,
+            currentTime: new Date()
+        });
 
         const newReport = {
             id: Date.now(), // Временный ID для mock данных
@@ -265,7 +348,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
             triggers: formData.triggers,
             status: formData.isActive ? 'ACTIVE' : 'INACTIVE',
             lastRun: null,
-            nextRun: formData.isActive ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null,
+            nextRun: nextRun,
             createdAt: new Date(),
             createdBy: 'Текущий пользователь'
         };

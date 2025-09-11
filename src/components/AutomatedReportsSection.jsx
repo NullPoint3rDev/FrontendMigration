@@ -122,15 +122,86 @@ const AutomatedReportsSection = () => {
     };
 
     const calculateNextRun = (trigger) => {
-        if (trigger.type === 'TIME') {
+        if (trigger.type === 'TIME' && trigger.time) {
             const now = new Date();
+            const [hours, minutes] = trigger.time.split(':').map(Number);
+            
+            // Создаем дату на сегодня с указанным временем
+            const todayAtTime = new Date(now);
+            todayAtTime.setHours(hours, minutes, 0, 0);
+            
+            console.log('Debug calculateNextRun:', {
+                trigger,
+                now: now.toISOString(),
+                todayAtTime: todayAtTime.toISOString(),
+                hours,
+                minutes
+            });
+            
             switch (trigger.value) {
                 case 'daily':
-                    return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                    // Если время уже прошло сегодня, планируем на завтра
+                    if (todayAtTime <= now) {
+                        todayAtTime.setDate(todayAtTime.getDate() + 1);
+                    }
+                    return todayAtTime;
+                    
                 case 'weekly':
+                    if (trigger.daysOfWeek) {
+                        const days = trigger.daysOfWeek.split(',');
+                        const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+                        const dayNumbers = [0, 1, 2, 3, 4, 5, 6];
+                        
+                        // Находим ближайший день недели
+                        let nextRun = new Date(todayAtTime);
+                        let found = false;
+                        
+                        // Проверяем оставшиеся дни этой недели
+                        for (let i = 0; i < 7 && !found; i++) {
+                            const checkDate = new Date(todayAtTime);
+                            checkDate.setDate(todayAtTime.getDate() + i);
+                            const dayName = dayNames[checkDate.getDay()];
+                            
+                            if (days.includes(dayName)) {
+                                if (i === 0 && todayAtTime > now) {
+                                    // Сегодня и время еще не прошло
+                                    nextRun = todayAtTime;
+                                    found = true;
+                                } else if (i > 0) {
+                                    // Ближайший день в будущем
+                                    nextRun = checkDate;
+                                    found = true;
+                                }
+                            }
+                        }
+                        
+                        // Если не нашли в этой неделе, берем первый день следующей недели
+                        if (!found && days.length > 0) {
+                            const firstDay = dayNumbers[dayNames.indexOf(days[0])];
+                            nextRun = new Date(todayAtTime);
+                            nextRun.setDate(todayAtTime.getDate() + (7 - todayAtTime.getDay() + firstDay) % 7);
+                        }
+                        
+                        return nextRun;
+                    }
                     return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                    
                 case 'monthly':
+                    if (trigger.dayOfMonth) {
+                        const dayOfMonth = parseInt(trigger.dayOfMonth);
+                        const nextRun = new Date(now);
+                        nextRun.setDate(dayOfMonth);
+                        nextRun.setHours(hours, minutes, 0, 0);
+                        
+                        // Если день уже прошел в этом месяце, планируем на следующий месяц
+                        if (nextRun <= now) {
+                            nextRun.setMonth(nextRun.getMonth() + 1);
+                        }
+                        
+                        return nextRun;
+                    }
                     return new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                    
                 default:
                     return null;
             }
