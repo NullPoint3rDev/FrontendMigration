@@ -49,7 +49,8 @@ const AutomatedReportsSection = () => {
                         templateName: data[0].templateName,
                         templateId: data[0].templateId,
                         triggers: data[0].triggers,
-                        triggersConfig: data[0].triggersConfig
+                        triggersConfig: data[0].triggersConfig,
+                        fullReport: data[0]
                     });
                 }
                 setAutomatedReports(data);
