@@ -363,7 +363,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
             name: formData.name,
             templateId: parseInt(formData.templateId), // Убеждаемся, что это число
             templateName: formData.templateName,
-            triggersConfig: JSON.stringify(formData.triggers), // Преобразуем триггеры в JSON строку
+            triggers: formData.triggers, // Отправляем триггеры как массив объектов
             isActive: formData.isActive,
             lastRun: null,
             nextRun: nextRun ? nextRun.toISOString().replace('Z', '').replace(/\.\d{3}$/, '') : null, // Убираем Z и миллисекунды для Java LocalDateTime
