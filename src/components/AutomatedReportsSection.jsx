@@ -326,7 +326,7 @@ const AutomatedReportsSection = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {paginatedReports.map((report) => (
+                            {paginatedReports && paginatedReports.map((report) => (
                                 <tr key={report.id}>
                                     <td>
                                         <div className="report-name-cell">
@@ -338,7 +338,7 @@ const AutomatedReportsSection = () => {
                                     </td>
                                     <td>
                                         <div className="triggers-cell">
-                                            {report.triggers.map((trigger, index) => (
+                                            {report.triggers && report.triggers.map((trigger, index) => (
                                                 <span key={index} className="trigger-tag">
                                                     <i className={`fas ${getTriggerIcon(trigger.type)}`}></i>
                                                     {trigger.description}

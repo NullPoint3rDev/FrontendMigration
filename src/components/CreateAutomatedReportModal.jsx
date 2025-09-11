@@ -35,7 +35,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                 const userTemplates = JSON.parse(savedTemplates);
                 // Преобразуем шаблоны в формат, ожидаемый компонентом
                 const formattedTemplates = userTemplates.map(template => ({
-                    id: template.id,
+                    id: parseInt(template.id), // Преобразуем в число
                     name: template.name,
                     type: template.reportType
                 }));
@@ -79,7 +79,7 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
         const template = templates.find(t => t.id === templateId);
         setFormData(prev => ({
             ...prev,
-            templateId: templateId,
+            templateId: parseInt(templateId), // Преобразуем в число
             templateName: template ? template.name : ''
         }));
     };
@@ -337,12 +337,14 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
         console.log('Debug nextRun calculation:', {
             trigger: formData.triggers[0],
             nextRun: nextRun,
-            currentTime: new Date()
+            currentTime: new Date(),
+            templateId: formData.templateId,
+            templateIdType: typeof formData.templateId
         });
 
         const newReport = {
             name: formData.name,
-            templateId: formData.templateId,
+            templateId: parseInt(formData.templateId), // Убеждаемся, что это число
             templateName: formData.templateName,
             triggersConfig: JSON.stringify(formData.triggers), // Преобразуем триггеры в JSON строку
             isActive: formData.isActive,
