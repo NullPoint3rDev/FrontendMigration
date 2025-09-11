@@ -42,6 +42,16 @@ const AutomatedReportsSection = () => {
                 // Если пользователь не найден, загружаем все отчеты (для админа)
                 const data = await getAllAutomatedReports();
                 console.log('Debug loaded all reports:', data);
+                if (data && data.length > 0) {
+                    console.log('Debug first report structure:', {
+                        id: data[0].id,
+                        name: data[0].name,
+                        templateName: data[0].templateName,
+                        templateId: data[0].templateId,
+                        triggers: data[0].triggers,
+                        triggersConfig: data[0].triggersConfig
+                    });
+                }
                 setAutomatedReports(data);
             }
         } catch (err) {

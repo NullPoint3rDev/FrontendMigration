@@ -79,15 +79,18 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
     };
 
     const handleTemplateChange = (templateId) => {
-        const template = templates.find(t => t.id === templateId);
+        const templateIdNum = parseInt(templateId);
+        const template = templates.find(t => t.id === templateIdNum);
         console.log('Debug template change:', {
             templateId,
+            templateIdNum,
+            templates: templates,
             template,
             templateName: template ? template.name : 'NOT_FOUND'
         });
         setFormData(prev => ({
             ...prev,
-            templateId: parseInt(templateId), // Преобразуем в число
+            templateId: templateIdNum, // Преобразуем в число
             templateName: template ? template.name : ''
         }));
     };
