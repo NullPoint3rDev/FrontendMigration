@@ -51,6 +51,14 @@ export async function getUnreadNotificationsByUser(userId) {
     return res.json();
 }
 
+// Получить уведомления о автоматических отчетах
+export async function getAutomatedReportNotifications(userId) {
+    const res = await fetch(`${API_URL}/user/${userId}/automated-reports`, {
+        headers: getAuthHeaders()
+    });
+    return res.json();
+}
+
 // Получить количество непрочитанных уведомлений пользователя
 export async function getUnreadNotificationsCountByUser(userId) {
     const res = await fetch(`${API_URL}/user/${userId}/unread/count`, {

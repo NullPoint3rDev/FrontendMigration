@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUserNotifications, markNotificationAsRead, deleteNotification } from '../api/notificationApi';
+import { getUserNotifications, markNotificationAsRead, deleteNotification, getAutomatedReportNotifications } from '../api/notificationApi';
 import '../styles/notificationsSection.css';
 
 const NotificationsSection = () => {
@@ -30,8 +30,19 @@ const NotificationsSection = () => {
             // Получаем ID пользователя из localStorage
             const user = JSON.parse(localStorage.getItem('user'));
             if (user && user.id) {
-                const data = await getUserNotifications(user.id);
-                setNotifications(data);
+                // Загружаем обычные уведомления
+                const regularNotifications = await getUserNotifications(user.id);
+                
+                // Загружаем уведомления о автоматических отчетах
+                const automatedReportNotifications = await getAutomatedReportNotifications(user.id);
+                
+                // Объединяем все уведомления
+                const allNotifications = [...regularNotifications, ...automatedReportNotifications];
+                
+                // Сортируем по дате создания (новые сверху)
+                allNotifications.sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated));
+                
+                setNotifications(allNotifications);
             } else {
                 setNotifications([]);
             }
@@ -112,7 +123,9 @@ const NotificationsSection = () => {
             ERROR: 'Ошибка',
             WARNING: 'Предупреждение',
             INFO: 'Информация',
-            SYSTEM: 'Система'
+            SYSTEM: 'Система',
+            AUTOMATED_REPORT: 'Автоматические отчеты',
+            AUTOMATED_REPORT_ERROR: 'Ошибки автоматических отчетов'
         };
         return labels[type] || type;
     };
@@ -170,6 +183,8 @@ const NotificationsSection = () => {
                         <option value="WARNING">Предупреждение</option>
                         <option value="INFO">Информация</option>
                         <option value="SYSTEM">Система</option>
+                        <option value="AUTOMATED_REPORT">Автоматические отчеты</option>
+                        <option value="AUTOMATED_REPORT_ERROR">Ошибки автоматических отчетов</option>
                     </select>
                 </div>
                 
@@ -225,6 +240,23 @@ const NotificationsSection = () => {
                                     
                                     <h4 className="notification-title">{notification.title}</h4>
                                     <p className="notification-text">{notification.content}</p>
+                                    
+                                    {/* Специальная обработка для уведомлений о автоматических отчетах */}
+                                    {notification.type === 'AUTOMATED_REPORT' && notification.link && (
+                                        <div className="notification-actions">
+                                            <button 
+                                                className="view-report-btn"
+                                                onClick={() => {
+                                                    // Переходим на страницу с отчетами
+                                                    window.location.href = '/reports/history';
+                                                }}
+                                            >
+                                                <i className="fas fa-file-alt"></i>
+                                                Посмотреть отчет
+                                            </button>
+                                        </div>
+                                    )}
+                                    
                                     <span className="notification-time">
                                         {new Date(notification.createdAt).toLocaleString('ru-RU')}
                                     </span>
