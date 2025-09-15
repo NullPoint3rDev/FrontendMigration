@@ -29,12 +29,16 @@ const NotificationsSection = () => {
         try {
             // Получаем ID пользователя из localStorage
             const user = JSON.parse(localStorage.getItem('user'));
+            console.log('NotificationsSection: User from localStorage:', user);
             if (user && user.id) {
+                console.log('NotificationsSection: Loading notifications for user ID:', user.id);
                 // Загружаем обычные уведомления
                 const regularNotifications = await getUserNotifications(user.id);
+                console.log('NotificationsSection: Regular notifications:', regularNotifications);
                 
                 // Загружаем уведомления о автоматических отчетах
                 const automatedReportNotifications = await getAutomatedReportNotifications(user.id);
+                console.log('NotificationsSection: Automated report notifications:', automatedReportNotifications);
                 
                 // Объединяем все уведомления
                 const allNotifications = [...regularNotifications, ...automatedReportNotifications];
@@ -42,8 +46,10 @@ const NotificationsSection = () => {
                 // Сортируем по дате создания (новые сверху)
                 allNotifications.sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated));
                 
+                console.log('NotificationsSection: All notifications:', allNotifications);
                 setNotifications(allNotifications);
             } else {
+                console.warn('NotificationsSection: No user or user.id found in localStorage');
                 setNotifications([]);
             }
         } catch (err) {

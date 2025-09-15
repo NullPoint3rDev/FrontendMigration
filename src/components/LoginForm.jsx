@@ -58,12 +58,17 @@ const LoginForm = () => {
             }
             
             // Сохраняем информацию о пользователе
+            console.log('LoginForm: Response from server:', response);
             if (response.user) {
+                console.log('LoginForm: Saving user object:', response.user);
                 localStorage.setItem('user', JSON.stringify(response.user));
             } else if (response.userId) {
                 // Если в ответе есть только userId, создаем объект пользователя
                 const user = { id: response.userId, username: formData.username };
+                console.log('LoginForm: Creating user object:', user);
                 localStorage.setItem('user', JSON.stringify(user));
+            } else {
+                console.warn('LoginForm: No user information in response');
             }
 
             console.log('Успешный вход, перенаправление на главную страницу');

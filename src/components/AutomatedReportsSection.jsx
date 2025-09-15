@@ -34,16 +34,19 @@ const AutomatedReportsSection = () => {
         try {
             // Получаем ID пользователя из localStorage
             const user = JSON.parse(localStorage.getItem('user'));
+            console.log('AutomatedReportsSection: User from localStorage:', user);
             if (user && user.id) {
+                console.log('AutomatedReportsSection: Loading reports for user ID:', user.id);
                 const data = await getUserAutomatedReports(user.id);
-                console.log('Debug loaded user reports:', data);
+                console.log('AutomatedReportsSection: Loaded user reports:', data);
                 setAutomatedReports(data);
             } else {
+                console.log('AutomatedReportsSection: No user found, loading all reports');
                 // Если пользователь не найден, загружаем все отчеты (для админа)
                 const data = await getAllAutomatedReports();
-                console.log('Debug loaded all reports:', data);
+                console.log('AutomatedReportsSection: Loaded all reports:', data);
                 if (data && data.length > 0) {
-                    console.log('Debug first report structure:', {
+                    console.log('AutomatedReportsSection: First report structure:', {
                         id: data[0].id,
                         name: data[0].name,
                         templateName: data[0].templateName,
