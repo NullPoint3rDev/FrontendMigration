@@ -124,6 +124,7 @@ const NotificationsSection = () => {
 
 
     const getTypeLabel = (type) => {
+        if (!type) return 'Неизвестно';
         const labels = {
             SUCCESS: 'Успех',
             ERROR: 'Ошибка',
@@ -229,10 +230,10 @@ const NotificationsSection = () => {
                                 <div className="notification-content">
                                     <div className="notification-header">
                                         <div className="notification-badges">
-                                            <span className={`type-badge ${notification.type.toLowerCase()}`}>
+                                            <span className={`type-badge ${notification.type ? notification.type.toLowerCase() : 'unknown'}`}>
                                                 {getTypeLabel(notification.type)}
                                             </span>
-                                            <span className={`status-badge ${notification.status.toLowerCase()}`}>
+                                            <span className={`status-badge ${notification.status ? notification.status.toLowerCase() : 'unknown'}`}>
                                                 {notification.status === 'UNREAD' ? 'Новое' : 'Прочитано'}
                                             </span>
                                         </div>
