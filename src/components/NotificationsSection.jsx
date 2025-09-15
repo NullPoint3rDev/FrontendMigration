@@ -32,7 +32,7 @@ const NotificationsSection = () => {
             console.log('NotificationsSection: User from localStorage:', user);
             if (user && user.id) {
                 console.log('NotificationsSection: Loading notifications for user ID:', user.id);
-                // Загружаем обычные уведомления
+                // Загружаем обычные уведомления (исключая автоматические отчеты)
                 const regularNotifications = await getUserNotifications(user.id);
                 console.log('NotificationsSection: Regular notifications:', regularNotifications);
                 
@@ -40,8 +40,14 @@ const NotificationsSection = () => {
                 const automatedReportNotifications = await getAutomatedReportNotifications(user.id);
                 console.log('NotificationsSection: Automated report notifications:', automatedReportNotifications);
                 
-                // Объединяем все уведомления
-                const allNotifications = [...regularNotifications, ...automatedReportNotifications];
+                // Фильтруем обычные уведомления, исключая автоматические отчеты
+                const filteredRegularNotifications = regularNotifications.filter(
+                    notification => notification.type !== 'AUTOMATED_REPORT' && notification.type !== 'AUTOMATED_REPORT_ERROR'
+                );
+                console.log('NotificationsSection: Filtered regular notifications:', filteredRegularNotifications);
+                
+                // Объединяем уведомления без дублирования
+                const allNotifications = [...filteredRegularNotifications, ...automatedReportNotifications];
                 
                 // Сортируем по дате создания (новые сверху)
                 allNotifications.sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated));
