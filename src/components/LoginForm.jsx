@@ -56,6 +56,15 @@ const LoginForm = () => {
             if (response.sessionId) {
                 localStorage.setItem('sessionId', response.sessionId);
             }
+            
+            // Сохраняем информацию о пользователе
+            if (response.user) {
+                localStorage.setItem('user', JSON.stringify(response.user));
+            } else if (response.userId) {
+                // Если в ответе есть только userId, создаем объект пользователя
+                const user = { id: response.userId, username: formData.username };
+                localStorage.setItem('user', JSON.stringify(user));
+            }
 
             console.log('Успешный вход, перенаправление на главную страницу');
 
