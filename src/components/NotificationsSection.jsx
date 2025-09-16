@@ -239,7 +239,6 @@ const NotificationsSection = () => {
                         <thead>
                             <tr>
                                 <th>Тип</th>
-                                <th>Заголовок</th>
                                 <th>Сообщение</th>
                                 <th>Статус</th>
                                 <th>Дата</th>
@@ -251,14 +250,17 @@ const NotificationsSection = () => {
                                 <tr 
                                     key={notification.id} 
                                     className={`notification-row ${notification.status === 'UNREAD' ? 'unread' : 'read'}`}
+                                    onClick={() => {
+                                        // При клике на строку переходим к отчетам для автоматических отчетов
+                                        if (notification.type === 'AUTOMATED_REPORT') {
+                                            window.location.href = '/reports/history';
+                                        }
+                                    }}
                                 >
                                     <td>
                                         <span className={`type-badge ${notification.type ? notification.type.toLowerCase() : 'unknown'}`}>
                                             {getTypeLabel(notification.type)}
                                         </span>
-                                    </td>
-                                    <td className="notification-title-cell">
-                                        {notification.title || 'Без заголовка'}
                                     </td>
                                     <td className="notification-message-cell">
                                         {notification.message || notification.content || 'Без сообщения'}
@@ -279,10 +281,11 @@ const NotificationsSection = () => {
                                     <td>
                                         <div className="notification-actions">
                                             {/* Специальная обработка для уведомлений о автоматических отчетах */}
-                                            {notification.type === 'AUTOMATED_REPORT' && notification.link && (
+                                            {notification.type === 'AUTOMATED_REPORT' && (
                                                 <button 
                                                     className="action-btn view-report"
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.stopPropagation(); // Предотвращаем всплытие события
                                                         // Переходим на страницу с отчетами
                                                         window.location.href = '/reports/history';
                                                     }}
@@ -293,7 +296,10 @@ const NotificationsSection = () => {
                                             )}
                                             <button 
                                                 className="action-btn menu"
-                                                onClick={(e) => handleMenuOpen(e, notification)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation(); // Предотвращаем всплытие события
+                                                    handleMenuOpen(e, notification);
+                                                }}
                                             >
                                                 <i className="fas fa-ellipsis-v"></i>
                                             </button>

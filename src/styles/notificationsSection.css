@@ -496,16 +496,9 @@
   background: rgba(108, 99, 255, 0.1);
 }
 
-.notification-title-cell {
-  font-weight: 600;
-  color: var(--text-primary);
-  max-width: 200px;
-  word-wrap: break-word;
-}
-
 .notification-message-cell {
   color: var(--text-secondary);
-  max-width: 300px;
+  max-width: 400px;
   word-wrap: break-word;
   line-height: 1.4;
 }
@@ -564,6 +557,48 @@
   font-size: 0.875rem;
 }
 
+/* Badge Styles - белый цвет для надписей */
+.type-badge,
+.status-badge {
+  color: #ffffff !important;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.type-badge.automated_report {
+  background-color: #2196f3;
+  border: 1px solid #1976d2;
+}
+
+.type-badge.automated_report_error {
+  background-color: #f44336;
+  border: 1px solid #d32f2f;
+}
+
+.type-badge.unknown {
+  background-color: #9e9e9e;
+  border: 1px solid #757575;
+}
+
+.status-badge.unread {
+  background-color: #ff9800;
+  border: 1px solid #f57c00;
+}
+
+.status-badge.read {
+  background-color: #4caf50;
+  border: 1px solid #388e3c;
+}
+
+.status-badge.unknown {
+  background-color: #9e9e9e;
+  border: 1px solid #757575;
+}
+
 /* Responsive Table */
 @media (max-width: 768px) {
   .notifications-table {
@@ -575,9 +610,8 @@
     padding: 0.75rem 0.5rem;
   }
   
-  .notification-title-cell,
   .notification-message-cell {
-    max-width: 150px;
+    max-width: 200px;
   }
   
   .action-btn {
