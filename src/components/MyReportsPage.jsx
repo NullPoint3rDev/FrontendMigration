@@ -66,8 +66,21 @@ const MyReportsPage = () => {
                 const apiReports = await response.json();
                 console.log('MyReportsPage: Loaded reports from API:', apiReports);
                 
-                // Объединяем отчеты из localStorage и API
-                const allReports = [...localReports, ...apiReports];
+                // Объединяем отчеты из localStorage и API, избегая дублирования
+                const allReports = [...localReports];
+                
+                // Добавляем отчеты из API, если их нет в localStorage
+                apiReports.forEach(apiReport => {
+                    const exists = localReports.some(localReport => 
+                        localReport.id === apiReport.id || 
+                        (localReport.reportName === apiReport.reportName && 
+                         localReport.generatedAt === apiReport.generatedAt)
+                    );
+                    if (!exists) {
+                        allReports.push(apiReport);
+                    }
+                });
+                
                 setGeneratedReports(allReports);
             } else {
                 console.error('Ошибка загрузки отчетов из API:', response.status);
@@ -129,10 +142,7 @@ const MyReportsPage = () => {
         const confirmMessage = `Вы уверены, что хотите удалить ВСЕ отчеты (${generatedReports.length} штук)?\n\nЭто действие нельзя отменить!`;
         if (window.confirm(confirmMessage)) {
             try {
-                // Очищаем отчеты из localStorage
-                localStorage.removeItem('savedReports');
-                
-                // Очищаем отчеты из API
+                // СНАЧАЛА очищаем отчеты из API
                 const response = await fetch('/api/reports/history/clear', {
                     method: 'DELETE',
                     headers: {
@@ -142,7 +152,17 @@ const MyReportsPage = () => {
                 });
                 
                 if (response.ok) {
+                    // Затем очищаем отчеты из localStorage
+                    localStorage.removeItem('savedReports');
+                    
+                    // И сразу обновляем состояние
                     setGeneratedReports([]);
+                    
+                    // Принудительно перезагружаем отчеты для проверки
+                    setTimeout(() => {
+                        loadGeneratedReports();
+                    }, 500);
+                    
                     console.log('All reports cleared successfully');
                     alert('Все отчеты успешно удалены!');
                 } else {
@@ -501,18 +521,18 @@ const MyReportsPage = () => {
                             </div>
                         ) : (
                             <div className="reports-list">
-                                {generatedReports.map((report) => (
-                                    <div key={report.id} className="report-item">
+                                {generatedReports.map((report, index) => (
+                                    <div key={`report-${report.id || index}-${report.reportName || report.name || 'unknown'}`} className="report-item">
                                         <div className="report-info">
-                                            <div className="report-name">{report.name}</div>
+                                            <div className="report-name">{report.reportName || report.name || 'Без названия'}</div>
                                             <div className="report-details">
-                                                <span className="report-type">Тип: {report.reportType}</span>
-                                                <span className="report-format">Формат: {report.format}</span>
-                                                <span className="report-period">Период: {report.period}</span>
-                                                <span className="report-rows">Строк: {report.rowCount}</span>
+                                                <span className="report-type">Тип: {report.reportType || 'Неизвестно'}</span>
+                                                <span className="report-format">Формат: {report.format || 'Неизвестно'}</span>
+                                                <span className="report-period">Период: {report.period || 'Неизвестно'}</span>
+                                                {report.rowCount && <span className="report-rows">Строк: {report.rowCount}</span>}
                                             </div>
                                             <div className="report-date">
-                                                Создан: {new Date(report.createdAt).toLocaleString('ru-RU')}
+                                                Создан: {new Date(report.generatedAt || report.createdAt || Date.now()).toLocaleString('ru-RU')}
                                             </div>
                                         </div>
                                         
