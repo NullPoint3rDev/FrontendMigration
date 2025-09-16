@@ -445,3 +445,147 @@
     font-size: 0.875rem;
   }
 }
+
+/* Table Styles for Notifications */
+.notifications-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  margin-bottom: 2rem;
+}
+
+.notifications-table thead {
+  background: var(--surface-secondary);
+}
+
+.notifications-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.notifications-table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.notification-row {
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.notification-row:hover {
+  background: var(--surface-hover);
+}
+
+.notification-row.unread {
+  background: rgba(108, 99, 255, 0.05);
+  border-left: 3px solid var(--primary);
+}
+
+.notification-row.unread:hover {
+  background: rgba(108, 99, 255, 0.1);
+}
+
+.notification-title-cell {
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 200px;
+  word-wrap: break-word;
+}
+
+.notification-message-cell {
+  color: var(--text-secondary);
+  max-width: 300px;
+  word-wrap: break-word;
+  line-height: 1.4;
+}
+
+.notification-date-cell {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.notification-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+}
+
+.action-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.action-btn.view-report {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.action-btn.view-report:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  color: white;
+}
+
+.action-btn.menu {
+  padding: 0.5rem;
+  min-width: auto;
+}
+
+.action-btn i {
+  font-size: 0.875rem;
+}
+
+/* Responsive Table */
+@media (max-width: 768px) {
+  .notifications-table {
+    font-size: 0.875rem;
+  }
+  
+  .notifications-table th,
+  .notifications-table td {
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .notification-title-cell,
+  .notification-message-cell {
+    max-width: 150px;
+  }
+  
+  .action-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
+  
+  .action-btn span {
+    display: none;
+  }
+}

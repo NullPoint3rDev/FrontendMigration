@@ -50,9 +50,17 @@ const NotificationsSection = () => {
                 const allNotifications = [...filteredRegularNotifications, ...automatedReportNotifications];
                 
                 // Сортируем по дате создания (новые сверху)
-                allNotifications.sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated));
+                allNotifications.sort((a, b) => {
+                    const dateA = a.dateCreated || a.createdAt;
+                    const dateB = b.dateCreated || b.createdAt;
+                    return new Date(dateB) - new Date(dateA);
+                });
                 
                 console.log('NotificationsSection: All notifications:', allNotifications);
+                if (allNotifications.length > 0) {
+                    console.log('NotificationsSection: First notification structure:', allNotifications[0]);
+                    console.log('NotificationsSection: First notification keys:', Object.keys(allNotifications[0]));
+                }
                 setNotifications(allNotifications);
             } else {
                 console.warn('NotificationsSection: No user or user.id found in localStorage');
@@ -227,56 +235,74 @@ const NotificationsSection = () => {
                 </div>
             ) : (
                 <>
-                    <div className="notifications-list">
-                        {paginatedNotifications.map((notification) => (
-                            <div
-                                key={notification.id}
-                                className={`notification-item ${notification.status === 'UNREAD' ? 'unread' : 'read'}`}
-                            >
-                                <div className="notification-content">
-                                    <div className="notification-header">
-                                        <div className="notification-badges">
-                                            <span className={`type-badge ${notification.type ? notification.type.toLowerCase() : 'unknown'}`}>
-                                                {getTypeLabel(notification.type)}
-                                            </span>
-                                            <span className={`status-badge ${notification.status ? notification.status.toLowerCase() : 'unknown'}`}>
-                                                {notification.status === 'UNREAD' ? 'Новое' : 'Прочитано'}
-                                            </span>
-                                        </div>
-                                        <button 
-                                            className="notification-menu-btn"
-                                            onClick={(e) => handleMenuOpen(e, notification)}
-                                        >
-                                            <i className="fas fa-ellipsis-v"></i>
-                                        </button>
-                                    </div>
-                                    
-                                    <h4 className="notification-title">{notification.title}</h4>
-                                    <p className="notification-text">{notification.content}</p>
-                                    
-                                    {/* Специальная обработка для уведомлений о автоматических отчетах */}
-                                    {notification.type === 'AUTOMATED_REPORT' && notification.link && (
+                    <table className="notifications-table">
+                        <thead>
+                            <tr>
+                                <th>Тип</th>
+                                <th>Заголовок</th>
+                                <th>Сообщение</th>
+                                <th>Статус</th>
+                                <th>Дата</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {paginatedNotifications.map((notification) => (
+                                <tr 
+                                    key={notification.id} 
+                                    className={`notification-row ${notification.status === 'UNREAD' ? 'unread' : 'read'}`}
+                                >
+                                    <td>
+                                        <span className={`type-badge ${notification.type ? notification.type.toLowerCase() : 'unknown'}`}>
+                                            {getTypeLabel(notification.type)}
+                                        </span>
+                                    </td>
+                                    <td className="notification-title-cell">
+                                        {notification.title || 'Без заголовка'}
+                                    </td>
+                                    <td className="notification-message-cell">
+                                        {notification.message || notification.content || 'Без сообщения'}
+                                    </td>
+                                    <td>
+                                        <span className={`status-badge ${notification.status ? notification.status.toLowerCase() : 'unknown'}`}>
+                                            {notification.status === 'UNREAD' ? 'Новое' : 'Прочитано'}
+                                        </span>
+                                    </td>
+                                    <td className="notification-date-cell">
+                                        {notification.dateCreated ? 
+                                            new Date(notification.dateCreated).toLocaleString('ru-RU') :
+                                            notification.createdAt ? 
+                                                new Date(notification.createdAt).toLocaleString('ru-RU') :
+                                                'Дата не указана'
+                                        }
+                                    </td>
+                                    <td>
                                         <div className="notification-actions">
+                                            {/* Специальная обработка для уведомлений о автоматических отчетах */}
+                                            {notification.type === 'AUTOMATED_REPORT' && notification.link && (
+                                                <button 
+                                                    className="action-btn view-report"
+                                                    onClick={() => {
+                                                        // Переходим на страницу с отчетами
+                                                        window.location.href = '/reports/history';
+                                                    }}
+                                                >
+                                                    <i className="fas fa-file-alt"></i>
+                                                    <span>Посмотреть отчет</span>
+                                                </button>
+                                            )}
                                             <button 
-                                                className="view-report-btn"
-                                                onClick={() => {
-                                                    // Переходим на страницу с отчетами
-                                                    window.location.href = '/reports/history';
-                                                }}
+                                                className="action-btn menu"
+                                                onClick={(e) => handleMenuOpen(e, notification)}
                                             >
-                                                <i className="fas fa-file-alt"></i>
-                                                Посмотреть отчет
+                                                <i className="fas fa-ellipsis-v"></i>
                                             </button>
                                         </div>
-                                    )}
-                                    
-                                    <span className="notification-time">
-                                        {new Date(notification.createdAt).toLocaleString('ru-RU')}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
 
                     {/* Пагинация */}
                     {filteredNotifications.length > itemsPerPage && (
