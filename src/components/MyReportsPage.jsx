@@ -17,7 +17,7 @@ const MyReportsPage = () => {
     const [currentTemplate, setCurrentTemplate] = useState(null);
     const [generatedReports, setGeneratedReports] = useState([]);
 
-    // Загружаем шаблоны и отчеты из localStorage при монтировании компонента
+    // Загружаем шаблоны и отчеты при монтировании компонента
     useEffect(() => {
         loadTemplates();
         loadGeneratedReports();
@@ -40,15 +40,42 @@ const MyReportsPage = () => {
         setTemplates(newTemplates);
     };
 
-    const loadGeneratedReports = () => {
+    const loadGeneratedReports = async () => {
+        // Загружаем отчеты из localStorage
         const savedReports = localStorage.getItem('savedReports');
+        let localReports = [];
         if (savedReports) {
             try {
-                setGeneratedReports(JSON.parse(savedReports));
+                localReports = JSON.parse(savedReports);
             } catch (error) {
-                console.error('Ошибка загрузки отчетов:', error);
-                setGeneratedReports([]);
+                console.error('Ошибка загрузки отчетов из localStorage:', error);
             }
+        }
+        
+        // Загружаем отчеты из API (включая автоматически сгенерированные)
+        try {
+            const response = await fetch('/api/reports/history', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const apiReports = await response.json();
+                console.log('MyReportsPage: Loaded reports from API:', apiReports);
+                
+                // Объединяем отчеты из localStorage и API
+                const allReports = [...localReports, ...apiReports];
+                setGeneratedReports(allReports);
+            } else {
+                console.error('Ошибка загрузки отчетов из API:', response.status);
+                setGeneratedReports(localReports);
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки отчетов из API:', error);
+            setGeneratedReports(localReports);
         }
     };
 
@@ -326,10 +353,22 @@ const MyReportsPage = () => {
         <div className="my-reports-page">
             <div className="my-reports-container">
                 <div className="my-reports-header">
-                    <h1 className="page-title">Мои отчеты</h1>
-                    <p className="page-description">
-                        Создавайте собственные шаблоны отчетов и просматривайте их прямо в браузере
-                    </p>
+                    <div className="header-content">
+                        <div>
+                            <h1 className="page-title">Мои отчеты</h1>
+                            <p className="page-description">
+                                Создавайте собственные шаблоны отчетов и просматривайте их прямо в браузере
+                            </p>
+                        </div>
+                        <button 
+                            className="refresh-reports-button"
+                            onClick={loadGeneratedReports}
+                            title="Обновить список отчетов"
+                        >
+                            <i className="fas fa-sync-alt"></i>
+                            Обновить
+                        </button>
+                    </div>
                 </div>
 
                 <div className="my-reports-content">
