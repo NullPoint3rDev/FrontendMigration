@@ -38,63 +38,18 @@
   -webkit-text-fill-color: transparent;
 }
 
-.notifications-tabs {
-  background: var(--surface);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: var(--card-shadow);
-}
-
-.tab-buttons {
+.notifications-content {
   display: flex;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border-color);
+  flex-direction: column;
+  gap: 2rem;
 }
 
-.tab-button {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  padding: 1rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  position: relative;
+.notification-constructor-section {
+  /* Стили для конструктора уведомлений */
 }
 
-.tab-button:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
-}
-
-.tab-button.active {
-  color: var(--primary);
-  background: rgba(108, 99, 255, 0.1);
-}
-
-.tab-button.active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--primary);
-}
-
-.tab-button i {
-  font-size: 1.1rem;
-}
-
-.tab-content {
-  padding: 2rem;
-  min-height: 600px;
+.notifications-list-section {
+  /* Стили для списка уведомлений */
 }
 
 /* Responsive design */

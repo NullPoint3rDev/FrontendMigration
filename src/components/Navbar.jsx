@@ -35,19 +35,7 @@ const Navbar = () => {
                 { label: 'Перечень оборудования', path: '/equipment-list' },
             ],
         },
-        {
-            label: 'Отчеты',
-            dropdown: [
-                { label: 'Мои отчеты', path: '/my-reports' },
-                { label: 'По работе оборудования', path: '/reports/equipment' },
-                { label: 'По работе сварщиков', path: '/reports/welders' },
-                { label: 'По расходу материалов', path: '/reports/materials' },
-                { label: 'По сварочным швам', path: '/reports/welds' },
-                { label: 'По ошибкам сварочного оборудования', path: '/reports/errors' },
-                { label: 'Перечень швов, выполненных с нарушением', path: '/reports/violations' },
-                { label: 'Отчет о выполнении сварочного задания', path: '/reports/tasks' },
-            ],
-        },
+        { label: 'Отчеты', path: '/my-reports' },
         { label: 'Уведомления', path: '/notifications' },
         {
             label: 'Настройки',

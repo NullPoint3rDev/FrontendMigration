@@ -4,6 +4,7 @@ import CreateTemplateModal from './CreateTemplateModal';
 import ReportPeriodModal from './ReportPeriodModal';
 import ReportViewer from './ReportViewer';
 import { reportHelpers } from '../api/reportApi';
+import { getAuthHeaders } from '../api/api';
 import '../styles/myReportsPage.css';
 
 const MyReportsPage = () => {
@@ -128,6 +129,78 @@ const MyReportsPage = () => {
         if (window.confirm('Вы уверены, что хотите удалить этот шаблон?')) {
             const updatedTemplates = templates.filter(t => t.id !== templateId);
             saveTemplates(updatedTemplates);
+        }
+    };
+
+    const handleToggleAuto = async (template, isEnabled) => {
+        try {
+            if (isEnabled) {
+                // Создаем автоматический отчет на основе шаблона
+                const automatedReportData = {
+                    name: `Авто: ${template.name}`,
+                    description: `Автоматический отчет на основе шаблона "${template.name}"`,
+                    templateId: template.id,
+                    templateName: template.name,
+                    templateType: template.reportType,
+                    triggers: [{
+                        type: 'time',
+                        value: 'daily',
+                        time: '09:00'
+                    }],
+                    isActive: true
+                };
+
+                // Вызываем API для создания автоматического отчета
+                const response = await fetch('/api/automated-reports', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(await getAuthHeaders())
+                    },
+                    body: JSON.stringify(automatedReportData)
+                });
+
+                if (response.ok) {
+                    // Обновляем шаблон с флагом авто
+                    const responseData = await response.json();
+                    const updatedTemplates = templates.map(t => 
+                        t.id === template.id 
+                            ? { ...t, isAutoEnabled: true, automatedReportId: responseData.id }
+                            : t
+                    );
+                    saveTemplates(updatedTemplates);
+                    alert('Автоматический отчет создан успешно!');
+                } else {
+                    alert('Ошибка при создании автоматического отчета');
+                }
+            } else {
+                // Отключаем автоматический отчет
+                if (template.automatedReportId) {
+                    const response = await fetch(`/api/automated-reports/${template.automatedReportId}/toggle`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(await getAuthHeaders())
+                        }
+                    });
+
+                    if (response.ok) {
+                        // Обновляем шаблон
+                        const updatedTemplates = templates.map(t => 
+                            t.id === template.id 
+                                ? { ...t, isAutoEnabled: false }
+                                : t
+                        );
+                        saveTemplates(updatedTemplates);
+                        alert('Автоматический отчет отключен');
+                    } else {
+                        alert('Ошибка при отключении автоматического отчета');
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка при переключении авто режима:', error);
+            alert('Ошибка при изменении настроек автоматизации');
         }
     };
 
@@ -501,6 +574,17 @@ const MyReportsPage = () => {
                                             )}
                                         </div>
                                         <div className="template-actions">
+                                            <div className="auto-toggle-container">
+                                                <label className="auto-toggle-label">
+                                                    <span className="auto-toggle-text">Авто</span>
+                                                    <input
+                                                        type="checkbox"
+                                                        className="auto-toggle-switch"
+                                                        checked={template.isAutoEnabled || false}
+                                                        onChange={(e) => handleToggleAuto(template, e.target.checked)}
+                                                    />
+                                                </label>
+                                            </div>
                                             <button 
                                                 className="create-report-button"
                                                 onClick={() => handleCreateReportFromTemplate(template)}
@@ -543,78 +627,93 @@ const MyReportsPage = () => {
                                 <p>Создайте отчет из шаблона, чтобы он появился здесь</p>
                             </div>
                         ) : (
-                            <div className="reports-list">
-                                {generatedReports.map((report, index) => (
-                                    <div key={`report-${report.id || index}-${report.reportName || report.name || 'unknown'}`} className="report-item">
-                                        <div className="report-info">
-                                            <div className="report-name">
-                                                {report.reportName || report.name || 'Без названия'}
-                                                {report.isAutoGenerated && (
-                                                    <span className="auto-generated-badge">🤖 Авто</span>
-                                                )}
-                                            </div>
-                                            <div className="report-details">
-                                                <span className="report-type">Тип: {report.reportType || 'Неизвестно'}</span>
-                                                <span className="report-format">Формат: {report.format || 'Неизвестно'}</span>
-                                                <span className="report-period">Период: {report.period || 'Неизвестно'}</span>
-                                                {report.rowCount && <span className="report-rows">Строк: {report.rowCount}</span>}
-                                            </div>
-                                            <div className="report-date">
-                                                Создан: {new Date(report.generatedAt || report.createdAt || Date.now()).toLocaleString('ru-RU')}
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="report-actions">
-                                            <button 
-                                                className="view-button"
-                                                onClick={() => {
-                                                    // Проверяем, есть ли данные для просмотра
-                                                    if (report.data && Array.isArray(report.data) && report.data.length > 0) {
-                                                        const template = {
-                                                            name: report.reportName || report.name,
-                                                            columns: Object.keys(report.data[0] || {}),
-                                                            format: report.format
-                                                        };
-                                                        setReportData(report.data);
-                                                        setSelectedTemplate(template);
-                                                    } else {
-                                                        // Для отчетов из API проверяем, есть ли данные
-                                                        if (report.reportData && Array.isArray(report.reportData) && report.reportData.length > 0) {
-                                                            // Если есть данные, показываем их как обычный отчет
-                                                            const template = {
-                                                                name: report.reportName || report.name || 'Автоматический отчет',
-                                                                columns: Object.keys(report.reportData[0] || {}),
-                                                                format: report.format
-                                                            };
-                                                            setReportData(report.reportData);
-                                                            setSelectedTemplate(template);
-                                                        } else {
-                                                            // Если данных нет, показываем сообщение
-                                                            alert('Данные отчета недоступны для просмотра. Это автоматически сгенерированный отчет.');
-                                                        }
-                                                    }
-                                                }}
-                                                title="Просмотреть отчет"
-                                            >
-                                                👁️ Просмотр
-                                            </button>
-                                            <button 
-                                                className="download-button"
-                                                onClick={() => handleDownloadReport(report)}
-                                                title="Скачать отчет"
-                                            >
-                                                📥 Скачать
-                                            </button>
-                                            <button 
-                                                className="delete-button"
-                                                onClick={() => handleDeleteReport(report.id)}
-                                                title="Удалить отчет"
-                                            >
-                                                🗑️ Удалить
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                            <div className="reports-table-container">
+                                <table className="reports-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Тип отчета</th>
+                                            <th>Дата создания</th>
+                                            <th>Формат</th>
+                                            <th>Действия</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {generatedReports.map((report, index) => (
+                                            <tr key={`report-${report.id || index}-${report.reportName || report.name || 'unknown'}`} className="report-row">
+                                                <td className="report-type-cell">
+                                                    <div className="report-name">
+                                                        {report.reportName || report.name || 'Без названия'}
+                                                        {report.isAutoGenerated && (
+                                                            <span className="auto-generated-badge">🤖 Авто</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="report-details">
+                                                        <span className="report-type">Тип: {report.reportType || 'Неизвестно'}</span>
+                                                        {report.period && <span className="report-period">Период: {report.period}</span>}
+                                                        {report.rowCount && <span className="report-rows">Строк: {report.rowCount}</span>}
+                                                    </div>
+                                                </td>
+                                                <td className="report-date-cell">
+                                                    {new Date(report.generatedAt || report.createdAt || Date.now()).toLocaleString('ru-RU')}
+                                                </td>
+                                                <td className="report-format-cell">
+                                                    <span className="format-badge">{report.format || 'Неизвестно'}</span>
+                                                </td>
+                                                <td className="report-actions-cell">
+                                                    <div className="report-actions">
+                                                        <button 
+                                                            className="view-button"
+                                                            onClick={() => {
+                                                                // Проверяем, есть ли данные для просмотра
+                                                                if (report.data && Array.isArray(report.data) && report.data.length > 0) {
+                                                                    const template = {
+                                                                        name: report.reportName || report.name,
+                                                                        columns: Object.keys(report.data[0] || {}),
+                                                                        format: report.format
+                                                                    };
+                                                                    setReportData(report.data);
+                                                                    setSelectedTemplate(template);
+                                                                } else {
+                                                                    // Для отчетов из API проверяем, есть ли данные
+                                                                    if (report.reportData && Array.isArray(report.reportData) && report.reportData.length > 0) {
+                                                                        // Если есть данные, показываем их как обычный отчет
+                                                                        const template = {
+                                                                            name: report.reportName || report.name || 'Автоматический отчет',
+                                                                            columns: Object.keys(report.reportData[0] || {}),
+                                                                            format: report.format
+                                                                        };
+                                                                        setReportData(report.reportData);
+                                                                        setSelectedTemplate(template);
+                                                                    } else {
+                                                                        // Если данных нет, показываем сообщение
+                                                                        alert('Данные отчета недоступны для просмотра. Это автоматически сгенерированный отчет.');
+                                                                    }
+                                                                }
+                                                            }}
+                                                            title="Просмотреть отчет"
+                                                        >
+                                                            👁️ Просмотр
+                                                        </button>
+                                                        <button 
+                                                            className="download-button"
+                                                            onClick={() => handleDownloadReport(report)}
+                                                            title="Скачать отчет"
+                                                        >
+                                                            📥 Скачать
+                                                        </button>
+                                                        <button 
+                                                            className="delete-button"
+                                                            onClick={() => handleDeleteReport(report.id)}
+                                                            title="Удалить отчет"
+                                                        >
+                                                            🗑️ Удалить
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
                     </div>

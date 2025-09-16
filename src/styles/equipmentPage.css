@@ -612,6 +612,30 @@
   accent-color: var(--primary);
 }
 
+/* Weekdays container styles */
+.weekdays-container {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.weekday-label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.weekday-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
 /* Modal body styles */
 .modal-body {
   margin-bottom: 2rem;

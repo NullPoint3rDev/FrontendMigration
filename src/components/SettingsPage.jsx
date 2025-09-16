@@ -26,6 +26,15 @@ const SettingsPage = () => {
             smsNotifications: false,
             language: 'ru',
             timezone: 'Europe/Moscow'
+        },
+        // Автоматическое формирование отчетов
+        automation: {
+            enabled: false,
+            repeatPeriod: 'daily',
+            executionTime: '09:00',
+            weekdays: [1, 2, 3, 4, 5], // Пн-Пт по умолчанию
+            dayOfMonth: 1,
+            quarterMonths: '1,4,7,10'
         }
     });
 
@@ -86,6 +95,14 @@ const SettingsPage = () => {
                     smsNotifications: false,
                     language: 'ru',
                     timezone: 'Europe/Moscow'
+                },
+                automation: {
+                    enabled: false,
+                    repeatPeriod: 'daily',
+                    executionTime: '09:00',
+                    weekdays: [1, 2, 3, 4, 5],
+                    dayOfMonth: 1,
+                    quarterMonths: '1,4,7,10'
                 }
             };
             setSettings(defaultSettings);
@@ -133,6 +150,101 @@ const SettingsPage = () => {
             )}
 
             <div className="settings-container">
+                {/* Автоматическое формирование отчета */}
+                <div className="settings-section">
+                    <h2 className="section-title">Автоматическое формирование отчета</h2>
+                    <p className="section-description">
+                        Настройте параметры автоматического создания отчетов на основе шаблонов
+                    </p>
+                    
+                    <div className="settings-grid">
+                        <div className="setting-item">
+                            <label className="setting-label">Период повторения</label>
+                            <select
+                                value={settings.automation?.repeatPeriod || 'daily'}
+                                onChange={(e) => updateSetting('automation', 'repeatPeriod', e.target.value)}
+                                className="setting-input"
+                            >
+                                <option value="once">Разовый</option>
+                                <option value="daily">По дням недели</option>
+                                <option value="weekly">Еженедельно</option>
+                                <option value="monthly">Ежемесячно</option>
+                                <option value="quarterly">Квартальный</option>
+                            </select>
+                        </div>
+                        
+                        <div className="setting-item">
+                            <label className="setting-label">Время выполнения</label>
+                            <input
+                                type="time"
+                                value={settings.automation?.executionTime || '09:00'}
+                                onChange={(e) => updateSetting('automation', 'executionTime', e.target.value)}
+                                className="setting-input"
+                            />
+                        </div>
+                        
+                        <div className="setting-item">
+                            <label className="setting-label">Дни недели (если выбрано "По дням недели")</label>
+                            <div className="weekdays-container">
+                                {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day, index) => (
+                                    <label key={day} className="weekday-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.automation?.weekdays?.includes(index) || false}
+                                            onChange={(e) => {
+                                                const weekdays = settings.automation?.weekdays || [];
+                                                const newWeekdays = e.target.checked 
+                                                    ? [...weekdays, index]
+                                                    : weekdays.filter(d => d !== index);
+                                                updateSetting('automation', 'weekdays', newWeekdays);
+                                            }}
+                                            className="weekday-checkbox"
+                                        />
+                                        {day}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        <div className="setting-item">
+                            <label className="setting-label">День месяца (если выбрано "Ежемесячно")</label>
+                            <input
+                                type="number"
+                                value={settings.automation?.dayOfMonth || 1}
+                                onChange={(e) => updateSetting('automation', 'dayOfMonth', parseInt(e.target.value))}
+                                className="setting-input"
+                                min="1"
+                                max="31"
+                            />
+                        </div>
+                        
+                        <div className="setting-item">
+                            <label className="setting-label">Месяцы квартала (если выбрано "Квартальный")</label>
+                            <select
+                                value={settings.automation?.quarterMonths || '1,4,7,10'}
+                                onChange={(e) => updateSetting('automation', 'quarterMonths', e.target.value)}
+                                className="setting-input"
+                            >
+                                <option value="1,4,7,10">Январь, Апрель, Июль, Октябрь</option>
+                                <option value="2,5,8,11">Февраль, Май, Август, Ноябрь</option>
+                                <option value="3,6,9,12">Март, Июнь, Сентябрь, Декабрь</option>
+                            </select>
+                        </div>
+                        
+                        <div className="setting-item checkbox-item">
+                            <label className="setting-label">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.automation?.enabled || false}
+                                    onChange={(e) => updateSetting('automation', 'enabled', e.target.checked)}
+                                    className="setting-checkbox"
+                                />
+                                Включить автоматическое формирование отчетов
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Время хранения информации в БД */}
                 <div className="settings-section">
                     <h2 className="section-title">Время хранения информации в БД</h2>

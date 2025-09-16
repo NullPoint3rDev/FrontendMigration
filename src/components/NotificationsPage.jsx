@@ -1,42 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import NotificationsSection from './NotificationsSection';
-import AutomatedReportsSection from './AutomatedReportsSection';
+import NotificationConstructor from './NotificationConstructor';
 import '../styles/notificationsPage.css';
 
 const NotificationsPage = () => {
-    const [activeTab, setActiveTab] = useState(0);
-
-    const handleTabChange = (newValue) => {
-        setActiveTab(newValue);
-    };
-
     return (
         <div className="notifications-page">
             <div className="notifications-header">
                 <h1 className="notifications-title">Уведомления</h1>
             </div>
             
-            <div className="notifications-tabs">
-                <div className="tab-buttons">
-                    <button 
-                        className={`tab-button ${activeTab === 0 ? 'active' : ''}`}
-                        onClick={() => handleTabChange(0)}
-                    >
-                        <i className="fas fa-bell"></i>
-                        Уведомления
-                    </button>
-                    <button 
-                        className={`tab-button ${activeTab === 1 ? 'active' : ''}`}
-                        onClick={() => handleTabChange(1)}
-                    >
-                        <i className="fas fa-clock"></i>
-                        Автоматизированные отчеты
-                    </button>
+            <div className="notifications-content">
+                {/* Конструктор уведомлений */}
+                <div className="notification-constructor-section">
+                    <NotificationConstructor />
                 </div>
                 
-                <div className="tab-content">
-                    {activeTab === 0 && <NotificationsSection />}
-                    {activeTab === 1 && <AutomatedReportsSection />}
+                {/* Список уведомлений */}
+                <div className="notifications-list-section">
+                    <NotificationsSection />
                 </div>
             </div>
         </div>
