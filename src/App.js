@@ -30,7 +30,6 @@ import ViolationsReportPage from './components/ViolationsReportPage';
 import TasksReportPage from './components/TasksReportPage';
 import EmployeesPage from './components/EmployeesPage';
 import DeviceMonitorPage from './components/DeviceMonitorPage';
-import ReportHistoryInitializer from './components/ReportHistoryInitializer';
 import './App.css';
 
 const theme = createTheme({
@@ -54,7 +53,6 @@ function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
-            <ReportHistoryInitializer />
             <Router>
                 <Routes>
                     <Route path="/login" element={<AuthPage />} />

@@ -364,7 +364,12 @@ const MyReportsPage = () => {
     const handleDownloadReport = async (report) => {
         try {
             // Используем данные из отчета
-            const reportData = report.data || [];
+            let reportData = report.data || [];
+            
+            // Если данных нет в report.data, проверяем report.reportData
+            if (!reportData || reportData.length === 0) {
+                reportData = report.reportData || [];
+            }
             
             // Проверяем, есть ли данные для скачивания
             if (!reportData || reportData.length === 0) {
@@ -573,8 +578,20 @@ const MyReportsPage = () => {
                                                         setReportData(report.data);
                                                         setSelectedTemplate(template);
                                                     } else {
-                                                        // Для отчетов из API (без данных) показываем сообщение
-                                                        alert('Данные отчета недоступны для просмотра. Это автоматически сгенерированный отчет.');
+                                                        // Для отчетов из API проверяем, есть ли данные
+                                                        if (report.reportData && Array.isArray(report.reportData) && report.reportData.length > 0) {
+                                                            // Если есть данные, показываем их как обычный отчет
+                                                            const template = {
+                                                                name: report.reportName || report.name || 'Автоматический отчет',
+                                                                columns: Object.keys(report.reportData[0] || {}),
+                                                                format: report.format
+                                                            };
+                                                            setReportData(report.reportData);
+                                                            setSelectedTemplate(template);
+                                                        } else {
+                                                            // Если данных нет, показываем сообщение
+                                                            alert('Данные отчета недоступны для просмотра. Это автоматически сгенерированный отчет.');
+                                                        }
                                                     }
                                                 }}
                                                 title="Просмотреть отчет"
