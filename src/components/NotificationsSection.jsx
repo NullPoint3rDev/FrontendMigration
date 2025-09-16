@@ -253,7 +253,7 @@ const NotificationsSection = () => {
                                     onClick={() => {
                                         // При клике на строку переходим к отчетам для автоматических отчетов
                                         if (notification.type === 'AUTOMATED_REPORT') {
-                                            window.location.href = '/reports/history';
+                                            window.location.href = '/my-reports';
                                         }
                                     }}
                                 >
@@ -287,7 +287,7 @@ const NotificationsSection = () => {
                                                     onClick={(e) => {
                                                         e.stopPropagation(); // Предотвращаем всплытие события
                                                         // Переходим на страницу с отчетами
-                                                        window.location.href = '/reports/history';
+                                                        window.location.href = '/my-reports';
                                                     }}
                                                 >
                                                     <i className="fas fa-file-alt"></i>
