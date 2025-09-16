@@ -125,6 +125,37 @@ const MyReportsPage = () => {
         }
     };
 
+    const handleClearAllReports = async () => {
+        const confirmMessage = `Вы уверены, что хотите удалить ВСЕ отчеты (${generatedReports.length} штук)?\n\nЭто действие нельзя отменить!`;
+        if (window.confirm(confirmMessage)) {
+            try {
+                // Очищаем отчеты из localStorage
+                localStorage.removeItem('savedReports');
+                
+                // Очищаем отчеты из API
+                const response = await fetch('/api/reports/history/clear', {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    setGeneratedReports([]);
+                    console.log('All reports cleared successfully');
+                    alert('Все отчеты успешно удалены!');
+                } else {
+                    const errorText = await response.text();
+                    throw new Error(`API Error: ${response.status} - ${errorText}`);
+                }
+            } catch (error) {
+                console.error('Error clearing reports:', error);
+                alert('Ошибка при очистке отчетов: ' + error.message);
+            }
+        }
+    };
+
     const handleEditTemplate = (template) => {
         setEditingTemplate(template);
         setIsCreateModalOpen(true);
@@ -360,14 +391,24 @@ const MyReportsPage = () => {
                                 Создавайте собственные шаблоны отчетов и просматривайте их прямо в браузере
                             </p>
                         </div>
-                        <button 
-                            className="refresh-reports-button"
-                            onClick={loadGeneratedReports}
-                            title="Обновить список отчетов"
-                        >
-                            <i className="fas fa-sync-alt"></i>
-                            Обновить
-                        </button>
+                        <div className="header-actions">
+                            <button 
+                                className="refresh-reports-button"
+                                onClick={loadGeneratedReports}
+                                title="Обновить список отчетов"
+                            >
+                                <i className="fas fa-sync-alt"></i>
+                                Обновить
+                            </button>
+                            <button 
+                                className="clear-all-reports-button"
+                                onClick={handleClearAllReports}
+                                title="Удалить все отчеты"
+                            >
+                                <i className="fas fa-trash-alt"></i>
+                                Очистить все
+                            </button>
+                        </div>
                     </div>
                 </div>
 
