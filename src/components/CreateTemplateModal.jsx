@@ -13,7 +13,9 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
     const [autoTime, setAutoTime] = useState('09:00');
     const [selectedDays, setSelectedDays] = useState([]); // для ежедневного повтора
     const [weekInterval, setWeekInterval] = useState(1); // для еженедельного повтора
+    const [selectedWeekDay, setSelectedWeekDay] = useState(1); // для еженедельного повтора - день недели
     const [selectedMonth, setSelectedMonth] = useState(1); // для ежемесячного повтора
+    const [selectedDayOfMonth, setSelectedDayOfMonth] = useState(1); // для ежемесячного повтора - день месяца
     const [selectedQuarter, setSelectedQuarter] = useState(1); // для квартального повтора
     const [customDate, setCustomDate] = useState(''); // для кастомной даты
 
@@ -38,7 +40,9 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                 setAutoTime('09:00');
                 setSelectedDays([]);
                 setWeekInterval(1);
+                setSelectedWeekDay(1);
                 setSelectedMonth(1);
+                setSelectedDayOfMonth(1);
                 setSelectedQuarter(1);
                 setCustomDate('');
             }
@@ -231,7 +235,9 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             autoTime,
             selectedDays,
             weekInterval,
+            selectedWeekDay,
             selectedMonth,
+            selectedDayOfMonth,
             selectedQuarter,
             customDate,
             createdAt: editingTemplate ? editingTemplate.createdAt : new Date().toISOString(),
@@ -404,7 +410,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                         </div>
 
                         {/* Время выполнения */}
-                        {repeatType !== 'never' && repeatType !== 'weekly' && repeatType !== 'quarterly' && (
+                        {repeatType !== 'never' && repeatType !== 'quarterly' && (
                             <div className="auto-time-container">
                                 <label className="form-label">Время выполнения</label>
                                 <input
@@ -438,35 +444,67 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                         {/* Настройки для еженедельного повтора */}
                         {repeatType === 'weekly' && (
                             <div className="weekly-settings">
-                                <label className="form-label">Интервал (недели)</label>
-                                <select
-                                    value={weekInterval}
-                                    onChange={(e) => setWeekInterval(parseInt(e.target.value))}
-                                    className="interval-select"
-                                >
-                                    <option value={1}>Каждую неделю</option>
-                                    <option value={2}>Каждые 2 недели</option>
-                                    <option value={3}>Каждые 3 недели</option>
-                                    <option value={4}>Каждые 4 недели</option>
-                                </select>
+                                <div className="weekly-interval">
+                                    <label className="form-label">Интервал (недели)</label>
+                                    <select
+                                        value={weekInterval}
+                                        onChange={(e) => setWeekInterval(parseInt(e.target.value))}
+                                        className="interval-select"
+                                    >
+                                        <option value={1}>Каждую неделю</option>
+                                        <option value={2}>Каждые 2 недели</option>
+                                        <option value={3}>Каждые 3 недели</option>
+                                        <option value={4}>Каждые 4 недели</option>
+                                    </select>
+                                </div>
+                                <div className="weekly-day">
+                                    <label className="form-label">День недели</label>
+                                    <select
+                                        value={selectedWeekDay}
+                                        onChange={(e) => setSelectedWeekDay(parseInt(e.target.value))}
+                                        className="weekday-select"
+                                    >
+                                        {weekDays.map(day => (
+                                            <option key={day.value} value={day.value}>
+                                                {day.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         )}
 
                         {/* Настройки для ежемесячного повтора */}
                         {repeatType === 'monthly' && (
                             <div className="monthly-settings">
-                                <label className="form-label">Месяц</label>
-                                <select
-                                    value={selectedMonth}
-                                    onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                                    className="month-select"
-                                >
-                                    {months.map(month => (
-                                        <option key={month.value} value={month.value}>
-                                            {month.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="monthly-month">
+                                    <label className="form-label">Месяц</label>
+                                    <select
+                                        value={selectedMonth}
+                                        onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                                        className="month-select"
+                                    >
+                                        {months.map(month => (
+                                            <option key={month.value} value={month.value}>
+                                                {month.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="monthly-day">
+                                    <label className="form-label">День месяца</label>
+                                    <select
+                                        value={selectedDayOfMonth}
+                                        onChange={(e) => setSelectedDayOfMonth(parseInt(e.target.value))}
+                                        className="day-of-month-select"
+                                    >
+                                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                                            <option key={day} value={day}>
+                                                {day} число
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         )}
 
