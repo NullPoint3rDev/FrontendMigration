@@ -5,28 +5,28 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
     const [formData, setFormData] = useState({
         name: '',
         description: '',
-        type: '',
         triggerType: '',
         triggerValue: '',
         threshold: '',
         equipmentId: '',
+        timeThreshold: '', // время для превышения тока
         isActive: true
     });
 
     const [errors, setErrors] = useState({});
 
     const triggerTypes = [
-        { value: 'current', label: 'По току' },
-        { value: 'voltage', label: 'По напряжению' },
+        { value: 'current', label: 'По превышению тока' },
         { value: 'errors', label: 'По ошибкам' },
-        { value: 'temperature', label: 'По температуре' }
+        { value: 'welding_start', label: 'По началу сварки' },
+        { value: 'user_change', label: 'По смене пользователя' }
     ];
 
-    const notificationTypes = [
-        { value: 'warning', label: 'Предупреждение' },
-        { value: 'error', label: 'Ошибка' },
-        { value: 'info', label: 'Информация' },
-        { value: 'critical', label: 'Критическое' }
+    const equipmentList = [
+        { id: '1', name: 'Аппарат 1' },
+        { id: '2', name: 'Аппарат 2' },
+        { id: '3', name: 'Аппарат 3' },
+        { id: '4', name: 'Аппарат 4' }
     ];
 
     const handleInputChange = (e) => {
@@ -52,7 +52,7 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
             triggerType,
             triggerValue: '', // Сбрасываем значение при смене типа
             threshold: '',
-            equipmentId: ''
+            timeThreshold: '' // Сбрасываем время при смене типа
         }));
     };
 
@@ -63,22 +63,27 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
             newErrors.name = 'Название обязательно';
         }
 
-        if (!formData.type) {
-            newErrors.type = 'Тип уведомления обязателен';
-        }
+        // Убрано: валидация типа уведомления
 
         if (!formData.triggerType) {
             newErrors.triggerType = 'Тип триггера обязателен';
         }
 
-        if (formData.triggerType && !formData.triggerValue) {
-            newErrors.triggerValue = 'Значение триггера обязательно';
-        }
-
-        if (formData.triggerType === 'current' || formData.triggerType === 'voltage') {
-            if (!formData.threshold || isNaN(formData.threshold)) {
+        // Валидация для превышения тока
+        if (formData.triggerType === 'current') {
+            if (!formData.threshold) {
+                newErrors.threshold = 'Пороговое значение тока обязательно';
+            } else if (isNaN(parseFloat(formData.threshold))) {
                 newErrors.threshold = 'Пороговое значение должно быть числом';
             }
+            if (!formData.timeThreshold) {
+                newErrors.timeThreshold = 'Время превышения обязательно';
+            }
+        }
+
+        // Валидация для других типов триггеров
+        if (formData.triggerType && formData.triggerType !== 'current' && !formData.triggerValue) {
+            newErrors.triggerValue = 'Значение триггера обязательно';
         }
 
         setErrors(newErrors);
@@ -116,11 +121,11 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
             setFormData({
                 name: '',
                 description: '',
-                type: '',
                 triggerType: '',
                 triggerValue: '',
                 threshold: '',
                 equipmentId: '',
+                timeThreshold: '',
                 isActive: true
             });
         } catch (error) {
@@ -131,28 +136,22 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
 
     const getTriggerValueOptions = () => {
         switch (formData.triggerType) {
-            case 'current':
-                return [
-                    { value: 'exceeds', label: 'Превышает' },
-                    { value: 'below', label: 'Ниже' },
-                    { value: 'equals', label: 'Равно' }
-                ];
-            case 'voltage':
-                return [
-                    { value: 'exceeds', label: 'Превышает' },
-                    { value: 'below', label: 'Ниже' },
-                    { value: 'equals', label: 'Равно' }
-                ];
             case 'errors':
                 return [
                     { value: 'any', label: 'Любая ошибка' },
                     { value: 'critical', label: 'Критическая ошибка' },
                     { value: 'warning', label: 'Предупреждение' }
                 ];
-            case 'temperature':
+            case 'welding_start':
                 return [
-                    { value: 'exceeds', label: 'Превышает' },
-                    { value: 'below', label: 'Ниже' }
+                    { value: 'started', label: 'Начало сварки' },
+                    { value: 'stopped', label: 'Остановка сварки' }
+                ];
+            case 'user_change':
+                return [
+                    { value: 'login', label: 'Вход пользователя' },
+                    { value: 'logout', label: 'Выход пользователя' },
+                    { value: 'switch', label: 'Смена пользователя' }
                 ];
             default:
                 return [];
@@ -204,26 +203,7 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                         />
                     </div>
 
-                    {/* Тип уведомления */}
-                    <div className="form-group">
-                        <label className="form-label">
-                            Тип уведомления *
-                        </label>
-                        <select
-                            name="type"
-                            value={formData.type}
-                            onChange={handleInputChange}
-                            className={`form-input ${errors.type ? 'error' : ''}`}
-                        >
-                            <option value="">Выберите тип</option>
-                            {notificationTypes.map(type => (
-                                <option key={type.value} value={type.value}>
-                                    {type.label}
-                                </option>
-                            ))}
-                        </select>
-                        {errors.type && <span className="error-message">{errors.type}</span>}
-                    </div>
+                    {/* Убрано: Тип уведомления */}
 
                     {/* Тип триггера */}
                     <div className="form-group">
@@ -247,7 +227,7 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                     </div>
 
                     {/* Значение триггера */}
-                    {formData.triggerType && (
+                    {formData.triggerType && formData.triggerType !== 'current' && (
                         <div className="form-group">
                             <label className="form-label">
                                 Значение триггера *
@@ -269,11 +249,11 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                         </div>
                     )}
 
-                    {/* Пороговое значение */}
-                    {(formData.triggerType === 'current' || formData.triggerType === 'voltage' || formData.triggerType === 'temperature') && (
+                    {/* Пороговое значение для превышения тока */}
+                    {formData.triggerType === 'current' && (
                         <div className="form-group">
                             <label className="form-label">
-                                Пороговое значение *
+                                Пороговое значение тока (А) *
                             </label>
                             <input
                                 type="number"
@@ -281,27 +261,50 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                                 value={formData.threshold}
                                 onChange={handleInputChange}
                                 className={`form-input ${errors.threshold ? 'error' : ''}`}
-                                placeholder={formData.triggerType === 'current' ? 'Амперы' : 
-                                           formData.triggerType === 'voltage' ? 'Вольты' : 'Градусы'}
+                                placeholder="Амперы"
                                 step="0.1"
                             />
                             {errors.threshold && <span className="error-message">{errors.threshold}</span>}
                         </div>
                     )}
 
-                    {/* ID оборудования */}
+                    {/* Время превышения тока */}
+                    {formData.triggerType === 'current' && (
+                        <div className="form-group">
+                            <label className="form-label">
+                                Время превышения (сек) *
+                            </label>
+                            <input
+                                type="number"
+                                name="timeThreshold"
+                                value={formData.timeThreshold}
+                                onChange={handleInputChange}
+                                className={`form-input ${errors.timeThreshold ? 'error' : ''}`}
+                                placeholder="Секунды"
+                                min="1"
+                            />
+                            {errors.timeThreshold && <span className="error-message">{errors.timeThreshold}</span>}
+                        </div>
+                    )}
+
+                    {/* Выбор аппарата */}
                     <div className="form-group">
                         <label className="form-label">
-                            ID оборудования
+                            Аппарат
                         </label>
-                        <input
-                            type="text"
+                        <select
                             name="equipmentId"
                             value={formData.equipmentId}
                             onChange={handleInputChange}
                             className="form-input"
-                            placeholder="ID оборудования (необязательно)"
-                        />
+                        >
+                            <option value="">Выберите аппарат</option>
+                            {equipmentList.map(equipment => (
+                                <option key={equipment.id} value={equipment.id}>
+                                    {equipment.name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
                     {/* Активность */}
