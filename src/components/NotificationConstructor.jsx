@@ -85,7 +85,7 @@ const NotificationConstructor = () => {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = (e) => {
         e.preventDefault();
         
         if (!validateForm()) {
@@ -93,11 +93,19 @@ const NotificationConstructor = () => {
         }
 
         try {
-            // Здесь будет API вызов для создания уведомления
-            console.log('Creating notification:', formData);
+            // Сохраняем шаблон уведомления в localStorage (демо-версия)
+            const notificationTemplates = JSON.parse(localStorage.getItem('notificationTemplates') || '[]');
+            const newTemplate = {
+                id: `template_${Date.now()}`,
+                ...formData,
+                createdAt: new Date().toISOString()
+            };
             
-            // Имитация успешного создания
-            alert('Уведомление создано успешно!');
+            notificationTemplates.push(newTemplate);
+            localStorage.setItem('notificationTemplates', JSON.stringify(notificationTemplates));
+            
+            console.log('Notification template created (demo):', newTemplate);
+            alert(`Шаблон уведомления "${formData.name}" создан успешно!\n\nВ демо-версии данные сохраняются только в браузере.`);
             
             // Сброс формы
             setFormData({

@@ -54,18 +54,19 @@ const SettingsPage = () => {
         localStorage.setItem('systemSettings', JSON.stringify(settings));
     }, [settings]);
 
-    const handleSave = async () => {
+    const handleSave = () => {
         try {
             setLoading(true);
-            // TODO: Заменить на реальный API вызов
-            // await api.updateSettings(settings);
+            
+            // Сохраняем настройки в localStorage (демо-версия)
+            localStorage.setItem('systemSettings', JSON.stringify(settings));
             
             // Имитация сохранения
             setTimeout(() => {
                 setLoading(false);
                 setSaved(true);
                 setTimeout(() => setSaved(false), 3000);
-            }, 1000);
+            }, 500);
         } catch (error) {
             console.error('Ошибка сохранения настроек:', error);
             setLoading(false);

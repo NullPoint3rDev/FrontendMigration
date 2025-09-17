@@ -4,7 +4,6 @@ import CreateTemplateModal from './CreateTemplateModal';
 import ReportPeriodModal from './ReportPeriodModal';
 import ReportViewer from './ReportViewer';
 import { reportHelpers } from '../api/reportApi';
-import { getAuthHeaders } from '../api/api';
 import '../styles/myReportsPage.css';
 
 const MyReportsPage = () => {
@@ -132,71 +131,30 @@ const MyReportsPage = () => {
         }
     };
 
-    const handleToggleAuto = async (template, isEnabled) => {
+    const handleToggleAuto = (template, isEnabled) => {
         try {
             if (isEnabled) {
-                // Создаем автоматический отчет на основе шаблона
-                const automatedReportData = {
-                    name: `Авто: ${template.name}`,
-                    description: `Автоматический отчет на основе шаблона "${template.name}"`,
-                    templateId: template.id,
-                    templateName: template.name,
-                    templateType: template.reportType,
-                    triggers: [{
-                        type: 'time',
-                        value: 'daily',
-                        time: '09:00'
-                    }],
-                    isActive: true
-                };
-
-                // Вызываем API для создания автоматического отчета
-                const response = await fetch('/api/automated-reports', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(await getAuthHeaders())
-                    },
-                    body: JSON.stringify(automatedReportData)
-                });
-
-                if (response.ok) {
-                    // Обновляем шаблон с флагом авто
-                    const responseData = await response.json();
-                    const updatedTemplates = templates.map(t => 
-                        t.id === template.id 
-                            ? { ...t, isAutoEnabled: true, automatedReportId: responseData.id }
-                            : t
-                    );
-                    saveTemplates(updatedTemplates);
-                    alert('Автоматический отчет создан успешно!');
-                } else {
-                    alert('Ошибка при создании автоматического отчета');
-                }
-            } else {
-                // Отключаем автоматический отчет
-                if (template.automatedReportId) {
-                    const response = await fetch(`/api/automated-reports/${template.automatedReportId}/toggle`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            ...(await getAuthHeaders())
+                // Включаем авто режим (только на фронтенде)
+                const updatedTemplates = templates.map(t => 
+                    t.id === template.id 
+                        ? { 
+                            ...t, 
+                            isAutoEnabled: true, 
+                            automatedReportId: `auto_${template.id}_${Date.now()}` // Генерируем локальный ID
                         }
-                    });
-
-                    if (response.ok) {
-                        // Обновляем шаблон
-                        const updatedTemplates = templates.map(t => 
-                            t.id === template.id 
-                                ? { ...t, isAutoEnabled: false }
-                                : t
-                        );
-                        saveTemplates(updatedTemplates);
-                        alert('Автоматический отчет отключен');
-                    } else {
-                        alert('Ошибка при отключении автоматического отчета');
-                    }
-                }
+                        : t
+                );
+                saveTemplates(updatedTemplates);
+                alert(`Автоматический режим включен для шаблона "${template.name}"!\n\nВ демо-версии это работает только на фронтенде.`);
+            } else {
+                // Отключаем авто режим
+                const updatedTemplates = templates.map(t => 
+                    t.id === template.id 
+                        ? { ...t, isAutoEnabled: false, automatedReportId: null }
+                        : t
+                );
+                saveTemplates(updatedTemplates);
+                alert(`Автоматический режим отключен для шаблона "${template.name}"!`);
             }
         } catch (error) {
             console.error('Ошибка при переключении авто режима:', error);
