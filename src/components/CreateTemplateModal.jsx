@@ -177,7 +177,6 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
         setSelectedReportType('');
         setSelectedColumns([]);
         setSelectedFormat('xlsx');
-        setSelectedEquipment([]);
         onClose();
     };
 
