@@ -564,7 +564,9 @@
 .quarter-select,
 .weekday-select,
 .day-of-month-select,
-.custom-date-input {
+.custom-date-input,
+.monthly-date-input,
+.quarterly-date-input {
     width: 100%;
     padding: 12px 16px;
     border: 2px solid #e9ecef;
@@ -581,7 +583,9 @@
 .quarter-select:focus,
 .weekday-select:focus,
 .day-of-month-select:focus,
-.custom-date-input:focus {
+.custom-date-input:focus,
+.monthly-date-input:focus,
+.quarterly-date-input:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
@@ -660,27 +664,10 @@
 
 /* Стили для группировки настроек */
 .weekly-settings,
-.monthly-settings {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
+.monthly-settings,
+.quarterly-settings,
+.custom-settings {
     margin-top: 15px;
-}
-
-.weekly-interval,
-.weekly-day,
-.monthly-month,
-.monthly-day {
-    display: flex;
-    flex-direction: column;
-}
-
-@media (max-width: 768px) {
-    .weekly-settings,
-    .monthly-settings {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
 }
 
 @media (max-width: 768px) {
