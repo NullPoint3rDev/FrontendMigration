@@ -566,7 +566,8 @@
 .day-of-month-select,
 .custom-date-input,
 .monthly-date-input,
-.quarterly-date-input {
+.quarterly-date-input,
+.weekly-date-input {
     width: 100%;
     padding: 12px 16px;
     border: 2px solid #e9ecef;
@@ -585,7 +586,8 @@
 .day-of-month-select:focus,
 .custom-date-input:focus,
 .monthly-date-input:focus,
-.quarterly-date-input:focus {
+.quarterly-date-input:focus,
+.weekly-date-input:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
@@ -660,6 +662,34 @@
     margin: 15px 0 0 0;
     line-height: 1.4;
     font-style: italic;
+}
+
+/* Стили для "Выбрать все" */
+.select-all-container {
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.select-all-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    color: #495057;
+}
+
+.select-all-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.select-all-checkbox span {
+    font-size: 0.95rem;
 }
 
 /* Стили для группировки настроек */
