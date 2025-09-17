@@ -238,9 +238,9 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             return;
         }
 
-        // Валидация для кастомной даты
+        // Валидация для одноразового выполнения
         if (repeatType === 'custom' && !customDate) {
-            alert('Выберите дату для кастомного повтора');
+            alert('Выберите дату для одноразового выполнения');
             return;
         }
 
@@ -424,7 +424,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                                 <option value="weekly">Еженедельно</option>
                                 <option value="monthly">Ежемесячно</option>
                                 <option value="quarterly">Раз в квартал</option>
-                                <option value="custom">Настроить</option>
+                                <option value="custom">Один раз</option>
                             </select>
                         </div>
 
@@ -488,7 +488,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                             </div>
                         )}
 
-                        {/* Настройки для кастомной даты */}
+                        {/* Настройки для одноразового выполнения */}
                         {repeatType === 'custom' && (
                             <div className="custom-settings">
                                 <label className="form-label">Дата выполнения</label>
