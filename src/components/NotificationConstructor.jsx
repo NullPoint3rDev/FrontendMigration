@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import '../styles/notificationConstructor.css';
 
-const NotificationConstructor = () => {
+const NotificationConstructor = ({ onTemplateCreated }) => {
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -106,6 +106,11 @@ const NotificationConstructor = () => {
             
             console.log('Notification template created (demo):', newTemplate);
             alert(`Шаблон уведомления "${formData.name}" создан успешно!\n\nВ демо-версии данные сохраняются только в браузере.`);
+            
+            // Уведомляем родительский компонент о создании шаблона
+            if (onTemplateCreated) {
+                onTemplateCreated();
+            }
             
             // Сброс формы
             setFormData({

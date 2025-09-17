@@ -37,13 +37,7 @@ const Navbar = () => {
         },
         { label: 'Отчеты', path: '/my-reports' },
         { label: 'Уведомления', path: '/notifications' },
-        {
-            label: 'Настройки',
-            dropdown: [
-                { label: 'Время хранения информации в БД', path: '/settings/storage' },
-                { label: 'Время отсутствия активности пользователя', path: '/settings/inactivity' },
-            ],
-        },
+        { label: 'Настройки', path: '/settings' },
         { label: 'О программе', path: '/about' },
     ];
 

@@ -95,6 +95,7 @@ function App() {
                                 <Route path="/notifications" element={<NotificationsPage />} />
                                 
                                 {/* 6. Настройки */}
+                                <Route path="/settings" element={<SettingsPage />} />
                                 <Route path="/settings/storage" element={<SettingsPage />} />
                                 <Route path="/settings/inactivity" element={<SettingsPage />} />
                                 
