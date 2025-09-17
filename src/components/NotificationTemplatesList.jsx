@@ -106,85 +106,59 @@ const NotificationTemplatesList = ({ templates, onTemplateDeleted }) => {
                 <span className="templates-count">{templates.length} шаблонов</span>
             </div>
             
-            <div className="templates-table-container">
-                <table className="templates-table">
-                    <thead>
-                        <tr>
-                            <th>Название</th>
-                            <th>Тип</th>
-                            <th>Триггер</th>
-                            <th>Пороговое значение</th>
-                            <th>Статус</th>
-                            <th>Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {templates.map((template) => (
-                            <tr key={template.id} className="template-row">
-                                <td className="template-name-cell">
-                                    <div className="template-name">
-                                        {template.name}
-                                    </div>
-                                    {template.description && (
-                                        <div className="template-description">
-                                            {template.description}
-                                        </div>
-                                    )}
-                                </td>
-                                <td className="template-type-cell">
+            <div className="templates-list">
+                {templates.map((template) => (
+                    <div key={template.id} className="template-item">
+                        <div className="template-info">
+                            <div className="template-name">
+                                {template.name}
+                            </div>
+                            {template.description && (
+                                <div className="template-description">
+                                    {template.description}
+                                </div>
+                            )}
+                            <div className="template-details">
+                                <span className="template-type">
                                     <span className={`type-badge type-${template.type}`}>
                                         {getTypeLabel(template.type)}
                                     </span>
-                                </td>
-                                <td className="template-trigger-cell">
-                                    <div className="trigger-info">
-                                        <span className="trigger-type">
-                                            {getTriggerTypeLabel(template.triggerType)}
-                                        </span>
-                                        <span className="trigger-value">
-                                            {getTriggerValueLabel(template.triggerValue)}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td className="template-threshold-cell">
-                                    {template.threshold ? (
-                                        <span className="threshold-value">
-                                            {template.threshold}
-                                            {template.triggerType === 'current' ? ' А' : 
-                                             template.triggerType === 'voltage' ? ' В' : 
-                                             template.triggerType === 'temperature' ? '°C' : ''}
-                                        </span>
-                                    ) : (
-                                        <span className="no-threshold">—</span>
-                                    )}
-                                </td>
-                                <td className="template-status-cell">
-                                    <span className={`status-badge ${template.isActive ? 'active' : 'inactive'}`}>
-                                        {template.isActive ? 'Активен' : 'Неактивен'}
+                                </span>
+                                <span className="template-trigger">
+                                    {getTriggerTypeLabel(template.triggerType)}: {getTriggerValueLabel(template.triggerValue)}
+                                </span>
+                                {template.threshold && (
+                                    <span className="template-threshold">
+                                        Порог: {template.threshold}
+                                        {template.triggerType === 'current' ? ' А' : 
+                                         template.triggerType === 'voltage' ? ' В' : 
+                                         template.triggerType === 'temperature' ? '°C' : ''}
                                     </span>
-                                </td>
-                                <td className="template-actions-cell">
-                                    <div className="template-actions">
-                                        <button 
-                                            className={`toggle-button ${template.isActive ? 'deactivate' : 'activate'}`}
-                                            onClick={() => handleToggleStatus(template.id, template.name, template.isActive)}
-                                            title={template.isActive ? 'Деактивировать' : 'Активировать'}
-                                        >
-                                            <i className={`fas ${template.isActive ? 'fa-pause' : 'fa-play'}`}></i>
-                                        </button>
-                                        <button 
-                                            className="delete-button"
-                                            onClick={() => handleDeleteTemplate(template.id, template.name)}
-                                            title="Удалить шаблон"
-                                        >
-                                            <i className="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                                )}
+                            </div>
+                        </div>
+                        
+                        <div className="template-actions">
+                            <span className={`status-badge ${template.isActive ? 'active' : 'inactive'}`}>
+                                {template.isActive ? 'Активен' : 'Неактивен'}
+                            </span>
+                            <button 
+                                className={`toggle-button ${template.isActive ? 'deactivate' : 'activate'}`}
+                                onClick={() => handleToggleStatus(template.id, template.name, template.isActive)}
+                                title={template.isActive ? 'Деактивировать' : 'Активировать'}
+                            >
+                                <i className={`fas ${template.isActive ? 'fa-pause' : 'fa-play'}`}></i>
+                            </button>
+                            <button 
+                                className="delete-button"
+                                onClick={() => handleDeleteTemplate(template.id, template.name)}
+                                title="Удалить шаблон"
+                            >
+                                <i className="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );

@@ -102,6 +102,7 @@
 }
 
 /* Стили для выпадающего списка типа отчета */
+.machine-select,
 .report-type-select {
     width: 100%;
     padding: 12px 16px;
@@ -113,6 +114,7 @@
     transition: border-color 0.3s ease;
 }
 
+.machine-select:focus,
 .report-type-select:focus {
     outline: none;
     border-color: #667eea;
@@ -548,5 +550,42 @@
 
     .column-controls {
         justify-content: center;
+    }
+}
+
+/* Стили для времени автоматизации */
+.auto-time-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.auto-time-input {
+    width: 200px;
+    padding: 12px 16px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 1rem;
+    background-color: white;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+.auto-time-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.auto-time-description {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin: 0;
+    line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+    .auto-time-input {
+        width: 100%;
     }
 }

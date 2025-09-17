@@ -10,6 +10,8 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
     const [equipment, setEquipment] = useState([]);
     const [selectedEquipment, setSelectedEquipment] = useState([]);
     const [loadingEquipment, setLoadingEquipment] = useState(false);
+    const [selectedMachine, setSelectedMachine] = useState('');
+    const [autoTime, setAutoTime] = useState('09:00');
 
     // Загружаем список оборудования при открытии модального окна
     useEffect(() => {
@@ -29,6 +31,8 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                 setSelectedColumns([]);
                 setSelectedFormat('xlsx');
                 setSelectedEquipment([]);
+                setSelectedMachine('');
+                setAutoTime('09:00');
             }
         }
     }, [isOpen, editingTemplate]);
@@ -180,6 +184,8 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             columns: selectedColumns,
             format: selectedFormat,
             selectedEquipment,
+            selectedMachine,
+            autoTime,
             createdAt: editingTemplate ? editingTemplate.createdAt : new Date().toISOString(),
             lastUsed: null
         };
@@ -219,6 +225,23 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                             placeholder="Введите название шаблона"
                             className="template-name-input"
                         />
+                    </div>
+
+                    {/* Выбор аппарата */}
+                    <div className="form-section">
+                        <h3>Выберите аппарат</h3>
+                        <select
+                            value={selectedMachine}
+                            onChange={(e) => setSelectedMachine(e.target.value)}
+                            className="machine-select"
+                        >
+                            <option value="">Выберите аппарат</option>
+                            {equipment.map(machine => (
+                                <option key={machine.id} value={machine.id}>
+                                    {machine.name || machine.model || `Аппарат ${machine.id}`}
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
                     {/* Выбор типа отчета */}
@@ -267,27 +290,27 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                             </div>
                         )}
                         <div className="columns-grid">
-                            {allColumns.map(column => {
-                                const isAvailable = selectedReportType && reportTypeColumns[selectedReportType]?.includes(column);
-                                const isSelected = selectedColumns.includes(column);
-                                
-                                return (
-                                    <label 
-                                        key={column} 
-                                        className={`column-checkbox ${!isAvailable ? 'disabled' : ''}`}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={isSelected}
-                                            onChange={() => handleColumnToggle(column)}
-                                            disabled={!isAvailable}
-                                        />
-                                        <span className={`checkbox-label ${!isAvailable ? 'disabled' : ''}`}>
-                                            {column}
-                                        </span>
-                                    </label>
-                                );
-                            })}
+                            {selectedReportType && reportTypeColumns[selectedReportType] ? 
+                                reportTypeColumns[selectedReportType].map(column => {
+                                    const isSelected = selectedColumns.includes(column);
+                                    
+                                    return (
+                                        <label 
+                                            key={column} 
+                                            className="column-checkbox"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => handleColumnToggle(column)}
+                                            />
+                                            <span className="checkbox-label">
+                                                {column}
+                                            </span>
+                                        </label>
+                                    );
+                                }) : null
+                            }
                         </div>
                         <div className="selected-count">
                             Выбрано столбцов: {selectedColumns.length} из {selectedReportType ? reportTypeColumns[selectedReportType]?.length || 0 : 0}
@@ -355,6 +378,22 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                                     <span className="format-label">{format.label}</span>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+
+                    {/* Время автоматизации */}
+                    <div className="form-section">
+                        <h3>Время автоматического создания отчета</h3>
+                        <div className="auto-time-container">
+                            <input
+                                type="time"
+                                value={autoTime}
+                                onChange={(e) => setAutoTime(e.target.value)}
+                                className="auto-time-input"
+                            />
+                            <p className="auto-time-description">
+                                Время, в которое отчет будет автоматически создаваться (если включен авто режим)
+                            </p>
                         </div>
                     </div>
                 </div>
