@@ -539,14 +539,34 @@ const MyReportsPage = () => {
                                         </div>
                                         <div className="template-actions">
                                             <div className="auto-toggle-container">
-                                                <label className="auto-toggle-label">
+                                                <label 
+                                                    className={`auto-toggle-label ${template.repeatType === 'never' ? 'disabled' : ''}`}
+                                                    onClick={(e) => {
+                                                        if (template.repeatType === 'never') {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                        }
+                                                    }}
+                                                >
                                                     <span className="auto-toggle-text">Авто</span>
                                                     <input
                                                         type="checkbox"
                                                         className="auto-toggle-switch"
                                                         checked={template.isAutoEnabled || false}
                                                         disabled={template.repeatType === 'never'}
-                                                        onChange={(e) => handleToggleAuto(template, e.target.checked)}
+                                                        onChange={(e) => {
+                                                            if (template.repeatType === 'never') {
+                                                                e.preventDefault();
+                                                                return;
+                                                            }
+                                                            handleToggleAuto(template, e.target.checked);
+                                                        }}
+                                                        onClick={(e) => {
+                                                            if (template.repeatType === 'never') {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                            }
+                                                        }}
                                                     />
                                                 </label>
                                             </div>

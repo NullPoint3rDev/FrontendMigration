@@ -219,6 +219,11 @@
     user-select: none;
 }
 
+.auto-toggle-label.disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
 .auto-toggle-text {
     font-size: 0.9rem;
     font-weight: 500;
