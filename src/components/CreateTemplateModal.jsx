@@ -8,8 +8,6 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
     const [selectedColumns, setSelectedColumns] = useState([]);
     const [selectedFormat, setSelectedFormat] = useState('xlsx');
     const [equipment, setEquipment] = useState([]);
-    const [selectedEquipment, setSelectedEquipment] = useState([]);
-    const [loadingEquipment, setLoadingEquipment] = useState(false);
     const [selectedMachine, setSelectedMachine] = useState('');
     const [autoTime, setAutoTime] = useState('09:00');
 
@@ -23,14 +21,12 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                 setSelectedReportType(editingTemplate.reportType);
                 setSelectedColumns(editingTemplate.columns);
                 setSelectedFormat(editingTemplate.format);
-                setSelectedEquipment(editingTemplate.selectedEquipment || []);
             } else {
                 // Сбрасываем поля при создании нового шаблона
                 setTemplateName('');
                 setSelectedReportType('');
                 setSelectedColumns([]);
                 setSelectedFormat('xlsx');
-                setSelectedEquipment([]);
                 setSelectedMachine('');
                 setAutoTime('09:00');
             }
@@ -56,14 +52,11 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
     }, [selectedReportType, editingTemplate]);
 
     const loadEquipment = async () => {
-        setLoadingEquipment(true);
         try {
             const equipmentData = await getAllWeldingMachines();
             setEquipment(equipmentData);
         } catch (error) {
             console.error('Ошибка загрузки оборудования:', error);
-        } finally {
-            setLoadingEquipment(false);
         }
     };
 
@@ -139,21 +132,6 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
         setSelectedColumns([]);
     };
 
-    const handleEquipmentToggle = (equipmentId) => {
-        setSelectedEquipment(prev => 
-            prev.includes(equipmentId) 
-                ? prev.filter(id => id !== equipmentId)
-                : [...prev, equipmentId]
-        );
-    };
-
-    const handleSelectAllEquipment = () => {
-        setSelectedEquipment(equipment.map(eq => eq.id));
-    };
-
-    const handleDeselectAllEquipment = () => {
-        setSelectedEquipment([]);
-    };
 
 
     const handleCreate = () => {
@@ -172,8 +150,8 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             return;
         }
 
-        if (selectedEquipment.length === 0) {
-            alert('Выберите хотя бы один аппарат для отчета');
+        if (!selectedMachine) {
+            alert('Выберите аппарат для отчета');
             return;
         }
 
@@ -183,7 +161,6 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             reportType: selectedReportType,
             columns: selectedColumns,
             format: selectedFormat,
-            selectedEquipment,
             selectedMachine,
             autoTime,
             createdAt: editingTemplate ? editingTemplate.createdAt : new Date().toISOString(),
@@ -317,52 +294,6 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                         </div>
                     </div>
 
-                    {/* Выбор оборудования */}
-                    <div className="form-section">
-                        <div className="section-header">
-                            <h3>Выберите аппараты для отчета</h3>
-                            <div className="equipment-controls">
-                                <button 
-                                    type="button"
-                                    className="control-button select-all"
-                                    onClick={handleSelectAllEquipment}
-                                >
-                                    Выбрать все
-                                </button>
-                                <button 
-                                    type="button"
-                                    className="control-button deselect-all"
-                                    onClick={handleDeselectAllEquipment}
-                                >
-                                    Снять все
-                                </button>
-                            </div>
-                        </div>
-                        {loadingEquipment ? (
-                            <div className="loading-equipment">Загрузка оборудования...</div>
-                        ) : (
-                            <div className="equipment-grid">
-                                {equipment.map(eq => (
-                                    <label key={eq.id} className="equipment-checkbox">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedEquipment.includes(eq.id)}
-                                            onChange={() => handleEquipmentToggle(eq.id)}
-                                        />
-                                        <div className="equipment-info">
-                                            <span className="equipment-name">{eq.name}</span>
-                                            <span className="equipment-details">
-                                                {eq.model} (№{eq.serialNumber || eq.id})
-                                            </span>
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-                        <div className="selected-count">
-                            Выбрано аппаратов: {selectedEquipment.length} из {equipment.length}
-                        </div>
-                    </div>
 
                     {/* Выбор формата */}
                     <div className="form-section">
@@ -405,7 +336,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                     <button 
                         className="create-button" 
                         onClick={handleCreate}
-                        disabled={!templateName.trim() || !selectedReportType || selectedColumns.length === 0 || selectedEquipment.length === 0}
+                        disabled={!templateName.trim() || !selectedReportType || selectedColumns.length === 0 || !selectedMachine}
                     >
                         {editingTemplate ? 'Сохранить изменения' : 'Создать шаблон'}
                     </button>
