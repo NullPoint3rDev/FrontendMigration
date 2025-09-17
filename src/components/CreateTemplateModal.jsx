@@ -11,7 +11,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
     const [selectedMachine, setSelectedMachine] = useState('');
     const [repeatType, setRepeatType] = useState('never'); // never, daily, weekly, monthly, quarterly, custom
     const [autoTime, setAutoTime] = useState('09:00');
-    const [selectedDays, setSelectedDays] = useState([]); // для ежедневного повтора
+    // const [selectedDays, setSelectedDays] = useState([]); // для ежедневного повтора - убрано
     const [selectedWeekDays, setSelectedWeekDays] = useState([]); // для еженедельного повтора - дни недели
     const [monthlyDate, setMonthlyDate] = useState(''); // для ежемесячного повтора - дата
     const [quarterlyDate, setQuarterlyDate] = useState(''); // для квартального повтора - дата
@@ -37,7 +37,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                 setSelectedMachine('');
                 setRepeatType('never');
                 setAutoTime('09:00');
-                setSelectedDays([]);
+                // setSelectedDays([]); // убрано
                 setSelectedWeekDays([]);
                 setMonthlyDate('');
                 setQuarterlyDate('');
@@ -179,13 +179,13 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
         { value: 4, label: '4 квартал (Октябрь-Декабрь)' }
     ];
 
-    const handleDayToggle = (dayValue) => {
-        setSelectedDays(prev => 
-            prev.includes(dayValue) 
-                ? prev.filter(day => day !== dayValue)
-                : [...prev, dayValue]
-        );
-    };
+    // const handleDayToggle = (dayValue) => { // убрано
+    //     setSelectedDays(prev => 
+    //         prev.includes(dayValue) 
+    //             ? prev.filter(day => day !== dayValue)
+    //             : [...prev, dayValue]
+    //     );
+    // };
 
     const handleWeekDayToggle = (dayValue) => {
         setSelectedWeekDays(prev => 
@@ -218,11 +218,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             return;
         }
 
-        // Валидация для ежедневного повтора
-        if (repeatType === 'daily' && selectedDays.length === 0) {
-            alert('Выберите хотя бы один день недели для ежедневного повтора');
-            return;
-        }
+        // Валидация для ежедневного повтора - убрана (только время)
 
         // Валидация для еженедельного повтора
         if (repeatType === 'weekly' && selectedWeekDays.length === 0) {
@@ -257,7 +253,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             selectedMachine,
             repeatType,
             autoTime,
-            selectedDays,
+            // selectedDays, // убрано
             selectedWeekDays,
             monthlyDate,
             quarterlyDate,
@@ -445,24 +441,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                             </div>
                         )}
 
-                        {/* Настройки для ежедневного повтора */}
-                        {repeatType === 'daily' && (
-                            <div className="daily-settings">
-                                <label className="form-label">Дни недели</label>
-                                <div className="weekdays-grid">
-                                    {weekDays.map(day => (
-                                        <label key={day.value} className="weekday-checkbox">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedDays.includes(day.value)}
-                                                onChange={() => handleDayToggle(day.value)}
-                                            />
-                                            <span>{day.label}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        {/* Настройки для ежедневного повтора - убраны (только время) */}
 
                         {/* Настройки для еженедельного повтора */}
                         {repeatType === 'weekly' && (
