@@ -241,6 +241,12 @@
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
+.auto-toggle-switch:disabled {
+    background: #e9ecef;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
 .auto-toggle-switch::before {
     content: '';
     position: absolute;
@@ -256,6 +262,11 @@
 
 .auto-toggle-switch:checked::before {
     transform: translateX(20px);
+}
+
+.auto-toggle-switch:disabled::before {
+    background: #f8f9fa;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .generate-button {

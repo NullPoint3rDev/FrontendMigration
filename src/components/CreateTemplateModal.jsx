@@ -9,7 +9,12 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
     const [selectedFormat, setSelectedFormat] = useState('xlsx');
     const [equipment, setEquipment] = useState([]);
     const [selectedMachine, setSelectedMachine] = useState('');
+    const [repeatType, setRepeatType] = useState('never'); // never, daily, weekly, monthly, yearly
     const [autoTime, setAutoTime] = useState('09:00');
+    const [selectedDays, setSelectedDays] = useState([]); // для ежедневного повтора
+    const [weekInterval, setWeekInterval] = useState(1); // для еженедельного повтора
+    const [selectedMonth, setSelectedMonth] = useState(1); // для ежемесячного повтора
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // для ежегодного повтора
 
     // Загружаем список оборудования при открытии модального окна
     useEffect(() => {
@@ -28,7 +33,12 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                 setSelectedColumns([]);
                 setSelectedFormat('xlsx');
                 setSelectedMachine('');
+                setRepeatType('never');
                 setAutoTime('09:00');
+                setSelectedDays([]);
+                setWeekInterval(1);
+                setSelectedMonth(1);
+                setSelectedYear(new Date().getFullYear());
             }
         }
     }, [isOpen, editingTemplate]);
@@ -132,6 +142,40 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
         setSelectedColumns([]);
     };
 
+    // Функции для работы с днями недели
+    const weekDays = [
+        { value: 1, label: 'Понедельник' },
+        { value: 2, label: 'Вторник' },
+        { value: 3, label: 'Среда' },
+        { value: 4, label: 'Четверг' },
+        { value: 5, label: 'Пятница' },
+        { value: 6, label: 'Суббота' },
+        { value: 0, label: 'Воскресенье' }
+    ];
+
+    const months = [
+        { value: 1, label: 'Январь' },
+        { value: 2, label: 'Февраль' },
+        { value: 3, label: 'Март' },
+        { value: 4, label: 'Апрель' },
+        { value: 5, label: 'Май' },
+        { value: 6, label: 'Июнь' },
+        { value: 7, label: 'Июль' },
+        { value: 8, label: 'Август' },
+        { value: 9, label: 'Сентябрь' },
+        { value: 10, label: 'Октябрь' },
+        { value: 11, label: 'Ноябрь' },
+        { value: 12, label: 'Декабрь' }
+    ];
+
+    const handleDayToggle = (dayValue) => {
+        setSelectedDays(prev => 
+            prev.includes(dayValue) 
+                ? prev.filter(day => day !== dayValue)
+                : [...prev, dayValue]
+        );
+    };
+
 
 
     const handleCreate = () => {
@@ -155,6 +199,12 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             return;
         }
 
+        // Валидация для ежедневного повтора
+        if (repeatType === 'daily' && selectedDays.length === 0) {
+            alert('Выберите хотя бы один день недели для ежедневного повтора');
+            return;
+        }
+
         const templateData = {
             id: editingTemplate ? editingTemplate.id : Date.now().toString(),
             name: templateName.trim(),
@@ -162,7 +212,12 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             columns: selectedColumns,
             format: selectedFormat,
             selectedMachine,
+            repeatType,
             autoTime,
+            selectedDays,
+            weekInterval,
+            selectedMonth,
+            selectedYear,
             createdAt: editingTemplate ? editingTemplate.createdAt : new Date().toISOString(),
             lastUsed: null
         };
@@ -311,20 +366,119 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                         </div>
                     </div>
 
-                    {/* Время автоматизации */}
+                    {/* Настройки автоматизации */}
                     <div className="form-section">
-                        <h3>Время автоматического создания отчета</h3>
-                        <div className="auto-time-container">
-                            <input
-                                type="time"
-                                value={autoTime}
-                                onChange={(e) => setAutoTime(e.target.value)}
-                                className="auto-time-input"
-                            />
-                            <p className="auto-time-description">
-                                Время, в которое отчет будет автоматически создаваться (если включен авто режим)
-                            </p>
+                        <h3>Настройки автоматического создания отчета</h3>
+                        
+                        {/* Тип повтора */}
+                        <div className="repeat-type-container">
+                            <label className="form-label">Повтор</label>
+                            <select
+                                value={repeatType}
+                                onChange={(e) => setRepeatType(e.target.value)}
+                                className="repeat-type-select"
+                            >
+                                <option value="never">Никогда</option>
+                                <option value="daily">Ежедневно</option>
+                                <option value="weekly">Еженедельно</option>
+                                <option value="monthly">Ежемесячно</option>
+                                <option value="yearly">Ежегодно</option>
+                            </select>
                         </div>
+
+                        {/* Время выполнения */}
+                        {repeatType !== 'never' && (
+                            <div className="auto-time-container">
+                                <label className="form-label">Время выполнения</label>
+                                <input
+                                    type="time"
+                                    value={autoTime}
+                                    onChange={(e) => setAutoTime(e.target.value)}
+                                    className="auto-time-input"
+                                />
+                            </div>
+                        )}
+
+                        {/* Настройки для ежедневного повтора */}
+                        {repeatType === 'daily' && (
+                            <div className="daily-settings">
+                                <label className="form-label">Дни недели</label>
+                                <div className="weekdays-grid">
+                                    {weekDays.map(day => (
+                                        <label key={day.value} className="weekday-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedDays.includes(day.value)}
+                                                onChange={() => handleDayToggle(day.value)}
+                                            />
+                                            <span>{day.label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Настройки для еженедельного повтора */}
+                        {repeatType === 'weekly' && (
+                            <div className="weekly-settings">
+                                <label className="form-label">Интервал (недели)</label>
+                                <select
+                                    value={weekInterval}
+                                    onChange={(e) => setWeekInterval(parseInt(e.target.value))}
+                                    className="interval-select"
+                                >
+                                    <option value={1}>Каждую неделю</option>
+                                    <option value={2}>Каждые 2 недели</option>
+                                    <option value={3}>Каждые 3 недели</option>
+                                    <option value={4}>Каждые 4 недели</option>
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Настройки для ежемесячного повтора */}
+                        {repeatType === 'monthly' && (
+                            <div className="monthly-settings">
+                                <label className="form-label">Месяц</label>
+                                <select
+                                    value={selectedMonth}
+                                    onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                                    className="month-select"
+                                >
+                                    {months.map(month => (
+                                        <option key={month.value} value={month.value}>
+                                            {month.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Настройки для ежегодного повтора */}
+                        {repeatType === 'yearly' && (
+                            <div className="yearly-settings">
+                                <label className="form-label">Год</label>
+                                <select
+                                    value={selectedYear}
+                                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                                    className="year-select"
+                                >
+                                    {Array.from({ length: 10 }, (_, i) => {
+                                        const year = new Date().getFullYear() + i;
+                                        return (
+                                            <option key={year} value={year}>
+                                                {year}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
+                        )}
+
+                        {repeatType !== 'never' && (
+                            <p className="auto-description">
+                                Отчет будет автоматически создаваться согласно выбранным настройкам
+                            </p>
+                        )}
                     </div>
                 </div>
 

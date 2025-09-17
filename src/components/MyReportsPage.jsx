@@ -133,6 +133,12 @@ const MyReportsPage = () => {
 
     const handleToggleAuto = (template, isEnabled) => {
         try {
+            // Проверяем, можно ли включить авто режим
+            if (isEnabled && template.repeatType === 'never') {
+                alert('Нельзя включить автоматический режим для шаблона с настройкой "Никогда".\n\nИзмените настройки повтора в шаблоне на другой вариант.');
+                return;
+            }
+
             if (isEnabled) {
                 // Включаем авто режим (только на фронтенде)
                 const updatedTemplates = templates.map(t => 
@@ -539,6 +545,7 @@ const MyReportsPage = () => {
                                                         type="checkbox"
                                                         className="auto-toggle-switch"
                                                         checked={template.isAutoEnabled || false}
+                                                        disabled={template.repeatType === 'never'}
                                                         onChange={(e) => handleToggleAuto(template, e.target.checked)}
                                                     />
                                                 </label>
