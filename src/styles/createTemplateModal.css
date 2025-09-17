@@ -561,7 +561,8 @@
 .repeat-type-select,
 .interval-select,
 .month-select,
-.year-select {
+.quarter-select,
+.custom-date-input {
     width: 100%;
     padding: 12px 16px;
     border: 2px solid #e9ecef;
@@ -575,7 +576,8 @@
 .repeat-type-select:focus,
 .interval-select:focus,
 .month-select:focus,
-.year-select:focus {
+.quarter-select:focus,
+.custom-date-input:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);

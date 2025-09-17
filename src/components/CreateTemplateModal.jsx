@@ -9,12 +9,13 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
     const [selectedFormat, setSelectedFormat] = useState('xlsx');
     const [equipment, setEquipment] = useState([]);
     const [selectedMachine, setSelectedMachine] = useState('');
-    const [repeatType, setRepeatType] = useState('never'); // never, daily, weekly, monthly, yearly
+    const [repeatType, setRepeatType] = useState('never'); // never, daily, weekly, monthly, quarterly, custom
     const [autoTime, setAutoTime] = useState('09:00');
     const [selectedDays, setSelectedDays] = useState([]); // для ежедневного повтора
     const [weekInterval, setWeekInterval] = useState(1); // для еженедельного повтора
     const [selectedMonth, setSelectedMonth] = useState(1); // для ежемесячного повтора
-    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // для ежегодного повтора
+    const [selectedQuarter, setSelectedQuarter] = useState(1); // для квартального повтора
+    const [customDate, setCustomDate] = useState(''); // для кастомной даты
 
     // Загружаем список оборудования при открытии модального окна
     useEffect(() => {
@@ -38,7 +39,8 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                 setSelectedDays([]);
                 setWeekInterval(1);
                 setSelectedMonth(1);
-                setSelectedYear(new Date().getFullYear());
+                setSelectedQuarter(1);
+                setCustomDate('');
             }
         }
     }, [isOpen, editingTemplate]);
@@ -168,6 +170,13 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
         { value: 12, label: 'Декабрь' }
     ];
 
+    const quarters = [
+        { value: 1, label: '1 квартал (Январь-Март)' },
+        { value: 2, label: '2 квартал (Апрель-Июнь)' },
+        { value: 3, label: '3 квартал (Июль-Сентябрь)' },
+        { value: 4, label: '4 квартал (Октябрь-Декабрь)' }
+    ];
+
     const handleDayToggle = (dayValue) => {
         setSelectedDays(prev => 
             prev.includes(dayValue) 
@@ -205,6 +214,12 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             return;
         }
 
+        // Валидация для кастомной даты
+        if (repeatType === 'custom' && !customDate) {
+            alert('Выберите дату для кастомного повтора');
+            return;
+        }
+
         const templateData = {
             id: editingTemplate ? editingTemplate.id : Date.now().toString(),
             name: templateName.trim(),
@@ -217,7 +232,8 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             selectedDays,
             weekInterval,
             selectedMonth,
-            selectedYear,
+            selectedQuarter,
+            customDate,
             createdAt: editingTemplate ? editingTemplate.createdAt : new Date().toISOString(),
             lastUsed: null
         };
@@ -382,12 +398,13 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                                 <option value="daily">Ежедневно</option>
                                 <option value="weekly">Еженедельно</option>
                                 <option value="monthly">Ежемесячно</option>
-                                <option value="yearly">Ежегодно</option>
+                                <option value="quarterly">Раз в квартал</option>
+                                <option value="custom">Настроить</option>
                             </select>
                         </div>
 
                         {/* Время выполнения */}
-                        {repeatType !== 'never' && (
+                        {repeatType !== 'never' && repeatType !== 'weekly' && repeatType !== 'quarterly' && (
                             <div className="auto-time-container">
                                 <label className="form-label">Время выполнения</label>
                                 <input
@@ -453,24 +470,34 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                             </div>
                         )}
 
-                        {/* Настройки для ежегодного повтора */}
-                        {repeatType === 'yearly' && (
-                            <div className="yearly-settings">
-                                <label className="form-label">Год</label>
+                        {/* Настройки для квартального повтора */}
+                        {repeatType === 'quarterly' && (
+                            <div className="quarterly-settings">
+                                <label className="form-label">Квартал</label>
                                 <select
-                                    value={selectedYear}
-                                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                                    className="year-select"
+                                    value={selectedQuarter}
+                                    onChange={(e) => setSelectedQuarter(parseInt(e.target.value))}
+                                    className="quarter-select"
                                 >
-                                    {Array.from({ length: 10 }, (_, i) => {
-                                        const year = new Date().getFullYear() + i;
-                                        return (
-                                            <option key={year} value={year}>
-                                                {year}
-                                            </option>
-                                        );
-                                    })}
+                                    {quarters.map(quarter => (
+                                        <option key={quarter.value} value={quarter.value}>
+                                            {quarter.label}
+                                        </option>
+                                    ))}
                                 </select>
+                            </div>
+                        )}
+
+                        {/* Настройки для кастомной даты */}
+                        {repeatType === 'custom' && (
+                            <div className="custom-settings">
+                                <label className="form-label">Дата выполнения</label>
+                                <input
+                                    type="date"
+                                    value={customDate}
+                                    onChange={(e) => setCustomDate(e.target.value)}
+                                    className="custom-date-input"
+                                />
                             </div>
                         )}
 
