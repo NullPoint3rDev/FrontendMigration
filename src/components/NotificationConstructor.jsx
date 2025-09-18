@@ -266,21 +266,8 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
         const hasChildren = isGroup && node.children && node.children.length > 0;
         
         return (
-            <div key={node.id} className="tree-node" style={{ marginLeft: `${level * 20}px` }}>
+            <div key={node.id} className="tree-node">
                 <div className="tree-node-content">
-                    {hasChildren && (
-                        <button
-                            type="button"
-                            className="tree-toggle"
-                            onClick={() => handleNodeToggle(node.id)}
-                        >
-                            <span className={`tree-arrow ${isExpanded ? 'expanded' : ''}`}>
-                                ▶
-                            </span>
-                        </button>
-                    )}
-                    {!hasChildren && <span className="tree-spacer"></span>}
-                    
                     <label className="tree-checkbox-label">
                         <input
                             type="checkbox"
@@ -292,6 +279,18 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                             {isGroup ? '📁' : '⚙️'} {node.name}
                         </span>
                     </label>
+                    
+                    {hasChildren && (
+                        <button
+                            type="button"
+                            className="tree-toggle"
+                            onClick={() => handleNodeToggle(node.id)}
+                        >
+                            <span className={`tree-arrow ${isExpanded ? 'expanded' : ''}`}>
+                                ▶
+                            </span>
+                        </button>
+                    )}
                 </div>
                 
                 {hasChildren && isExpanded && (
