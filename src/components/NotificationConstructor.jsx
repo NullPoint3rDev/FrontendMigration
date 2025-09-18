@@ -8,6 +8,7 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
         triggerType: '',
         triggerValue: '',
         threshold: '',
+        equipmentGroupId: '', // группа аппаратов
         equipmentId: '',
         timeThreshold: '', // время для превышения тока
         isActive: true
@@ -22,11 +23,19 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
         { value: 'user_change', label: 'По смене пользователя' }
     ];
 
+    const equipmentGroups = [
+        { id: '1', name: 'Группа 1' },
+        { id: '2', name: 'Группа 2' },
+        { id: '3', name: 'Группа 3' }
+    ];
+
     const equipmentList = [
-        { id: '1', name: 'Аппарат 1' },
-        { id: '2', name: 'Аппарат 2' },
-        { id: '3', name: 'Аппарат 3' },
-        { id: '4', name: 'Аппарат 4' }
+        { id: '1', name: 'Аппарат 1', groupId: '1' },
+        { id: '2', name: 'Аппарат 2', groupId: '1' },
+        { id: '3', name: 'Аппарат 3', groupId: '2' },
+        { id: '4', name: 'Аппарат 4', groupId: '2' },
+        { id: '5', name: 'Аппарат 5', groupId: '3' },
+        { id: '6', name: 'Аппарат 6', groupId: '3' }
     ];
 
     const handleInputChange = (e) => {
@@ -53,6 +62,15 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
             triggerValue: '', // Сбрасываем значение при смене типа
             threshold: '',
             timeThreshold: '' // Сбрасываем время при смене типа
+        }));
+    };
+
+    const handleEquipmentGroupChange = (e) => {
+        const groupId = e.target.value;
+        setFormData(prev => ({
+            ...prev,
+            equipmentGroupId: groupId,
+            equipmentId: '' // Сбрасываем выбор аппарата при смене группы
         }));
     };
 
@@ -124,6 +142,7 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                 triggerType: '',
                 triggerValue: '',
                 threshold: '',
+                equipmentGroupId: '',
                 equipmentId: '',
                 timeThreshold: '',
                 isActive: true
@@ -156,6 +175,13 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
             default:
                 return [];
         }
+    };
+
+    const getFilteredEquipment = () => {
+        if (!formData.equipmentGroupId) {
+            return [];
+        }
+        return equipmentList.filter(equipment => equipment.groupId === formData.equipmentGroupId);
     };
 
     return (
@@ -287,6 +313,26 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                         </div>
                     )}
 
+                    {/* Выбор группы аппаратов */}
+                    <div className="form-group">
+                        <label className="form-label">
+                            Группа аппаратов
+                        </label>
+                        <select
+                            name="equipmentGroupId"
+                            value={formData.equipmentGroupId}
+                            onChange={handleEquipmentGroupChange}
+                            className="form-input"
+                        >
+                            <option value="">Выберите группу аппаратов</option>
+                            {equipmentGroups.map(group => (
+                                <option key={group.id} value={group.id}>
+                                    {group.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
                     {/* Выбор аппарата */}
                     <div className="form-group">
                         <label className="form-label">
@@ -297,9 +343,10 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                             value={formData.equipmentId}
                             onChange={handleInputChange}
                             className="form-input"
+                            disabled={!formData.equipmentGroupId}
                         >
                             <option value="">Выберите аппарат</option>
-                            {equipmentList.map(equipment => (
+                            {getFilteredEquipment().map(equipment => (
                                 <option key={equipment.id} value={equipment.id}>
                                     {equipment.name}
                                 </option>
