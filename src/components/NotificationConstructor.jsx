@@ -8,8 +8,8 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
         triggerType: '',
         triggerValue: '',
         threshold: '',
-        equipmentGroupId: '', // группа аппаратов
-        equipmentId: '',
+        equipmentGroupIds: [], // группы аппаратов (множественный выбор)
+        equipmentIds: [], // аппараты (множественный выбор)
         timeThreshold: '', // время для превышения тока
         isActive: true
     });
@@ -67,11 +67,29 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
 
     const handleEquipmentGroupChange = (e) => {
         const groupId = e.target.value;
-        setFormData(prev => ({
-            ...prev,
-            equipmentGroupId: groupId,
-            equipmentId: '' // Сбрасываем выбор аппарата при смене группы
-        }));
+        const isChecked = e.target.checked;
+        
+        setFormData(prev => {
+            let newGroupIds;
+            if (isChecked) {
+                newGroupIds = [...prev.equipmentGroupIds, groupId];
+            } else {
+                newGroupIds = prev.equipmentGroupIds.filter(id => id !== groupId);
+                // Убираем аппараты из этой группы
+                const equipmentInGroup = equipmentList.filter(eq => eq.groupId === groupId).map(eq => eq.id);
+                const newEquipmentIds = prev.equipmentIds.filter(id => !equipmentInGroup.includes(id));
+                return {
+                    ...prev,
+                    equipmentGroupIds: newGroupIds,
+                    equipmentIds: newEquipmentIds
+                };
+            }
+            
+            return {
+                ...prev,
+                equipmentGroupIds: newGroupIds
+            };
+        });
     };
 
     const validateForm = () => {
@@ -142,8 +160,8 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                 triggerType: '',
                 triggerValue: '',
                 threshold: '',
-                equipmentGroupId: '',
-                equipmentId: '',
+                equipmentGroupIds: [],
+                equipmentIds: [],
                 timeThreshold: '',
                 isActive: true
             });
@@ -177,11 +195,44 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
         }
     };
 
+    const handleEquipmentChange = (e) => {
+        const equipmentId = e.target.value;
+        const isChecked = e.target.checked;
+        
+        setFormData(prev => {
+            let newEquipmentIds;
+            if (isChecked) {
+                newEquipmentIds = [...prev.equipmentIds, equipmentId];
+            } else {
+                newEquipmentIds = prev.equipmentIds.filter(id => id !== equipmentId);
+            }
+            
+            // Автоматически выбираем группу, если все аппараты из группы выбраны
+            const selectedEquipment = equipmentList.filter(eq => newEquipmentIds.includes(eq.id));
+            const groupsWithAllEquipment = equipmentGroups.filter(group => {
+                const equipmentInGroup = equipmentList.filter(eq => eq.groupId === group.id);
+                return equipmentInGroup.every(eq => newEquipmentIds.includes(eq.id));
+            });
+            
+            const newGroupIds = groupsWithAllEquipment.map(group => group.id);
+            
+            return {
+                ...prev,
+                equipmentIds: newEquipmentIds,
+                equipmentGroupIds: newGroupIds
+            };
+        });
+    };
+
     const getFilteredEquipment = () => {
-        if (!formData.equipmentGroupId) {
-            return [];
+        // Если выбраны группы, показываем только аппараты из этих групп
+        if (formData.equipmentGroupIds.length > 0) {
+            return equipmentList.filter(equipment => 
+                formData.equipmentGroupIds.includes(equipment.groupId)
+            );
         }
-        return equipmentList.filter(equipment => equipment.groupId === formData.equipmentGroupId);
+        // Иначе показываем все аппараты
+        return equipmentList;
     };
 
     return (
@@ -275,83 +326,80 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                         </div>
                     )}
 
-                    {/* Пороговое значение для превышения тока */}
+                    {/* Пороговое значение и время превышения тока */}
                     {formData.triggerType === 'current' && (
-                        <div className="form-group">
-                            <label className="form-label">
-                                Пороговое значение тока (А) *
-                            </label>
-                            <input
-                                type="number"
-                                name="threshold"
-                                value={formData.threshold}
-                                onChange={handleInputChange}
-                                className={`form-input ${errors.threshold ? 'error' : ''}`}
-                                placeholder="Амперы"
-                                step="0.1"
-                            />
-                            {errors.threshold && <span className="error-message">{errors.threshold}</span>}
+                        <div className="form-group-row">
+                            <div className="form-group">
+                                <label className="form-label">
+                                    Пороговое значение тока (А) *
+                                </label>
+                                <input
+                                    type="number"
+                                    name="threshold"
+                                    value={formData.threshold}
+                                    onChange={handleInputChange}
+                                    className={`form-input ${errors.threshold ? 'error' : ''}`}
+                                    placeholder="Амперы"
+                                    step="0.1"
+                                />
+                                {errors.threshold && <span className="error-message">{errors.threshold}</span>}
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">
+                                    Время превышения (сек) *
+                                </label>
+                                <input
+                                    type="number"
+                                    name="timeThreshold"
+                                    value={formData.timeThreshold}
+                                    onChange={handleInputChange}
+                                    className={`form-input ${errors.timeThreshold ? 'error' : ''}`}
+                                    placeholder="Секунды"
+                                    min="1"
+                                />
+                                {errors.timeThreshold && <span className="error-message">{errors.timeThreshold}</span>}
+                            </div>
                         </div>
                     )}
 
-                    {/* Время превышения тока */}
-                    {formData.triggerType === 'current' && (
+                    {/* Выбор группы аппаратов и аппаратов */}
+                    <div className="form-group-row">
                         <div className="form-group">
                             <label className="form-label">
-                                Время превышения (сек) *
+                                Группы аппаратов
                             </label>
-                            <input
-                                type="number"
-                                name="timeThreshold"
-                                value={formData.timeThreshold}
-                                onChange={handleInputChange}
-                                className={`form-input ${errors.timeThreshold ? 'error' : ''}`}
-                                placeholder="Секунды"
-                                min="1"
-                            />
-                            {errors.timeThreshold && <span className="error-message">{errors.timeThreshold}</span>}
+                            <div className="checkbox-list">
+                                {equipmentGroups.map(group => (
+                                    <label key={group.id} className="checkbox-item">
+                                        <input
+                                            type="checkbox"
+                                            value={group.id}
+                                            checked={formData.equipmentGroupIds.includes(group.id)}
+                                            onChange={handleEquipmentGroupChange}
+                                        />
+                                        <span>{group.name}</span>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
-                    )}
-
-                    {/* Выбор группы аппаратов */}
-                    <div className="form-group">
-                        <label className="form-label">
-                            Группа аппаратов
-                        </label>
-                        <select
-                            name="equipmentGroupId"
-                            value={formData.equipmentGroupId}
-                            onChange={handleEquipmentGroupChange}
-                            className="form-input"
-                        >
-                            <option value="">Выберите группу аппаратов</option>
-                            {equipmentGroups.map(group => (
-                                <option key={group.id} value={group.id}>
-                                    {group.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Выбор аппарата */}
-                    <div className="form-group">
-                        <label className="form-label">
-                            Аппарат
-                        </label>
-                        <select
-                            name="equipmentId"
-                            value={formData.equipmentId}
-                            onChange={handleInputChange}
-                            className="form-input"
-                            disabled={!formData.equipmentGroupId}
-                        >
-                            <option value="">Выберите аппарат</option>
-                            {getFilteredEquipment().map(equipment => (
-                                <option key={equipment.id} value={equipment.id}>
-                                    {equipment.name}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="form-group">
+                            <label className="form-label">
+                                Аппараты
+                            </label>
+                            <div className="checkbox-list">
+                                {getFilteredEquipment().map(equipment => (
+                                    <label key={equipment.id} className="checkbox-item">
+                                        <input
+                                            type="checkbox"
+                                            value={equipment.id}
+                                            checked={formData.equipmentIds.includes(equipment.id)}
+                                            onChange={handleEquipmentChange}
+                                        />
+                                        <span>{equipment.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     {/* Активность */}
