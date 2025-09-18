@@ -15,6 +15,7 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
     });
 
     const [errors, setErrors] = useState({});
+    const [expandedNodes, setExpandedNodes] = useState({});
 
     const triggerTypes = [
         { value: 'current', label: 'По превышению тока' },
@@ -23,19 +24,34 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
         { value: 'user_change', label: 'По смене пользователя' }
     ];
 
-    const equipmentGroups = [
-        { id: '1', name: 'Группа 1' },
-        { id: '2', name: 'Группа 2' },
-        { id: '3', name: 'Группа 3' }
-    ];
-
-    const equipmentList = [
-        { id: '1', name: 'Аппарат 1', groupId: '1' },
-        { id: '2', name: 'Аппарат 2', groupId: '1' },
-        { id: '3', name: 'Аппарат 3', groupId: '2' },
-        { id: '4', name: 'Аппарат 4', groupId: '2' },
-        { id: '5', name: 'Аппарат 5', groupId: '3' },
-        { id: '6', name: 'Аппарат 6', groupId: '3' }
+    const equipmentTree = [
+        {
+            id: 'group1',
+            name: 'Группа 1',
+            type: 'group',
+            children: [
+                { id: '1', name: 'Аппарат 1', type: 'equipment', groupId: 'group1' },
+                { id: '2', name: 'Аппарат 2', type: 'equipment', groupId: 'group1' }
+            ]
+        },
+        {
+            id: 'group2',
+            name: 'Группа 2',
+            type: 'group',
+            children: [
+                { id: '3', name: 'Аппарат 3', type: 'equipment', groupId: 'group2' },
+                { id: '4', name: 'Аппарат 4', type: 'equipment', groupId: 'group2' }
+            ]
+        },
+        {
+            id: 'group3',
+            name: 'Группа 3',
+            type: 'group',
+            children: [
+                { id: '5', name: 'Аппарат 5', type: 'equipment', groupId: 'group3' },
+                { id: '6', name: 'Аппарат 6', type: 'equipment', groupId: 'group3' }
+            ]
+        }
     ];
 
     const handleInputChange = (e) => {
@@ -65,30 +81,74 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
         }));
     };
 
-    const handleEquipmentGroupChange = (e) => {
-        const groupId = e.target.value;
-        const isChecked = e.target.checked;
-        
+    const handleNodeToggle = (nodeId) => {
+        setExpandedNodes(prev => ({
+            ...prev,
+            [nodeId]: !prev[nodeId]
+        }));
+    };
+
+    const handleNodeCheck = (nodeId, nodeType, isChecked) => {
         setFormData(prev => {
-            let newGroupIds;
-            if (isChecked) {
-                newGroupIds = [...prev.equipmentGroupIds, groupId];
-            } else {
-                newGroupIds = prev.equipmentGroupIds.filter(id => id !== groupId);
-                // Убираем аппараты из этой группы
-                const equipmentInGroup = equipmentList.filter(eq => eq.groupId === groupId).map(eq => eq.id);
-                const newEquipmentIds = prev.equipmentIds.filter(id => !equipmentInGroup.includes(id));
+            if (nodeType === 'group') {
+                // Находим группу и все её дочерние элементы
+                const group = equipmentTree.find(g => g.id === nodeId);
+                const equipmentInGroup = group ? group.children.map(child => child.id) : [];
+                
+                let newGroupIds, newEquipmentIds;
+                if (isChecked) {
+                    newGroupIds = [...prev.equipmentGroupIds, nodeId];
+                    newEquipmentIds = [...prev.equipmentIds, ...equipmentInGroup];
+                } else {
+                    newGroupIds = prev.equipmentGroupIds.filter(id => id !== nodeId);
+                    newEquipmentIds = prev.equipmentIds.filter(id => !equipmentInGroup.includes(id));
+                }
+                
                 return {
                     ...prev,
                     equipmentGroupIds: newGroupIds,
                     equipmentIds: newEquipmentIds
                 };
+            } else {
+                // Обработка выбора отдельного аппарата
+                let newEquipmentIds;
+                if (isChecked) {
+                    newEquipmentIds = [...prev.equipmentIds, nodeId];
+                } else {
+                    newEquipmentIds = prev.equipmentIds.filter(id => id !== nodeId);
+                }
+                
+                // Проверяем, нужно ли автоматически выбрать/снять группу
+                const equipment = equipmentTree.flatMap(group => group.children).find(eq => eq.id === nodeId);
+                if (equipment) {
+                    const groupId = equipment.groupId;
+                    const group = equipmentTree.find(g => g.id === groupId);
+                    const allEquipmentInGroup = group.children.map(child => child.id);
+                    const selectedEquipmentInGroup = allEquipmentInGroup.filter(id => newEquipmentIds.includes(id));
+                    
+                    let newGroupIds = [...prev.equipmentGroupIds];
+                    if (selectedEquipmentInGroup.length === allEquipmentInGroup.length) {
+                        // Все аппараты в группе выбраны - выбираем группу
+                        if (!newGroupIds.includes(groupId)) {
+                            newGroupIds.push(groupId);
+                        }
+                    } else {
+                        // Не все аппараты выбраны - снимаем группу
+                        newGroupIds = newGroupIds.filter(id => id !== groupId);
+                    }
+                    
+                    return {
+                        ...prev,
+                        equipmentGroupIds: newGroupIds,
+                        equipmentIds: newEquipmentIds
+                    };
+                }
+                
+                return {
+                    ...prev,
+                    equipmentIds: newEquipmentIds
+                };
             }
-            
-            return {
-                ...prev,
-                equipmentGroupIds: newGroupIds
-            };
         });
     };
 
@@ -165,6 +225,7 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                 timeThreshold: '',
                 isActive: true
             });
+            setExpandedNodes({});
         } catch (error) {
             console.error('Ошибка при создании уведомления:', error);
             alert('Ошибка при создании уведомления');
@@ -195,44 +256,51 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
         }
     };
 
-    const handleEquipmentChange = (e) => {
-        const equipmentId = e.target.value;
-        const isChecked = e.target.checked;
+    const renderTreeNode = (node, level = 0) => {
+        const isExpanded = expandedNodes[node.id];
+        const isGroup = node.type === 'group';
+        const isChecked = isGroup 
+            ? formData.equipmentGroupIds.includes(node.id)
+            : formData.equipmentIds.includes(node.id);
         
-        setFormData(prev => {
-            let newEquipmentIds;
-            if (isChecked) {
-                newEquipmentIds = [...prev.equipmentIds, equipmentId];
-            } else {
-                newEquipmentIds = prev.equipmentIds.filter(id => id !== equipmentId);
-            }
-            
-            // Автоматически выбираем группу, если все аппараты из группы выбраны
-            const selectedEquipment = equipmentList.filter(eq => newEquipmentIds.includes(eq.id));
-            const groupsWithAllEquipment = equipmentGroups.filter(group => {
-                const equipmentInGroup = equipmentList.filter(eq => eq.groupId === group.id);
-                return equipmentInGroup.every(eq => newEquipmentIds.includes(eq.id));
-            });
-            
-            const newGroupIds = groupsWithAllEquipment.map(group => group.id);
-            
-            return {
-                ...prev,
-                equipmentIds: newEquipmentIds,
-                equipmentGroupIds: newGroupIds
-            };
-        });
-    };
-
-    const getFilteredEquipment = () => {
-        // Если выбраны группы, показываем только аппараты из этих групп
-        if (formData.equipmentGroupIds.length > 0) {
-            return equipmentList.filter(equipment => 
-                formData.equipmentGroupIds.includes(equipment.groupId)
-            );
-        }
-        // Иначе показываем все аппараты
-        return equipmentList;
+        const hasChildren = isGroup && node.children && node.children.length > 0;
+        
+        return (
+            <div key={node.id} className="tree-node" style={{ marginLeft: `${level * 20}px` }}>
+                <div className="tree-node-content">
+                    {hasChildren && (
+                        <button
+                            type="button"
+                            className="tree-toggle"
+                            onClick={() => handleNodeToggle(node.id)}
+                        >
+                            <span className={`tree-arrow ${isExpanded ? 'expanded' : ''}`}>
+                                ▶
+                            </span>
+                        </button>
+                    )}
+                    {!hasChildren && <span className="tree-spacer"></span>}
+                    
+                    <label className="tree-checkbox-label">
+                        <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => handleNodeCheck(node.id, node.type, e.target.checked)}
+                            className="tree-checkbox"
+                        />
+                        <span className={`tree-label ${isGroup ? 'group-label' : 'equipment-label'}`}>
+                            {isGroup ? '📁' : '⚙️'} {node.name}
+                        </span>
+                    </label>
+                </div>
+                
+                {hasChildren && isExpanded && (
+                    <div className="tree-children">
+                        {node.children.map(child => renderTreeNode(child, level + 1))}
+                    </div>
+                )}
+            </div>
+        );
     };
 
     return (
@@ -362,43 +430,13 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                         </div>
                     )}
 
-                    {/* Выбор группы аппаратов и аппаратов */}
-                    <div className="form-group-row">
-                        <div className="form-group">
-                            <label className="form-label">
-                                Группы аппаратов
-                            </label>
-                            <div className="checkbox-list">
-                                {equipmentGroups.map(group => (
-                                    <label key={group.id} className="checkbox-item">
-                                        <input
-                                            type="checkbox"
-                                            value={group.id}
-                                            checked={formData.equipmentGroupIds.includes(group.id)}
-                                            onChange={handleEquipmentGroupChange}
-                                        />
-                                        <span>{group.name}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">
-                                Аппараты
-                            </label>
-                            <div className="checkbox-list">
-                                {getFilteredEquipment().map(equipment => (
-                                    <label key={equipment.id} className="checkbox-item">
-                                        <input
-                                            type="checkbox"
-                                            value={equipment.id}
-                                            checked={formData.equipmentIds.includes(equipment.id)}
-                                            onChange={handleEquipmentChange}
-                                        />
-                                        <span>{equipment.name}</span>
-                                    </label>
-                                ))}
-                            </div>
+                    {/* Выбор оборудования */}
+                    <div className="form-group">
+                        <label className="form-label">
+                            Оборудование
+                        </label>
+                        <div className="equipment-tree">
+                            {equipmentTree.map(node => renderTreeNode(node))}
                         </div>
                     </div>
 
