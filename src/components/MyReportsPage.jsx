@@ -27,7 +27,14 @@ const MyReportsPage = () => {
         const savedTemplates = localStorage.getItem('reportTemplates');
         if (savedTemplates) {
             try {
-                setTemplates(JSON.parse(savedTemplates));
+                const templates = JSON.parse(savedTemplates);
+                // Сортируем шаблоны по дате создания (новые сначала)
+                const sortedTemplates = templates.sort((a, b) => {
+                    const dateA = new Date(a.createdAt || 0);
+                    const dateB = new Date(b.createdAt || 0);
+                    return dateB - dateA; // Новые сначала
+                });
+                setTemplates(sortedTemplates);
             } catch (error) {
                 console.error('Ошибка загрузки шаблонов:', error);
                 setTemplates([]);
@@ -36,8 +43,15 @@ const MyReportsPage = () => {
     };
 
     const saveTemplates = (newTemplates) => {
-        localStorage.setItem('reportTemplates', JSON.stringify(newTemplates));
-        setTemplates(newTemplates);
+        // Сортируем шаблоны по дате создания (новые сначала)
+        const sortedTemplates = newTemplates.sort((a, b) => {
+            const dateA = new Date(a.createdAt || 0);
+            const dateB = new Date(b.createdAt || 0);
+            return dateB - dateA; // Новые сначала
+        });
+        
+        localStorage.setItem('reportTemplates', JSON.stringify(sortedTemplates));
+        setTemplates(sortedTemplates);
     };
 
     const loadGeneratedReports = async () => {
@@ -116,8 +130,8 @@ const MyReportsPage = () => {
             );
             saveTemplates(updatedTemplates);
         } else {
-            // Если это новый шаблон, добавляем его
-            const updatedTemplates = [...templates, newTemplate];
+            // Если это новый шаблон, добавляем его в начало списка
+            const updatedTemplates = [newTemplate, ...templates];
             saveTemplates(updatedTemplates);
         }
         
