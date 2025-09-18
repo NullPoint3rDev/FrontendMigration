@@ -17,6 +17,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
     const [quarterlyDate, setQuarterlyDate] = useState(''); // для квартального повтора - дата
     const [selectedQuarter, setSelectedQuarter] = useState(1); // для квартального повтора
     const [customDate, setCustomDate] = useState(''); // для кастомной даты
+    const [emailAddress, setEmailAddress] = useState(''); // для отправки отчета на email
 
     // Загружаем список оборудования при открытии модального окна
     useEffect(() => {
@@ -43,6 +44,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                 setQuarterlyDate('');
                 setSelectedQuarter(1);
                 setCustomDate('');
+                setEmailAddress('');
             }
         }
     }, [isOpen, editingTemplate]);
@@ -252,6 +254,21 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             return;
         }
 
+        // Валидация email адреса для повторяющихся отчетов
+        if (repeatType !== 'never' && !emailAddress.trim()) {
+            alert('Введите email адрес для отправки автоматических отчетов');
+            return;
+        }
+
+        // Валидация формата email
+        if (repeatType !== 'never' && emailAddress.trim()) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(emailAddress.trim())) {
+                alert('Введите корректный email адрес');
+                return;
+            }
+        }
+
         const templateData = {
             id: editingTemplate ? editingTemplate.id : Date.now().toString(),
             name: templateName.trim(),
@@ -267,6 +284,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
             quarterlyDate,
             selectedQuarter,
             customDate,
+            emailAddress: emailAddress.trim(),
             createdAt: editingTemplate ? editingTemplate.createdAt : new Date().toISOString(),
             lastUsed: null
         };
@@ -281,6 +299,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
         setSelectedReportType('');
         setSelectedColumns([]);
         setSelectedFormat('xlsx');
+        setEmailAddress('');
         onClose();
     };
 
@@ -534,6 +553,26 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                             <p className="auto-description">
                                 Отчет будет автоматически создаваться согласно выбранным настройкам
                             </p>
+                        )}
+
+                        {/* Поле для email адреса (только для повторяющихся отчетов) */}
+                        {repeatType !== 'never' && (
+                            <div className="email-section">
+                                <label className="form-label">
+                                    Email для отправки отчета <span className="required">*</span>
+                                </label>
+                                <input
+                                    type="email"
+                                    value={emailAddress}
+                                    onChange={(e) => setEmailAddress(e.target.value)}
+                                    placeholder="example@company.com"
+                                    className="form-input email-input"
+                                    required
+                                />
+                                <p className="email-description">
+                                    На этот адрес будут отправляться автоматически сгенерированные отчеты
+                                </p>
+                            </div>
                         )}
                     </div>
                 </div>
