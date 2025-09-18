@@ -375,3 +375,59 @@
         max-height: 120px;
     }
 }
+
+/* Стили для поля email */
+.email-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: var(--background, #1A1A2E);
+    color: var(--text-primary, #FFFFFF);
+}
+
+.email-input:focus {
+    outline: none;
+    border-color: var(--primary, #6C63FF);
+    box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.email-input:invalid {
+    border-color: var(--secondary, #FF6584);
+}
+
+.email-input:valid {
+    border-color: var(--accent, #4CAF50);
+}
+
+.email-input::placeholder {
+    color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.email-description {
+    margin-top: 8px;
+    font-size: 0.9rem;
+    color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+    font-style: italic;
+    line-height: 1.4;
+}
+
+.required {
+    color: var(--secondary, #FF6584);
+    font-weight: bold;
+}
+
+/* Адаптивность для поля email */
+@media (max-width: 768px) {
+    .email-input {
+        padding: 10px 14px;
+        font-size: 0.95rem;
+    }
+    
+    .email-description {
+        font-size: 0.85rem;
+    }
+}

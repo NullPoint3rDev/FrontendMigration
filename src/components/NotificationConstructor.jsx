@@ -11,6 +11,7 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
         equipmentGroupIds: [], // группы аппаратов (множественный выбор)
         equipmentIds: [], // аппараты (множественный выбор)
         timeThreshold: '', // время для превышения тока
+        emailAddress: '', // email для отправки уведомлений
         isActive: true
     });
 
@@ -182,6 +183,16 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
             newErrors.triggerValue = 'Значение триггера обязательно';
         }
 
+        // Валидация email адреса
+        if (!formData.emailAddress.trim()) {
+            newErrors.emailAddress = 'Email адрес обязателен';
+        } else {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(formData.emailAddress.trim())) {
+                newErrors.emailAddress = 'Введите корректный email адрес';
+            }
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -223,6 +234,7 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                 equipmentGroupIds: [],
                 equipmentIds: [],
                 timeThreshold: '',
+                emailAddress: '',
                 isActive: true
             });
             setExpandedNodes({});
@@ -345,6 +357,26 @@ const NotificationConstructor = ({ onTemplateCreated }) => {
                             placeholder="Описание уведомления (необязательно)"
                             rows="3"
                         />
+                    </div>
+
+                    {/* Email для отправки уведомлений */}
+                    <div className="form-group">
+                        <label className="form-label">
+                            Email для отправки уведомлений <span className="required">*</span>
+                        </label>
+                        <input
+                            type="email"
+                            name="emailAddress"
+                            value={formData.emailAddress}
+                            onChange={handleInputChange}
+                            className={`form-input email-input ${errors.emailAddress ? 'error' : ''}`}
+                            placeholder="example@company.com"
+                            required
+                        />
+                        {errors.emailAddress && <span className="error-message">{errors.emailAddress}</span>}
+                        <p className="email-description">
+                            На этот адрес будут отправляться уведомления при срабатывании триггера
+                        </p>
                     </div>
 
                     {/* Убрано: Тип уведомления */}
