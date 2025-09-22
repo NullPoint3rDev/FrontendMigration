@@ -103,6 +103,21 @@ const initialEquipment = [
         inventoryNumber: '',
         assignedWelders: []
     },
+    {
+        id: 7,
+        name: 'Блок мониторинга ОГК',
+        model: 'Блок мониторинга ОГК',
+        mac: '8CAAB50C4254',
+        department: 'Конструкторский отдел ALLOY',
+        status: '',
+        imageUrl: '/images/display_adaptive.png',
+        commissionDate: '',
+        manufactureYear: '',
+        lastService: '',
+        serialNumber: '',
+        inventoryNumber: '',
+        assignedWelders: []
+    },
 ];
 
 const navMenu = [
