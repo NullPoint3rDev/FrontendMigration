@@ -56,7 +56,7 @@ const DeviceMonitorPage = () => {
 
         const stompClient = new Client({
             brokerURL: undefined,
-            webSocketFactory: () => new SockJS('http://95.172.58.219:8084/api/ws'),
+            webSocketFactory: () => new SockJS('http://localhost:8084/api/ws'),
             reconnectDelay: 5000,
             onConnect: () => {
                 console.log('🔌 WebSocket подключен к сварочному аппарату');
@@ -103,7 +103,18 @@ const DeviceMonitorPage = () => {
             },
             onStompError: (error) => {
                 console.error('⚠️ WebSocket ошибка:', error);
+                console.error('⚠️ Детали ошибки:', {
+                    message: error.message,
+                    type: error.type,
+                    details: error.details
+                });
                 setError('Ошибка подключения к сварочному аппарату: ' + error.message);
+                setConnectionStatus('error');
+                setIsConnecting(false);
+            },
+            onWebSocketError: (error) => {
+                console.error('⚠️ WebSocket соединение ошибка:', error);
+                setError('Ошибка WebSocket соединения: ' + error.message);
                 setConnectionStatus('error');
                 setIsConnecting(false);
             }
