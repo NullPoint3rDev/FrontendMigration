@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { WEBSOCKET_URL } from '../config';
 import {
     Card,
     CardContent,
@@ -30,7 +31,7 @@ const WeldingDeviceMonitor = () => {
     useEffect(() => {
         const stompClient = new Client({
             brokerURL: undefined,
-            webSocketFactory: () => new SockJS('http://95.172.58.219:8084/api/ws'),
+            webSocketFactory: () => new SockJS(WEBSOCKET_URL),
             reconnectDelay: 5000,
             onConnect: () => {
                 console.log('🔌 Подключен к сварочному аппарату');

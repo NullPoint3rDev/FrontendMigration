@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { WEBSOCKET_URL } from '../config';
 import {
     Box,
     Card,
@@ -51,12 +52,15 @@ const DeviceMonitorPage = () => {
     }, []);
 
     const connectWebSocket = () => {
+        console.log('🔌 Попытка подключения к WebSocket...');
+        console.log('🌐 WebSocket URL:', WEBSOCKET_URL);
+        console.log('🌐 Current hostname:', window.location.hostname);
         setIsConnecting(true);
         setError(null);
 
         const stompClient = new Client({
             brokerURL: undefined,
-            webSocketFactory: () => new SockJS('http://localhost:8084/api/ws'),
+            webSocketFactory: () => new SockJS(WEBSOCKET_URL),
             reconnectDelay: 5000,
             onConnect: () => {
                 console.log('🔌 WebSocket подключен к сварочному аппарату');

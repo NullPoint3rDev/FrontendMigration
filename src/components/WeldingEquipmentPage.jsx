@@ -3,6 +3,7 @@ import '../styles/equipmentPage.css';
 import { useNavigate } from 'react-router-dom';
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
+import { WEBSOCKET_URL } from '../config';
 import { 
     createWeldingMachine, 
     updateWeldingMachine, 
@@ -93,7 +94,7 @@ function WeldingEquipmentPage() {
     useEffect(() => {
         const stompClient = new Client({
             brokerURL: undefined, // обязательно undefined, если используешь SockJS
-            webSocketFactory: () => new SockJS('http://95.172.58.219:8084/api/ws'),
+            webSocketFactory: () => new SockJS(WEBSOCKET_URL),
             reconnectDelay: 5000,
             onConnect: () => {
                 console.log('WebSocket подключен к сварочному аппарату');
