@@ -12,113 +12,7 @@ import {
     getAllWeldingMachineTypes
 } from '../api/weldingMachineApi';
 
-const initialEquipment = [
-    {
-        id: 1,
-        name: 'MC-501-MXPULSE',
-        model: 'MC-501-MXPULSE',
-        mac: '001A2B3C4D5E',
-        department: 'Конструкторский отдел ALLOY',
-        status: '',
-        imageUrl: '/images/mx_pulse.webp',
-        commissionDate: '',
-        manufactureYear: '',
-        lastService: '',
-        serialNumber: '',
-        inventoryNumber: '',
-        assignedWelders: []
-    },
-    {
-        id: 2,
-        name: 'T2',
-        model: 'T2',
-        mac: '001A2B3C4D5C',
-        department: 'Конструкторский отдел ALLOY',
-        status: '',
-        imageUrl: '/images/T2.jpg',
-        commissionDate: '',
-        manufactureYear: '',
-        lastService: '',
-        serialNumber: '',
-        inventoryNumber: '',
-        assignedWelders: []
-    },
-    {
-        id: 3,
-        name: 'MC500M1',
-        model: 'MC500M1',
-        mac: '001A2B3C4D5D',
-        department: 'Конструкторский отдел ALLOY',
-        status: '',
-        imageUrl: '/images/MC500M1.jpg',
-        commissionDate: '',
-        manufactureYear: '',
-        lastService: '',
-        serialNumber: '',
-        inventoryNumber: '',
-        assignedWelders: []
-    },
-    {
-        id: 4,
-        name: 'MC-1001A1',
-        model: 'MC-1001A1',
-        mac: '001A2B3C4D5F',
-        department: 'Конструкторский отдел ALLOY',
-        status: '',
-        imageUrl: '/images/MC-1001A1.jpg',
-        commissionDate: '',
-        manufactureYear: '',
-        lastService: '',
-        serialNumber: '',
-        inventoryNumber: '',
-        assignedWelders: []
-    },
-    {
-        id: 5,
-        name: 'МС-501 MX',
-        model: 'МС-501 MX',
-        mac: '001A2B3C4D5G',
-        department: 'Конструкторский отдел ALLOY',
-        status: '',
-        imageUrl: '/images/МС-501 MX.jpg',
-        commissionDate: '',
-        manufactureYear: '',
-        lastService: '',
-        serialNumber: '',
-        inventoryNumber: '',
-        assignedWelders: []
-    },
-    {
-        id: 6,
-        name: 'БМ 500',
-        model: 'БМ 500',
-        mac: '001A2B3C4D5C',
-        department: 'Конструкторский отдел ALLOY',
-        status: '',
-        imageUrl: '/images/БМ 500.jpg',
-        commissionDate: '',
-        manufactureYear: '',
-        lastService: '',
-        serialNumber: '',
-        inventoryNumber: '',
-        assignedWelders: []
-    },
-    {
-        id: 7,
-        name: 'Блок мониторинга ОГК',
-        model: 'Блок мониторинга ОГК',
-        mac: '8CAAB50C4254',
-        department: 'Конструкторский отдел ALLOY',
-        status: '',
-        imageUrl: '/images/display_adaptive.png',
-        commissionDate: '',
-        manufactureYear: '',
-        lastService: '',
-        serialNumber: '',
-        inventoryNumber: '',
-        assignedWelders: []
-    },
-];
+// Данные теперь загружаются с API сервера
 
 const navMenu = [
     { label: 'Главная', path: '/' },
@@ -188,20 +82,13 @@ function WeldingEquipmentPage() {
         }
     }, []);
 
-    // Load equipment from localStorage or use initial data
+    // Load equipment from API only
     useEffect(() => {
-        const savedEquipment = localStorage.getItem('equipment');
-        if (savedEquipment) {
-            setEquipment(JSON.parse(savedEquipment));
-        } else {
-            setEquipment(initialEquipment);
-        }
+        // Убираем загрузку из localStorage, используем только API
+        loadEquipment();
     }, []);
 
-    // Save equipment to localStorage when it changes
-    useEffect(() => {
-        localStorage.setItem('equipment', JSON.stringify(equipment));
-    }, [equipment]);
+    // Данные теперь хранятся в базе данных, localStorage не нужен
 
     useEffect(() => {
         const stompClient = new Client({
