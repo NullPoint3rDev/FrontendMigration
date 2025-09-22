@@ -145,7 +145,7 @@ const WeldingDeviceMonitor = () => {
                                 variant="outlined"
                             />
                             <Typography variant="body2" ml={2} color="textSecondary">
-                                MAC: 8CAAB579425A
+                                MAC: 8CAAB50C4254
                             </Typography>
                         </Box>
                         {lastUpdate && (

@@ -158,7 +158,7 @@ const DeviceMonitorPage = () => {
     const processStructuredData = (data) => {
         try {
             if (data.state && data.state.properties) {
-                const mac = '8CAAB579425A'; // MAC адрес сварочного аппарата
+                const mac = '8CAAB50C4254'; // MAC адрес сварочного аппарата
                 const params = {};
                 
                 // Извлекаем только ток из структурированных данных
