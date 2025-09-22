@@ -3,36 +3,7 @@ import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { WEBSOCKET_URL } from '../config';
-import {
-    Box,
-    Card,
-    CardContent,
-    Typography,
-    Grid,
-    Paper,
-    Chip,
-    Alert,
-    Divider,
-    List,
-    ListItem,
-    ListItemText,
-    ListItemIcon,
-    CircularProgress,
-    Button
-} from '@mui/material';
-import {
-    Wifi,
-    WifiOff,
-    Memory,
-    Speed,
-    Thermostat,
-    ElectricBolt,
-    Refresh,
-    Settings,
-    Warning,
-    CheckCircle,
-    Error
-} from '@mui/icons-material';
+import '../styles/deviceMonitor.css';
 
 const DeviceMonitorPage = () => {
     const [searchParams] = useSearchParams();
@@ -146,8 +117,8 @@ const DeviceMonitorPage = () => {
                     if (part.includes(':')) {
                         const [key, value] = part.split(':');
                         if (key && value) {
-                            // Показываем только ток
-                            if (key.trim() === 'State.I') {
+                            // Показываем ток и напряжение
+                            if (key.trim() === 'State.I' || key.trim() === 'State.U') {
                                 // Конвертируем hex в десятичное число
                                 const decimalValue = parseInt(value.trim(), 16);
                                 params[key.trim()] = decimalValue.toString();
@@ -176,11 +147,11 @@ const DeviceMonitorPage = () => {
                 const mac = '8CAAB50C4254'; // MAC адрес сварочного аппарата
                 const params = {};
                 
-                // Извлекаем только ток из структурированных данных
+                // Извлекаем ток и напряжение из структурированных данных
                 Object.entries(data.state.properties).forEach(([key, prop]) => {
                     if (prop && prop.value) {
-                        // Показываем только ток
-                        if (key === 'State.I') {
+                        // Показываем ток и напряжение
+                        if (key === 'State.I' || key === 'State.U') {
                             // Конвертируем hex в десятичное число
                             const decimalValue = parseInt(prop.value, 16);
                             params[key] = decimalValue.toString();
@@ -217,37 +188,39 @@ const DeviceMonitorPage = () => {
     const getParameterDisplayName = (key) => {
         switch (key) {
             case 'State.I': return 'Ток (А)';
+            case 'State.U': return 'Напряжение (В)';
             default: return key;
         }
     };
 
     const getStatusColor = (status) => {
         switch (status) {
-            case 'connected': return 'success';
-            case 'disconnected': return 'error';
-            case 'error': return 'warning';
-            default: return 'default';
+            case 'connected': return '#4CAF50';
+            case 'disconnected': return '#FF6584';
+            case 'error': return '#FF9800';
+            default: return '#9E9E9E';
         }
     };
 
     const getStatusIcon = (status) => {
         switch (status) {
-            case 'connected': return <CheckCircle />;
-            case 'disconnected': return <WifiOff />;
-            case 'error': return <Error />;
-            default: return <WifiOff />;
+            case 'connected': return '🟢';
+            case 'disconnected': return '🔴';
+            case 'error': return '🟡';
+            default: return '⚪';
         }
     };
 
     const getParameterIcon = (key) => {
         const lowerKey = key.toLowerCase();
-        if (lowerKey.includes('temp')) return <Thermostat />;
-        if (lowerKey.includes('speed')) return <Speed />;
-        if (lowerKey.includes('power')) return <ElectricBolt />;
-        if (lowerKey.includes('memory')) return <Memory />;
-        if (lowerKey.includes('status')) return <Settings />;
-        if (key === 'State.I') return <ElectricBolt />; // Иконка для тока
-        return <Settings />;
+        if (lowerKey.includes('temp')) return '🌡️';
+        if (lowerKey.includes('speed')) return '⚡';
+        if (lowerKey.includes('power')) return '🔌';
+        if (lowerKey.includes('memory')) return '💾';
+        if (lowerKey.includes('status')) return '⚙️';
+        if (key === 'State.I') return '⚡'; // Иконка для тока
+        if (key === 'State.U') return '🔋'; // Иконка для напряжения
+        return '⚙️';
     };
 
     const handleReconnect = () => {
@@ -263,189 +236,91 @@ const DeviceMonitorPage = () => {
     };
 
     return (
-        <Box sx={{ p: 3, backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-                <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
-                    📊 Мониторинг сварочного аппарата
-                </Typography>
-                <Button
-                    variant="outlined"
-                    onClick={handleBackToEquipment}
-                    sx={{ minWidth: '120px' }}
-                >
+        <div className="device-monitor-page">
+            <div className="device-monitor-header">
+                <h1 className="device-monitor-title">📊 Мониторинг сварочного аппарата</h1>
+                <button className="back-btn" onClick={handleBackToEquipment}>
                     ← Назад к оборудованию
-                </Button>
-            </Box>
+                </button>
+            </div>
             
             {/* Информация о выбранном аппарате */}
-            <Card sx={{ mb: 3, boxShadow: 2 }}>
-                <CardContent>
-                    <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: '#1976d2' }}>
-                        {machineName}
-                    </Typography>
-                    <Typography variant="body1" color="textSecondary">
-                        MAC-адрес: <strong>{machineMac}</strong>
-                    </Typography>
-                </CardContent>
-            </Card>
+            <div className="device-info-card">
+                <h2 className="device-name">{machineName}</h2>
+            </div>
 
             {/* Статус подключения */}
-            <Card sx={{ mb: 3, boxShadow: 3 }}>
-                <CardContent>
-                    <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap">
-                        <Box display="flex" alignItems="center" gap={2}>
-                            <Chip
-                                icon={getStatusIcon(connectionStatus)}
-                                label={connectionStatus === 'connected' ? 'Подключен' : 
-                                       connectionStatus === 'disconnected' ? 'Отключен' : 'Ошибка'}
-                                color={getStatusColor(connectionStatus)}
-                                variant="outlined"
-                                size="large"
-                            />
-                            <Typography variant="body1" color="textSecondary">
-                                MAC: <strong>{machineMac}</strong>
-                            </Typography>
-                            <Typography variant="body2" color="textSecondary">
-                                Сервер: <strong>95.172.58.219:8084</strong>
-                            </Typography>
-                        </Box>
-                        <Box display="flex" alignItems="center" gap={2}>
-                            {isConnecting && <CircularProgress size={20} />}
-                            <Button
-                                variant="outlined"
-                                startIcon={<Refresh />}
-                                onClick={handleReconnect}
-                                disabled={isConnecting}
-                            >
-                                Переподключиться
-                            </Button>
-                        </Box>
-                    </Box>
-                    {lastUpdate && (
-                        <Typography variant="body2" color="textSecondary" mt={1}>
-                            Последнее обновление: {lastUpdate.toLocaleTimeString()}
-                        </Typography>
-                    )}
-                </CardContent>
-            </Card>
+            <div className="status-card">
+                <div className="status-info">
+                    <div className="status-indicator">
+                        <span className="status-icon">{getStatusIcon(connectionStatus)}</span>
+                        <span className="status-text">
+                            {connectionStatus === 'connected' ? 'Подключен' : 
+                             connectionStatus === 'disconnected' ? 'Отключен' : 'Ошибка'}
+                        </span>
+                    </div>
+                    <button 
+                        className="reconnect-btn"
+                        onClick={handleReconnect}
+                        disabled={isConnecting}
+                    >
+                        {isConnecting ? '🔄' : '🔄'} Переподключиться
+                    </button>
+                </div>
+                {lastUpdate && (
+                    <div className="last-update">
+                        Последнее обновление: {lastUpdate.toLocaleTimeString()}
+                    </div>
+                )}
+            </div>
 
             {/* Ошибки */}
             {error && (
-                <Alert severity="error" sx={{ mb: 3 }}>
+                <div className="error-message">
                     {error}
-                </Alert>
+                </div>
             )}
 
-            <Grid container spacing={3}>
-                {/* Данные устройства */}
-                <Grid item xs={12} md={8}>
-                    <Card sx={{ boxShadow: 3 }}>
-                        <CardContent>
-                            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                                ⚡ Ток сварочного аппарата
-                            </Typography>
-                            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                            </Typography>
-                            <Divider sx={{ mb: 2 }} />
-                            
-                            {Object.keys(deviceData).length > 0 ? (
-                                <Grid container spacing={2}>
-                                    {Object.entries(deviceData).map(([mac, data]) => (
-                                        <Grid item xs={12} key={mac}>
-                                            <Paper elevation={2} sx={{ p: 2, backgroundColor: '#fafafa' }}>
-                                                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                                                    🔧 Сварочный аппарат ({mac})
-                                                </Typography>
-                                                
-                                                <Grid container spacing={2}>
-                                                    {Object.entries(data).map(([key, value]) => {
-                                                        if (key === 'timestamp') return null;
-                                                        
-                                                        return (
-                                                            <Grid item xs={12} key={key}>
-                                                                <Paper elevation={3} sx={{ p: 4, textAlign: 'center', backgroundColor: 'white', border: '3px solid #1976d2' }}>
-                                                                    <Box display="flex" alignItems="center" justifyContent="center" mb={3}>
-                                                                        {getParameterIcon(key)}
-                                                                        <Typography variant="h4" color="textSecondary" ml={2}>
-                                                                            {getParameterDisplayName(key)}
-                                                                        </Typography>
-                                                                    </Box>
-                                                                    <Typography variant="h1" fontWeight="bold" color="primary">
-                                                                        {value}
-                                                                    </Typography>
-                                                                </Paper>
-                                                            </Grid>
-                                                        );
-                                                    })}
-                                                </Grid>
-                                                
-                                                <Box mt={2}>
-                                                    <Typography variant="caption" color="textSecondary">
-                                                        Обновлено: {data.timestamp}
-                                                    </Typography>
-                                                </Box>
-                                            </Paper>
-                                        </Grid>
-                                    ))}
-                                </Grid>
-                            ) : (
-                                <Box textAlign="center" py={4}>
-                                    <Warning sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-                                    <Typography variant="body1" color="textSecondary">
-                                        {connectionStatus === 'connected' 
-                                            ? 'Ожидание данных тока от сварочного аппарата...' 
-                                            : 'Нет подключения к сварочному аппарату'}
-                                    </Typography>
-                                </Box>
-                            )}
-                        </CardContent>
-                    </Card>
-                </Grid>
-
-                {/* История сообщений */}
-                <Grid item xs={12} md={4}>
-                    <Card sx={{ boxShadow: 3 }}>
-                        <CardContent>
-                            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                                    📝 История сообщений
-                                </Typography>
-                                <Button
-                                    size="small"
-                                    onClick={clearHistory}
-                                    disabled={messageHistory.length === 0}
-                                >
-                                    Очистить
-                                </Button>
-                            </Box>
-                            <Divider sx={{ mb: 2 }} />
-                            
-                            {messageHistory.length > 0 ? (
-                                <List sx={{ maxHeight: 400, overflow: 'auto' }}>
-                                    {messageHistory.map((msg, index) => (
-                                        <ListItem key={index} sx={{ border: '1px solid #e0e0e0', mb: 1, borderRadius: 1 }}>
-                                            <ListItemIcon>
-                                                <CheckCircle color="success" />
-                                            </ListItemIcon>
-                                            <ListItemText
-                                                primary={msg.data.substring(0, 50) + (msg.data.length > 50 ? '...' : '')}
-                                                secondary={msg.timestamp.toLocaleTimeString()}
-                                            />
-                                        </ListItem>
-                                    ))}
-                                </List>
-                            ) : (
-                                <Box textAlign="center" py={2}>
-                                    <Typography variant="body2" color="textSecondary">
-                                        Нет сообщений
-                                    </Typography>
-                                </Box>
-                            )}
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
-        </Box>
+            {/* Данные устройства */}
+            <div className="device-data-section">
+                <h3 className="section-title">⚡ Параметры сварочного аппарата</h3>
+                
+                {Object.keys(deviceData).length > 0 ? (
+                    <div className="parameters-grid">
+                        {Object.entries(deviceData).map(([mac, data]) => (
+                            <div key={mac} className="device-parameters">
+                                {Object.entries(data).map(([key, value]) => {
+                                    if (key === 'timestamp') return null;
+                                    
+                                    return (
+                                        <div key={key} className="parameter-card">
+                                            <div className="parameter-header">
+                                                <span className="parameter-icon">{getParameterIcon(key)}</span>
+                                                <span className="parameter-name">{getParameterDisplayName(key)}</span>
+                                            </div>
+                                            <div className="parameter-value">{value}</div>
+                                        </div>
+                                    );
+                                })}
+                                
+                                <div className="update-time">
+                                    Обновлено: {data.timestamp}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="no-data">
+                        <div className="no-data-icon">⚠️</div>
+                        <p className="no-data-text">
+                            {connectionStatus === 'connected' 
+                                ? 'Ожидание данных от сварочного аппарата...' 
+                                : 'Нет подключения к сварочному аппарату'}
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
     );
 };
 
