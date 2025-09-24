@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { equipmentApi } from '../api/equipmentApi';
 import '../styles/reportPeriodModal.css';
 
 const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
@@ -6,9 +7,25 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
     const [customDateFrom, setCustomDateFrom] = useState('');
     const [customDateTo, setCustomDateTo] = useState('');
     const [format, setFormat] = useState('EXCEL');
-    // Убрано: выбор оборудования
+    const [equipment, setEquipment] = useState([]);
+    const [selectedEquipmentId, setSelectedEquipmentId] = useState('');
 
-    // Убрано: загрузка оборудования
+    // Загружаем список оборудования при открытии модального окна
+    useEffect(() => {
+        if (isOpen && reportType === 'equipment') {
+            loadEquipment();
+        }
+    }, [isOpen, reportType]);
+
+    const loadEquipment = async () => {
+        try {
+            const equipmentList = await equipmentApi.getEquipment();
+            setEquipment(equipmentList);
+            console.log('Загружено оборудование:', equipmentList);
+        } catch (error) {
+            console.error('Ошибка загрузки оборудования:', error);
+        }
+    };
 
     const periods = [
         { value: 'day', label: 'День', description: 'Отчет за текущий день' },
@@ -51,8 +68,8 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
             period: selectedPeriod,
             format,
             dateFrom: selectedPeriod === 'custom' ? customDateFrom : null,
-            dateTo: selectedPeriod === 'custom' ? customDateTo : null
-            // Убрано: equipmentId
+            dateTo: selectedPeriod === 'custom' ? customDateTo : null,
+            equipmentId: selectedEquipmentId || null
         };
 
         onGenerate(reportData);
@@ -78,7 +95,24 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
                 </div>
 
                 <div className="modal-body">
-                    {/* Убрано: выбор оборудования */}
+                    {/* Выбор оборудования для отчетов по оборудованию */}
+                    {reportType === 'equipment' && (
+                        <div className="equipment-selection">
+                            <h3>Выберите оборудование:</h3>
+                            <select 
+                                value={selectedEquipmentId} 
+                                onChange={(e) => setSelectedEquipmentId(e.target.value)}
+                                className="equipment-select"
+                            >
+                                <option value="">Все оборудование</option>
+                                {equipment.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                        {item.name} (MAC: {item.mac})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div className="period-selection">
                         <h3>Выберите период формирования отчета:</h3>
