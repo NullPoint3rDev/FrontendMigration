@@ -6,7 +6,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
     const [templateName, setTemplateName] = useState('');
     const [selectedReportType, setSelectedReportType] = useState('');
     const [selectedColumns, setSelectedColumns] = useState([]);
-    const [selectedFormat, setSelectedFormat] = useState('xlsx');
+    const [selectedFormat, setSelectedFormat] = useState('EXCEL');
     const [equipment, setEquipment] = useState([]);
     const [selectedMachine, setSelectedMachine] = useState('');
     const [repeatType, setRepeatType] = useState('never'); // never, daily, weekly, monthly, quarterly, custom
@@ -34,7 +34,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                 setTemplateName('');
                 setSelectedReportType('');
                 setSelectedColumns([]);
-                setSelectedFormat('xlsx');
+                setSelectedFormat('EXCEL');
                 setSelectedMachine('');
                 setRepeatType('never');
                 setAutoTime('09:00');
@@ -126,7 +126,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
 
     // Форматы отчетов
     const formats = [
-        { value: 'xlsx', label: 'Excel (.xlsx)', icon: '📊' },
+        { value: 'EXCEL', label: 'Excel (.xlsx)', icon: '📊' },
         { value: 'csv', label: 'CSV (.csv)', icon: '📋' }
     ];
 
@@ -298,7 +298,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
         setTemplateName('');
         setSelectedReportType('');
         setSelectedColumns([]);
-        setSelectedFormat('xlsx');
+        setSelectedFormat('EXCEL');
         setEmailAddress('');
         onClose();
     };
