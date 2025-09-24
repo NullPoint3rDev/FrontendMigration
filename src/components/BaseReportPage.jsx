@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import ReportPeriodModal from './ReportPeriodModal';
-import ReportsList from './ReportsList';
 import ReportViewer from './ReportViewer';
 import { reportApi, reportHelpers } from '../api/reportApi';
 import '../styles/baseReportPage.css';
@@ -106,20 +105,14 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
                     </button>
                 </div>
                 
-                {/* Список отчетов */}
-                <ReportsList 
-                    reportType={reportType} 
-                    reportName={title}
-                    onViewReport={(report) => {
-                        const template = {
-                            name: report.name,
-                            columns: Object.keys(report.data[0] || {}),
-                            format: report.format
-                        };
-                        setReportData(report.data);
-                        setSelectedReport(template);
-                    }}
-                />
+                {/* Информация о том, что отчеты скачиваются сразу */}
+                <div className="reports-info">
+                    <div className="info-icon">ℹ️</div>
+                    <div className="info-text">
+                        <h4>Отчеты скачиваются автоматически</h4>
+                        <p>После создания отчета файл будет автоматически скачан в папку "Загрузки"</p>
+                    </div>
+                </div>
             </div>
 
             <ReportPeriodModal

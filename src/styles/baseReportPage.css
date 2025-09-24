@@ -301,3 +301,35 @@
         padding: 15px;
     }
 }
+
+/* Информационный блок */
+.reports-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: rgba(108, 99, 255, 0.1);
+    border: 1px solid rgba(108, 99, 255, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 30px;
+    backdrop-filter: blur(10px);
+}
+
+.info-icon {
+    font-size: 2rem;
+    color: #6C63FF;
+}
+
+.info-text h4 {
+    margin: 0 0 8px 0;
+    color: #6C63FF;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.info-text p {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
+    line-height: 1.5;
+}
