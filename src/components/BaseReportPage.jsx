@@ -35,20 +35,45 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
             
             console.log('Отправляем запрос на сервер:', requestData);
             
-            // Вызываем API для генерации отчета
+            // Получаем данные для просмотра онлайн
+            const onlineData = await getReportDataForViewing(reportType, requestData);
+            
+            // Показываем отчет онлайн
+            if (onlineData && onlineData.length > 0) {
+                const template = {
+                    name: `${title} - ${new Date().toLocaleDateString('ru-RU')}`,
+                    columns: Object.keys(onlineData[0] || {}),
+                    format: reportData.format
+                };
+                
+                setReportData(onlineData);
+                setSelectedReport(template);
+                console.log('Отчет показан онлайн с реальными данными');
+            }
+            
+            // Также скачиваем файл
             const blob = await reportApi.generateReport(reportType, requestData);
             const filename = reportHelpers.getReportFilename(reportType, reportData.format);
-            
-            // Скачиваем файл
             reportHelpers.downloadReport(blob, filename);
             
-            console.log('Отчет успешно сгенерирован и скачан');
+            console.log('Отчет успешно сгенерирован, показан онлайн и скачан');
             
         } catch (error) {
             console.error('Ошибка генерации отчета:', error);
             alert('Ошибка при генерации отчета: ' + error.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const getReportDataForViewing = async (reportType, requestData) => {
+        try {
+            // Получаем данные отчета для просмотра онлайн
+            const data = await reportApi.getReportDataForViewing(reportType, requestData);
+            return data;
+        } catch (error) {
+            console.error('Ошибка получения данных для просмотра:', error);
+            return null;
         }
     };
 
@@ -105,12 +130,12 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
                     </button>
                 </div>
                 
-                {/* Информация о том, что отчеты скачиваются сразу */}
+                {/* Информация о том, что отчеты показываются онлайн и скачиваются */}
                 <div className="reports-info">
                     <div className="info-icon">ℹ️</div>
                     <div className="info-text">
-                        <h4>Отчеты скачиваются автоматически</h4>
-                        <p>После создания отчета файл будет автоматически скачан в папку "Загрузки"</p>
+                        <h4>Отчеты показываются онлайн и скачиваются</h4>
+                        <p>После создания отчета он будет показан на экране и автоматически скачан в папку "Загрузки"</p>
                     </div>
                 </div>
             </div>

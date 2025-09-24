@@ -195,6 +195,29 @@ export const reportApi = {
         }
     },
 
+    // Получить данные отчета для просмотра онлайн
+    getReportDataForViewing: async (reportType, requestData) => {
+        try {
+            const res = await fetch(`${BASE_URL}/data/${reportType}`, {
+                method: 'POST',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+            
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            
+            return await res.json();
+        } catch (error) {
+            console.error('Ошибка получения данных отчета для просмотра:', error);
+            throw error;
+        }
+    },
+
     // Удалить отчет
     deleteReport: async (reportId) => {
         try {

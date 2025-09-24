@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import CreateTemplateModal from './CreateTemplateModal';
 import ReportPeriodModal from './ReportPeriodModal';
 import ReportViewer from './ReportViewer';
-import { reportHelpers } from '../api/reportApi';
+import {reportApi, reportHelpers} from '../api/reportApi';
 import '../styles/myReportsPage.css';
 
 const MyReportsPage = () => {
@@ -14,6 +14,8 @@ const MyReportsPage = () => {
     const [isReportPeriodModalOpen, setIsReportPeriodModalOpen] = useState(false);
     const [currentTemplate, setCurrentTemplate] = useState(null);
     const [generatedReports, setGeneratedReports] = useState([]);
+    const [selectedTemplate, setSelectedTemplate] = useState(null);
+    const [reportData, setReportData] = useState(null);
 
     // Загружаем шаблоны и отчеты при монтировании компонента
     useEffect(() => {
@@ -270,14 +272,28 @@ const MyReportsPage = () => {
             
             console.log('Отправляем запрос на сервер:', requestData);
             
-            // Вызываем API для генерации отчета
+            // Получаем данные для просмотра онлайн
+            const onlineData = await getReportDataForViewing(currentTemplate.reportType, requestData);
+            
+            // Показываем отчет онлайн
+            if (onlineData && onlineData.length > 0) {
+                const template = {
+                    name: `${currentTemplate.name} - ${new Date().toLocaleDateString('ru-RU')}`,
+                    columns: Object.keys(onlineData[0] || {}),
+                    format: currentTemplate.format
+                };
+                
+                setReportData(onlineData);
+                setSelectedTemplate(template);
+                console.log('Отчет по шаблону показан онлайн с реальными данными');
+            }
+            
+            // Также скачиваем файл
             const blob = await reportApi.generateReport(currentTemplate.reportType, requestData);
             const filename = reportHelpers.getReportFilename(currentTemplate.reportType, currentTemplate.format);
-            
-            // Скачиваем файл
             reportHelpers.downloadReport(blob, filename);
             
-            console.log('Отчет по шаблону успешно сгенерирован и скачан');
+            console.log('Отчет по шаблону успешно сгенерирован, показан онлайн и скачан');
             
             // Обновляем lastUsed в шаблоне
             const updatedTemplates = templates.map(t => 
@@ -295,6 +311,22 @@ const MyReportsPage = () => {
             setIsReportPeriodModalOpen(false);
             setCurrentTemplate(null);
         }
+    };
+
+    const getReportDataForViewing = async (reportType, requestData) => {
+        try {
+            // Получаем данные отчета для просмотра онлайн
+            const data = await reportApi.getReportDataForViewing(reportType, requestData);
+            return data;
+        } catch (error) {
+            console.error('Ошибка получения данных для просмотра:', error);
+            return null;
+        }
+    };
+
+    const handleCloseReport = () => {
+        setReportData(null);
+        setSelectedTemplate(null);
     };
 
     const handleOpenReport = async (template) => {
@@ -701,6 +733,14 @@ const MyReportsPage = () => {
                 reportType={currentTemplate?.reportType || 'equipment'}
             />
 
+            {/* Компонент просмотра отчета */}
+            {reportData && selectedTemplate && (
+                <ReportViewer
+                    data={reportData}
+                    template={selectedTemplate}
+                    onClose={handleCloseReport}
+                />
+            )}
             
         </div>
     );
