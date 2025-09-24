@@ -21,39 +21,29 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
             console.log('Генерируем отчет:', reportData);
             console.log('Формат из модального окна:', reportData.format);
             
-            // Генерируем данные отчета
-            const data = reportHelpers.generateReportData(reportType, 50);
+            // Создаем запрос для API
+            const requestData = reportHelpers.createReportRequest(
+                reportType,
+                reportData.format,
+                reportData.dateFrom,
+                reportData.dateTo,
+                reportData.period,
+                {
+                    weldingMachineId: reportData.equipmentId || null,
+                    welderId: reportData.welderId || null
+                }
+            );
             
-            // Создаем объект отчета для сохранения
-            const report = {
-                id: `report_${reportType}_${Date.now()}`,
-                name: `${title} - ${new Date().toLocaleDateString('ru-RU')}`,
-                reportType: reportType,
-                format: reportData.format === 'EXCEL' ? 'xlsx' : reportData.format.toLowerCase(),
-                period: reportData.period,
-                dateFrom: reportData.dateFrom,
-                dateTo: reportData.dateTo,
-                equipmentId: reportData.equipmentId,
-                data: data,
-                createdAt: new Date().toISOString(),
-                rowCount: data.length
-            };
+            console.log('Отправляем запрос на сервер:', requestData);
             
-            // Сохраняем отчет (пока в localStorage, потом можно на сервер)
-            const savedReports = JSON.parse(localStorage.getItem('savedReports') || '[]');
-            savedReports.push(report);
-            localStorage.setItem('savedReports', JSON.stringify(savedReports));
+            // Вызываем API для генерации отчета
+            const blob = await reportApi.generateReport(reportType, requestData);
+            const filename = reportHelpers.getReportFilename(reportType, reportData.format);
             
-            // Создаем template для ReportViewer
-            const template = {
-                name: report.name,
-                columns: Object.keys(data[0] || {}),
-                format: report.format
-            };
+            // Скачиваем файл
+            reportHelpers.downloadReport(blob, filename);
             
-            // Показываем отчет онлайн
-            setReportData(data);
-            setSelectedReport(template);
+            console.log('Отчет успешно сгенерирован и скачан');
             
         } catch (error) {
             console.error('Ошибка генерации отчета:', error);
