@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { equipmentApi } from '../api/equipmentApi';
+import { getAllWeldingMachines } from '../api/weldingMachineApi';
 import '../styles/reportPeriodModal.css';
 
 const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
@@ -19,7 +19,7 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
 
     const loadEquipment = async () => {
         try {
-            const equipmentList = await equipmentApi.getEquipment();
+            const equipmentList = await getAllWeldingMachines();
             setEquipment(equipmentList);
             console.log('Загружено оборудование:', equipmentList);
         } catch (error) {
