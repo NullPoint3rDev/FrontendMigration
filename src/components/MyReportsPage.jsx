@@ -10,8 +10,6 @@ const MyReportsPage = () => {
     const [templates, setTemplates] = useState([]);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState(null);
-    const [selectedTemplate, setSelectedTemplate] = useState(null);
-    const [reportData, setReportData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [isReportPeriodModalOpen, setIsReportPeriodModalOpen] = useState(false);
     const [currentTemplate, setCurrentTemplate] = useState(null);
@@ -254,45 +252,32 @@ const MyReportsPage = () => {
 
         setLoading(true);
         try {
-            // Генерируем данные отчета на основе типа отчета из шаблона
-            const data = reportHelpers.generateReportData(currentTemplate.reportType, 50);
+            console.log('Генерируем отчет по шаблону:', currentTemplate);
+            console.log('Данные отчета:', reportData);
             
-            // Добавляем столбцы Дата и Время в начало данных
-            const dataWithDateTime = data.map((row, index) => ({
-                'Дата': new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('ru-RU'),
-                'Время': new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-                ...row
-            }));
-
-            // Создаем объект отчета для сохранения
-            const report = {
-                id: `report_${currentTemplate.reportType}_${Date.now()}`,
-                name: `${currentTemplate.name} - ${new Date().toLocaleDateString('ru-RU')}`,
-                reportType: currentTemplate.reportType,
-                format: currentTemplate.format,
-                period: reportData.period,
-                dateFrom: reportData.dateFrom,
-                dateTo: reportData.dateTo,
-                equipmentId: reportData.equipmentId,
-                data: dataWithDateTime,
-                createdAt: new Date().toISOString(),
-                rowCount: dataWithDateTime.length,
-                templateId: currentTemplate.id
-            };
+            // Создаем запрос для API
+            const requestData = reportHelpers.createReportRequest(
+                currentTemplate.reportType,
+                currentTemplate.format,
+                reportData.dateFrom,
+                reportData.dateTo,
+                reportData.period,
+                {
+                    weldingMachineId: reportData.equipmentId || null,
+                    welderId: reportData.welderId || null
+                }
+            );
             
-            // Сохраняем отчет
-            const updatedReports = [...generatedReports, report];
-            saveGeneratedReports(updatedReports);
+            console.log('Отправляем запрос на сервер:', requestData);
             
-            // Показываем отчет онлайн
-            const template = {
-                name: report.name,
-                columns: ['Дата', 'Время', ...currentTemplate.columns],
-                format: report.format
-            };
+            // Вызываем API для генерации отчета
+            const blob = await reportApi.generateReport(currentTemplate.reportType, requestData);
+            const filename = reportHelpers.getReportFilename(currentTemplate.reportType, currentTemplate.format);
             
-            setReportData(dataWithDateTime);
-            setSelectedTemplate(template);
+            // Скачиваем файл
+            reportHelpers.downloadReport(blob, filename);
+            
+            console.log('Отчет по шаблону успешно сгенерирован и скачан');
             
             // Обновляем lastUsed в шаблоне
             const updatedTemplates = templates.map(t => 
@@ -313,28 +298,9 @@ const MyReportsPage = () => {
     };
 
     const handleOpenReport = async (template) => {
-        setLoading(true);
-        try {
-            // Здесь будет логика генерации отчета на основе шаблона
-            // Пока что создаем тестовые данные
-            const mockData = generateMockReportData(template);
-            
-            setReportData(mockData);
-            setSelectedTemplate(template);
-
-            // Обновляем время последнего использования
-            const updatedTemplates = templates.map(t => 
-                t.id === template.id 
-                    ? { ...t, lastUsed: new Date().toISOString() }
-                    : t
-            );
-            saveTemplates(updatedTemplates);
-        } catch (error) {
-            console.error('Ошибка открытия отчета:', error);
-            alert('Ошибка при открытии отчета');
-        } finally {
-            setLoading(false);
-        }
+        // Просто открываем модальное окно для создания отчета
+        setCurrentTemplate(template);
+        setIsReportPeriodModalOpen(true);
     };
 
     const generateMockReportData = (template) => {
@@ -407,10 +373,6 @@ const MyReportsPage = () => {
         return mockData;
     };
 
-    const handleCloseReport = () => {
-        setReportData(null);
-        setSelectedTemplate(null);
-    };
 
     const handleDownloadReport = async (report) => {
         try {
@@ -670,8 +632,7 @@ const MyReportsPage = () => {
                                                                         columns: Object.keys(report.data[0] || {}),
                                                                         format: report.format
                                                                     };
-                                                                    setReportData(report.data);
-                                                                    setSelectedTemplate(template);
+                                                                    // Отчеты теперь скачиваются сразу, просмотр не требуется
                                                                 } else {
                                                                     // Для отчетов из API проверяем, есть ли данные
                                                                     if (report.reportData && Array.isArray(report.reportData) && report.reportData.length > 0) {
@@ -681,8 +642,7 @@ const MyReportsPage = () => {
                                                                             columns: Object.keys(report.reportData[0] || {}),
                                                                             format: report.format
                                                                         };
-                                                                        setReportData(report.reportData);
-                                                                        setSelectedTemplate(template);
+                                                                        // Отчеты теперь скачиваются сразу, просмотр не требуется
                                                                     } else {
                                                                         // Если данных нет, показываем сообщение
                                                                         alert('Данные отчета недоступны для просмотра. Это автоматически сгенерированный отчет.');
@@ -741,14 +701,6 @@ const MyReportsPage = () => {
                 reportType={currentTemplate?.reportType || 'equipment'}
             />
 
-            {/* Компонент просмотра отчета */}
-            {reportData && selectedTemplate && (
-                <ReportViewer
-                    data={reportData}
-                    template={selectedTemplate}
-                    onClose={handleCloseReport}
-                />
-            )}
             
         </div>
     );
