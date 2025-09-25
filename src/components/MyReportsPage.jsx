@@ -272,6 +272,7 @@ const MyReportsPage = () => {
                 );
             
             console.log('Отправляем запрос на сервер:', requestData);
+            console.log('Выбранные столбцы из шаблона:', currentTemplate.selectedColumns);
             
             // Получаем данные для просмотра онлайн
             const onlineData = await getReportDataForViewing(currentTemplate.reportType, requestData);
