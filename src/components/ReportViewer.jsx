@@ -22,9 +22,9 @@ const ReportViewer = ({ data, template, onClose }) => {
     
     // Создаем массив столбцов для отображения
     const columns = [
-        { field: 'startTime', header: 'Дата', type: 'date' },
-        { field: 'startTime', header: 'Время', type: 'time' },
-        ...selectedColumns.map(col => columnMapping[col]).filter(Boolean)
+        { field: 'startTime', header: 'Дата', type: 'date', key: 'date' },
+        { field: 'startTime', header: 'Время', type: 'time', key: 'time' },
+        ...selectedColumns.map(col => ({ ...columnMapping[col], key: columnMapping[col]?.field })).filter(Boolean)
     ];
     
     // Сортировка данных - всегда вызываем useMemo
@@ -159,7 +159,7 @@ const ReportViewer = ({ data, template, onClose }) => {
                             <tr>
                                 {columns.map(column => (
                                     <th 
-                                        key={column.field}
+                                        key={column.key}
                                         onClick={() => handleSort(column)}
                                         className={`sortable ${sortConfig.key === column.field ? 'sorted' : ''}`}
                                     >
@@ -175,7 +175,7 @@ const ReportViewer = ({ data, template, onClose }) => {
                             {processedData.map((row, index) => (
                                 <tr key={index}>
                                     {columns.map(column => (
-                                        <td key={column.field}>
+                                        <td key={column.key}>
                                             {(() => {
                                                 let value = row[column.field];
                                                 if (column.type === 'date' && value) {
