@@ -5,16 +5,21 @@ import '../styles/reportViewer.css';
 const ReportViewer = ({ data, template, onClose }) => {
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
-    // Маппинг между названиями столбцов в шаблоне и полями в данных
+    // Маппинг между полями в данных и их отображаемыми названиями
     const columnMapping = {
-        'Сварщик': { field: 'welderName', header: 'Сварщик' },
-        'Режим': { field: 'weldingMode', header: 'Режим' },
-        'Сила тока': { field: 'current', header: 'Сила тока, А' },
-        'Масса проволоки': { field: 'wireConsumption', header: 'Масса проволоки, кг' },
-        'Напряжение': { field: 'voltage', header: 'Напряжение, V' },
-        'Проволока': { field: 'wireFeedRate', header: 'Проволока, м/мин' },
-        'Газ л/мин': { field: 'gasFlow', header: 'Газ, л/мин' },
-        'Время сварки (с)': { field: 'weldingTime', header: 'Время сварки (с)' }
+        'welderName': { field: 'welderName', header: 'Сварщик' },
+        'weldingMode': { field: 'weldingMode', header: 'Режим' },
+        'current': { field: 'current', header: 'Сила тока, А' },
+        'wireConsumption': { field: 'wireConsumption', header: 'Масса проволоки, кг' },
+        'voltage': { field: 'voltage', header: 'Напряжение, V' },
+        'wireFeedRate': { field: 'wireFeedRate', header: 'Проволока, м/мин' },
+        'gasFlow': { field: 'gasFlow', header: 'Газ, л/мин' },
+        'weldingTime': { field: 'weldingTime', header: 'Время сварки (с)' },
+        'weldingMachineName': { field: 'weldingMachineName', header: 'Оборудование' },
+        'weldingMachineSerialNumber': { field: 'weldingMachineSerialNumber', header: 'Серийный номер' },
+        'weldingType': { field: 'weldingType', header: 'Тип сварки' },
+        'organizationUnitName': { field: 'organizationUnitName', header: 'Подразделение' },
+        'notes': { field: 'notes', header: 'Примечания' }
     };
 
     // Получаем столбцы из шаблона с защитой от undefined
