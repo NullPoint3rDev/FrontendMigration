@@ -8,6 +8,14 @@ const ReportViewer = ({ data, template, onClose }) => {
     // Получаем столбцы из шаблона с защитой от undefined
     const columns = template?.columns || [];
     
+    // Отладочная информация
+    console.log('ReportViewer получил:', {
+        template: template,
+        columns: columns,
+        selectedColumns: template?.selectedColumns,
+        dataLength: data?.length
+    });
+    
     // Сортировка данных - всегда вызываем useMemo
     const processedData = useMemo(() => {
         if (!data || !Array.isArray(data) || data.length === 0) return [];
