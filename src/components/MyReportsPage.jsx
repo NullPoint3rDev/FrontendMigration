@@ -279,7 +279,7 @@ const MyReportsPage = () => {
             if (onlineData && onlineData.length > 0) {
                 const template = {
                     name: `${currentTemplate.name} - ${new Date().toLocaleDateString('ru-RU')}`,
-                    columns: Object.keys(onlineData[0] || {}),
+                    columns: currentTemplate.columns, // Используем выбранные столбцы из шаблона
                     format: currentTemplate.format
                 };
                 
