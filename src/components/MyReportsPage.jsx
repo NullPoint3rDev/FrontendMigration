@@ -258,17 +258,18 @@ const MyReportsPage = () => {
             console.log('Данные отчета:', reportData);
             
             // Создаем запрос для API
-            const requestData = reportHelpers.createReportRequest(
-                currentTemplate.reportType,
-                currentTemplate.format,
-                reportData.dateFrom,
-                reportData.dateTo,
-                reportData.period,
-                {
-                    weldingMachineId: reportData.equipmentId || null,
-                    welderId: reportData.welderId || null
-                }
-            );
+                const requestData = reportHelpers.createReportRequest(
+                    currentTemplate.reportType,
+                    currentTemplate.format,
+                    reportData.dateFrom,
+                    reportData.dateTo,
+                    reportData.period,
+                    {
+                        weldingMachineId: reportData.equipmentId || null,
+                        welderId: reportData.welderId || null,
+                        selectedColumns: currentTemplate.selectedColumns || []
+                    }
+                );
             
             console.log('Отправляем запрос на сервер:', requestData);
             

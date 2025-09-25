@@ -29,7 +29,8 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
                 reportData.period,
                 {
                     weldingMachineId: reportData.equipmentId || null,
-                    welderId: reportData.welderId || null
+                    welderId: reportData.welderId || null,
+                    selectedColumns: [] // Пустой массив означает все столбцы
                 }
             );
             
