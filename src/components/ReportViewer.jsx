@@ -20,12 +20,30 @@ const ReportViewer = ({ data, template, onClose }) => {
     // Получаем столбцы из шаблона с защитой от undefined
     const selectedColumns = template?.columns || [];
     
+    // Отладочная информация
+    console.log('Selected columns from template:', selectedColumns);
+    console.log('Column mapping:', columnMapping);
+    
     // Создаем массив столбцов для отображения
+    const mappedColumns = selectedColumns.map(col => {
+        const mapping = columnMapping[col];
+        if (mapping) {
+            return { ...mapping, key: mapping.field };
+        } else {
+            console.warn(`No mapping found for column: ${col}`);
+            return null;
+        }
+    }).filter(Boolean);
+    
+    console.log('Mapped columns:', mappedColumns);
+    
     const columns = [
         { field: 'startTime', header: 'Дата', type: 'date', key: 'date' },
         { field: 'startTime', header: 'Время', type: 'time', key: 'time' },
-        ...selectedColumns.map(col => ({ ...columnMapping[col], key: columnMapping[col]?.field })).filter(Boolean)
+        ...mappedColumns
     ];
+    
+    console.log('Final columns array:', columns);
     
     // Сортировка данных - всегда вызываем useMemo
     const processedData = useMemo(() => {
