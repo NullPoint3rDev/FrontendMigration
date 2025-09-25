@@ -5,8 +5,27 @@ import '../styles/reportViewer.css';
 const ReportViewer = ({ data, template, onClose }) => {
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
+    // Маппинг между названиями столбцов в шаблоне и полями в данных
+    const columnMapping = {
+        'Сварщик': { field: 'welderName', header: 'Сварщик' },
+        'Режим': { field: 'weldingMode', header: 'Режим' },
+        'Сила тока': { field: 'current', header: 'Сила тока, А' },
+        'Масса проволоки': { field: 'wireConsumption', header: 'Масса проволоки, кг' },
+        'Напряжение': { field: 'voltage', header: 'Напряжение, V' },
+        'Проволока': { field: 'wireFeedRate', header: 'Проволока, м/мин' },
+        'Газ л/мин': { field: 'gasFlow', header: 'Газ, л/мин' },
+        'Время сварки (с)': { field: 'weldingTime', header: 'Время сварки (с)' }
+    };
+
     // Получаем столбцы из шаблона с защитой от undefined
-    const columns = template?.columns || [];
+    const selectedColumns = template?.columns || [];
+    
+    // Создаем массив столбцов для отображения
+    const columns = [
+        { field: 'startTime', header: 'Дата', type: 'date' },
+        { field: 'startTime', header: 'Время', type: 'time' },
+        ...selectedColumns.map(col => columnMapping[col]).filter(Boolean)
+    ];
     
     // Сортировка данных - всегда вызываем useMemo
     const processedData = useMemo(() => {
@@ -56,16 +75,24 @@ const ReportViewer = ({ data, template, onClose }) => {
 
     const handleSort = (column) => {
         setSortConfig(prev => ({
-            key: column,
-            direction: prev.key === column && prev.direction === 'asc' ? 'desc' : 'asc'
+            key: column.field,
+            direction: prev.key === column.field && prev.direction === 'asc' ? 'desc' : 'asc'
         }));
     };
 
     const exportToCSV = () => {
         const csvContent = [
-            columns.join(','),
+            columns.map(col => col.header).join(','),
             ...processedData.map(row => 
-                columns.map(column => `"${row[column] || ''}"`).join(',')
+                columns.map(column => {
+                    let value = row[column.field];
+                    if (column.type === 'date' && value) {
+                        value = new Date(value).toLocaleDateString();
+                    } else if (column.type === 'time' && value) {
+                        value = new Date(value).toLocaleTimeString();
+                    }
+                    return `"${value || ''}"`;
+                }).join(',')
             )
         ].join('\n');
 
@@ -103,7 +130,7 @@ const ReportViewer = ({ data, template, onClose }) => {
     };
 
     const getSortIcon = (column) => {
-        if (sortConfig.key !== column) return '↕️';
+        if (sortConfig.key !== column.field) return '↕️';
         return sortConfig.direction === 'asc' ? '↑' : '↓';
     };
 
@@ -132,12 +159,12 @@ const ReportViewer = ({ data, template, onClose }) => {
                             <tr>
                                 {columns.map(column => (
                                     <th 
-                                        key={column}
+                                        key={column.field}
                                         onClick={() => handleSort(column)}
-                                        className={`sortable ${sortConfig.key === column ? 'sorted' : ''}`}
+                                        className={`sortable ${sortConfig.key === column.field ? 'sorted' : ''}`}
                                     >
                                         <div className="th-content">
-                                            <span>{column}</span>
+                                            <span>{column.header}</span>
                                             <span className="sort-icon">{getSortIcon(column)}</span>
                                         </div>
                                     </th>
@@ -148,8 +175,16 @@ const ReportViewer = ({ data, template, onClose }) => {
                             {processedData.map((row, index) => (
                                 <tr key={index}>
                                     {columns.map(column => (
-                                        <td key={column}>
-                                            {row[column] || '-'}
+                                        <td key={column.field}>
+                                            {(() => {
+                                                let value = row[column.field];
+                                                if (column.type === 'date' && value) {
+                                                    return new Date(value).toLocaleDateString();
+                                                } else if (column.type === 'time' && value) {
+                                                    return new Date(value).toLocaleTimeString();
+                                                }
+                                                return value || '-';
+                                            })()}
                                         </td>
                                     ))}
                                 </tr>
