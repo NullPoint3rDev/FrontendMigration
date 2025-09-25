@@ -272,7 +272,6 @@ const MyReportsPage = () => {
                 );
             
             console.log('Отправляем запрос на сервер:', requestData);
-            console.log('Выбранные столбцы из шаблона:', currentTemplate.selectedColumns);
             
             // Получаем данные для просмотра онлайн
             const onlineData = await getReportDataForViewing(currentTemplate.reportType, requestData);
@@ -744,16 +743,6 @@ const MyReportsPage = () => {
                 />
             )}
             
-            {/* Отладочная информация */}
-            {reportData && selectedTemplate && (
-                <div style={{position: 'fixed', top: '10px', right: '10px', background: 'white', padding: '10px', border: '1px solid black', zIndex: 9999}}>
-                    <h4>Отладка:</h4>
-                    <p>Шаблон: {selectedTemplate.name}</p>
-                    <p>Столбцы в шаблоне: {JSON.stringify(selectedTemplate.columns)}</p>
-                    <p>Выбранные столбцы: {JSON.stringify(selectedTemplate.selectedColumns)}</p>
-                    <p>Количество данных: {reportData.length}</p>
-                </div>
-            )}
             
         </div>
     );

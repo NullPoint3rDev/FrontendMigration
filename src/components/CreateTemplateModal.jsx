@@ -58,8 +58,9 @@ const CreateTemplateModal = ({ isOpen, onClose, onCreate, editingTemplate = null
                 const filteredColumns = selectedColumns.filter(col => availableColumns.includes(col));
                 setSelectedColumns(filteredColumns.length > 0 ? filteredColumns : availableColumns);
             } else {
-                // При создании нового шаблона выбираем все доступные столбцы
-                setSelectedColumns(reportTypeColumns[selectedReportType]);
+                // При создании нового шаблона НЕ выбираем столбцы автоматически
+                // Пользователь должен сам выбрать нужные столбцы
+                setSelectedColumns([]);
             }
         } else if (!selectedReportType) {
             // Если тип отчета не выбран, очищаем выбор столбцов
