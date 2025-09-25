@@ -267,11 +267,10 @@ const MyReportsPage = () => {
                     {
                         weldingMachineId: reportData.equipmentId || null,
                         welderId: reportData.welderId || null,
-                        selectedColumns: currentTemplate.selectedColumns || []
+                        selectedColumns: currentTemplate.columns || []
                     }
                 );
             
-            console.log('Отправляем запрос на сервер:', requestData);
             
             // Получаем данные для просмотра онлайн
             const onlineData = await getReportDataForViewing(currentTemplate.reportType, requestData);
