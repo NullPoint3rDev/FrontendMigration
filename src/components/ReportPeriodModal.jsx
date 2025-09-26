@@ -57,8 +57,19 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
 
     const handleGenerate = () => {
         if (selectedPeriod === 'custom' && (!customDateFrom || !customDateTo)) {
-            alert('Для кастомного периода выберите даты начала и окончания');
+            alert('Для кастомного периода выберите даты и время начала и окончания');
             return;
+        }
+
+        // Проверяем, что время начала не позже времени окончания
+        if (selectedPeriod === 'custom' && customDateFrom && customDateTo) {
+            const startDate = new Date(customDateFrom);
+            const endDate = new Date(customDateTo);
+            
+            if (startDate >= endDate) {
+                alert('Время начала должно быть раньше времени окончания');
+                return;
+            }
         }
 
         // Убрано: валидация оборудования
@@ -140,17 +151,17 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
                             <h3>Выберите период:</h3>
                             <div className="date-inputs">
                                 <div className="date-input">
-                                    <label>Дата начала:</label>
+                                    <label>Дата и время начала:</label>
                                     <input
-                                        type="date"
+                                        type="datetime-local"
                                         value={customDateFrom}
                                         onChange={(e) => setCustomDateFrom(e.target.value)}
                                     />
                                 </div>
                                 <div className="date-input">
-                                    <label>Дата окончания:</label>
+                                    <label>Дата и время окончания:</label>
                                     <input
-                                        type="date"
+                                        type="datetime-local"
                                         value={customDateTo}
                                         onChange={(e) => setCustomDateTo(e.target.value)}
                                     />
