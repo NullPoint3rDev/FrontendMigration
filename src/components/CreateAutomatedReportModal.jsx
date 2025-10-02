@@ -7,7 +7,9 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
         templateId: '',
         templateName: '',
         triggers: [],
-        isActive: true
+        isActive: true,
+        emailNotifications: false,
+        emailRecipients: ''
     });
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -61,7 +63,9 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
             templateId: '',
             templateName: '',
             triggers: [],
-            isActive: true
+            isActive: true,
+            emailNotifications: false,
+            emailRecipients: ''
         });
         setTriggerType('');
         setTriggerValue('');
@@ -378,6 +382,8 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
             templateName: formData.templateName,
             triggers: cleanTriggers, // Отправляем очищенные триггеры
             isActive: formData.isActive,
+            emailNotifications: formData.emailNotifications,
+            emailRecipients: formData.emailRecipients,
             lastRun: null,
             nextRun: nextRun ? nextRun.toISOString().replace('Z', '').replace(/\.\d{3}$/, '') : null, // Убираем Z и миллисекунды для Java LocalDateTime
             createdAt: new Date().toISOString().replace('Z', '').replace(/\.\d{3}$/, ''), // Убираем Z и миллисекунды для Java LocalDateTime
@@ -589,6 +595,37 @@ const CreateAutomatedReportModal = ({ open, onClose, onSave }) => {
                             Активировать автоматический отчет сразу после создания
                         </label>
                     </div>
+
+                    <div className="form-group">
+                        <label className="checkbox-label">
+                            <input
+                                type="checkbox"
+                                checked={formData.emailNotifications}
+                                onChange={(e) => handleInputChange('emailNotifications', e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            Отправлять отчеты по email
+                        </label>
+                    </div>
+
+                    {formData.emailNotifications && (
+                        <div className="form-group">
+                            <label className="form-label">Email получатели</label>
+                            <input
+                                type="text"
+                                name="emailRecipients"
+                                value={formData.emailRecipients}
+                                onChange={(e) => handleInputChange('emailRecipients', e.target.value)}
+                                className="form-input"
+                                placeholder="email1@example.com, email2@example.com"
+                                required={formData.emailNotifications}
+                            />
+                            <div className="info-message">
+                                <i className="fas fa-info-circle"></i>
+                                Укажите email адреса через запятую. Отчеты будут отправляться на указанные адреса.
+                            </div>
+                        </div>
+                    )}
 
                     <div className="modal-actions">
                         <button type="button" className="cancel-btn" onClick={onClose}>
