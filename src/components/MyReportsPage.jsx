@@ -111,14 +111,24 @@ const MyReportsPage = () => {
         setGeneratedReports(newReports);
     };
 
-    const handleCreateTemplate = (templateData) => {
+    const handleCreateTemplate = async (templateData) => {
         const newTemplate = {
             id: templateData.id,
             name: templateData.name,
             reportType: templateData.reportType,
             columns: templateData.columns,
             format: templateData.format,
-            selectedEquipment: templateData.selectedEquipment,
+            selectedMachine: templateData.selectedMachine,
+            // Сохраняем настройки автоматизации
+            repeatType: templateData.repeatType,
+            autoTime: templateData.autoTime,
+            selectedDays: templateData.selectedDays,
+            weeklyDate: templateData.weeklyDate,
+            monthlyDate: templateData.monthlyDate,
+            quarterlyDate: templateData.quarterlyDate,
+            selectedQuarter: templateData.selectedQuarter,
+            customDate: templateData.customDate,
+            emailAddress: templateData.emailAddress,
             createdAt: templateData.createdAt,
             lastUsed: null
         };
@@ -135,7 +145,174 @@ const MyReportsPage = () => {
             saveTemplates(updatedTemplates);
         }
         
+        // Если настроена автоматизация (repeatType !== 'never'), создаем автоматический отчет в бэкенде
+        if (templateData.repeatType && templateData.repeatType !== 'never' && templateData.emailAddress) {
+            try {
+                await createAutomatedReport(templateData);
+            } catch (error) {
+                console.error('Ошибка создания автоматического отчета:', error);
+                alert('Шаблон создан, но не удалось настроить автоматическую отправку отчетов. Проверьте настройки email.');
+            }
+        }
+        
         setIsCreateModalOpen(false);
+    };
+
+    const createAutomatedReport = async (templateData) => {
+        try {
+            // Преобразуем настройки повтора в формат, понятный бэкенду
+            const triggers = [];
+            
+            // Создаем триггер на основе типа повтора
+            if (templateData.repeatType === 'daily') {
+                triggers.push({
+                    type: 'TIME',
+                    value: 'daily',
+                    description: `Каждый день в ${templateData.autoTime}`,
+                    time: templateData.autoTime,
+                    daysOfWeek: templateData.selectedDays ? templateData.selectedDays.join(',') : undefined,
+                    isActive: true,
+                    priority: 5,
+                    timezone: 'UTC'
+                });
+            } else if (templateData.repeatType === 'weekly') {
+                triggers.push({
+                    type: 'TIME',
+                    value: 'weekly',
+                    description: `Еженедельно в ${templateData.autoTime}`,
+                    time: templateData.autoTime,
+                    isActive: true,
+                    priority: 5,
+                    timezone: 'UTC'
+                });
+            } else if (templateData.repeatType === 'monthly') {
+                triggers.push({
+                    type: 'TIME',
+                    value: 'monthly',
+                    description: `Ежемесячно в ${templateData.autoTime}`,
+                    time: templateData.autoTime,
+                    dayOfMonth: templateData.monthlyDate ? new Date(templateData.monthlyDate).getDate() : 1,
+                    isActive: true,
+                    priority: 5,
+                    timezone: 'UTC'
+                });
+            } else if (templateData.repeatType === 'quarterly') {
+                triggers.push({
+                    type: 'TIME',
+                    value: 'monthly',
+                    description: `Ежеквартально в ${templateData.autoTime}`,
+                    time: templateData.autoTime,
+                    dayOfMonth: templateData.quarterlyDate ? new Date(templateData.quarterlyDate).getDate() : 1,
+                    isActive: true,
+                    priority: 5,
+                    timezone: 'UTC'
+                });
+            } else if (templateData.repeatType === 'custom') {
+                triggers.push({
+                    type: 'TIME',
+                    value: 'daily',
+                    description: `Одноразово в ${templateData.autoTime}`,
+                    time: templateData.autoTime,
+                    isActive: true,
+                    priority: 5,
+                    timezone: 'UTC'
+                });
+            }
+
+            // Рассчитываем следующее время выполнения
+            const nextRun = calculateNextRunTime(templateData);
+
+            const automatedReportData = {
+                name: `${templateData.name} (автоматический)`,
+                templateId: parseInt(templateData.id),
+                templateName: templateData.name,
+                templateType: templateData.reportType,
+                triggers: triggers,
+                isActive: true,
+                emailNotifications: true,
+                emailRecipients: templateData.emailAddress,
+                lastRun: null,
+                nextRun: nextRun ? nextRun.toISOString().replace('Z', '').replace(/\.\d{3}$/, '') : null,
+                createdAt: new Date().toISOString().replace('Z', '').replace(/\.\d{3}$/, ''),
+                createdBy: 1 // Временное значение, должно быть ID текущего пользователя
+            };
+
+            console.log('Creating automated report:', automatedReportData);
+
+            const response = await fetch('/api/automated-reports', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(automatedReportData)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                console.log('Automated report created successfully:', result);
+                alert('Автоматический отчет успешно создан! Отчеты будут отправляться на указанный email адрес.');
+            } else {
+                const errorData = await response.json();
+                console.error('Error creating automated report:', errorData);
+                throw new Error(errorData.message || 'Ошибка создания автоматического отчета');
+            }
+        } catch (error) {
+            console.error('Error in createAutomatedReport:', error);
+            throw error;
+        }
+    };
+
+    const calculateNextRunTime = (templateData) => {
+        if (!templateData.repeatType || templateData.repeatType === 'never') {
+            return null;
+        }
+
+        const now = new Date();
+        const [hours, minutes] = templateData.autoTime.split(':').map(Number);
+        
+        // Создаем дату на сегодня с указанным временем
+        const todayAtTime = new Date(now);
+        todayAtTime.setHours(hours, minutes, 0, 0);
+        
+        switch (templateData.repeatType) {
+            case 'daily':
+                // Если время уже прошло сегодня, планируем на завтра
+                if (todayAtTime <= now) {
+                    todayAtTime.setDate(todayAtTime.getDate() + 1);
+                }
+                return todayAtTime;
+                
+            case 'weekly':
+                // Планируем на следующую неделю
+                const nextWeek = new Date(todayAtTime);
+                nextWeek.setDate(todayAtTime.getDate() + 7);
+                return nextWeek;
+                
+            case 'monthly':
+                // Планируем на следующий месяц
+                const nextMonth = new Date(todayAtTime);
+                nextMonth.setMonth(todayAtTime.getMonth() + 1);
+                return nextMonth;
+                
+            case 'quarterly':
+                // Планируем на следующий квартал
+                const nextQuarter = new Date(todayAtTime);
+                nextQuarter.setMonth(todayAtTime.getMonth() + 3);
+                return nextQuarter;
+                
+            case 'custom':
+                // Для одноразового выполнения используем указанную дату
+                if (templateData.customDate) {
+                    const customDate = new Date(templateData.customDate);
+                    customDate.setHours(hours, minutes, 0, 0);
+                    return customDate;
+                }
+                return todayAtTime;
+                
+            default:
+                return null;
+        }
     };
 
     const handleDeleteTemplate = (templateId) => {
