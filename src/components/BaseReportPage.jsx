@@ -52,12 +52,9 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
                 console.log('Отчет показан онлайн с реальными данными');
             }
             
-            // Также скачиваем файл
-            const blob = await reportApi.generateReport(reportType, requestData);
-            const filename = reportHelpers.getReportFilename(reportType, reportData.format);
-            reportHelpers.downloadReport(blob, filename);
-            
-            console.log('Отчет успешно сгенерирован, показан онлайн и скачан');
+            // Ранее здесь выполнялось автоматическое скачивание файла отчета.
+            // По требованию: отключаем авто-скачивание. Пользователь сможет скачать из окна просмотра.
+            console.log('Отчет успешно сгенерирован и показан онлайн (скачивание не запускается автоматически)');
             
         } catch (error) {
             console.error('Ошибка генерации отчета:', error);
@@ -131,12 +128,12 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
                     </button>
                 </div>
                 
-                {/* Информация о том, что отчеты показываются онлайн и скачиваются */}
+                {/* Информация для пользователя */}
                 <div className="reports-info">
                     <div className="info-icon">ℹ️</div>
                     <div className="info-text">
-                        <h4>Отчеты показываются онлайн и скачиваются</h4>
-                        <p>После создания отчета он будет показан на экране и автоматически скачан в папку "Загрузки"</p>
+                        <h4>Отчеты показываются онлайн</h4>
+                        <p>После создания отчет будет показан на экране. При необходимости вы можете скачать его вручную из окна просмотра.</p>
                     </div>
                 </div>
             </div>

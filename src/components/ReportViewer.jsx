@@ -34,11 +34,10 @@ const ReportViewer = ({ data, template, onClose }) => {
         const mapping = columnMapping[col];
         if (mapping) {
             return { ...mapping, key: mapping.field };
-        } else {
-            console.warn(`No mapping found for column: ${col}`);
-            return null;
         }
-    }).filter(Boolean);
+        // Нет явного маппинга — показываем как есть, берём поле по ключу из данных
+        return { field: col, header: col, key: col };
+    });
     
     console.log('Mapped columns:', mappedColumns);
     
@@ -114,7 +113,9 @@ const ReportViewer = ({ data, template, onClose }) => {
                     } else if (column.type === 'time' && value) {
                         value = new Date(value).toLocaleTimeString();
                     }
-                    return `"${value || ''}"`;
+                    // Пустые значения выводим как 0 по требованию
+                    const safe = (value === undefined || value === null || value === '') ? 0 : value;
+                    return `"${safe}"`;
                 }).join(',')
             )
         ].join('\n');
@@ -206,7 +207,8 @@ const ReportViewer = ({ data, template, onClose }) => {
                                                 } else if (column.type === 'time' && value) {
                                                     return new Date(value).toLocaleTimeString();
                                                 }
-                                                return value || '-';
+                                                // Пустые значения отображаем как 0 по требованию
+                                                return (value === undefined || value === null || value === '') ? 0 : value;
                                             })()}
                                         </td>
                                     ))}
@@ -214,6 +216,12 @@ const ReportViewer = ({ data, template, onClose }) => {
                             ))}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Кнопки ручной выгрузки */}
+                <div className="report-export-actions">
+                    <button onClick={exportToCSV} className="export-button">Скачать CSV</button>
+                    <button onClick={exportToExcel} className="export-button">Скачать Excel</button>
                 </div>
 
                 {processedData.length === 0 && (
