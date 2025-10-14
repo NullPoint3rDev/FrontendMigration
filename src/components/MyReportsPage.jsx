@@ -465,12 +465,9 @@ const MyReportsPage = () => {
                 console.log('Отчет по шаблону показан онлайн с реальными данными');
             }
             
-            // Также скачиваем файл
-            const blob = await reportApi.generateReport(currentTemplate.reportType, requestData);
-            const filename = reportHelpers.getReportFilename(currentTemplate.reportType, currentTemplate.format);
-            reportHelpers.downloadReport(blob, filename);
-            
-            console.log('Отчет по шаблону успешно сгенерирован, показан онлайн и скачан');
+            // Ранее здесь выполнялось автоматическое скачивание файла.
+            // Отключаем авто-скачивание: теперь только онлайн-просмотр и ручная выгрузка из окна просмотра
+            console.log('Отчет по шаблону успешно сгенерирован и показан онлайн (без автоскачивания)');
             
             // Обновляем lastUsed в шаблоне
             const updatedTemplates = templates.map(t => 
@@ -841,7 +838,7 @@ const MyReportsPage = () => {
                                                                         columns: Object.keys(report.data[0] || {}),
                                                                         format: report.format
                                                                     };
-                                                                    // Отчеты теперь скачиваются сразу, просмотр не требуется
+                                                                    // Отчеты доступны для просмотра и ручного скачивания из окна просмотра
                                                                 } else {
                                                                     // Для отчетов из API проверяем, есть ли данные
                                                                     if (report.reportData && Array.isArray(report.reportData) && report.reportData.length > 0) {
@@ -851,7 +848,7 @@ const MyReportsPage = () => {
                                                                             columns: Object.keys(report.reportData[0] || {}),
                                                                             format: report.format
                                                                         };
-                                                                        // Отчеты теперь скачиваются сразу, просмотр не требуется
+                                                                        // Отчеты доступны для просмотра и ручного скачивания из окна просмотра
                                                                     } else {
                                                                         // Если данных нет, показываем сообщение
                                                                         alert('Данные отчета недоступны для просмотра. Это автоматически сгенерированный отчет.');
