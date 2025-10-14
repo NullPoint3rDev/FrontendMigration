@@ -38,19 +38,19 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
             
             // Получаем данные для просмотра онлайн
             const onlineData = await getReportDataForViewing(reportType, requestData);
-            
-            // Показываем отчет онлайн
-            if (onlineData && onlineData.length > 0) {
-                const template = {
-                    name: `${title} - ${new Date().toLocaleDateString('ru-RU')}`,
-                    columns: Object.keys(onlineData[0] || {}),
-                    format: reportData.format
-                };
-                
-                setReportData(onlineData);
-                setSelectedReport(template);
-                console.log('Отчет показан онлайн с реальными данными');
-            }
+
+            // Показываем отчет онлайн даже если данных нет
+            const inferredColumns = Array.isArray(onlineData) && onlineData.length > 0
+                ? Object.keys(onlineData[0])
+                : (requestData?.selectedColumns || []);
+            const template = {
+                name: `${title} - ${new Date().toLocaleDateString('ru-RU')}`,
+                columns: inferredColumns,
+                format: reportData.format
+            };
+            setReportData(Array.isArray(onlineData) ? onlineData : []);
+            setSelectedReport(template);
+            console.log('Отчет показан онлайн (возможно без данных)');
             
             // Ранее здесь выполнялось автоматическое скачивание файла отчета.
             // По требованию: отключаем авто-скачивание. Пользователь сможет скачать из окна просмотра.

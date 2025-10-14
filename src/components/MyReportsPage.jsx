@@ -452,18 +452,15 @@ const MyReportsPage = () => {
             // Получаем данные для просмотра онлайн
             const onlineData = await getReportDataForViewing(currentTemplate.reportType, requestData);
             
-            // Показываем отчет онлайн
-            if (onlineData && onlineData.length > 0) {
-                const template = {
-                    name: `${currentTemplate.name} - ${new Date().toLocaleDateString('ru-RU')}`,
-                    columns: currentTemplate.columns, // Используем выбранные столбцы из шаблона
-                    format: currentTemplate.format
-                };
-                
-                setReportData(onlineData);
-                setSelectedTemplate(template);
-                console.log('Отчет по шаблону показан онлайн с реальными данными');
-            }
+            // Показываем отчет онлайн всегда, даже если данных нет (отобразится заглушка "Нет данных")
+            const template = {
+                name: `${currentTemplate.name} - ${new Date().toLocaleDateString('ru-RU')}`,
+                columns: currentTemplate.columns, // Используем выбранные столбцы из шаблона
+                format: currentTemplate.format
+            };
+            setReportData(Array.isArray(onlineData) ? onlineData : []);
+            setSelectedTemplate(template);
+            console.log('Отчет по шаблону показан онлайн (возможно без данных)');
             
             // Ранее здесь выполнялось автоматическое скачивание файла.
             // Отключаем авто-скачивание: теперь только онлайн-просмотр и ручная выгрузка из окна просмотра
