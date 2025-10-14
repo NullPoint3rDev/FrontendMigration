@@ -38,7 +38,6 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
 
     const formats = [
         { value: 'EXCEL', label: 'Excel (.xlsx)', icon: '📊' },
-        { value: 'PDF', label: 'PDF (.pdf)', icon: '📄' },
         { value: 'CSV', label: 'CSV (.csv)', icon: '📋' }
     ];
 

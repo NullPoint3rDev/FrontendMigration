@@ -7,19 +7,10 @@ const ReportViewer = ({ data, template, onClose }) => {
 
     // Маппинг между названиями столбцов в шаблоне и полями в данных
     const columnMapping = {
-        'Сварщик': { field: 'welderName', header: 'Сварщик' },
-        'Режим': { field: 'weldingMode', header: 'Режим' },
-        'Сила тока': { field: 'current', header: 'Сила тока, А' },
-        'Масса проволоки': { field: 'wireConsumption', header: 'Масса проволоки, кг' },
-        'Напряжение': { field: 'voltage', header: 'Напряжение, V' },
-        'Проволока': { field: 'wireFeedRate', header: 'Проволока, м/мин' },
-        'Газ л/мин': { field: 'gasFlow', header: 'Газ, л/мин' },
-        'Время сварки (с)': { field: 'weldingTime', header: 'Время сварки (с)' },
-        'Оборудование': { field: 'weldingMachineName', header: 'Оборудование' },
-        'Серийный номер': { field: 'weldingMachineSerialNumber', header: 'Серийный номер' },
-        'Тип сварки': { field: 'weldingType', header: 'Тип сварки' },
-        'Подразделение': { field: 'organizationUnitName', header: 'Подразделение' },
-        'Примечания': { field: 'notes', header: 'Примечания' }
+        'Средний Ток': { field: 'Средний Ток', header: 'Средний Ток' },
+        'Среднее напряжение': { field: 'Среднее напряжение', header: 'Среднее напряжение' },
+        'Начало шва': { field: 'Начало шва', header: 'Начало шва', type: 'datetime' },
+        'Длительность шва (с)': { field: 'Длительность шва (с)', header: 'Длительность шва (с)' }
     };
 
     // Получаем столбцы из шаблона с защитой от undefined
@@ -41,11 +32,7 @@ const ReportViewer = ({ data, template, onClose }) => {
     
     console.log('Mapped columns:', mappedColumns);
     
-    const columns = [
-        { field: 'startTime', header: 'Дата', type: 'date', key: 'date' },
-        { field: 'startTime', header: 'Время', type: 'time', key: 'time' },
-        ...mappedColumns
-    ];
+    const columns = mappedColumns; // только выбранные пользователем из допустимых 4
     
     console.log('Final columns array:', columns);
     
@@ -206,6 +193,8 @@ const ReportViewer = ({ data, template, onClose }) => {
                                                     return new Date(value).toLocaleDateString();
                                                 } else if (column.type === 'time' && value) {
                                                     return new Date(value).toLocaleTimeString();
+                                                } else if (column.type === 'datetime' && value) {
+                                                    return new Date(value).toLocaleString('ru-RU');
                                                 }
                                                 // Пустые значения отображаем как 0 по требованию
                                                 return (value === undefined || value === null || value === '') ? 0 : value;

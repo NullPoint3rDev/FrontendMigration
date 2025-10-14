@@ -43,7 +43,11 @@ export const reportApi = {
                 throw new Error(`HTTP error! status: ${res.status}`);
             }
             
-            const data = await res.json();
+            let data = await res.json();
+            // Для соответствия требованиям исключаем PDF для фронтенда
+            if (Array.isArray(data)) {
+                data = data.filter(f => f !== 'PDF');
+            }
             console.log('Полученные форматы отчетов:', data);
             return data;
         } catch (error) {
