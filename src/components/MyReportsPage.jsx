@@ -434,19 +434,19 @@ const MyReportsPage = () => {
             console.log('Генерируем отчет по шаблону:', currentTemplate);
             console.log('Данные отчета:', reportData);
             
-            // Создаем запрос для API
-                const requestData = reportHelpers.createReportRequest(
-                    currentTemplate.reportType,
-                    currentTemplate.format,
-                    reportData.dateFrom,
-                    reportData.dateTo,
-                    reportData.period,
-                    {
-                        weldingMachineId: reportData.equipmentId || null,
-                        welderId: reportData.welderId || null,
-                        selectedColumns: currentTemplate.columns || []
-                    }
-                );
+            // Создаем запрос для API. Приоритет выбранного в шаблоне оборудования
+            const requestData = reportHelpers.createReportRequest(
+                currentTemplate.reportType,
+                currentTemplate.format,
+                reportData.dateFrom,
+                reportData.dateTo,
+                reportData.period,
+                {
+                    weldingMachineId: currentTemplate.selectedMachine || reportData.equipmentId || null,
+                    welderId: reportData.welderId || null,
+                    selectedColumns: currentTemplate.columns || []
+                }
+            );
             
             
             // Получаем данные для просмотра онлайн

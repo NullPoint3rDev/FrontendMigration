@@ -12,7 +12,7 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
 
     // Загружаем список оборудования при открытии модального окна
     useEffect(() => {
-        if (isOpen && reportType === 'equipment') {
+        if (isOpen && (reportType === 'equipment' || reportType === 'welds')) {
             loadEquipment();
         }
     }, [isOpen, reportType]);
@@ -106,8 +106,8 @@ const ReportPeriodModal = ({ isOpen, onClose, onGenerate, reportType }) => {
                 </div>
 
                 <div className="modal-body">
-                    {/* Выбор оборудования для отчетов по оборудованию */}
-                    {reportType === 'equipment' && (
+                    {/* Выбор оборудования для отчетов по оборудованию и по швам */}
+                    {(reportType === 'equipment' || reportType === 'welds') && (
                         <div className="equipment-selection">
                             <h3>Выберите оборудование:</h3>
                             <select 
