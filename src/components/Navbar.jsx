@@ -25,7 +25,7 @@ const Navbar = () => {
                 { label: 'Сетевое оборудование системы мониторинга', path: '/network-equipment' },
                 { label: 'Сварочные материалы', path: '/materials' },
                 { label: 'Технологические карты сварки (WPS)', path: '/wps' },
-               // { label: 'Тестирование плат', path: '/device-test' },
+                { label: 'Тестирование плат', path: '/device-test' },
             ],
         },
         {

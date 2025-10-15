@@ -209,15 +209,21 @@ const DeviceTestPage = () => {
 
     return (
         <div className="device-test-page">
+            {/* Заголовок */}
             <div className="device-test-header">
                 <h1 className="device-test-title">🧪 Тестирование плат</h1>
-                <div className="connection-status">
-                    <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
-                        {getStatusIcon(isConnected)}
-                    </span>
-                    <span className="status-text">
-                        {isConnected ? 'Подключен' : 'Отключен'}
-                    </span>
+                <div className="header-controls">
+                    <div className="connection-status">
+                        <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
+                            {getStatusIcon(isConnected)}
+                        </span>
+                        <span className="status-text">
+                            {isConnected ? 'Подключен' : 'Отключен'}
+                        </span>
+                    </div>
+                    <button className="clear-history-btn" onClick={clearHistory}>
+                        🗑️ Очистить историю
+                    </button>
                 </div>
             </div>
 
@@ -230,45 +236,48 @@ const DeviceTestPage = () => {
                 </div>
             )}
 
+            {/* Основной контент */}
             <div className="device-test-content">
-                {/* Левая панель - выбор устройства */}
-                <div className="device-selection-panel">
-                    <h3 className="panel-title">📱 Выбор платы</h3>
-                    <div className="device-list">
-                        {devices.map(device => (
-                            <div 
-                                key={device.mac}
-                                className={`device-item ${selectedDevice?.mac === device.mac ? 'selected' : ''}`}
-                                onClick={() => setSelectedDevice(device)}
-                            >
-                                <div className="device-info">
-                                    <div className="device-name">{device.name}</div>
-                                    <div className="device-mac">{device.mac}</div>
-                                    <div className="device-ip">{device.ip}:{device.port}</div>
+                {/* Левая панель - выбор устройства и отправка команд */}
+                <div className="left-panel">
+                    <div className="panel-card">
+                        <h3 className="panel-title">📱 Выбор платы</h3>
+                        <div className="device-list">
+                            {devices.map(device => (
+                                <div 
+                                    key={device.mac}
+                                    className={`device-item ${selectedDevice?.mac === device.mac ? 'selected' : ''}`}
+                                    onClick={() => setSelectedDevice(device)}
+                                >
+                                    <div className="device-info">
+                                        <div className="device-name">{device.name}</div>
+                                        <div className="device-mac">{device.mac}</div>
+                                        <div className="device-ip">{device.ip}:{device.port}</div>
+                                    </div>
+                                    <div className="device-status">
+                                        {deviceState?.mac === device.mac && (
+                                            <span 
+                                                className="status-dot"
+                                                style={{ backgroundColor: getStatusColor(deviceState.connected) }}
+                                            />
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="device-status">
-                                    {deviceState?.mac === device.mac && (
-                                        <span 
-                                            className="status-dot"
-                                            style={{ backgroundColor: getStatusColor(deviceState.connected) }}
-                                        />
-                                    )}
-                                </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
 
                     {/* Отправка команд */}
                     {selectedDevice && (
-                        <div className="command-section">
-                            <h4 className="section-title">📤 Отправка команды</h4>
-                            <div className="command-input-group">
+                        <div className="panel-card">
+                            <h3 className="panel-title">📤 Отправка команды</h3>
+                            <div className="command-section">
                                 <textarea
                                     className="command-input"
                                     placeholder="Введите команду для отправки плате..."
                                     value={commandInput}
                                     onChange={(e) => setCommandInput(e.target.value)}
-                                    rows={3}
+                                    rows={4}
                                 />
                                 <button 
                                     className="send-button"
@@ -283,10 +292,10 @@ const DeviceTestPage = () => {
                 </div>
 
                 {/* Правая панель - мониторинг */}
-                <div className="monitoring-panel">
+                <div className="right-panel">
                     {/* Состояние устройства */}
                     {selectedDevice && deviceState && (
-                        <div className="device-state-card">
+                        <div className="panel-card">
                             <h3 className="panel-title">📊 Состояние платы</h3>
                             <div className="state-info">
                                 <div className="state-item">
@@ -314,14 +323,9 @@ const DeviceTestPage = () => {
                     )}
 
                     {/* Сообщения в реальном времени */}
-                    <div className="realtime-messages-card">
-                        <div className="card-header">
-                            <h3 className="panel-title">⚡ Сообщения в реальном времени</h3>
-                            <button className="clear-button" onClick={clearHistory}>
-                                🗑️ Очистить
-                            </button>
-                        </div>
-                        <div className="messages-list">
+                    <div className="panel-card">
+                        <h3 className="panel-title">⚡ Сообщения в реальном времени</h3>
+                        <div className="messages-container">
                             {realtimeMessages.length > 0 ? (
                                 realtimeMessages.map((msg, index) => (
                                     <div key={index} className={`message-item ${msg.type}`}>
@@ -350,9 +354,9 @@ const DeviceTestPage = () => {
                     </div>
 
                     {/* История сообщений */}
-                    <div className="history-card">
+                    <div className="panel-card">
                         <h3 className="panel-title">📚 История сообщений (последние 100)</h3>
-                        <div className="history-list">
+                        <div className="history-container">
                             {messageHistory.length > 0 ? (
                                 messageHistory.map((msg, index) => (
                                     <div key={index} className={`history-item ${msg.type}`}>
