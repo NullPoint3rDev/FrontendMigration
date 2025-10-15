@@ -30,6 +30,7 @@ import ViolationsReportPage from './components/ViolationsReportPage';
 import TasksReportPage from './components/TasksReportPage';
 import EmployeesPage from './components/EmployeesPage';
 import DeviceMonitorPage from './components/DeviceMonitorPage';
+import DeviceTestPage from './components/DeviceTestPage';
 import './App.css';
 
 const theme = createTheme({
@@ -75,6 +76,7 @@ function App() {
                                 <Route path="/materials" element={<div className="main-content"><h2>Сварочные материалы</h2></div>} />
                                 <Route path="/wps" element={<WPSPage />} />
                                 <Route path="/device-monitor" element={<DeviceMonitorPage />} />
+                                <Route path="/device-test" element={<DeviceTestPage />} />
                                 
                                 {/* 3. Мониторинг */}
                                 <Route path="/enterprise-map" element={<EnterpriseMapPage />} />

@@ -1,0 +1,476 @@
+/* Device Test Page Styles */
+.device-test-page {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.device-test-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 20px 30px;
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.device-test-title {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 25px;
+    border: 2px solid transparent;
+}
+
+.connection-status.connected {
+    border-color: #4CAF50;
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.connection-status.disconnected {
+    border-color: #FF6584;
+    background: rgba(255, 101, 132, 0.1);
+}
+
+.status-indicator {
+    font-size: 1.2rem;
+}
+
+.status-text {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.device-test-content {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 30px;
+    height: calc(100vh - 200px);
+}
+
+/* Device Selection Panel */
+.device-selection-panel {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    overflow-y: auto;
+}
+
+.panel-title {
+    margin: 0 0 20px 0;
+    color: #2c3e50;
+    font-size: 1.4rem;
+    font-weight: 600;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 10px;
+}
+
+.device-list {
+    margin-bottom: 30px;
+}
+
+.device-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    margin-bottom: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.device-item:hover {
+    background: rgba(102, 126, 234, 0.1);
+    border-color: rgba(102, 126, 234, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.device-item.selected {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: #667eea;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.device-info {
+    flex: 1;
+}
+
+.device-name {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 1.1rem;
+    margin-bottom: 5px;
+}
+
+.device-mac {
+    font-family: 'Courier New', monospace;
+    color: #667eea;
+    font-size: 0.9rem;
+    margin-bottom: 3px;
+}
+
+.device-ip {
+    color: #7f8c8d;
+    font-size: 0.85rem;
+}
+
+.device-status {
+    display: flex;
+    align-items: center;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* Command Section */
+.command-section {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.section-title {
+    margin: 0 0 15px 0;
+    color: #2c3e50;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.command-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.command-input {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    resize: vertical;
+    min-height: 80px;
+    transition: border-color 0.3s ease;
+}
+
+.command-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.send-button {
+    padding: 12px 25px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 25px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+}
+
+.send-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.send-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Monitoring Panel */
+.monitoring-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+}
+
+.device-state-card,
+.realtime-messages-card,
+.history-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.clear-button {
+    padding: 8px 15px;
+    background: rgba(255, 101, 132, 0.1);
+    color: #FF6584;
+    border: 1px solid #FF6584;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.clear-button:hover {
+    background: #FF6584;
+    color: white;
+    transform: translateY(-1px);
+}
+
+/* State Info */
+.state-info {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.state-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.state-label {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.state-value {
+    color: #7f8c8d;
+    font-family: 'Courier New', monospace;
+}
+
+/* Messages */
+.messages-list,
+.history-list {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.message-item,
+.history-item {
+    margin-bottom: 15px;
+    padding: 15px;
+    border-radius: 10px;
+    border-left: 4px solid;
+    background: rgba(255, 255, 255, 0.8);
+    transition: all 0.3s ease;
+}
+
+.message-item:hover,
+.history-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.message-item.command_sent,
+.history-item.sent {
+    border-left-color: #4CAF50;
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.message-item.device_message,
+.history-item.received {
+    border-left-color: #2196F3;
+    background: rgba(33, 150, 243, 0.05);
+}
+
+.message-header,
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.message-type,
+.history-type {
+    font-size: 1.2rem;
+}
+
+.message-mac,
+.history-mac {
+    font-weight: 600;
+    color: #2c3e50;
+    font-family: 'Courier New', monospace;
+}
+
+.message-time,
+.history-time {
+    color: #7f8c8d;
+    font-size: 0.8rem;
+}
+
+.message-content,
+.history-content {
+    font-family: 'Courier New', monospace;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 10px;
+    border-radius: 5px;
+    word-break: break-all;
+    font-size: 0.9rem;
+    color: #2c3e50;
+}
+
+/* No Messages/History */
+.no-messages,
+.no-history {
+    text-align: center;
+    padding: 40px 20px;
+    color: #7f8c8d;
+}
+
+.no-messages-icon,
+.no-history-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    opacity: 0.5;
+}
+
+.no-messages p,
+.no-history p {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+/* Error Message */
+.error-message {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 101, 132, 0.1);
+    border: 2px solid #FF6584;
+    color: #FF6584;
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.error-icon {
+    font-size: 1.2rem;
+    margin-right: 10px;
+}
+
+.error-close {
+    background: none;
+    border: none;
+    color: #FF6584;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 25px;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.3s ease;
+}
+
+.error-close:hover {
+    background: rgba(255, 101, 132, 0.2);
+}
+
+/* Scrollbar Styling */
+.messages-list::-webkit-scrollbar,
+.history-list::-webkit-scrollbar,
+.device-selection-panel::-webkit-scrollbar,
+.monitoring-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.messages-list::-webkit-scrollbar-track,
+.history-list::-webkit-scrollbar-track,
+.device-selection-panel::-webkit-scrollbar-track,
+.monitoring-panel::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.messages-list::-webkit-scrollbar-thumb,
+.history-list::-webkit-scrollbar-thumb,
+.device-selection-panel::-webkit-scrollbar-thumb,
+.monitoring-panel::-webkit-scrollbar-thumb {
+    background: rgba(102, 126, 234, 0.6);
+    border-radius: 4px;
+}
+
+.messages-list::-webkit-scrollbar-thumb:hover,
+.history-list::-webkit-scrollbar-thumb:hover,
+.device-selection-panel::-webkit-scrollbar-thumb:hover,
+.monitoring-panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(102, 126, 234, 0.8);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .device-test-content {
+        grid-template-columns: 350px 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .device-test-content {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+    }
+    
+    .device-test-header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .device-test-title {
+        font-size: 2rem;
+    }
+    
+    .device-selection-panel {
+        max-height: 400px;
+    }
+}
