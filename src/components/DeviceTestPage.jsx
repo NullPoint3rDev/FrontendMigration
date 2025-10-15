@@ -29,15 +29,25 @@ const DeviceTestPage = () => {
 
     const loadDevices = async () => {
         try {
+            console.log('🔍 Загружаем устройства с API:', `${API_BASE_URL}/device-test/devices`);
             const response = await fetch(`${API_BASE_URL}/device-test/devices`);
+            console.log('📡 Ответ сервера:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
+            console.log('📱 Полученные устройства:', data);
             setDevices(data);
+            
             if (data.length > 0 && !selectedDevice) {
                 setSelectedDevice(data[0]);
+                console.log('✅ Выбрано устройство по умолчанию:', data[0]);
             }
         } catch (err) {
-            console.error('Ошибка загрузки устройств:', err);
-            setError('Ошибка загрузки списка устройств');
+            console.error('❌ Ошибка загрузки устройств:', err);
+            setError(`Ошибка загрузки списка устройств: ${err.message}`);
         }
     };
 
@@ -100,9 +110,12 @@ const DeviceTestPage = () => {
                     if (message.body) {
                         console.log('📨 Получено сообщение от устройства:', message.body);
                         
+                        const extractedMac = extractMacFromMessage(message.body);
+                        console.log('🔍 Извлеченный MAC:', extractedMac);
+                        
                         setRealtimeMessages(prev => [
                             {
-                                mac: extractMacFromMessage(message.body),
+                                mac: extractedMac,
                                 type: 'device_message',
                                 data: message.body,
                                 timestamp: new Date()
@@ -131,9 +144,32 @@ const DeviceTestPage = () => {
     };
 
     const extractMacFromMessage = (message) => {
-        // Пытаемся извлечь MAC из сообщения
-        const macMatch = message.match(/([0-9A-Fa-f]{12})/);
-        return macMatch ? macMatch[1] : 'Unknown';
+        // Пытаемся извлечь MAC из сообщения в различных форматах
+        console.log('🔍 Извлекаем MAC из сообщения:', message);
+        
+        // Формат: TIMESTAMP|MAC:data
+        const pipeMatch = message.match(/\|([0-9A-Fa-f]{12}):/);
+        if (pipeMatch) {
+            console.log('✅ Найден MAC после |:', pipeMatch[1]);
+            return pipeMatch[1];
+        }
+        
+        // Формат: MAC:data
+        const colonMatch = message.match(/^([0-9A-Fa-f]{12}):/);
+        if (colonMatch) {
+            console.log('✅ Найден MAC в начале:', colonMatch[1]);
+            return colonMatch[1];
+        }
+        
+        // Любой 12-символьный hex
+        const anyMatch = message.match(/([0-9A-Fa-f]{12})/);
+        if (anyMatch) {
+            console.log('✅ Найден MAC в тексте:', anyMatch[1]);
+            return anyMatch[1];
+        }
+        
+        console.log('❌ MAC не найден в сообщении');
+        return 'Unknown';
     };
 
     const sendCommand = async () => {
@@ -146,20 +182,29 @@ const DeviceTestPage = () => {
         setError(null);
 
         try {
-            const response = await fetch(`${API_BASE_URL}/device-test/devices/${selectedDevice.mac}/send`, {
+            const url = `${API_BASE_URL}/device-test/devices/${selectedDevice.mac}/send`;
+            const payload = { command: commandInput.trim() };
+            
+            console.log('📤 Отправляем команду:', {
+                url,
+                device: selectedDevice,
+                command: payload.command
+            });
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    command: commandInput.trim()
-                })
+                body: JSON.stringify(payload)
             });
 
+            console.log('📡 Ответ сервера:', response.status, response.statusText);
             const data = await response.json();
+            console.log('📊 Данные ответа:', data);
             
             if (response.ok) {
-                console.log('✅ Команда отправлена:', data);
+                console.log('✅ Команда отправлена успешно:', data);
                 setCommandInput('');
                 // Обновляем историю
                 loadDeviceHistory();
@@ -167,7 +212,7 @@ const DeviceTestPage = () => {
                 setError(data.error || 'Ошибка отправки команды');
             }
         } catch (err) {
-            console.error('Ошибка отправки команды:', err);
+            console.error('❌ Ошибка отправки команды:', err);
             setError('Ошибка отправки команды: ' + err.message);
         } finally {
             setLoading(false);
