@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { WEBSOCKET_URL, API_BASE_URL } from '../config';
+import { getAuthHeaders } from '../services/api';
 import '../styles/deviceTestPage.css';
 
 const DeviceTestPage = () => {
@@ -30,7 +31,9 @@ const DeviceTestPage = () => {
     const loadDevices = async () => {
         try {
             console.log('🔍 Загружаем устройства с API:', `${API_BASE_URL}/device-test/devices`);
-            const response = await fetch(`${API_BASE_URL}/device-test/devices`);
+            const response = await fetch(`${API_BASE_URL}/device-test/devices`, {
+                headers: getAuthHeaders()
+            });
             console.log('📡 Ответ сервера:', response.status, response.statusText);
             
             if (!response.ok) {
@@ -55,7 +58,9 @@ const DeviceTestPage = () => {
         if (!selectedDevice) return;
         
         try {
-            const response = await fetch(`${API_BASE_URL}/device-test/devices/${selectedDevice.mac}/state`);
+            const response = await fetch(`${API_BASE_URL}/device-test/devices/${selectedDevice.mac}/state`, {
+                headers: getAuthHeaders()
+            });
             const data = await response.json();
             setDeviceState(data);
         } catch (err) {
@@ -67,7 +72,9 @@ const DeviceTestPage = () => {
         if (!selectedDevice) return;
         
         try {
-            const response = await fetch(`${API_BASE_URL}/device-test/devices/${selectedDevice.mac}/history`);
+            const response = await fetch(`${API_BASE_URL}/device-test/devices/${selectedDevice.mac}/history`, {
+                headers: getAuthHeaders()
+            });
             const data = await response.json();
             setMessageHistory(data);
         } catch (err) {
@@ -193,9 +200,7 @@ const DeviceTestPage = () => {
 
             const response = await fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(payload)
             });
 
@@ -222,7 +227,8 @@ const DeviceTestPage = () => {
     const clearHistory = async () => {
         try {
             await fetch(`${API_BASE_URL}/device-test/history/clear`, {
-                method: 'POST'
+                method: 'POST',
+                headers: getAuthHeaders()
             });
             setMessageHistory([]);
             setRealtimeMessages([]);
