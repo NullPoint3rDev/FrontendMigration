@@ -112,8 +112,10 @@ const DeviceTestPage = () => {
                     }
                 });
 
-                // Подписываемся на обычные сообщения от устройств
-                stompClient.subscribe('/topic/device', (message) => {
+                // Подписываемся на обычные сообщения от устройств ТОЛЬКО для выбранного
+                // Если нет выбранного устройства, можно подписаться позже при выборе
+                if (selectedDevice?.mac) {
+                    stompClient.subscribe(`/topic/device/${selectedDevice.mac}`, (message) => {
                     if (message.body) {
                         console.log('📨 Получено сообщение от устройства:', message.body);
                         
@@ -130,7 +132,8 @@ const DeviceTestPage = () => {
                             ...prev.slice(0, 9)
                         ]);
                     }
-                });
+                    });
+                }
             },
             onDisconnect: () => {
                 console.log('❌ WebSocket отключен');

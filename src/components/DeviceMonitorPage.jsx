@@ -20,7 +20,8 @@ const DeviceMonitorPage = () => {
 
     useEffect(() => {
         connectWebSocket();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [machineMac]);
 
     const connectWebSocket = () => {
         console.log('🔌 Попытка подключения к WebSocket...');
@@ -39,7 +40,8 @@ const DeviceMonitorPage = () => {
                 setError(null);
                 setIsConnecting(false);
                 
-                stompClient.subscribe('/topic/device', (message) => {
+                // Подписка на старый формат ТОЛЬКО для текущего MAC
+                stompClient.subscribe(`/topic/device/${machineMac}`, (message) => {
                     if (message.body) {
                         console.log('📊 Получены данные:', message.body);
                         processDeviceData(message.body);
@@ -57,8 +59,8 @@ const DeviceMonitorPage = () => {
                     }
                 });
                 
-                // Подписываемся на структурированные данные
-                stompClient.subscribe('/topic/device-state', (message) => {
+                // Подписка на структурированные данные ТОЛЬКО для текущего MAC
+                stompClient.subscribe(`/topic/device-state/${machineMac}`, (message) => {
                     if (message.body) {
                         try {
                             const data = JSON.parse(message.body);
@@ -144,7 +146,7 @@ const DeviceMonitorPage = () => {
     const processStructuredData = (data) => {
         try {
             if (data.state && data.state.properties) {
-                const mac = '8CAAB50C4254'; // MAC адрес сварочного аппарата
+                const mac = data.mac || machineMac; // берём из payload, fallback на выбранный MAC
                 const params = {};
                 
                 // Извлекаем ток и напряжение из структурированных данных
