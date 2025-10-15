@@ -123,7 +123,11 @@ const DeviceMonitorPage = () => {
                             if (key.trim() === 'State.I' || key.trim() === 'State.U') {
                                 // Конвертируем hex в десятичное число
                                 const decimalValue = parseInt(value.trim(), 16);
-                                params[key.trim()] = decimalValue.toString();
+                                if (key.trim() === 'State.U') {
+                                    params[key.trim()] = (decimalValue / 10).toString();
+                                } else {
+                                    params[key.trim()] = decimalValue.toString();
+                                }
                             }
                         }
                     }
@@ -156,7 +160,11 @@ const DeviceMonitorPage = () => {
                         if (key === 'State.I' || key === 'State.U') {
                             // Конвертируем hex в десятичное число
                             const decimalValue = parseInt(prop.value, 16);
-                            params[key] = decimalValue.toString();
+                            if (key === 'State.U') {
+                                params[key] = (decimalValue / 10).toString();
+                            } else {
+                                params[key] = decimalValue.toString();
+                            }
                         }
                     }
                 });
