@@ -30,10 +30,26 @@ const DeviceMonitorPage = () => {
         
         // Устанавливаем новый таймаут для обновления (100мс дебаунсинг)
         updateTimeoutRef.current = setTimeout(() => {
-            setDeviceData(prev => ({
-                ...prev,
-                ...newData
-            }));
+            setDeviceData(prev => {
+                const updated = { ...prev };
+                Object.keys(newData).forEach(mac => {
+                    if (updated[mac]) {
+                        // Сохраняем существующие значения, обновляем только новые
+                        updated[mac] = {
+                            ...updated[mac],
+                            ...Object.fromEntries(
+                                Object.entries(newData[mac]).filter(([key, value]) => 
+                                    value !== undefined && value !== null && value !== '0' && value !== 0
+                                )
+                            ),
+                            timestamp: newData[mac].timestamp || updated[mac].timestamp
+                        };
+                    } else {
+                        updated[mac] = newData[mac];
+                    }
+                });
+                return updated;
+            });
             setLastUpdate(new Date());
         }, 100);
     }, []);
@@ -508,14 +524,6 @@ const DeviceMonitorPage = () => {
                                         </div>
                                     )}
                                     
-                                    {/* Отладочная информация */}
-                                    {console.log('🔍 Данные для отображения:', {
-                                        Current: data.Current,
-                                        'State.I': data['State.I'],
-                                        Voltage: data.Voltage,
-                                        'State.U': data['State.U'],
-                                        allData: data
-                                    })}
                                 </div>
                                 
                                 {/* Остальные параметры в списке */}
