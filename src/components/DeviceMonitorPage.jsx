@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -17,11 +17,40 @@ const DeviceMonitorPage = () => {
     const [error, setError] = useState(null);
     const [isConnecting, setIsConnecting] = useState(false);
     const [messageHistory, setMessageHistory] = useState([]);
+    
+    // Реф для дебаунсинга обновлений
+    const updateTimeoutRef = useRef(null);
+
+    // Оптимизированная функция для обновления данных с дебаунсингом
+    const updateDeviceData = useCallback((newData) => {
+        // Очищаем предыдущий таймаут
+        if (updateTimeoutRef.current) {
+            clearTimeout(updateTimeoutRef.current);
+        }
+        
+        // Устанавливаем новый таймаут для обновления (100мс дебаунсинг)
+        updateTimeoutRef.current = setTimeout(() => {
+            setDeviceData(prev => ({
+                ...prev,
+                ...newData
+            }));
+            setLastUpdate(new Date());
+        }, 100);
+    }, []);
 
     useEffect(() => {
         connectWebSocket();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [machineMac]);
+
+    // Очистка таймаута при размонтировании
+    useEffect(() => {
+        return () => {
+            if (updateTimeoutRef.current) {
+                clearTimeout(updateTimeoutRef.current);
+            }
+        };
+    }, []);
 
     const connectWebSocket = () => {
         console.log('🔌 Попытка подключения к WebSocket...');
@@ -133,14 +162,12 @@ const DeviceMonitorPage = () => {
                     }
                 });
 
-                setDeviceData(prev => ({
-                    ...prev,
+                updateDeviceData({
                     [mac]: {
-                        ...prev[mac],
                         ...params,
                         timestamp: timestamp || new Date().toLocaleTimeString()
                     }
-                }));
+                });
             }
         } catch (err) {
             console.error('Ошибка обработки данных:', err);
@@ -153,30 +180,63 @@ const DeviceMonitorPage = () => {
                 const mac = data.mac || machineMac; // берём из payload, fallback на выбранный MAC
                 const params = {};
                 
-                // Извлекаем ток и напряжение из структурированных данных
+                // Извлекаем ВСЕ параметры из структурированных данных
                 Object.entries(data.state.properties).forEach(([key, prop]) => {
                     if (prop && prop.value) {
-                        // Показываем ток и напряжение
-                        if (key === 'State.I' || key === 'State.U') {
-                            // Конвертируем hex в десятичное число
-                            const decimalValue = parseInt(prop.value, 16);
-                            if (key === 'State.U') {
-                                params[key] = (decimalValue / 10).toString();
-                            } else {
-                                params[key] = decimalValue.toString();
-                            }
+                        // Обрабатываем все параметры Core
+                        if (key === 'Voltage') {
+                            // Напряжение в десятых долях вольта
+                            const decimalValue = parseInt(prop.value, 10);
+                            params[key] = (decimalValue / 10).toFixed(1);
+                        } else if (key === 'Current') {
+                            // Ток
+                            params[key] = prop.value;
+                        } else if (key === 'WeldingCurrent') {
+                            // Ток сварки
+                            params[key] = prop.value;
+                        } else if (key === 'WeldingVoltage') {
+                            // Напряжение сварки
+                            params[key] = prop.value;
+                        } else if (key === 'GasFlow') {
+                            // Расход газа
+                            params[key] = prop.value;
+                        } else if (key === 'WeldingMachineState') {
+                            // Состояние сварочного аппарата
+                            params[key] = prop.value;
+                        } else if (key === 'JobNumber') {
+                            // Номер работы
+                            params[key] = prop.value;
+                        } else if (key === 'Inductance') {
+                            // Индуктивность
+                            params[key] = prop.value;
+                        } else if (key.startsWith('Errors')) {
+                            // Ошибки
+                            params[key] = prop.value;
+                        } else if (key.startsWith('VoltagePhase')) {
+                            // Напряжения фаз
+                            params[key] = prop.value;
+                        } else if (key.startsWith('Temperature') || key.includes('Temperature')) {
+                            // Температуры
+                            params[key] = prop.value;
+                        } else if (key === 'WireIndex') {
+                            // Индекс проволоки
+                            params[key] = prop.value;
+                        } else if (key === 'Flags') {
+                            // Флаги
+                            params[key] = prop.value;
+                        } else {
+                            // Все остальные параметры
+                            params[key] = prop.value;
                         }
                     }
                 });
                 
-                setDeviceData(prev => ({
-                    ...prev,
+                updateDeviceData({
                     [mac]: {
-                        ...prev[mac],
                         ...params,
                         timestamp: data.timestamp || new Date().toLocaleTimeString()
                     }
-                }));
+                });
                 
                 console.log('✅ Структурированные данные обработаны:', params);
             }
@@ -197,8 +257,44 @@ const DeviceMonitorPage = () => {
     // Функция для получения читаемого названия параметра
     const getParameterDisplayName = (key) => {
         switch (key) {
+            // Основные параметры
+            case 'Voltage': return 'Напряжение (В)';
+            case 'Current': return 'Ток (А)';
+            case 'WeldingCurrent': return 'Ток сварки (А)';
+            case 'WeldingVoltage': return 'Напряжение сварки (В)';
+            case 'GasFlow': return 'Расход газа (л/мин)';
+            case 'WeldingMachineState': return 'Состояние аппарата';
+            case 'JobNumber': return 'Номер работы';
+            case 'Inductance': return 'Индуктивность (мГн)';
+            case 'WireIndex': return 'Индекс проволоки';
+            case 'Flags': return 'Флаги';
+            
+            // Ошибки
+            case 'Errors1': return 'Ошибка 1';
+            case 'Errors2': return 'Ошибка 2';
+            case 'Errors3': return 'Ошибка 3';
+            
+            // Напряжения фаз
+            case 'VoltagePhaseA': return 'Напряжение фазы A (В)';
+            case 'VoltagePhaseB': return 'Напряжение фазы B (В)';
+            case 'VoltagePhaseC': return 'Напряжение фазы C (В)';
+            
+            // Температуры
+            case 'ChillerTemperature1': return 'Температура чиллера 1 (°C)';
+            case 'ChillerTemperature2': return 'Температура чиллера 2 (°C)';
+            case 'PrimaryCoilTemperature': return 'Температура первичной обмотки (°C)';
+            case 'SecondaryCoilTemperature': return 'Температура вторичной обмотки (°C)';
+            
+            // Старые параметры (для совместимости)
             case 'State.I': return 'Ток (А)';
             case 'State.U': return 'Напряжение (В)';
+            case 'State.Ctrl': return 'Управление';
+            case 'State.material': return 'Материал';
+            case 'State.Temperature': return 'Температура';
+            case 'State.GasFlow': return 'Расход газа';
+            case 'VERSION': return 'Версия';
+            case 'MODEL': return 'Модель';
+            
             default: return key;
         }
     };
@@ -223,13 +319,46 @@ const DeviceMonitorPage = () => {
 
     const getParameterIcon = (key) => {
         const lowerKey = key.toLowerCase();
-        if (lowerKey.includes('temp')) return '🌡️';
+        
+        // Основные параметры
+        if (key === 'Voltage') return '🔋';
+        if (key === 'Current') return '⚡';
+        if (key === 'WeldingCurrent') return '⚡';
+        if (key === 'WeldingVoltage') return '🔋';
+        if (key === 'GasFlow') return '💨';
+        if (key === 'WeldingMachineState') return '⚙️';
+        if (key === 'JobNumber') return '📋';
+        if (key === 'Inductance') return '🔄';
+        if (key === 'WireIndex') return '📏';
+        if (key === 'Flags') return '🚩';
+        
+        // Ошибки
+        if (key.startsWith('Errors')) return '⚠️';
+        
+        // Напряжения фаз
+        if (key.startsWith('VoltagePhase')) return '🔌';
+        
+        // Температуры
+        if (lowerKey.includes('temp') || lowerKey.includes('temperature')) return '🌡️';
+        if (key === 'ChillerTemperature1' || key === 'ChillerTemperature2') return '❄️';
+        if (key === 'PrimaryCoilTemperature' || key === 'SecondaryCoilTemperature') return '🔥';
+        
+        // Старые параметры (для совместимости)
+        if (key === 'State.I') return '⚡';
+        if (key === 'State.U') return '🔋';
+        if (key === 'State.Ctrl') return '🎛️';
+        if (key === 'State.material') return '🔧';
+        if (key === 'State.Temperature') return '🌡️';
+        if (key === 'State.GasFlow') return '💨';
+        if (key === 'VERSION') return '📱';
+        if (key === 'MODEL') return '🏷️';
+        
+        // Общие категории
         if (lowerKey.includes('speed')) return '⚡';
         if (lowerKey.includes('power')) return '🔌';
         if (lowerKey.includes('memory')) return '💾';
         if (lowerKey.includes('status')) return '⚙️';
-        if (key === 'State.I') return '⚡'; // Иконка для тока
-        if (key === 'State.U') return '🔋'; // Иконка для напряжения
+        
         return '⚙️';
     };
 

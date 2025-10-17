@@ -183,8 +183,8 @@
 
 .parameters-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
 }
 
 .device-parameters {
@@ -196,12 +196,16 @@
 .parameter-card {
   background: rgba(0, 0, 0, 0.2);
   border-radius: 12px;
-  padding: 2rem;
+  padding: 1.5rem;
   text-align: center;
   border: 2px solid var(--primary);
   transition: var(--transition);
   position: relative;
   overflow: hidden;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .parameter-card:hover {
@@ -244,11 +248,12 @@
 }
 
 .parameter-value {
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: bold;
   color: var(--primary);
   text-shadow: 0 0 20px rgba(108, 99, 255, 0.5);
   animation: pulse 2s infinite;
+  word-break: break-word;
 }
 
 @keyframes pulse {
