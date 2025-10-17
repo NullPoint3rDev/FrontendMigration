@@ -31,23 +31,39 @@ const DeviceMonitorPage = () => {
         // Устанавливаем новый таймаут для обновления (50мс дебаунсинг - уменьшили)
         updateTimeoutRef.current = setTimeout(() => {
             const updateTime = new Date();
-            console.log('🔄 Обновление состояния в:', updateTime.toLocaleTimeString());
             setDeviceData(prev => {
                 const updated = { ...prev };
                 Object.keys(newData).forEach(mac => {
                     if (updated[mac]) {
-                        // Сохраняем существующие значения, обновляем только значимые новые
+                        // Обновляем все данные, но приоритет новым значениям
                         const filteredNewData = Object.fromEntries(
                             Object.entries(newData[mac]).filter(([key, value]) => 
                                 key === 'timestamp' || // Всегда обновляем timestamp
-                                (value !== undefined && value !== null && value !== '0' && value !== 0)
+                                (value !== undefined && value !== null)
                             )
                         );
                         
-                        updated[mac] = {
-                            ...updated[mac],
-                            ...filteredNewData
-                        };
+                        // Приоритет новым Core данным над старыми State данными
+                        const mergedData = { ...updated[mac] };
+                        
+                        // Сначала добавляем все новые данные
+                        Object.entries(filteredNewData).forEach(([key, value]) => {
+                            if (key !== 'timestamp') {
+                                mergedData[key] = value;
+                            }
+                        });
+                        
+                        // Приоритет Core данных над State данными
+                        if (mergedData.Current && mergedData['State.I']) {
+                            mergedData['State.I'] = mergedData.Current; // Core Current приоритетнее
+                        }
+                        if (mergedData.Voltage && mergedData['State.U']) {
+                            mergedData['State.U'] = mergedData.Voltage; // Core Voltage приоритетнее
+                        }
+                        
+                        mergedData.timestamp = filteredNewData.timestamp || mergedData.timestamp;
+                        
+                        updated[mac] = mergedData;
                     } else {
                         updated[mac] = newData[mac];
                     }
@@ -93,7 +109,7 @@ const DeviceMonitorPage = () => {
                 stompClient.subscribe(`/topic/device/${machineMac}`, (message) => {
                     if (message.body) {
                         const receiveTime = new Date();
-                        console.log('📊 Получены данные:', message.body, 'время:', receiveTime.toLocaleTimeString());
+                        console.log('📊 Получены данные (старый формат):', message.body, 'время:', receiveTime.toLocaleTimeString());
                         processDeviceData(message.body);
                         setLastUpdate(receiveTime);
                         
@@ -115,7 +131,7 @@ const DeviceMonitorPage = () => {
                         try {
                             const data = JSON.parse(message.body);
                             const receiveTime = new Date();
-                            console.log('📊 Получены структурированные данные:', data, 'время:', receiveTime.toLocaleTimeString());
+                            console.log('📊 Получены данные (новый формат):', data, 'время:', receiveTime.toLocaleTimeString());
                             processStructuredData(data);
                             setLastUpdate(receiveTime);
                         } catch (err) {
@@ -157,7 +173,6 @@ const DeviceMonitorPage = () => {
 
     const processDeviceData = (rawData) => {
         try {
-            console.log('🔍 Обработка старых данных:', rawData);
             // Формат данных: TIMESTAMP|MAC:PARAM1:VAL1;PARAM2:VAL2;...
             const [timestamp, ...dataParts] = rawData.split('|');
             const dataString = dataParts.join('|');
@@ -245,7 +260,6 @@ const DeviceMonitorPage = () => {
 
     const processStructuredData = (data) => {
         try {
-            console.log('🔍 Обработка структурированных данных:', data);
             if (data.state && data.state.properties) {
                 const mac = data.mac || machineMac; // берём из payload, fallback на выбранный MAC
                 const params = {};
@@ -316,7 +330,6 @@ const DeviceMonitorPage = () => {
                     }
                 });
                 
-                console.log('✅ Структурированные данные обработаны:', params);
             }
         } catch (err) {
             console.error('Ошибка обработки структурированных данных:', err);
