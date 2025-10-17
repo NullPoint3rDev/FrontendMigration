@@ -480,19 +480,49 @@ const DeviceMonitorPage = () => {
                         {console.log('🎨 Рендер данных устройства:', deviceData)}
                         {Object.entries(deviceData).map(([mac, data]) => (
                             <div key={mac} className="device-parameters">
-                                {Object.entries(data).map(([key, value]) => {
-                                    if (key === 'timestamp') return null;
-                                    
-                                    return (
-                                        <div key={key} className="parameter-card">
-                                            <div className="parameter-header">
-                                                <span className="parameter-icon">{getParameterIcon(key)}</span>
-                                                <span className="parameter-name">{getParameterDisplayName(key)}</span>
+                                {/* Основные параметры в плитках */}
+                                <div className="main-parameters-grid">
+                                    {Object.entries(data).map(([key, value]) => {
+                                        if (key === 'timestamp' || key === 'Current' || key === 'Voltage') {
+                                            if (key === 'timestamp') return null;
+                                            
+                                            return (
+                                                <div key={key} className="main-parameter-card">
+                                                    <div className="main-parameter-header">
+                                                        <span className="main-parameter-icon">{getParameterIcon(key)}</span>
+                                                        <span className="main-parameter-name">{getParameterDisplayName(key)}</span>
+                                                    </div>
+                                                    <div className="main-parameter-value">{value}</div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })}
+                                </div>
+                                
+                                {/* Остальные параметры в списке */}
+                                <div className="other-parameters-list">
+                                    <h4 className="other-parameters-title">Дополнительные параметры</h4>
+                                    {Object.entries(data).map(([key, value]) => {
+                                        if (key === 'timestamp' || key === 'Current' || key === 'Voltage' || 
+                                            key === 'State.Ctrl' || key === 'State.material' || key === 'State.GasFlow' || 
+                                            key === 'State.Temperature' || key === 'Packet.Index' || key === 'Time.Hours' || 
+                                            key === 'Time.Minutes' || key === 'Time.Seconds' || key === 'Date.Day' || 
+                                            key === 'Date.Month' || key === 'Date.Year') {
+                                            return null;
+                                        }
+                                        
+                                        return (
+                                            <div key={key} className="other-parameter-item">
+                                                <div className="other-parameter-info">
+                                                    <span className="other-parameter-icon">{getParameterIcon(key)}</span>
+                                                    <span className="other-parameter-name">{getParameterDisplayName(key)}</span>
+                                                </div>
+                                                <div className="other-parameter-value">{value}</div>
                                             </div>
-                                            <div className="parameter-value">{value}</div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
                                 
                                 <div className="update-time">
                                     Обновлено: {data.timestamp}
