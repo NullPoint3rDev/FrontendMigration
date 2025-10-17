@@ -28,21 +28,25 @@ const DeviceMonitorPage = () => {
             clearTimeout(updateTimeoutRef.current);
         }
         
-        // Устанавливаем новый таймаут для обновления (100мс дебаунсинг)
+        // Устанавливаем новый таймаут для обновления (50мс дебаунсинг - уменьшили)
         updateTimeoutRef.current = setTimeout(() => {
+            const updateTime = new Date();
+            console.log('🔄 Обновление состояния в:', updateTime.toLocaleTimeString());
             setDeviceData(prev => {
                 const updated = { ...prev };
                 Object.keys(newData).forEach(mac => {
                     if (updated[mac]) {
-                        // Сохраняем существующие значения, обновляем только новые
+                        // Сохраняем существующие значения, обновляем только значимые новые
+                        const filteredNewData = Object.fromEntries(
+                            Object.entries(newData[mac]).filter(([key, value]) => 
+                                key === 'timestamp' || // Всегда обновляем timestamp
+                                (value !== undefined && value !== null && value !== '0' && value !== 0)
+                            )
+                        );
+                        
                         updated[mac] = {
                             ...updated[mac],
-                            ...Object.fromEntries(
-                                Object.entries(newData[mac]).filter(([key, value]) => 
-                                    value !== undefined && value !== null && value !== '0' && value !== 0
-                                )
-                            ),
-                            timestamp: newData[mac].timestamp || updated[mac].timestamp
+                            ...filteredNewData
                         };
                     } else {
                         updated[mac] = newData[mac];
@@ -50,8 +54,8 @@ const DeviceMonitorPage = () => {
                 });
                 return updated;
             });
-            setLastUpdate(new Date());
-        }, 100);
+            setLastUpdate(updateTime);
+        }, 50); // Уменьшили дебаунсинг с 100мс до 50мс
     }, []);
 
     useEffect(() => {
@@ -88,9 +92,10 @@ const DeviceMonitorPage = () => {
                 // Подписка на старый формат ТОЛЬКО для текущего MAC
                 stompClient.subscribe(`/topic/device/${machineMac}`, (message) => {
                     if (message.body) {
-                        console.log('📊 Получены данные:', message.body);
+                        const receiveTime = new Date();
+                        console.log('📊 Получены данные:', message.body, 'время:', receiveTime.toLocaleTimeString());
                         processDeviceData(message.body);
-                        setLastUpdate(new Date());
+                        setLastUpdate(receiveTime);
                         
                         // Добавляем в историю сообщений
                         setMessageHistory(prev => [
@@ -109,9 +114,10 @@ const DeviceMonitorPage = () => {
                     if (message.body) {
                         try {
                             const data = JSON.parse(message.body);
-                            console.log('📊 Получены структурированные данные:', data);
+                            const receiveTime = new Date();
+                            console.log('📊 Получены структурированные данные:', data, 'время:', receiveTime.toLocaleTimeString());
                             processStructuredData(data);
-                            setLastUpdate(new Date());
+                            setLastUpdate(receiveTime);
                         } catch (err) {
                             console.error('Ошибка парсинга JSON:', err);
                         }
