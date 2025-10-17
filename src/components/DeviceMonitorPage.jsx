@@ -30,7 +30,6 @@ const DeviceMonitorPage = () => {
         
         // Устанавливаем новый таймаут для обновления (100мс дебаунсинг)
         updateTimeoutRef.current = setTimeout(() => {
-            console.log('🔄 Обновление данных устройства:', newData);
             setDeviceData(prev => ({
                 ...prev,
                 ...newData
@@ -198,7 +197,7 @@ const DeviceMonitorPage = () => {
                                 // Старые параметры (для совместимости)
                                 const decimalValue = parseInt(trimmedValue, 16);
                                 if (trimmedKey === 'State.U') {
-                                    params[trimmedKey] = (decimalValue / 10).toString();
+                                    params[trimmedKey] = (decimalValue / 10).toFixed(1);
                                 } else {
                                     params[trimmedKey] = decimalValue.toString();
                                 }
@@ -210,7 +209,6 @@ const DeviceMonitorPage = () => {
                     }
                 });
 
-                console.log('📊 Обработанные параметры:', params);
                 updateDeviceData({
                     [mac]: {
                         ...params,
@@ -274,6 +272,14 @@ const DeviceMonitorPage = () => {
                         } else if (key === 'Flags') {
                             // Флаги
                             params[key] = prop.value;
+                        } else if (key === 'State.I' || key === 'State.U') {
+                            // Старые параметры (для совместимости)
+                            const decimalValue = parseInt(prop.value, 16);
+                            if (key === 'State.U') {
+                                params[key] = (decimalValue / 10).toFixed(1);
+                            } else {
+                                params[key] = decimalValue.toString();
+                            }
                         } else {
                             // Все остальные параметры
                             params[key] = prop.value;
@@ -281,7 +287,6 @@ const DeviceMonitorPage = () => {
                     }
                 });
                 
-                console.log('📊 Структурированные параметры:', params);
                 updateDeviceData({
                     [mac]: {
                         ...params,
@@ -477,27 +482,31 @@ const DeviceMonitorPage = () => {
                 
                 {Object.keys(deviceData).length > 0 ? (
                     <div className="parameters-grid">
-                        {console.log('🎨 Рендер данных устройства:', deviceData)}
                         {Object.entries(deviceData).map(([mac, data]) => (
                             <div key={mac} className="device-parameters">
                                 {/* Основные параметры в плитках */}
                                 <div className="main-parameters-grid">
-                                    {Object.entries(data).map(([key, value]) => {
-                                        if (key === 'timestamp' || key === 'Current' || key === 'Voltage') {
-                                            if (key === 'timestamp') return null;
-                                            
-                                            return (
-                                                <div key={key} className="main-parameter-card">
-                                                    <div className="main-parameter-header">
-                                                        <span className="main-parameter-icon">{getParameterIcon(key)}</span>
-                                                        <span className="main-parameter-name">{getParameterDisplayName(key)}</span>
-                                                    </div>
-                                                    <div className="main-parameter-value">{value}</div>
-                                                </div>
-                                            );
-                                        }
-                                        return null;
-                                    })}
+                                    {/* Ток - приоритет новым параметрам, fallback на старые */}
+                                    {(data.Current || data['State.I']) && (
+                                        <div className="main-parameter-card">
+                                            <div className="main-parameter-header">
+                                                <span className="main-parameter-icon">⚡</span>
+                                                <span className="main-parameter-name">Ток (А)</span>
+                                            </div>
+                                            <div className="main-parameter-value">{data.Current || data['State.I']}</div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Напряжение - приоритет новым параметрам, fallback на старые */}
+                                    {(data.Voltage || data['State.U']) && (
+                                        <div className="main-parameter-card">
+                                            <div className="main-parameter-header">
+                                                <span className="main-parameter-icon">🔋</span>
+                                                <span className="main-parameter-name">Напряжение (В)</span>
+                                            </div>
+                                            <div className="main-parameter-value">{data.Voltage || data['State.U']}</div>
+                                        </div>
+                                    )}
                                 </div>
                                 
                                 {/* Остальные параметры в списке */}
@@ -505,6 +514,7 @@ const DeviceMonitorPage = () => {
                                     <h4 className="other-parameters-title">Дополнительные параметры</h4>
                                     {Object.entries(data).map(([key, value]) => {
                                         if (key === 'timestamp' || key === 'Current' || key === 'Voltage' || 
+                                            key === 'State.I' || key === 'State.U' ||
                                             key === 'State.Ctrl' || key === 'State.material' || key === 'State.GasFlow' || 
                                             key === 'State.Temperature' || key === 'Packet.Index' || key === 'Time.Hours' || 
                                             key === 'Time.Minutes' || key === 'Time.Seconds' || key === 'Date.Day' || 
