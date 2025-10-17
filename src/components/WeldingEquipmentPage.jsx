@@ -76,6 +76,7 @@ function WeldingEquipmentPage() {
     const currentYear = new Date().getFullYear();
     const navigate = useNavigate();
     const [deviceDataByMac, setDeviceDataByMac] = useState({});
+    const [shownErrors, setShownErrors] = useState(new Set());
 
     // Load welders from localStorage
     useEffect(() => {
@@ -137,8 +138,14 @@ function WeldingEquipmentPage() {
                             const errorData = JSON.parse(message.body);
                             console.error('Ошибка соответствия модели устройства:', errorData);
                             
-                            // Можно показать уведомление пользователю
-                            alert(`Ошибка соответствия модели для устройства ${errorData.mac}: ${errorData.message}`);
+                            // Создаем уникальный ключ для ошибки
+                            const errorKey = `${errorData.mac}_${errorData.message}`;
+                            
+                            // Показываем уведомление только если эта ошибка еще не была показана
+                            if (!shownErrors.has(errorKey)) {
+                                setShownErrors(prev => new Set([...prev, errorKey]));
+                                alert(`Ошибка соответствия модели для устройства ${errorData.mac}: ${errorData.message}`);
+                            }
                         } catch (e) {
                             console.error('Ошибка парсинга ошибки модели:', e);
                         }
