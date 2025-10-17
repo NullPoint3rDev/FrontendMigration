@@ -30,6 +30,7 @@ const DeviceMonitorPage = () => {
         
         // Устанавливаем новый таймаут для обновления (100мс дебаунсинг)
         updateTimeoutRef.current = setTimeout(() => {
+            console.log('🔄 Обновление данных устройства:', newData);
             setDeviceData(prev => ({
                 ...prev,
                 ...newData
@@ -135,6 +136,7 @@ const DeviceMonitorPage = () => {
 
     const processDeviceData = (rawData) => {
         try {
+            console.log('🔍 Обработка старых данных:', rawData);
             // Формат данных: TIMESTAMP|MAC:PARAM1:VAL1;PARAM2:VAL2;...
             const [timestamp, ...dataParts] = rawData.split('|');
             const dataString = dataParts.join('|');
@@ -148,20 +150,67 @@ const DeviceMonitorPage = () => {
                     if (part.includes(':')) {
                         const [key, value] = part.split(':');
                         if (key && value) {
-                            // Показываем ток и напряжение
-                            if (key.trim() === 'State.I' || key.trim() === 'State.U') {
-                                // Конвертируем hex в десятичное число
-                                const decimalValue = parseInt(value.trim(), 16);
-                                if (key.trim() === 'State.U') {
-                                    params[key.trim()] = (decimalValue / 10).toString();
+                            const trimmedKey = key.trim();
+                            const trimmedValue = value.trim();
+                            
+                            // Обрабатываем все параметры Core
+                            if (trimmedKey === 'Voltage') {
+                                // Напряжение в десятых долях вольта
+                                const decimalValue = parseInt(trimmedValue, 10);
+                                params[trimmedKey] = (decimalValue / 10).toFixed(1);
+                            } else if (trimmedKey === 'Current') {
+                                // Ток
+                                params[trimmedKey] = trimmedValue;
+                            } else if (trimmedKey === 'WeldingCurrent') {
+                                // Ток сварки
+                                params[trimmedKey] = trimmedValue;
+                            } else if (trimmedKey === 'WeldingVoltage') {
+                                // Напряжение сварки
+                                params[trimmedKey] = trimmedValue;
+                            } else if (trimmedKey === 'GasFlow') {
+                                // Расход газа
+                                params[trimmedKey] = trimmedValue;
+                            } else if (trimmedKey === 'WeldingMachineState') {
+                                // Состояние сварочного аппарата
+                                params[trimmedKey] = trimmedValue;
+                            } else if (trimmedKey === 'JobNumber') {
+                                // Номер работы
+                                params[trimmedKey] = trimmedValue;
+                            } else if (trimmedKey === 'Inductance') {
+                                // Индуктивность
+                                params[trimmedKey] = trimmedValue;
+                            } else if (trimmedKey.startsWith('Errors')) {
+                                // Ошибки
+                                params[trimmedKey] = trimmedValue;
+                            } else if (trimmedKey.startsWith('VoltagePhase')) {
+                                // Напряжения фаз
+                                params[trimmedKey] = trimmedValue;
+                            } else if (trimmedKey.startsWith('Temperature') || trimmedKey.includes('Temperature')) {
+                                // Температуры
+                                params[trimmedKey] = trimmedValue;
+                            } else if (trimmedKey === 'WireIndex') {
+                                // Индекс проволоки
+                                params[trimmedKey] = trimmedValue;
+                            } else if (trimmedKey === 'Flags') {
+                                // Флаги
+                                params[trimmedKey] = trimmedValue;
+                            } else if (trimmedKey === 'State.I' || trimmedKey === 'State.U') {
+                                // Старые параметры (для совместимости)
+                                const decimalValue = parseInt(trimmedValue, 16);
+                                if (trimmedKey === 'State.U') {
+                                    params[trimmedKey] = (decimalValue / 10).toString();
                                 } else {
-                                    params[key.trim()] = decimalValue.toString();
+                                    params[trimmedKey] = decimalValue.toString();
                                 }
+                            } else {
+                                // Все остальные параметры
+                                params[trimmedKey] = trimmedValue;
                             }
                         }
                     }
                 });
 
+                console.log('📊 Обработанные параметры:', params);
                 updateDeviceData({
                     [mac]: {
                         ...params,
@@ -176,6 +225,7 @@ const DeviceMonitorPage = () => {
 
     const processStructuredData = (data) => {
         try {
+            console.log('🔍 Обработка структурированных данных:', data);
             if (data.state && data.state.properties) {
                 const mac = data.mac || machineMac; // берём из payload, fallback на выбранный MAC
                 const params = {};
@@ -231,6 +281,7 @@ const DeviceMonitorPage = () => {
                     }
                 });
                 
+                console.log('📊 Структурированные параметры:', params);
                 updateDeviceData({
                     [mac]: {
                         ...params,
@@ -426,6 +477,7 @@ const DeviceMonitorPage = () => {
                 
                 {Object.keys(deviceData).length > 0 ? (
                     <div className="parameters-grid">
+                        {console.log('🎨 Рендер данных устройства:', deviceData)}
                         {Object.entries(deviceData).map(([mac, data]) => (
                             <div key={mac} className="device-parameters">
                                 {Object.entries(data).map(([key, value]) => {
