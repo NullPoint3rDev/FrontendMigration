@@ -71,6 +71,8 @@ function WeldingEquipmentPage() {
     const [welders, setWelders] = useState([]);
     const [organizationUnits, setOrganizationUnits] = useState([]);
     const [weldingMachineTypes, setWeldingMachineTypes] = useState([]);
+    const [modelFilter, setModelFilter] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
     const currentYear = new Date().getFullYear();
     const navigate = useNavigate();
     const [deviceDataByMac, setDeviceDataByMac] = useState({});
@@ -98,12 +100,48 @@ function WeldingEquipmentPage() {
             reconnectDelay: 5000,
             onConnect: () => {
                 console.log('WebSocket подключен к сварочному аппарату');
+                
+                // Подписка на данные от устройств
                 stompClient.subscribe('/topic/device', (message) => {
                     if (message.body) {
                         console.log('Получены данные от устройства:', message.body);
                         const [mac, ...dataArr] = message.body.split(':');
                         const data = dataArr.join(':');
                         setDeviceDataByMac(prev => ({ ...prev, [mac]: data }));
+                    }
+                });
+
+                // Подписка на события подключения/отключения устройств
+                stompClient.subscribe('/topic/device-status', (message) => {
+                    if (message.body) {
+                        try {
+                            const statusData = JSON.parse(message.body);
+                            console.log('Статус устройства обновлен:', statusData);
+                            
+                            // Обновляем статус устройства в списке
+                            setEquipment(prev => prev.map(item => 
+                                item.mac === statusData.mac 
+                                    ? { ...item, lastSeen: statusData.timestamp, status: statusData.status }
+                                    : item
+                            ));
+                        } catch (e) {
+                            console.error('Ошибка парсинга статуса устройства:', e);
+                        }
+                    }
+                });
+
+                // Подписка на события ошибок соответствия модели
+                stompClient.subscribe('/topic/device-model-error', (message) => {
+                    if (message.body) {
+                        try {
+                            const errorData = JSON.parse(message.body);
+                            console.error('Ошибка соответствия модели устройства:', errorData);
+                            
+                            // Можно показать уведомление пользователю
+                            alert(`Ошибка соответствия модели для устройства ${errorData.mac}: ${errorData.message}`);
+                        } catch (e) {
+                            console.error('Ошибка парсинга ошибки модели:', e);
+                        }
                     }
                 });
             },
@@ -154,7 +192,7 @@ function WeldingEquipmentPage() {
     const openAddModal = () => {
         setEditData({
             name: '',
-            model: '',
+            deviceModel: '',
             mac: '',
             department: '',
             status: '',
@@ -216,14 +254,13 @@ function WeldingEquipmentPage() {
         e.preventDefault();
         const newErrors = {};
         if (!editData.name) newErrors.name = 'Это поле обязательно';
-        if (!editData.model) newErrors.model = 'Это поле обязательно';
+        if (!editData.deviceModel) newErrors.deviceModel = 'Выберите модель устройства';
         // Приводим MAC к формату: только заглавные буквы, без двоеточий
         let mac = (editData.mac || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
         if (!mac || mac.length !== 12) {
             newErrors.mac = 'MAC-адрес должен содержать 12 символов (только 0-9, A-F)';
         }
         if (!editData.organizationUnit) newErrors.organizationUnit = 'Выберите подразделение';
-        if (!editData.weldingMachineType) newErrors.weldingMachineType = 'Выберите тип сварочной машины';
 
         if (Object.keys(newErrors).length) {
             setErrors(newErrors);
@@ -289,6 +326,29 @@ function WeldingEquipmentPage() {
         });
     };
 
+    // Функция для фильтрации оборудования
+    const getFilteredEquipment = () => {
+        let filtered = equipment;
+
+        // Фильтр по модели
+        if (modelFilter) {
+            filtered = filtered.filter(item => item.deviceModel === modelFilter);
+        }
+
+        // Фильтр по поисковому запросу
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(item => 
+                item.name?.toLowerCase().includes(term) ||
+                item.mac?.toLowerCase().includes(term) ||
+                item.serialNumber?.toLowerCase().includes(term) ||
+                item.inventoryNumber?.toLowerCase().includes(term)
+            );
+        }
+
+        return filtered;
+    };
+
     return (
         <div className="equipment-page">
             <div className="equipment-header">
@@ -299,8 +359,34 @@ function WeldingEquipmentPage() {
                 </button>
             </div>
 
+            {/* Фильтры */}
+            <div className="equipment-filters">
+                <div className="filter-group">
+                    <label className="filter-label">Поиск:</label>
+                    <input
+                        type="text"
+                        className="filter-input"
+                        placeholder="Поиск по названию, MAC, серийному номеру..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                <div className="filter-group">
+                    <label className="filter-label">Модель:</label>
+                    <select
+                        className="filter-select"
+                        value={modelFilter}
+                        onChange={(e) => setModelFilter(e.target.value)}
+                    >
+                        <option value="">Все модели</option>
+                        <option value="MONITORING_BLOCK">Блок мониторинга</option>
+                        <option value="CORE">Core</option>
+                    </select>
+                </div>
+            </div>
+
             <div className="equipment-grid">
-                {equipment.map((item) => (
+                {getFilteredEquipment().map((item) => (
                     <div key={item.id} className="equipment-card">
                         <img
                             src={item.imageUrl}
@@ -312,7 +398,7 @@ function WeldingEquipmentPage() {
                         />
                         <div className="equipment-info">
                             <h3 className="equipment-name">{item.name}</h3>
-                            <p className="equipment-model">Модель: {item.model}</p>
+                            <p className="equipment-model">Модель: {item.deviceModel === 'MONITORING_BLOCK' ? 'Блок мониторинга' : item.deviceModel === 'CORE' ? 'Core' : item.model || 'Не указана'}</p>
                             <div className="equipment-details">
                                 <div className="detail-item">
                                     <span className="detail-label">MAC:</span>
@@ -416,27 +502,37 @@ function WeldingEquipmentPage() {
                             </div>
 
                             <div className="form-group">
-                                <label className="form-label">Модель</label>
-                                <input
-                                    type="text"
-                                    name="model"
-                                    value={editData.model || ''}
+                                <label className="form-label">Модель устройства *</label>
+                                <select
+                                    name="deviceModel"
+                                    value={editData.deviceModel || ''}
                                     onChange={handleInputChange}
                                     className="form-input"
-                                    placeholder="Введите модель"
-                                />
-                                {errors.model && <p className="error-message">{errors.model}</p>}
+                                >
+                                    <option value="">Выберите модель устройства</option>
+                                    <option value="MONITORING_BLOCK">Блок мониторинга</option>
+                                    <option value="CORE">Core</option>
+                                </select>
+                                {errors.deviceModel && <p className="error-message">{errors.deviceModel}</p>}
                             </div>
 
                             <div className="form-group">
-                                <label className="form-label">MAC-адрес</label>
+                                <label className="form-label">MAC-адрес *</label>
                                 <input
                                     type="text"
                                     name="mac"
                                     value={editData.mac || ''}
-                                    onChange={handleInputChange}
+                                    onChange={(e) => {
+                                        // Автоматическая нормализация MAC-адреса
+                                        let value = e.target.value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+                                        if (value.length > 12) {
+                                            value = value.substring(0, 12);
+                                        }
+                                        setEditData({ ...editData, mac: value });
+                                    }}
                                     className="form-input"
-                                    placeholder="Введите MAC-адрес"
+                                    placeholder="Введите MAC-адрес (12 символов: 0-9, A-F)"
+                                    maxLength={12}
                                 />
                                 {errors.mac && <p className="error-message">{errors.mac}</p>}
                             </div>
@@ -464,40 +560,6 @@ function WeldingEquipmentPage() {
                                 )}
                             </div>
 
-                            <div className="form-group">
-                                <label className="form-label">Тип сварочной машины</label>
-                                <select
-                                    name="weldingMachineType"
-                                    value={editData.weldingMachineType?.id || ''}
-                                    onChange={(e) => {
-                                        const selectedType = weldingMachineTypes.find(type => type.id === parseInt(e.target.value));
-                                        setEditData({ ...editData, weldingMachineType: selectedType });
-                                    }}
-                                    className="form-input"
-                                >
-                                    <option value="">Выберите тип сварочной машины</option>
-                                    {weldingMachineTypes.map(type => (
-                                        <option key={type.id} value={type.id}>
-                                            {type.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                {errors.weldingMachineType && (
-                                    <p className="error-message">{errors.weldingMachineType}</p>
-                                )}
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">URL изображения</label>
-                                <input
-                                    type="text"
-                                    name="imageUrl"
-                                    value={editData.imageUrl || ''}
-                                    onChange={handleInputChange}
-                                    className="form-input"
-                                    placeholder="Введите URL изображения"
-                                />
-                            </div>
 
                             <div className="form-group">
                                 <label className="form-label">Дата ввода в эксплуатацию</label>
