@@ -507,6 +507,15 @@ const DeviceMonitorPage = () => {
                                             <div className="main-parameter-value">{data.Voltage || data['State.U']}</div>
                                         </div>
                                     )}
+                                    
+                                    {/* Отладочная информация */}
+                                    {console.log('🔍 Данные для отображения:', {
+                                        Current: data.Current,
+                                        'State.I': data['State.I'],
+                                        Voltage: data.Voltage,
+                                        'State.U': data['State.U'],
+                                        allData: data
+                                    })}
                                 </div>
                                 
                                 {/* Остальные параметры в списке */}
