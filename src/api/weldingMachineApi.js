@@ -50,6 +50,12 @@ export async function createWeldingMachine(machine) {
         headers: getAuthHeaders(),
         body: JSON.stringify(machine),
     });
+    
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Ошибка создания устройства' }));
+        throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
+    }
+    
     return res.json();
 }
 
@@ -60,6 +66,12 @@ export async function updateWeldingMachine(id, machine) {
         headers: getAuthHeaders(),
         body: JSON.stringify(machine),
     });
+    
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Ошибка обновления устройства' }));
+        throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
+    }
+    
     return res.json();
 }
 
@@ -69,7 +81,13 @@ export async function deleteWeldingMachine(id) {
         method: 'DELETE',
         headers: getAuthHeaders()
     });
-    return res.status === 204;
+    
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Ошибка удаления устройства' }));
+        throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
+    }
+    
+    return true;
 }
 
 // Получить все подразделения

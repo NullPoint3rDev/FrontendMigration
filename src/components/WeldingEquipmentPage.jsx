@@ -277,13 +277,17 @@ function WeldingEquipmentPage() {
 
             if (editData.id) {
                 await updateWeldingMachine(editData.id, machineData);
+                alert('Оборудование успешно обновлено');
             } else {
                 await createWeldingMachine(machineData);
+                alert('Оборудование успешно создано');
             }
             await loadEquipment();
             closeModal();
         } catch (err) {
+            console.error('Ошибка сохранения оборудования:', err);
             setErrors({ api: err.message });
+            alert('Ошибка сохранения оборудования: ' + err.message);
         }
     };
 
@@ -293,9 +297,11 @@ function WeldingEquipmentPage() {
             try {
                 await deleteWeldingMachine(id);
                 await loadEquipment();
-                closeModal();
+                // Показываем уведомление об успешном удалении
+                alert('Оборудование успешно удалено');
             } catch (err) {
-                setErrors({ api: err.message });
+                console.error('Ошибка удаления оборудования:', err);
+                alert('Ошибка удаления оборудования: ' + err.message);
             }
         }
     };
@@ -385,96 +391,66 @@ function WeldingEquipmentPage() {
                 </div>
             </div>
 
-            <div className="equipment-grid">
-                {getFilteredEquipment().map((item) => (
-                    <div key={item.id} className="equipment-card">
-                        <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className="equipment-image"
-                            onError={(e) => {
-                                e.target.src = '/images/placeholder.jpg';
-                            }}
-                        />
-                        <div className="equipment-info">
-                            <h3 className="equipment-name">{item.name}</h3>
-                            <p className="equipment-model">Модель: {item.deviceModel === 'MONITORING_BLOCK' ? 'Блок мониторинга' : item.deviceModel === 'CORE' ? 'Core' : item.model || 'Не указана'}</p>
-                            <div className="equipment-details">
-                                <div className="detail-item">
-                                    <span className="detail-label">MAC:</span>
-                                    {item.mac}
-                                </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">Отдел:</span>
-                                    {item.department}
-                                </div>
-                                {item.serialNumber && (
-                                    <div className="detail-item">
-                                        <span className="detail-label">Серийный номер:</span>
-                                        {item.serialNumber}
+            {getFilteredEquipment().length > 0 ? (
+                <table className="equipment-table">
+                    <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Модель</th>
+                            <th>MAC</th>
+                            <th>Подразделение</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {getFilteredEquipment().map((item) => (
+                            <tr key={item.id}>
+                                <td>{item.name}</td>
+                                <td>
+                                    {item.deviceModel === 'MONITORING_BLOCK' ? 'Блок мониторинга' : 
+                                     item.deviceModel === 'CORE' ? 'Core' : 
+                                     item.model || 'Не указана'}
+                                </td>
+                                <td>{item.mac}</td>
+                                <td>{item.organizationUnit?.name || 'Не указано'}</td>
+                                <td>
+                                    <div className="action-buttons">
+                                        <button
+                                            className="action-btn edit-btn"
+                                            onClick={() => openEditModal(item)}
+                                            title="Редактировать"
+                                        >
+                                            <i className="fas fa-edit"></i>
+                                        </button>
+                                        <button
+                                            className="action-btn control-btn"
+                                            onClick={() => handleControl(item)}
+                                            title="Управление"
+                                        >
+                                            <i className="fas fa-cog"></i>
+                                        </button>
+                                        <button
+                                            className="action-btn delete-btn"
+                                            onClick={() => handleDelete(item.id)}
+                                            title="Удалить"
+                                        >
+                                            <i className="fas fa-trash"></i>
+                                        </button>
                                     </div>
-                                )}
-                                {item.inventoryNumber && (
-                                    <div className="detail-item">
-                                        <span className="detail-label">Инв. номер:</span>
-                                        {item.inventoryNumber}
-                                    </div>
-                                )}
-                            </div>
-                            {item.assignedWelders && item.assignedWelders.length > 0 && (
-                                <div className="assigned-welders">
-                                    <div className="detail-label">Назначенные сварщики:</div>
-                                    {item.assignedWelders.map(welderName => {
-                                        const welder = welders.find(w => w.name === welderName);
-                                        return (
-                                            <div
-                                                key={welderName}
-                                                className="assigned-welder"
-                                                onClick={() => navigateToWelderProfile(welder?.id)}
-                                            >
-                                                <div>{welderName}</div>
-                                                <div className="rfid-code">
-                                                    RFID: {welder?.rfidCode || 'Не указан'}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                            {/* Данные от аппарата по MAC */}
-                            {deviceDataByMac[item.mac] && (
-                                <div className="device-data-block">
-                                    <strong>Данные от аппарата:</strong>
-                                    <pre>{deviceDataByMac[item.mac]}</pre>
-                                </div>
-                            )}
-                            <div className="equipment-actions">
-                                <button
-                                    className="action-btn control-btn"
-                                    onClick={() => handleControl(item)}
-                                >
-                                    <i className="fas fa-cog"></i>
-                                    Управление
-                                </button>
-                                <button
-                                    className="action-btn edit-btn"
-                                    onClick={() => openEditModal(item)}
-                                >
-                                    <i className="fas fa-edit"></i>
-                                    Редактировать
-                                </button>
-                                <button
-                                    className="action-btn delete-btn"
-                                    onClick={() => handleDelete(item.id)}
-                                >
-                                    <i className="fas fa-trash"></i>
-                                    Удалить
-                                </button>
-                            </div>
-                        </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            ) : (
+                <div className="no-equipment">
+                    <div className="no-equipment-content">
+                        <i className="fas fa-tools" style={{ fontSize: '3rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}></i>
+                        <h3>Нет оборудования</h3>
+                        <p>Добавьте первое устройство, нажав кнопку "Добавить оборудование"</p>
                     </div>
-                ))}
-            </div>
+                </div>
+            )}
 
             {modalOpen && (
                 <div className="modal-overlay" onClick={closeModal}>
