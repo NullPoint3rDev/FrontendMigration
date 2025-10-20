@@ -46,7 +46,7 @@ const handleResponse = async (response) => {
 // Helper function for adding auth headers
 export const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
-    // console.log('Getting auth headers with token:', token); // Убрали лишний лог
+    // Логи убраны для чистоты консоли
     if (!token) {
         console.warn('No token found in localStorage');
         return {
@@ -59,7 +59,7 @@ export const getAuthHeaders = () => {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     };
-    // console.log('Generated headers:', headers); // Убрали лишний лог
+    // Логи убраны для чистоты консоли
     return headers;
 };
 
