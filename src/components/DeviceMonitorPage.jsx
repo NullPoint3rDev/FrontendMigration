@@ -19,6 +19,9 @@ const DeviceMonitorPage = () => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [messageHistory, setMessageHistory] = useState([]);
     
+    // Состояние для polling
+    const [pollingInterval, setPollingInterval] = useState(null);
+    const [isPolling, setIsPolling] = useState(false);
     
     // Реф для дебаунсинга обновлений
     const updateTimeoutRef = useRef(null);
@@ -77,7 +80,8 @@ const DeviceMonitorPage = () => {
     }, []);
 
     useEffect(() => {
-        connectWebSocket();
+        startPolling();
+        return () => stopPolling();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [machineMac]);
 
@@ -90,109 +94,69 @@ const DeviceMonitorPage = () => {
         };
     }, []);
 
-    const connectWebSocket = () => {
-        console.log('🔌 Попытка подключения к WebSocket...');
-        console.log('🌐 WebSocket URL:', WEBSOCKET_URL);
-        console.log('🌐 Current hostname:', window.location.hostname);
+    // Функция для опроса состояния устройства (как в archive проекте)
+    const startPolling = () => {
+        console.log('🔄 Запуск polling для MAC:', machineMac);
         setIsConnecting(true);
         setError(null);
-
-        const stompClient = new Client({
-            brokerURL: undefined,
-            webSocketFactory: () => new SockJS(WEBSOCKET_URL),
-            reconnectDelay: 5000,
-            onConnect: () => {
-                console.log('🔌 WebSocket подключен к сварочному аппарату');
+        setIsPolling(true);
+        
+        // Первый запрос сразу
+        fetchDeviceState();
+        
+        // Устанавливаем интервал опроса каждые 500ms (как в archive проекте)
+        const interval = setInterval(() => {
+            fetchDeviceState();
+        }, 500);
+        
+        setPollingInterval(interval);
+    };
+    
+    // Функция для остановки polling
+    const stopPolling = () => {
+        console.log('🛑 Остановка polling');
+        setIsPolling(false);
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+        }
+    };
+    
+    // Функция для получения состояния устройства
+    const fetchDeviceState = async () => {
+        try {
+            const response = await archiveDeviceApi.getArchivePanelState(machineMac);
+            
+            if (response.success && response.state) {
+                const receiveTime = new Date();
+                console.log('📊 Получены данные через polling:', response.state, 'время:', receiveTime.toLocaleTimeString());
+                
+                // Обрабатываем данные
+                processStructuredData(response.state);
                 setConnectionStatus('connected');
+                setLastUpdate(receiveTime);
                 setError(null);
                 setIsConnecting(false);
                 
-                // Подписка на старый формат ТОЛЬКО для текущего MAC
-                stompClient.subscribe(`/topic/device/${machineMac}`, (message) => {
-                    if (message.body) {
-                        const receiveTime = new Date();
-                        console.log('📊 Получены данные (старый формат):', message.body, 'время:', receiveTime.toLocaleTimeString());
-                        processDeviceData(message.body);
-                        setLastUpdate(receiveTime);
-                        
-                        // Добавляем в историю сообщений
-                        setMessageHistory(prev => [
-                            {
-                                timestamp: new Date(),
-                                data: message.body,
-                                type: 'received'
-                            },
-                            ...prev.slice(0, 9) // Храним последние 10 сообщений
-                        ]);
-                    }
-                });
-                
-                // Подписка на структурированные данные ТОЛЬКО для текущего MAC
-                stompClient.subscribe(`/topic/device-state/${machineMac}`, (message) => {
-                    if (message.body) {
-                        try {
-                            const data = JSON.parse(message.body);
-                            const receiveTime = new Date();
-                            console.log('📊 Получены данные (новый формат):', data, 'время:', receiveTime.toLocaleTimeString());
-                            processStructuredData(data);
-                            setLastUpdate(receiveTime);
-                        } catch (err) {
-                            console.error('Ошибка парсинга JSON:', err);
-                        }
-                    }
-                });
-
-                // Подписка на archive-style события подключений для текущего MAC
-                stompClient.subscribe('/topic/archive-connection', (message) => {
-                    if (message.body) {
-                        try {
-                            const data = JSON.parse(message.body);
-                            console.log('📡 Archive connection event:', data);
-                            
-                            // Показываем только события для текущего устройства
-                            if (data.mac === machineMac) {
-                                // Обновляем статус подключения
-                                if (data.eventType === 'data_received') {
-                                    setConnectionStatus('connected');
-                                } else if (data.eventType === 'timeout') {
-                                    setConnectionStatus('disconnected');
-                                }
-                            }
-                        } catch (e) {
-                            console.error('Ошибка парсинга archive connection event:', e);
-                        }
-                    }
-                });
-            },
-            onDisconnect: () => {
-                console.log('❌ WebSocket отключен от сварочного аппарата');
+                // Добавляем в историю сообщений
+                setMessageHistory(prev => [
+                    {
+                        timestamp: new Date(),
+                        data: JSON.stringify(response.state),
+                        type: 'received'
+                    },
+                    ...prev.slice(0, 9) // Храним последние 10 сообщений
+                ]);
+            } else {
                 setConnectionStatus('disconnected');
-                setIsConnecting(false);
-            },
-            onStompError: (error) => {
-                console.error('⚠️ WebSocket ошибка:', error);
-                console.error('⚠️ Детали ошибки:', {
-                    message: error.message,
-                    type: error.type,
-                    details: error.details
-                });
-                setError('Ошибка подключения к сварочному аппарату: ' + error.message);
-                setConnectionStatus('error');
-                setIsConnecting(false);
-            },
-            onWebSocketError: (error) => {
-                console.error('⚠️ WebSocket соединение ошибка:', error);
-                setError('Ошибка WebSocket соединения: ' + error.message);
-                setConnectionStatus('error');
-                setIsConnecting(false);
+                setError(response.message || 'Устройство не найдено');
             }
-        });
-
-        stompClient.activate();
-
-        return () => {
-            stompClient.deactivate();
-        };
+        } catch (err) {
+            console.error('Ошибка получения состояния устройства:', err);
+            setConnectionStatus('error');
+            setError('Ошибка подключения: ' + err.message);
+            setIsConnecting(false);
+        }
     };
 
     const processDeviceData = (rawData) => {
@@ -478,7 +442,8 @@ const DeviceMonitorPage = () => {
     };
 
     const handleReconnect = () => {
-        connectWebSocket();
+        stopPolling();
+        startPolling();
     };
 
     const clearHistory = () => {

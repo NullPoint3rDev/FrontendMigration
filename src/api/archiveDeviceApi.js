@@ -102,3 +102,11 @@ export async function getArchiveOutboundQueueSize() {
     });
     return res.json();
 }
+
+// Получить текущее состояние устройства (для polling)
+export async function getArchivePanelState(mac) {
+    const res = await fetch(`${API_URL}/panel-state?mac=${encodeURIComponent(mac)}`, {
+        headers: getAuthHeaders()
+    });
+    return res.json();
+}

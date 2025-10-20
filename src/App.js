@@ -31,7 +31,6 @@ import TasksReportPage from './components/TasksReportPage';
 import EmployeesPage from './components/EmployeesPage';
 import DeviceMonitorPage from './components/DeviceMonitorPage';
 import DeviceTestPage from './components/DeviceTestPage';
-import ArchiveDeviceMonitor from './components/ArchiveDeviceMonitor';
 import './App.css';
 
 const theme = createTheme({
@@ -78,7 +77,6 @@ function App() {
                                 <Route path="/wps" element={<WPSPage />} />
                                 <Route path="/device-monitor" element={<DeviceMonitorPage />} />
                                 <Route path="/device-test" element={<DeviceTestPage />} />
-                                <Route path="/archive-device-monitor" element={<ArchiveDeviceMonitor />} />
                                 
                                 {/* 3. Мониторинг */}
                                 <Route path="/enterprise-map" element={<EnterpriseMapPage />} />
