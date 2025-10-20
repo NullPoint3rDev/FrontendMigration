@@ -97,6 +97,13 @@ const DeviceMonitorPage = () => {
     // Функция для опроса состояния устройства (как в archive проекте)
     const startPolling = () => {
         console.log('🔄 Запуск polling для MAC:', machineMac);
+        
+        // Останавливаем предыдущий polling если он есть
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+        }
+        
         setIsConnecting(true);
         setError(null);
         setIsPolling(true);
@@ -129,9 +136,7 @@ const DeviceMonitorPage = () => {
             
             if (response.success && response.state) {
                 const receiveTime = new Date();
-                console.log('📊 Получены данные через polling:', response);
-                console.log('📊 StateSummary объект:', response.state);
-                console.log('📊 Properties:', response.state.properties);
+                console.log('📊 Получены данные через polling:', response.state.status, 'время:', receiveTime.toLocaleTimeString());
                 
                 // Обрабатываем данные (оборачиваем в нужный формат)
                 processStructuredData({
@@ -253,9 +258,7 @@ const DeviceMonitorPage = () => {
 
     const processStructuredData = (data) => {
         try {
-            console.log('🔍 processStructuredData вызвана с данными:', data);
-            console.log('🔍 data.state:', data.state);
-            console.log('🔍 data.state.properties:', data.state?.properties);
+            // console.log('🔍 processStructuredData вызвана с данными:', data); // Убрали лишний лог
             
             if (data.state && data.state.properties) {
                 const mac = data.mac || machineMac; // берём из payload, fallback на выбранный MAC
@@ -320,12 +323,7 @@ const DeviceMonitorPage = () => {
                     }
                 });
                 
-                console.log('🔍 Обновляем данные устройства:', {
-                    [mac]: {
-                        ...params,
-                        timestamp: data.timestamp || new Date().toLocaleTimeString()
-                    }
-                });
+                // console.log('🔍 Обновляем данные устройства:', params); // Убрали лишний лог
                 
                 updateDeviceData({
                     [mac]: {
