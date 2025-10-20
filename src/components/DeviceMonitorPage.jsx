@@ -129,10 +129,15 @@ const DeviceMonitorPage = () => {
             
             if (response.success && response.state) {
                 const receiveTime = new Date();
-                console.log('📊 Получены данные через polling:', response.state, 'время:', receiveTime.toLocaleTimeString());
+                console.log('📊 Получены данные через polling:', response);
+                console.log('📊 StateSummary объект:', response.state);
+                console.log('📊 Properties:', response.state.properties);
                 
-                // Обрабатываем данные
-                processStructuredData(response.state);
+                // Обрабатываем данные (оборачиваем в нужный формат)
+                processStructuredData({
+                    mac: machineMac,
+                    state: response.state
+                });
                 setConnectionStatus('connected');
                 setLastUpdate(receiveTime);
                 setError(null);
@@ -248,6 +253,10 @@ const DeviceMonitorPage = () => {
 
     const processStructuredData = (data) => {
         try {
+            console.log('🔍 processStructuredData вызвана с данными:', data);
+            console.log('🔍 data.state:', data.state);
+            console.log('🔍 data.state.properties:', data.state?.properties);
+            
             if (data.state && data.state.properties) {
                 const mac = data.mac || machineMac; // берём из payload, fallback на выбранный MAC
                 const params = {};
@@ -308,6 +317,13 @@ const DeviceMonitorPage = () => {
                             // Все остальные параметры
                             params[key] = prop.value;
                         }
+                    }
+                });
+                
+                console.log('🔍 Обновляем данные устройства:', {
+                    [mac]: {
+                        ...params,
+                        timestamp: data.timestamp || new Date().toLocaleTimeString()
                     }
                 });
                 
