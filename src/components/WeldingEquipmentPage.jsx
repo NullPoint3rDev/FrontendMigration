@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/equipmentPage.css';
 import { useNavigate } from 'react-router-dom';
-import SockJS from 'sockjs-client';
-import { Client } from '@stomp/stompjs';
-import { WEBSOCKET_URL } from '../config';
+// WebSocket отключен — используем только polling API
 import { 
     createWeldingMachine, 
     updateWeldingMachine, 
@@ -94,76 +92,77 @@ function WeldingEquipmentPage() {
 
     // Данные теперь хранятся в базе данных, localStorage не нужен
 
-    useEffect(() => {
-        const stompClient = new Client({
-            brokerURL: undefined, // обязательно undefined, если используешь SockJS
-            webSocketFactory: () => new SockJS(WEBSOCKET_URL),
-            reconnectDelay: 5000,
-            onConnect: () => {
-                console.log('WebSocket подключен к сварочному аппарату');
-                
-                // Подписка на данные от устройств
-                stompClient.subscribe('/topic/device', (message) => {
-                    if (message.body) {
-                        console.log('Получены данные от устройства:', message.body);
-                        const [mac, ...dataArr] = message.body.split(':');
-                        const data = dataArr.join(':');
-                        setDeviceDataByMac(prev => ({ ...prev, [mac]: data }));
-                    }
-                });
+    // useEffect(() => {
+    //     // WebSocket отключен - все устройства работают через polling API (как в archive проекте)
+    //     // const stompClient = new Client({
+    //     //     brokerURL: undefined, // обязательно undefined, если используешь SockJS
+    //     //     webSocketFactory: () => new SockJS(WEBSOCKET_URL),
+    //     //     reconnectDelay: 5000,
+    //     //     onConnect: () => {
+    //     //         console.log('WebSocket подключен к сварочному аппарату');
+        //         
+        //         // Подписка на данные от устройств
+        //         stompClient.subscribe('/topic/device', (message) => {
+                //     if (message.body) {
+                //         console.log('Получены данные от устройства:', message.body);
+                //         const [mac, ...dataArr] = message.body.split(':');
+                //         const data = dataArr.join(':');
+                //         setDeviceDataByMac(prev => ({ ...prev, [mac]: data }));
+                //     }
+                // });
 
-                // Подписка на события подключения/отключения устройств
-                stompClient.subscribe('/topic/device-status', (message) => {
-                    if (message.body) {
-                        try {
-                            const statusData = JSON.parse(message.body);
-                            console.log('Статус устройства обновлен:', statusData);
+                // // Подписка на события подключения/отключения устройств
+                // stompClient.subscribe('/topic/device-status', (message) => {
+                //     if (message.body) {
+                //         try {
+                //             const statusData = JSON.parse(message.body);
+                //             console.log('Статус устройства обновлен:', statusData);
                             
-                            // Обновляем статус устройства в списке
-                            setEquipment(prev => prev.map(item => 
-                                item.mac === statusData.mac 
-                                    ? { ...item, lastSeen: statusData.timestamp, status: statusData.status }
-                                    : item
-                            ));
-                        } catch (e) {
-                            console.error('Ошибка парсинга статуса устройства:', e);
-                        }
-                    }
-                });
+                //             // Обновляем статус устройства в списке
+                //             setEquipment(prev => prev.map(item => 
+                //                 item.mac === statusData.mac 
+                //                     ? { ...item, lastSeen: statusData.timestamp, status: statusData.status }
+                //                     : item
+                //             ));
+                //         } catch (e) {
+                //             console.error('Ошибка парсинга статуса устройства:', e);
+                //         }
+                //     }
+                // });
 
-                // Подписка на события ошибок соответствия модели
-                stompClient.subscribe('/topic/device-model-error', (message) => {
-                    if (message.body) {
-                        try {
-                            const errorData = JSON.parse(message.body);
-                            console.error('Ошибка соответствия модели устройства:', errorData);
+                // // Подписка на события ошибок соответствия модели
+                // stompClient.subscribe('/topic/device-model-error', (message) => {
+                //     if (message.body) {
+                //         try {
+                //             const errorData = JSON.parse(message.body);
+                //             console.error('Ошибка соответствия модели устройства:', errorData);
                             
-                            // Создаем уникальный ключ для ошибки
-                            const errorKey = `${errorData.mac}_${errorData.message}`;
+                //             // Создаем уникальный ключ для ошибки
+                //             const errorKey = `${errorData.mac}_${errorData.message}`;
                             
-                            // Показываем уведомление только если эта ошибка еще не была показана
-                            if (!shownErrors.has(errorKey)) {
-                                setShownErrors(prev => new Set([...prev, errorKey]));
-                                alert(`Ошибка соответствия модели для устройства ${errorData.mac}: ${errorData.message}`);
-                            }
-                        } catch (e) {
-                            console.error('Ошибка парсинга ошибки модели:', e);
-                        }
-                    }
-                });
-            },
-            onDisconnect: () => {
-                console.log('WebSocket отключен от сварочного аппарата');
-            },
-            onStompError: (error) => {
-                console.error('WebSocket ошибка:', error);
-            }
-        });
-        stompClient.activate();
-        return () => {
-            stompClient.deactivate();
-        };
-    }, []);
+                //             // Показываем уведомление только если эта ошибка еще не была показана
+                //             if (!shownErrors.has(errorKey)) {
+                //                 setShownErrors(prev => new Set([...prev, errorKey]));
+                //                 alert(`Ошибка соответствия модели для устройства ${errorData.mac}: ${errorData.message}`);
+                //             }
+                //         } catch (e) {
+                //             console.error('Ошибка парсинга ошибки модели:', e);
+                //         }
+                //     }
+                //         //     });
+        // },
+        //     onDisconnect: () => {
+        //         console.log('WebSocket отключен от сварочного аппарата');
+        //     },
+        //     onStompError: (error) => {
+        //         console.error('WebSocket ошибка:', error);
+        //     }
+        // });
+        // stompClient.activate();
+        // return () => {
+        //     stompClient.deactivate();
+        // };
+    // }, []);
 
     // Navigation logic
     const handleNavClick = (item, e) => {

@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
-import { WEBSOCKET_URL, API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../config';
 import { getAuthHeaders } from '../services/api';
 import '../styles/deviceTestPage.css';
 
@@ -11,14 +9,14 @@ const DeviceTestPage = () => {
     const [deviceState, setDeviceState] = useState(null);
     const [messageHistory, setMessageHistory] = useState([]);
     const [commandInput, setCommandInput] = useState('');
-    const [isConnected, setIsConnected] = useState(false);
-    const [realtimeMessages, setRealtimeMessages] = useState([]);
+    const [isConnected, setIsConnected] = useState(false); // WebSocket disabled
+    const [realtimeMessages, setRealtimeMessages] = useState([]); // WebSocket disabled
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         loadDevices();
-        connectWebSocket();
+        // WebSocket disabled
     }, []);
 
     useEffect(() => {
@@ -82,76 +80,7 @@ const DeviceTestPage = () => {
         }
     };
 
-    const connectWebSocket = () => {
-        const stompClient = new Client({
-            brokerURL: undefined,
-            webSocketFactory: () => new SockJS(WEBSOCKET_URL),
-            reconnectDelay: 5000,
-            onConnect: () => {
-                console.log('🔌 WebSocket подключен для тестирования устройств');
-                setIsConnected(true);
-                setError(null);
-                
-                // Подписываемся на тестовые сообщения
-                stompClient.subscribe('/topic/device-test', (message) => {
-                    if (message.body) {
-                        try {
-                            const data = JSON.parse(message.body);
-                            console.log('📊 Получено тестовое сообщение:', data);
-                            
-                            setRealtimeMessages(prev => [
-                                {
-                                    ...data,
-                                    timestamp: new Date()
-                                },
-                                ...prev.slice(0, 9) // Храним последние 10 сообщений
-                            ]);
-                        } catch (err) {
-                            console.error('Ошибка парсинга тестового сообщения:', err);
-                        }
-                    }
-                });
-
-                // Подписываемся на обычные сообщения от устройств ТОЛЬКО для выбранного
-                // Если нет выбранного устройства, можно подписаться позже при выборе
-                if (selectedDevice?.mac) {
-                    stompClient.subscribe(`/topic/device/${selectedDevice.mac}`, (message) => {
-                    if (message.body) {
-                        console.log('📨 Получено сообщение от устройства:', message.body);
-                        
-                        const extractedMac = extractMacFromMessage(message.body);
-                        console.log('🔍 Извлеченный MAC:', extractedMac);
-                        
-                        setRealtimeMessages(prev => [
-                            {
-                                mac: extractedMac,
-                                type: 'device_message',
-                                data: message.body,
-                                timestamp: new Date()
-                            },
-                            ...prev.slice(0, 9)
-                        ]);
-                    }
-                    });
-                }
-            },
-            onDisconnect: () => {
-                console.log('❌ WebSocket отключен');
-                setIsConnected(false);
-            },
-            onStompError: (error) => {
-                console.error('⚠️ WebSocket ошибка:', error);
-                setError('Ошибка подключения к WebSocket: ' + error.message);
-                setIsConnected(false);
-            }
-        });
-
-        stompClient.activate();
-
-        return () => {
-            stompClient.deactivate();
-        };
-    };
+    // WebSocket fully disabled: no connectWebSocket
 
     const extractMacFromMessage = (message) => {
         // Пытаемся извлечь MAC из сообщения в различных форматах
