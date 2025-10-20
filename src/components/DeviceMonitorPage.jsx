@@ -4,6 +4,7 @@ import SockJS from 'sockjs-client';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { WEBSOCKET_URL } from '../config';
 import '../styles/deviceMonitor.css';
+import * as archiveDeviceApi from '../api/archiveDeviceApi';
 
 const DeviceMonitorPage = () => {
     const [searchParams] = useSearchParams();
@@ -17,6 +18,7 @@ const DeviceMonitorPage = () => {
     const [error, setError] = useState(null);
     const [isConnecting, setIsConnecting] = useState(false);
     const [messageHistory, setMessageHistory] = useState([]);
+    
     
     // Реф для дебаунсинга обновлений
     const updateTimeoutRef = useRef(null);
@@ -136,6 +138,28 @@ const DeviceMonitorPage = () => {
                             setLastUpdate(receiveTime);
                         } catch (err) {
                             console.error('Ошибка парсинга JSON:', err);
+                        }
+                    }
+                });
+
+                // Подписка на archive-style события подключений для текущего MAC
+                stompClient.subscribe('/topic/archive-connection', (message) => {
+                    if (message.body) {
+                        try {
+                            const data = JSON.parse(message.body);
+                            console.log('📡 Archive connection event:', data);
+                            
+                            // Показываем только события для текущего устройства
+                            if (data.mac === machineMac) {
+                                // Обновляем статус подключения
+                                if (data.eventType === 'data_received') {
+                                    setConnectionStatus('connected');
+                                } else if (data.eventType === 'timeout') {
+                                    setConnectionStatus('disconnected');
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Ошибка парсинга archive connection event:', e);
                         }
                     }
                 });
@@ -465,6 +489,42 @@ const DeviceMonitorPage = () => {
         navigate('/equipment');
     };
 
+    // Archive-style функции управления
+    const handleArchiveTimeSync = async () => {
+        try {
+            const result = await archiveDeviceApi.sendArchiveTimeSync(machineMac);
+            console.log('Синхронизация времени отправлена:', result);
+            alert('Команда синхронизации времени отправлена');
+        } catch (err) {
+            console.error('Ошибка синхронизации времени:', err);
+            alert('Ошибка синхронизации времени: ' + err.message);
+        }
+    };
+
+    const handleArchiveRequestStatus = async () => {
+        try {
+            const result = await archiveDeviceApi.requestArchiveStatus(machineMac);
+            console.log('Запрос статуса отправлен:', result);
+            alert('Запрос статуса отправлен');
+        } catch (err) {
+            console.error('Ошибка запроса статуса:', err);
+            alert('Ошибка запроса статуса: ' + err.message);
+        }
+    };
+
+    const handleArchiveReset = async () => {
+        if (window.confirm('Вы уверены, что хотите сбросить устройство?')) {
+            try {
+                const result = await archiveDeviceApi.resetArchiveDevice(machineMac);
+                console.log('Команда сброса отправлена:', result);
+                alert('Команда сброса отправлена');
+            } catch (err) {
+                console.error('Ошибка сброса устройства:', err);
+                alert('Ошибка сброса устройства: ' + err.message);
+            }
+        }
+    };
+
     return (
         <div className="device-monitor-page">
             <div className="device-monitor-header">
@@ -477,6 +537,7 @@ const DeviceMonitorPage = () => {
             {/* Информация о выбранном аппарате */}
             <div className="device-info-card">
                 <h2 className="device-name">{machineName}</h2>
+                <div className="device-mac">MAC: {machineMac}</div>
             </div>
 
             {/* Статус подключения */}
@@ -502,6 +563,37 @@ const DeviceMonitorPage = () => {
                         Последнее обновление: {lastUpdate.toLocaleTimeString()}
                     </div>
                 )}
+                
+                {/* Кнопки управления устройством */}
+                <div className="device-controls">
+                    <h4>🎛️ Управление устройством</h4>
+                    <div className="control-buttons">
+                        <button 
+                            className="control-btn time-sync-btn"
+                            onClick={handleArchiveTimeSync}
+                            title="Синхронизация времени"
+                        >
+                            <i className="fas fa-clock"></i>
+                            Синхронизация времени
+                        </button>
+                        <button 
+                            className="control-btn status-btn"
+                            onClick={handleArchiveRequestStatus}
+                            title="Запрос статуса"
+                        >
+                            <i className="fas fa-info-circle"></i>
+                            Запрос статуса
+                        </button>
+                        <button 
+                            className="control-btn reset-btn"
+                            onClick={handleArchiveReset}
+                            title="Сброс устройства"
+                        >
+                            <i className="fas fa-redo"></i>
+                            Сброс устройства
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* Ошибки */}
