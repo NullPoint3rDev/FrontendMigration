@@ -129,14 +129,14 @@ const DeviceMonitorPage = () => {
         }
     };
     
-    // Функция для получения состояния устройства (обновлено для чистоты логов)
+    // Функция для получения состояния устройства (версия 2 - логи убраны)
     const fetchDeviceState = async () => {
         try {
             const response = await archiveDeviceApi.getArchivePanelState(machineMac);
             
             if (response.success && response.state) {
                 const receiveTime = new Date();
-                // console.log('📊 Получены данные через polling:', response.state.status, 'время:', receiveTime.toLocaleTimeString());
+                // Логи убраны для чистоты консоли - версия 2
                 
                 // Обрабатываем данные (оборачиваем в нужный формат)
                 processStructuredData({

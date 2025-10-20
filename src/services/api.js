@@ -43,10 +43,10 @@ const handleResponse = async (response) => {
     }
 };
 
-// Helper function for adding auth headers
+// Helper function for adding auth headers (updated to remove logs)
 export const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
-    // Логи убраны для чистоты консоли
+    // Логи убраны для чистоты консоли - версия 2
     if (!token) {
         console.warn('No token found in localStorage');
         return {
