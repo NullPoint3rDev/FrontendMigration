@@ -4,7 +4,7 @@ import {
   createEmployee,
   updateEmployee,
   deleteEmployee
-} from '../api/userAccountApi';
+} from '../api/employeeApi';
 import {
   getAllOrganizationUnits,
   getAllUserRoles,
@@ -273,7 +273,7 @@ const EmployeesPage = () => {
   };
 
   const isAdmin = (employee) => {
-    return employee.userRole?.description?.toLowerCase().includes('администратор');
+    return employee.userRole?.name?.toLowerCase().includes('администратор');
   };
 
   if (loading && employees.length === 0) {
@@ -334,7 +334,7 @@ const EmployeesPage = () => {
             >
               <option value="">Все роли</option>
               {roles.map(role => (
-                <option key={role.id} value={role.id}>{role.description}</option>
+                <option key={role.id} value={role.id}>{role.name}</option>
               ))}
             </select>
           </div>
@@ -424,7 +424,7 @@ const EmployeesPage = () => {
               <div className="employee-cell">{emp.organizationUnit?.name || '-'}</div>
               <div className="employee-cell">
                 <span className={`role-badge ${isAdmin(emp) ? 'admin-role' : ''}`}>
-                  {emp.userRole?.description || '-'}
+                  {emp.userRole?.name || '-'}
                 </span>
               </div>
               <div className="employee-cell">
@@ -516,7 +516,7 @@ const EmployeesPage = () => {
                 <select className="form-input" value={editData.userRoleId || ''} onChange={handleRoleChange} required>
                   <option value="">Выберите роль</option>
                   {roles.map(role => (
-                    <option key={role.id} value={role.id}>{role.description}</option>
+                    <option key={role.id} value={role.id}>{role.name}</option>
                   ))}
                 </select>
               </div>
