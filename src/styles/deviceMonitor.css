@@ -502,60 +502,6 @@
 }
 
 /* Device Controls Styles */
-.device-controls {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.device-controls h4 {
-  margin: 0 0 1rem 0;
-  color: var(--text-primary);
-  font-size: 1.2rem;
-}
-
-.control-buttons {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.control-btn {
-  background: var(--surface);
-  color: var(--text-primary);
-  border: 2px solid var(--border-color);
-  padding: 0.8rem 1.2rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 160px;
-  justify-content: center;
-}
-
-.control-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--card-shadow);
-}
-
-.time-sync-btn:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.status-btn:hover {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
-.reset-btn:hover {
-  background: var(--secondary);
-  border-color: var(--secondary);
-}
 
 .device-mac {
   color: var(--text-secondary);
@@ -564,13 +510,3 @@
   margin-top: 0.5rem;
 }
 
-/* Device Controls Responsive */
-@media (max-width: 768px) {
-  .control-buttons {
-    flex-direction: column;
-  }
-  
-  .control-btn {
-    width: 100%;
-  }
-}
