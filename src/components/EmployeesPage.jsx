@@ -273,7 +273,7 @@ const EmployeesPage = () => {
   };
 
   const isAdmin = (employee) => {
-    return employee.userRole?.name?.toLowerCase().includes('admin');
+    return employee.userRole?.description?.toLowerCase().includes('администратор');
   };
 
   if (loading && employees.length === 0) {
@@ -334,7 +334,7 @@ const EmployeesPage = () => {
             >
               <option value="">Все роли</option>
               {roles.map(role => (
-                <option key={role.id} value={role.id}>{role.name}</option>
+                <option key={role.id} value={role.id}>{role.description}</option>
               ))}
             </select>
           </div>
@@ -424,7 +424,7 @@ const EmployeesPage = () => {
               <div className="employee-cell">{emp.organizationUnit?.name || '-'}</div>
               <div className="employee-cell">
                 <span className={`role-badge ${isAdmin(emp) ? 'admin-role' : ''}`}>
-                  {emp.userRole?.name || '-'}
+                  {emp.userRole?.description || '-'}
                 </span>
               </div>
               <div className="employee-cell">
@@ -516,7 +516,7 @@ const EmployeesPage = () => {
                 <select className="form-input" value={editData.userRoleId || ''} onChange={handleRoleChange} required>
                   <option value="">Выберите роль</option>
                   {roles.map(role => (
-                    <option key={role.id} value={role.id}>{role.name}</option>
+                    <option key={role.id} value={role.id}>{role.description}</option>
                   ))}
                 </select>
               </div>
