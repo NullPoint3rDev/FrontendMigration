@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, Menu, MenuItem, IconButton } from '@mui/material';
-import { AccountCircle, Logout } from '@mui/icons-material';
+import { Logout } from '@mui/icons-material';
 import { api } from '../services/api';
 import '../styles/userProfile.css';
 
@@ -33,10 +33,6 @@ const UserProfile = () => {
         setAnchorEl(null);
     };
 
-    const handleProfileClick = () => {
-        handleClose();
-        navigate('/profile');
-    };
 
     const handleLogout = () => {
         handleClose();
@@ -62,10 +58,6 @@ const UserProfile = () => {
                 onClose={handleClose}
                 className="profile-menu"
             >
-                <MenuItem onClick={handleProfileClick} className="menu-item">
-                    <AccountCircle sx={{ mr: 1 }} />
-                    Профиль
-                </MenuItem>
                 <MenuItem onClick={handleLogout} className="menu-item">
                     <Logout sx={{ mr: 1 }} />
                     Выйти

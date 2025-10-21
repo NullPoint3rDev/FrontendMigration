@@ -16,7 +16,6 @@ import WeldersPage from './pages/WeldersPage';
 import WelderProfilePage from './pages/WelderProfilePage';
 import AboutPage from './components/AboutPage';
 import AuthPage from './components/AuthPage';
-import UserProfilePage from './pages/UserProfilePage';
 import ReportsPage from './components/ReportsPage';
 import MyReportsPage from './components/MyReportsPage';
 import EquipmentReportPage from './components/EquipmentReportPage';
@@ -101,8 +100,6 @@ function App() {
                                 <Route path="/settings/storage" element={<SettingsPage />} />
                                 <Route path="/settings/inactivity" element={<SettingsPage />} />
                                 
-                                {/* Профиль пользователя */}
-                                <Route path="/profile" element={<UserProfilePage />} />
                             </Routes>
                         </PrivateRoute>
                     } />
