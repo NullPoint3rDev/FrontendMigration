@@ -4,7 +4,7 @@ import {
   createEmployee,
   updateEmployee,
   deleteEmployee
-} from '../api/employeeApi';
+} from '../api/userAccountApi';
 import {
   getAllOrganizationUnits,
   getAllUserRoles,
