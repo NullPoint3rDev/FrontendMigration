@@ -20,7 +20,6 @@ const emptyEmployee = {
   password: '',
   fullName: '',
   email: '',
-  employeeType: '',
   organizationUnit: null,
   userRoleId: '',
   position: '',
@@ -29,14 +28,6 @@ const emptyEmployee = {
   photo: null,
 };
 
-const employeeTypes = [
-  { value: 'ADMIN', label: 'Администратор' },
-  { value: 'MANAGER', label: 'Менеджер' },
-  { value: 'REGULATOR', label: 'Регулировщик' },
-  { value: 'WELDER', label: 'Сварщик' },
-  { value: 'QC', label: 'ОТК' },
-  { value: 'PROGRAMMER', label: 'Программист' }
-];
 
 const EmployeesPage = () => {
   const [employees, setEmployees] = useState([]);
@@ -58,7 +49,6 @@ const EmployeesPage = () => {
     status: '',
     role: '',
     organizationUnit: '',
-    employeeType: ''
   });
 
   useEffect(() => {
@@ -81,8 +71,7 @@ const EmployeesPage = () => {
         emp.fullName?.toLowerCase().includes(searchLower) ||
         emp.username?.toLowerCase().includes(searchLower) ||
         emp.email?.toLowerCase().includes(searchLower) ||
-        emp.position?.toLowerCase().includes(searchLower) ||
-        employeeTypes.find(type => type.value === emp.employeeType)?.label.toLowerCase().includes(searchLower)
+        emp.position?.toLowerCase().includes(searchLower)
       );
     }
 
@@ -101,10 +90,6 @@ const EmployeesPage = () => {
       filtered = filtered.filter(emp => emp.organizationUnit?.id === parseInt(filters.organizationUnit));
     }
 
-    // Фильтр по типу сотрудника
-    if (filters.employeeType) {
-      filtered = filtered.filter(emp => emp.employeeType === filters.employeeType);
-    }
 
     setFilteredEmployees(filtered);
   };
@@ -120,7 +105,6 @@ const EmployeesPage = () => {
       status: '',
       role: '',
       organizationUnit: '',
-      employeeType: ''
     });
   };
 
@@ -168,7 +152,6 @@ const EmployeesPage = () => {
       userRoleId: employee.userRole?.id || '',
       status: employee.status || '',
       organizationUnit: employee.organizationUnit || null,
-      employeeType: employee.employeeType || '',
       password: '',
     });
     setIsEdit(true);
@@ -230,7 +213,6 @@ const EmployeesPage = () => {
         username: editData.username,
         fullName: editData.fullName,
         email: editData.email,
-        employeeType: editData.employeeType,
         position: editData.position,
         phone: editData.phone,
         status: editData.status,
@@ -351,19 +333,6 @@ const EmployeesPage = () => {
               ))}
             </select>
           </div>
-          <div className="filter-group">
-            <select
-              name="employeeType"
-              value={filters.employeeType}
-              onChange={handleFilterChange}
-              className="filter-select"
-            >
-              <option value="">Все типы</option>
-              {employeeTypes.map(type => (
-                <option key={type.value} value={type.value}>{type.label}</option>
-              ))}
-            </select>
-          </div>
           <button className="clear-filters-btn" onClick={clearFilters}>
             Очистить фильтры
           </button>
@@ -378,7 +347,6 @@ const EmployeesPage = () => {
           <div className="employee-cell">Фото</div>
           <div className="employee-cell">ФИО</div>
           <div className="employee-cell">Логин</div>
-          <div className="employee-cell">Тип</div>
           <div className="employee-cell">Должность</div>
           <div className="employee-cell">Подразделение</div>
           <div className="employee-cell">Роль</div>
@@ -415,11 +383,6 @@ const EmployeesPage = () => {
                 </div>
               </div>
                              <div className="employee-cell">{emp.username}</div>
-               <div className="employee-cell employee-type-cell">
-                 <span className="employee-type-badge">
-                   {employeeTypes.find(type => type.value === emp.employeeType)?.label || '-'}
-                 </span>
-               </div>
                <div className="employee-cell">{emp.position || '-'}</div>
               <div className="employee-cell">{emp.organizationUnit?.name || '-'}</div>
               <div className="employee-cell">
@@ -484,15 +447,6 @@ const EmployeesPage = () => {
               <div className="form-group">
                 <label className="form-label">Email</label>
                 <input className="form-input" name="email" value={editData.email} onChange={handleInputChange} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Тип сотрудника</label>
-                <select className="form-input" name="employeeType" value={editData.employeeType} onChange={handleInputChange} required>
-                  <option value="">Выберите тип сотрудника</option>
-                  {employeeTypes.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Должность</label>
