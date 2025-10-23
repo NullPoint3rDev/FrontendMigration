@@ -355,7 +355,7 @@ const DeviceMonitorPage = () => {
             case 'GasFlow': return 'Расход газа (л/мин)';
             case 'WeldingMachineState': return 'Состояние аппарата';
             case 'JobNumber': return 'Номер работы';
-            case 'Inductance': return 'Индуктивность (мГн)';
+            case 'Inductance': return 'Индуктивность';
             case 'WireIndex': return 'Индекс проволоки';
             case 'Flags': return 'Флаги';
             
