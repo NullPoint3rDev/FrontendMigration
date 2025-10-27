@@ -25,6 +25,7 @@ const DeviceMonitorPage = () => {
     
     // Рефы для debounce статуса подключения
     const disconnectTimeoutRef = useRef(null);
+    const displayedStatusRef = useRef('disconnected');
     const [displayedStatus, setDisplayedStatus] = useState('disconnected'); // Отображаемый статус
     const [actualStatus, setActualStatus] = useState('disconnected'); // Реальный статус
 
@@ -108,62 +109,44 @@ const DeviceMonitorPage = () => {
         });
     }, [displayedStatus, connectionStatus, actualStatus]);
 
-    // Функция для обновления статуса с debounce
+    // Простая функция для обновления статуса (как в archive проекте)
     const updateConnectionStatus = (newStatus) => {
         console.log('🔄 updateConnectionStatus called:', {
             newStatus,
-            currentDisplayedStatus: displayedStatus,
-            currentActualStatus: actualStatus
+            currentDisplayedStatus: displayedStatusRef.current
         });
         
-        setActualStatus(newStatus);
-        
-        // Если статус "connected" - сразу показываем
-        if (newStatus === 'connected') {
-            console.log('✅ Устанавливаем статус: connected');
+        // Если статус изменился
+        if (displayedStatusRef.current !== newStatus) {
+            console.log('✅ Статус изменился:', displayedStatusRef.current, '->', newStatus);
+            
             // Очищаем таймаут отключения
             if (disconnectTimeoutRef.current) {
                 clearTimeout(disconnectTimeoutRef.current);
                 disconnectTimeoutRef.current = null;
             }
-            setDisplayedStatus('connected');
-            setConnectionStatus('connected');
-        } 
-        // Если статус "disconnected" - проверяем, был ли ранее подключен
-        else if (newStatus === 'disconnected') {
-            // Если ранее был подключен - добавляем задержку 3 секунды
-            if (displayedStatus === 'connected') {
+            
+            // Если отключаемся - добавляем задержку 3 секунды
+            if (newStatus === 'disconnected' && displayedStatusRef.current === 'connected') {
                 console.log('⏳ Устройство отключилось, ждем 3 секунды...');
-                // Очищаем предыдущий таймаут
-                if (disconnectTimeoutRef.current) {
-                    clearTimeout(disconnectTimeoutRef.current);
-                }
-                
-                // Устанавливаем новый таймаут
                 disconnectTimeoutRef.current = setTimeout(() => {
                     console.log('⏰ Таймаут истек, устанавливаем статус: disconnected');
+                    displayedStatusRef.current = 'disconnected';
                     setDisplayedStatus('disconnected');
                     setConnectionStatus('disconnected');
-                    // Очищаем данные при отключении
                     setDeviceData({});
-                }, 3000); // 3 секунды задержки
+                }, 3000);
             } else {
-                console.log('❌ Устройство уже было отключено, устанавливаем статус: disconnected');
-                // Если уже был отключен - показываем сразу
-                setDisplayedStatus('disconnected');
-                setConnectionStatus('disconnected');
-                setDeviceData({});
+                // Для всех остальных случаев - сразу обновляем
+                displayedStatusRef.current = newStatus;
+                setDisplayedStatus(newStatus);
+                setConnectionStatus(newStatus);
+                
+                // Очищаем данные при отключении
+                if (newStatus === 'disconnected') {
+                    setDeviceData({});
+                }
             }
-        }
-        // Для других статусов (error) - показываем сразу
-        else {
-            console.log('⚠️ Устанавливаем статус:', newStatus);
-            if (disconnectTimeoutRef.current) {
-                clearTimeout(disconnectTimeoutRef.current);
-                disconnectTimeoutRef.current = null;
-            }
-            setDisplayedStatus(newStatus);
-            setConnectionStatus(newStatus);
         }
     };
 
