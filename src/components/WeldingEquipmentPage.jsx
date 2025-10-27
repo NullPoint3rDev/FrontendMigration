@@ -543,6 +543,7 @@ function WeldingEquipmentPage() {
                             </div>
 
 
+
                             <div className="form-group">
                                 <label className="form-label">Дата ввода в эксплуатацию</label>
                                 <input

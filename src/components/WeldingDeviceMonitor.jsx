@@ -166,7 +166,7 @@ const WeldingDeviceMonitor = () => {
             )}
 
             {/* Данные устройства */}
-            {Object.keys(deviceData).length > 0 ? (
+            {Object.keys(deviceData).length > 0 && connectionStatus === 'connected' ? (
                 <Grid container spacing={3}>
                     {Object.entries(deviceData).map(([mac, data]) => (
                         <Grid item xs={12} key={mac}>
@@ -207,8 +207,15 @@ const WeldingDeviceMonitor = () => {
                         <Typography variant="body1" textAlign="center" color="textSecondary">
                             {connectionStatus === 'connected' 
                                 ? 'Ожидание данных от сварочного аппарата...' 
+                                : connectionStatus === 'disconnected'
+                                ? 'Сварочный аппарат выключен или отключен'
                                 : 'Нет подключения к сварочному аппарату'}
                         </Typography>
+                        {connectionStatus === 'disconnected' && (
+                            <Typography variant="body2" textAlign="center" color="textSecondary" sx={{ mt: 1, opacity: 0.8 }}>
+                                Данные не отображаются, так как аппарат не активен
+                            </Typography>
+                        )}
                     </CardContent>
                 </Card>
             )}

@@ -131,7 +131,7 @@ const DeviceMonitorPage = () => {
         try {
             const response = await archiveDeviceApi.getArchivePanelState(machineMac);
             
-            if (response.success && response.state) {
+            if (response.success && response.state && response.isConnected) {
                 const receiveTime = new Date();
                 // Логи убраны для чистоты консоли - версия 2
                 
@@ -155,8 +155,14 @@ const DeviceMonitorPage = () => {
                     ...prev.slice(0, 9) // Храним последние 10 сообщений
                 ]);
             } else {
+                // Если устройство отключено или не найдено
                 setConnectionStatus('disconnected');
                 setError(response.message || 'Устройство не найдено');
+                
+                // Очищаем данные устройства при отключении
+                if (response.status === 'disconnected') {
+                    setDeviceData({});
+                }
             }
         } catch (err) {
             console.error('Ошибка получения состояния устройства:', err);
@@ -582,12 +588,21 @@ const DeviceMonitorPage = () => {
                     </div>
                 ) : (
                     <div className="no-data">
-                        <div className="no-data-icon">⚠️</div>
+                        <div className="no-data-icon">
+                            {connectionStatus === 'connected' ? '⏳' : '🔴'}
+                        </div>
                         <p className="no-data-text">
                             {connectionStatus === 'connected' 
                                 ? 'Ожидание данных от сварочного аппарата...' 
+                                : connectionStatus === 'disconnected'
+                                ? 'Сварочный аппарат выключен'
                                 : 'Нет подключения к сварочному аппарату'}
                         </p>
+                        {connectionStatus === 'disconnected' && (
+                            <p className="no-data-subtext">
+                                Данные не отображаются, так как аппарат не активен
+                            </p>
+                        )}
                     </div>
                 )}
             </div>
