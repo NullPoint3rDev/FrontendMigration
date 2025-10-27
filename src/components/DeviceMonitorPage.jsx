@@ -113,20 +113,28 @@ const DeviceMonitorPage = () => {
             setDisplayedStatus('connected');
             setConnectionStatus('connected');
         } 
-        // Если статус "disconnected" - добавляем задержку 3 секунды
+        // Если статус "disconnected" - проверяем, был ли ранее подключен
         else if (newStatus === 'disconnected') {
-            // Очищаем предыдущий таймаут
-            if (disconnectTimeoutRef.current) {
-                clearTimeout(disconnectTimeoutRef.current);
-            }
-            
-            // Устанавливаем новый таймаут
-            disconnectTimeoutRef.current = setTimeout(() => {
+            // Если ранее был подключен - добавляем задержку 3 секунды
+            if (displayedStatus === 'connected') {
+                // Очищаем предыдущий таймаут
+                if (disconnectTimeoutRef.current) {
+                    clearTimeout(disconnectTimeoutRef.current);
+                }
+                
+                // Устанавливаем новый таймаут
+                disconnectTimeoutRef.current = setTimeout(() => {
+                    setDisplayedStatus('disconnected');
+                    setConnectionStatus('disconnected');
+                    // Очищаем данные при отключении
+                    setDeviceData({});
+                }, 3000); // 3 секунды задержки
+            } else {
+                // Если уже был отключен - показываем сразу
                 setDisplayedStatus('disconnected');
                 setConnectionStatus('disconnected');
-                // Очищаем данные при отключении
                 setDeviceData({});
-            }, 3000); // 3 секунды задержки
+            }
         }
         // Для других статусов (error) - показываем сразу
         else {
@@ -137,7 +145,7 @@ const DeviceMonitorPage = () => {
             setDisplayedStatus(newStatus);
             setConnectionStatus(newStatus);
         }
-    }, []);
+    }, [displayedStatus]);
 
     // Функция для опроса состояния устройства (как в archive проекте)
     const startPolling = () => {
@@ -211,8 +219,14 @@ const DeviceMonitorPage = () => {
             }
         } catch (err) {
             console.error('Ошибка получения состояния устройства:', err);
-            updateConnectionStatus('error');
-            setError('Ошибка подключения: ' + err.message);
+            // Если это ошибка сети (ERR_CONNECTION_REFUSED и т.п.) - считаем отключенным
+            if (err.message.includes('Failed to fetch') || err.message.includes('ERR_CONNECTION_REFUSED')) {
+                updateConnectionStatus('disconnected');
+                setError('Устройство отключено');
+            } else {
+                updateConnectionStatus('error');
+                setError('Ошибка подключения: ' + err.message);
+            }
             setIsConnecting(false);
         }
     };
@@ -551,11 +565,11 @@ const DeviceMonitorPage = () => {
                         {isConnecting ? '🔄' : '🔄'} Переподключиться
                     </button>
                 </div>
-                {/*{lastUpdate && (*/}
-                {/*    <div className="last-update">*/}
-                {/*        Последнее обновление: {lastUpdate.toLocaleTimeString()}*/}
-                {/*    </div>*/}
-                {/*)}*/}
+                {lastUpdate && (
+                    <div className="last-update">
+                        Последнее обновление: {lastUpdate.toLocaleTimeString()}
+                    </div>
+                )}
                 
             </div>
 
