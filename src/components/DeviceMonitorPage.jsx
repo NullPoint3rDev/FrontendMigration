@@ -109,7 +109,7 @@ const DeviceMonitorPage = () => {
     }, [displayedStatus, connectionStatus, actualStatus]);
 
     // Функция для обновления статуса с debounce
-    const updateConnectionStatus = useCallback((newStatus) => {
+    const updateConnectionStatus = (newStatus) => {
         console.log('🔄 updateConnectionStatus called:', {
             newStatus,
             currentDisplayedStatus: displayedStatus,
@@ -165,7 +165,7 @@ const DeviceMonitorPage = () => {
             setDisplayedStatus(newStatus);
             setConnectionStatus(newStatus);
         }
-    }, [displayedStatus]);
+    };
 
     // Функция для опроса состояния устройства (как в archive проекте)
     const startPolling = () => {
