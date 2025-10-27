@@ -99,6 +99,15 @@ const DeviceMonitorPage = () => {
         };
     }, []);
 
+    // Синхронизация connectionStatus с displayedStatus для отображения
+    useEffect(() => {
+        console.log('🔄 Состояние изменилось:', {
+            displayedStatus,
+            connectionStatus,
+            actualStatus
+        });
+    }, [displayedStatus, connectionStatus, actualStatus]);
+
     // Функция для обновления статуса с debounce
     const updateConnectionStatus = useCallback((newStatus) => {
         console.log('🔄 updateConnectionStatus called:', {
@@ -156,7 +165,7 @@ const DeviceMonitorPage = () => {
             setDisplayedStatus(newStatus);
             setConnectionStatus(newStatus);
         }
-    }, [displayedStatus, actualStatus]);
+    }, [displayedStatus]);
 
     // Функция для опроса состояния устройства (как в archive проекте)
     const startPolling = () => {
@@ -572,7 +581,7 @@ const DeviceMonitorPage = () => {
             <div className="status-card">
                 <div className="status-info">
                     <div className="status-indicator">
-                        <span className="status-icon">{getStatusIcon(connectionStatus)}</span>
+                        <span className="status-icon">{getStatusIcon(displayedStatus)}</span>
                         <span className="status-text">
                             {displayedStatus === 'connected' ? 'Подключен' : 
                              displayedStatus === 'disconnected' ? 'Отключен' : 'Ошибка'}
@@ -669,7 +678,7 @@ const DeviceMonitorPage = () => {
                 ) : (
                     <div className="no-data">
                         <div className="no-data-icon">
-                            {connectionStatus === 'connected' ? '⏳' : '🔴'}
+                            {displayedStatus === 'connected' ? '⏳' : '🔴'}
                         </div>
                         <p className="no-data-text">
                             {displayedStatus === 'connected' 
