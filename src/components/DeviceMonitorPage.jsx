@@ -551,11 +551,11 @@ const DeviceMonitorPage = () => {
                         {isConnecting ? '🔄' : '🔄'} Переподключиться
                     </button>
                 </div>
-                {lastUpdate && (
-                    <div className="last-update">
-                        Последнее обновление: {lastUpdate.toLocaleTimeString()}
-                    </div>
-                )}
+                {/*{lastUpdate && (*/}
+                {/*    <div className="last-update">*/}
+                {/*        Последнее обновление: {lastUpdate.toLocaleTimeString()}*/}
+                {/*    </div>*/}
+                {/*)}*/}
                 
             </div>
 
@@ -625,9 +625,9 @@ const DeviceMonitorPage = () => {
                                     })}
                                 </div>
                                 
-                                <div className="update-time">
-                                    Обновлено: {data.timestamp}
-                                </div>
+                                {/*<div className="update-time">*/}
+                                {/*    Обновлено: {data.timestamp}*/}
+                                {/*</div>*/}
                             </div>
                         ))}
                     </div>

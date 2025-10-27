@@ -149,11 +149,11 @@ const WeldingDeviceMonitor = () => {
                                 MAC: 8CAAB50C4254
                             </Typography>
                         </Box>
-                        {lastUpdate && (
-                            <Typography variant="body2" color="textSecondary">
-                                Последнее обновление: {lastUpdate.toLocaleTimeString()}
-                            </Typography>
-                        )}
+                        {/*{lastUpdate && (*/}
+                        {/*    // <Typography variant="body2" color="textSecondary">*/}
+                        {/*    //     Последнее обновление: {lastUpdate.toLocaleTimeString()}*/}
+                        {/*    // </Typography>*/}
+                        {/*)}*/}
                     </Box>
                 </CardContent>
             </Card>
