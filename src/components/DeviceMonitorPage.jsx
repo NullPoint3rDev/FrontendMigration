@@ -101,10 +101,17 @@ const DeviceMonitorPage = () => {
 
     // Функция для обновления статуса с debounce
     const updateConnectionStatus = useCallback((newStatus) => {
+        console.log('🔄 updateConnectionStatus called:', {
+            newStatus,
+            currentDisplayedStatus: displayedStatus,
+            currentActualStatus: actualStatus
+        });
+        
         setActualStatus(newStatus);
         
         // Если статус "connected" - сразу показываем
         if (newStatus === 'connected') {
+            console.log('✅ Устанавливаем статус: connected');
             // Очищаем таймаут отключения
             if (disconnectTimeoutRef.current) {
                 clearTimeout(disconnectTimeoutRef.current);
@@ -117,6 +124,7 @@ const DeviceMonitorPage = () => {
         else if (newStatus === 'disconnected') {
             // Если ранее был подключен - добавляем задержку 3 секунды
             if (displayedStatus === 'connected') {
+                console.log('⏳ Устройство отключилось, ждем 3 секунды...');
                 // Очищаем предыдущий таймаут
                 if (disconnectTimeoutRef.current) {
                     clearTimeout(disconnectTimeoutRef.current);
@@ -124,12 +132,14 @@ const DeviceMonitorPage = () => {
                 
                 // Устанавливаем новый таймаут
                 disconnectTimeoutRef.current = setTimeout(() => {
+                    console.log('⏰ Таймаут истек, устанавливаем статус: disconnected');
                     setDisplayedStatus('disconnected');
                     setConnectionStatus('disconnected');
                     // Очищаем данные при отключении
                     setDeviceData({});
                 }, 3000); // 3 секунды задержки
             } else {
+                console.log('❌ Устройство уже было отключено, устанавливаем статус: disconnected');
                 // Если уже был отключен - показываем сразу
                 setDisplayedStatus('disconnected');
                 setConnectionStatus('disconnected');
@@ -138,6 +148,7 @@ const DeviceMonitorPage = () => {
         }
         // Для других статусов (error) - показываем сразу
         else {
+            console.log('⚠️ Устанавливаем статус:', newStatus);
             if (disconnectTimeoutRef.current) {
                 clearTimeout(disconnectTimeoutRef.current);
                 disconnectTimeoutRef.current = null;
@@ -145,7 +156,7 @@ const DeviceMonitorPage = () => {
             setDisplayedStatus(newStatus);
             setConnectionStatus(newStatus);
         }
-    }, [displayedStatus]);
+    }, [displayedStatus, actualStatus]);
 
     // Функция для опроса состояния устройства (как в archive проекте)
     const startPolling = () => {
@@ -187,9 +198,18 @@ const DeviceMonitorPage = () => {
         try {
             const response = await archiveDeviceApi.getArchivePanelState(machineMac);
             
+            // Добавляем детальное логирование для отладки
+            console.log('🔍 API Response:', {
+                success: response.success,
+                isConnected: response.isConnected,
+                hasState: !!response.state,
+                message: response.message,
+                status: response.status
+            });
+            
             if (response.success && response.state && response.isConnected) {
                 const receiveTime = new Date();
-                // Логи убраны для чистоты консоли - версия 2
+                console.log('✅ Устройство подключено, обновляем данные');
                 
                 // Обрабатываем данные (оборачиваем в нужный формат)
                 processStructuredData({
@@ -214,6 +234,7 @@ const DeviceMonitorPage = () => {
                 ]);
             } else {
                 // Если устройство отключено или не найдено
+                console.log('❌ Устройство отключено:', response.message);
                 updateConnectionStatus('disconnected');
                 setError(response.message || 'Устройство не найдено');
             }
