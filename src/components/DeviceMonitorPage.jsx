@@ -131,29 +131,33 @@ const DeviceMonitorPage = () => {
         } 
         // Если статус "disconnected" - проверяем, был ли ранее подключен
         else if (newStatus === 'disconnected') {
-            // Если ранее был подключен - добавляем задержку 3 секунды
-            if (displayedStatus === 'connected') {
-                console.log('⏳ Устройство отключилось, ждем 3 секунды...');
-                // Очищаем предыдущий таймаут
-                if (disconnectTimeoutRef.current) {
-                    clearTimeout(disconnectTimeoutRef.current);
-                }
-                
-                // Устанавливаем новый таймаут
-                disconnectTimeoutRef.current = setTimeout(() => {
-                    console.log('⏰ Таймаут истек, устанавливаем статус: disconnected');
-                    setDisplayedStatus('disconnected');
+            // Используем функциональное обновление для получения актуального значения
+            setDisplayedStatus(currentDisplayedStatus => {
+                if (currentDisplayedStatus === 'connected') {
+                    console.log('⏳ Устройство отключилось, ждем 3 секунды...');
+                    // Очищаем предыдущий таймаут
+                    if (disconnectTimeoutRef.current) {
+                        clearTimeout(disconnectTimeoutRef.current);
+                    }
+                    
+                    // Устанавливаем новый таймаут
+                    disconnectTimeoutRef.current = setTimeout(() => {
+                        console.log('⏰ Таймаут истек, устанавливаем статус: disconnected');
+                        setDisplayedStatus('disconnected');
+                        setConnectionStatus('disconnected');
+                        // Очищаем данные при отключении
+                        setDeviceData({});
+                    }, 3000); // 3 секунды задержки
+                    
+                    return currentDisplayedStatus; // Возвращаем текущий статус, пока ждем
+                } else {
+                    console.log('❌ Устройство уже было отключено, устанавливаем статус: disconnected');
+                    // Если уже был отключен - показываем сразу
                     setConnectionStatus('disconnected');
-                    // Очищаем данные при отключении
                     setDeviceData({});
-                }, 3000); // 3 секунды задержки
-            } else {
-                console.log('❌ Устройство уже было отключено, устанавливаем статус: disconnected');
-                // Если уже был отключен - показываем сразу
-                setDisplayedStatus('disconnected');
-                setConnectionStatus('disconnected');
-                setDeviceData({});
-            }
+                    return 'disconnected';
+                }
+            });
         }
         // Для других статусов (error) - показываем сразу
         else {
