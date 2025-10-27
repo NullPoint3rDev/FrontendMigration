@@ -22,6 +22,11 @@ const DeviceMonitorPage = () => {
     
     // Реф для дебаунсинга обновлений
     const updateTimeoutRef = useRef(null);
+    
+    // Рефы для debounce статуса подключения
+    const disconnectTimeoutRef = useRef(null);
+    const [displayedStatus, setDisplayedStatus] = useState('disconnected'); // Отображаемый статус
+    const [actualStatus, setActualStatus] = useState('disconnected'); // Реальный статус
 
     // Оптимизированная функция для обновления данных с дебаунсингом
     const updateDeviceData = useCallback((newData) => {
@@ -82,13 +87,56 @@ const DeviceMonitorPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [machineMac]);
 
-    // Очистка таймаута при размонтировании
+    // Очистка таймаутов при размонтировании
     useEffect(() => {
         return () => {
             if (updateTimeoutRef.current) {
                 clearTimeout(updateTimeoutRef.current);
             }
+            if (disconnectTimeoutRef.current) {
+                clearTimeout(disconnectTimeoutRef.current);
+            }
         };
+    }, []);
+
+    // Функция для обновления статуса с debounce
+    const updateConnectionStatus = useCallback((newStatus) => {
+        setActualStatus(newStatus);
+        
+        // Если статус "connected" - сразу показываем
+        if (newStatus === 'connected') {
+            // Очищаем таймаут отключения
+            if (disconnectTimeoutRef.current) {
+                clearTimeout(disconnectTimeoutRef.current);
+                disconnectTimeoutRef.current = null;
+            }
+            setDisplayedStatus('connected');
+            setConnectionStatus('connected');
+        } 
+        // Если статус "disconnected" - добавляем задержку 3 секунды
+        else if (newStatus === 'disconnected') {
+            // Очищаем предыдущий таймаут
+            if (disconnectTimeoutRef.current) {
+                clearTimeout(disconnectTimeoutRef.current);
+            }
+            
+            // Устанавливаем новый таймаут
+            disconnectTimeoutRef.current = setTimeout(() => {
+                setDisplayedStatus('disconnected');
+                setConnectionStatus('disconnected');
+                // Очищаем данные при отключении
+                setDeviceData({});
+            }, 3000); // 3 секунды задержки
+        }
+        // Для других статусов (error) - показываем сразу
+        else {
+            if (disconnectTimeoutRef.current) {
+                clearTimeout(disconnectTimeoutRef.current);
+                disconnectTimeoutRef.current = null;
+            }
+            setDisplayedStatus(newStatus);
+            setConnectionStatus(newStatus);
+        }
     }, []);
 
     // Функция для опроса состояния устройства (как в archive проекте)
@@ -140,7 +188,9 @@ const DeviceMonitorPage = () => {
                     mac: machineMac,
                     state: response.state
                 });
-                setConnectionStatus('connected');
+                
+                // Обновляем статус с debounce
+                updateConnectionStatus('connected');
                 setLastUpdate(receiveTime);
                 setError(null);
                 setIsConnecting(false);
@@ -156,17 +206,12 @@ const DeviceMonitorPage = () => {
                 ]);
             } else {
                 // Если устройство отключено или не найдено
-                setConnectionStatus('disconnected');
+                updateConnectionStatus('disconnected');
                 setError(response.message || 'Устройство не найдено');
-                
-                // Очищаем данные устройства при отключении
-                if (response.status === 'disconnected') {
-                    setDeviceData({});
-                }
             }
         } catch (err) {
             console.error('Ошибка получения состояния устройства:', err);
-            setConnectionStatus('error');
+            updateConnectionStatus('error');
             setError('Ошибка подключения: ' + err.message);
             setIsConnecting(false);
         }
@@ -494,8 +539,8 @@ const DeviceMonitorPage = () => {
                     <div className="status-indicator">
                         <span className="status-icon">{getStatusIcon(connectionStatus)}</span>
                         <span className="status-text">
-                            {connectionStatus === 'connected' ? 'Подключен' : 
-                             connectionStatus === 'disconnected' ? 'Отключен' : 'Ошибка'}
+                            {displayedStatus === 'connected' ? 'Подключен' : 
+                             displayedStatus === 'disconnected' ? 'Отключен' : 'Ошибка'}
                         </span>
                     </div>
                     <button 
@@ -525,7 +570,7 @@ const DeviceMonitorPage = () => {
             <div className="device-data-section">
                 <h3 className="section-title">⚡ Параметры сварочного аппарата</h3>
                 
-                {Object.keys(deviceData).length > 0 ? (
+                {Object.keys(deviceData).length > 0 && displayedStatus === 'connected' ? (
                     <div className="parameters-grid">
                         {Object.entries(deviceData).map(([mac, data]) => (
                             <div key={mac} className="device-parameters">
@@ -592,13 +637,13 @@ const DeviceMonitorPage = () => {
                             {connectionStatus === 'connected' ? '⏳' : '🔴'}
                         </div>
                         <p className="no-data-text">
-                            {connectionStatus === 'connected' 
+                            {displayedStatus === 'connected' 
                                 ? 'Ожидание данных от сварочного аппарата...' 
-                                : connectionStatus === 'disconnected'
+                                : displayedStatus === 'disconnected'
                                 ? 'Сварочный аппарат выключен'
                                 : 'Нет подключения к сварочному аппарату'}
                         </p>
-                        {connectionStatus === 'disconnected' && (
+                        {displayedStatus === 'disconnected' && (
                             <p className="no-data-subtext">
                                 Данные не отображаются, так как аппарат не активен
                             </p>
