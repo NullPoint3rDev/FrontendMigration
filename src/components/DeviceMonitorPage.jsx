@@ -560,7 +560,7 @@ const DeviceMonitorPage = () => {
             </div>
 
             {/* Ошибки */}
-            {error && (
+            {error && displayedStatus === 'disconnected' && (
                 <div className="error-message">
                     {error}
                 </div>
