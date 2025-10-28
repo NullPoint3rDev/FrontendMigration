@@ -26,6 +26,9 @@ const DeviceMonitorPage = () => {
     // Простые состояния как в archive проекте
     const [isConnected, setIsConnected] = useState(false);
     const [hasData, setHasData] = useState(false);
+    
+    // Для задержки показа "отключен" при кратковременных паузах
+    const [disconnectTimeout, setDisconnectTimeout] = useState(null);
 
     // Оптимизированная функция для обновления данных с дебаунсингом
     const updateDeviceData = useCallback((newData) => {
@@ -92,20 +95,43 @@ const DeviceMonitorPage = () => {
             if (updateTimeoutRef.current) {
                 clearTimeout(updateTimeoutRef.current);
             }
+            if (disconnectTimeout) {
+                clearTimeout(disconnectTimeout);
+            }
         };
-    }, []);
+    }, [disconnectTimeout]);
 
     // Убираем сложную синхронизацию - теперь простое состояние
 
     // Простая функция как в archive проекте - просто обновляем состояние
     const updateConnectionStatus = (connected, hasStateData) => {
         console.log('🔄 updateConnectionStatus:', { connected, hasStateData });
-        setIsConnected(connected);
-        setHasData(hasStateData);
         
-        // Если нет данных - очищаем
-        if (!hasStateData) {
-            setDeviceData({});
+        // Если устройство подключено - сразу обновляем состояние
+        if (connected && hasStateData) {
+            // Очищаем таймаут отключения если он есть
+            if (disconnectTimeout) {
+                clearTimeout(disconnectTimeout);
+                setDisconnectTimeout(null);
+            }
+            
+            setIsConnected(true);
+            setHasData(true);
+        } else {
+            // Если устройство отключено - добавляем небольшую задержку (2 секунды)
+            // чтобы избежать мигания при кратковременных паузах
+            if (disconnectTimeout) {
+                clearTimeout(disconnectTimeout);
+            }
+            
+            const timeout = setTimeout(() => {
+                setIsConnected(false);
+                setHasData(false);
+                setDeviceData({}); // Очищаем данные
+                setDisconnectTimeout(null);
+            }, 2000); // 2 секунды задержки
+            
+            setDisconnectTimeout(timeout);
         }
     };
 
