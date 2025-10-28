@@ -16,8 +16,7 @@ const DeviceMonitorPage = () => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [messageHistory, setMessageHistory] = useState([]);
     
-    // Состояние для polling
-    const [pollingInterval, setPollingInterval] = useState(null);
+    // Состояние для polling (как в archive проекте)
     const [isPolling, setIsPolling] = useState(false);
     
     // Реф для дебаунсинга обновлений
@@ -26,9 +25,6 @@ const DeviceMonitorPage = () => {
     // Простые состояния как в archive проекте
     const [isConnected, setIsConnected] = useState(false);
     const [hasData, setHasData] = useState(false);
-    
-    // Для задержки показа "отключен" при кратковременных паузах
-    const [disconnectTimeout, setDisconnectTimeout] = useState(null);
 
     // Оптимизированная функция для обновления данных с дебаунсингом
     const updateDeviceData = useCallback((newData) => {
@@ -95,126 +91,96 @@ const DeviceMonitorPage = () => {
             if (updateTimeoutRef.current) {
                 clearTimeout(updateTimeoutRef.current);
             }
-            if (disconnectTimeout) {
-                clearTimeout(disconnectTimeout);
-            }
         };
-    }, [disconnectTimeout]);
+    }, []);
 
     // Убираем сложную синхронизацию - теперь простое состояние
 
     // Простая функция как в archive проекте - просто обновляем состояние
     const updateConnectionStatus = (connected, hasStateData) => {
         console.log('🔄 updateConnectionStatus:', { connected, hasStateData });
+        setIsConnected(connected);
+        setHasData(hasStateData);
         
-        // Если устройство подключено - сразу обновляем состояние
-        if (connected && hasStateData) {
-            // Очищаем таймаут отключения если он есть
-            if (disconnectTimeout) {
-                clearTimeout(disconnectTimeout);
-                setDisconnectTimeout(null);
-            }
-            
-            setIsConnected(true);
-            setHasData(true);
-        } else {
-            // Если устройство отключено - добавляем небольшую задержку (2 секунды)
-            // чтобы избежать мигания при кратковременных паузах
-            if (disconnectTimeout) {
-                clearTimeout(disconnectTimeout);
-            }
-            
-            const timeout = setTimeout(() => {
-                setIsConnected(false);
-                setHasData(false);
-                setDeviceData({}); // Очищаем данные
-                setDisconnectTimeout(null);
-            }, 2000); // 2 секунды задержки
-            
-            setDisconnectTimeout(timeout);
+        // Если нет данных - очищаем
+        if (!hasStateData) {
+            setDeviceData({});
         }
     };
 
-    // Функция для опроса состояния устройства (как в archive проекте)
+    // Функция для опроса состояния устройства (точно как в archive проекте)
     const startPolling = () => {
         console.log('🔄 Запуск polling для MAC:', machineMac);
-        
-        // Останавливаем предыдущий polling если он есть
-        if (pollingInterval) {
-            clearInterval(pollingInterval);
-            setPollingInterval(null);
-        }
         
         setIsConnecting(true);
         setError(null);
         setIsPolling(true);
         
-        // Первый запрос сразу
+        // Первый запрос сразу (как в archive проекте)
         fetchDeviceState();
-        
-        // Устанавливаем интервал опроса каждые 500ms (как в archive проекте)
-        const interval = setInterval(() => {
-            fetchDeviceState();
-        }, 500);
-        
-        setPollingInterval(interval);
     };
     
-    // Функция для остановки polling
+    // Функция для остановки polling (как в archive проекте)
     const stopPolling = () => {
         console.log('🛑 Остановка polling');
         setIsPolling(false);
-        if (pollingInterval) {
-            clearInterval(pollingInterval);
-            setPollingInterval(null);
-        }
+        // В archive проекте просто устанавливается this.visible = false
     };
     
     // Функция для получения состояния устройства (точно как в archive проекте)
-        const fetchDeviceState = async () => {
-            try {
-                const response = await archiveDeviceApi.getArchivePanelState(machineMac);
+    const fetchDeviceState = async () => {
+        if (!isPolling) {
+            return false; // Как в archive: if (!this.visible || this.paused) return false;
+        }
+
+        try {
+            const response = await archiveDeviceApi.getArchivePanelState(machineMac);
+            
+            console.log('🔍 API Response:', response);
+            
+            if (response && response !== null) {
+                console.log('✅ Устройство подключено, обновляем данные');
                 
-                console.log('🔍 API Response:', response);
+                // Обрабатываем данные
+                processStructuredData({
+                    mac: machineMac,
+                    state: response
+                });
                 
-                if (response && response !== null) {
-                    console.log('✅ Устройство подключено, обновляем данные');
-                    
-                    // Обрабатываем данные
-                    processStructuredData({
-                        mac: machineMac,
-                        state: response
-                    });
-                    
-                    // Просто обновляем состояние - есть данные
-                    updateConnectionStatus(true, true);
-                    setLastUpdate(new Date());
-                    setError(null);
-                    setIsConnecting(false);
-                    
-                    // Добавляем в историю сообщений
-                    setMessageHistory(prev => [
-                        {
-                            timestamp: new Date(),
-                            data: JSON.stringify(response),
-                            type: 'received'
-                        },
-                        ...prev.slice(0, 9)
-                    ]);
-                } else {
-                    // Нет данных - просто обновляем состояние
-                    console.log('❌ Нет данных от устройства');
-                    updateConnectionStatus(false, false);
-                    setError('Устройство не найдено');
-                }
-            } catch (err) {
-                console.error('Ошибка получения состояния устройства:', err);
-                // При ошибке - нет данных
-                updateConnectionStatus(false, false);
-                setError('Ошибка подключения: ' + err.message);
+                // Просто обновляем состояние - есть данные
+                updateConnectionStatus(true, true);
+                setLastUpdate(new Date());
+                setError(null);
                 setIsConnecting(false);
+                
+                // Добавляем в историю сообщений
+                setMessageHistory(prev => [
+                    {
+                        timestamp: new Date(),
+                        data: JSON.stringify(response),
+                        type: 'received'
+                    },
+                    ...prev.slice(0, 9)
+                ]);
+                
+                // Следующий запрос через 500ms (как в archive: this.timer = setTimeout(this.fetchState, this.refreshMilliseconds))
+                setTimeout(fetchDeviceState, 500);
+            } else {
+                // Нет данных - просто обновляем состояние
+                console.log('❌ Нет данных от устройства');
+                updateConnectionStatus(false, false);
+                setError('Устройство не найдено');
+                
+                // Следующий запрос через 500ms
+                setTimeout(fetchDeviceState, 500);
             }
-        };
+        } catch (err) {
+            console.log('catch'); // Как в archive проекте
+            
+            // При ошибке - следующий запрос через 3 раза реже (как в archive: this.refreshMilliseconds * 3)
+            setTimeout(fetchDeviceState, 500 * 3);
+        }
+    };
 
     const processDeviceData = (rawData) => {
         try {
