@@ -145,54 +145,50 @@ const DeviceMonitorPage = () => {
     };
     
     // Функция для получения состояния устройства (точно как в archive проекте)
-    const fetchDeviceState = async () => {
-        try {
-            const response = await archiveDeviceApi.getArchivePanelState(machineMac);
-            
-            console.log('🔍 API Response:', {
-                success: response.success,
-                isConnected: response.isConnected,
-                hasState: !!response.state
-            });
-            
-            if (response.success && response.state && response.isConnected) {
-                console.log('✅ Устройство подключено, обновляем данные');
+        const fetchDeviceState = async () => {
+            try {
+                const response = await archiveDeviceApi.getArchivePanelState(machineMac);
                 
-                // Обрабатываем данные
-                processStructuredData({
-                    mac: machineMac,
-                    state: response.state
-                });
+                console.log('🔍 API Response:', response);
                 
-                // Просто обновляем состояние - есть данные
-                updateConnectionStatus(true, true);
-                setLastUpdate(new Date());
-                setError(null);
-                setIsConnecting(false);
-                
-                // Добавляем в историю сообщений
-                setMessageHistory(prev => [
-                    {
-                        timestamp: new Date(),
-                        data: JSON.stringify(response.state),
-                        type: 'received'
-                    },
-                    ...prev.slice(0, 9)
-                ]);
-            } else {
-                // Нет данных - просто обновляем состояние
-                console.log('❌ Нет данных от устройства');
+                if (response && response !== null) {
+                    console.log('✅ Устройство подключено, обновляем данные');
+                    
+                    // Обрабатываем данные
+                    processStructuredData({
+                        mac: machineMac,
+                        state: response
+                    });
+                    
+                    // Просто обновляем состояние - есть данные
+                    updateConnectionStatus(true, true);
+                    setLastUpdate(new Date());
+                    setError(null);
+                    setIsConnecting(false);
+                    
+                    // Добавляем в историю сообщений
+                    setMessageHistory(prev => [
+                        {
+                            timestamp: new Date(),
+                            data: JSON.stringify(response),
+                            type: 'received'
+                        },
+                        ...prev.slice(0, 9)
+                    ]);
+                } else {
+                    // Нет данных - просто обновляем состояние
+                    console.log('❌ Нет данных от устройства');
+                    updateConnectionStatus(false, false);
+                    setError('Устройство не найдено');
+                }
+            } catch (err) {
+                console.error('Ошибка получения состояния устройства:', err);
+                // При ошибке - нет данных
                 updateConnectionStatus(false, false);
-                setError(response.message || 'Устройство не найдено');
+                setError('Ошибка подключения: ' + err.message);
+                setIsConnecting(false);
             }
-        } catch (err) {
-            console.error('Ошибка получения состояния устройства:', err);
-            // При ошибке - нет данных
-            updateConnectionStatus(false, false);
-            setError('Ошибка подключения: ' + err.message);
-            setIsConnecting(false);
-        }
-    };
+        };
 
     const processDeviceData = (rawData) => {
         try {
