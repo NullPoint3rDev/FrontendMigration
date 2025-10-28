@@ -18,6 +18,7 @@ const DeviceMonitorPage = () => {
     
     // Состояние для polling (как в archive проекте)
     const [isPolling, setIsPolling] = useState(false);
+    const [currentTimer, setCurrentTimer] = useState(null);
     
     // Реф для дебаунсинга обновлений
     const updateTimeoutRef = useRef(null);
@@ -91,8 +92,11 @@ const DeviceMonitorPage = () => {
             if (updateTimeoutRef.current) {
                 clearTimeout(updateTimeoutRef.current);
             }
+            if (currentTimer) {
+                clearTimeout(currentTimer);
+            }
         };
-    }, []);
+    }, [currentTimer]);
 
     // Убираем сложную синхронизацию - теперь простое состояние
 
@@ -124,7 +128,12 @@ const DeviceMonitorPage = () => {
     const stopPolling = () => {
         console.log('🛑 Остановка polling');
         setIsPolling(false);
-        // В archive проекте просто устанавливается this.visible = false
+        
+        // Очищаем текущий таймер
+        if (currentTimer) {
+            clearTimeout(currentTimer);
+            setCurrentTimer(null);
+        }
     };
     
     // Функция для получения состояния устройства (точно как в archive проекте)
@@ -164,7 +173,8 @@ const DeviceMonitorPage = () => {
                 ]);
                 
                 // Следующий запрос через 500ms (как в archive: this.timer = setTimeout(this.fetchState, this.refreshMilliseconds))
-                setTimeout(fetchDeviceState, 500);
+                const timer = setTimeout(fetchDeviceState, 500);
+                setCurrentTimer(timer);
             } else {
                 // Нет данных - просто обновляем состояние
                 console.log('❌ Нет данных от устройства');
@@ -172,13 +182,15 @@ const DeviceMonitorPage = () => {
                 setError('Устройство не найдено');
                 
                 // Следующий запрос через 500ms
-                setTimeout(fetchDeviceState, 500);
+                const timer = setTimeout(fetchDeviceState, 500);
+                setCurrentTimer(timer);
             }
         } catch (err) {
             console.log('catch'); // Как в archive проекте
             
             // При ошибке - следующий запрос через 3 раза реже (как в archive: this.refreshMilliseconds * 3)
-            setTimeout(fetchDeviceState, 500 * 3);
+            const timer = setTimeout(fetchDeviceState, 500 * 3);
+            setCurrentTimer(timer);
         }
     };
 
