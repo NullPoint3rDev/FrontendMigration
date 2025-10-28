@@ -105,20 +105,31 @@ export async function getArchiveOutboundQueueSize() {
 
 // Получить текущее состояние устройства (для polling)
 export async function getArchivePanelState(mac) {
-    const res = await fetch(`${API_URL}/panel-state?mac=${encodeURIComponent(mac)}`, {
-        headers: getAuthHeaders()
-    });
-    
-    // Проверяем, есть ли контент для парсинга
-    const text = await res.text();
-    if (!text || text.trim() === '') {
-        return null;
-    }
-    
     try {
-        return JSON.parse(text);
+        const res = await fetch(`${API_URL}/panel-state?mac=${encodeURIComponent(mac)}`, {
+            headers: getAuthHeaders()
+        });
+        
+        // Проверяем статус ответа
+        if (!res.ok) {
+            console.error('HTTP Error:', res.status, res.statusText);
+            return null;
+        }
+        
+        // Проверяем, есть ли контент для парсинга
+        const text = await res.text();
+        if (!text || text.trim() === '' || text.trim() === 'null') {
+            return null;
+        }
+        
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            console.error('Ошибка парсинга JSON:', error, 'Текст:', text);
+            return null;
+        }
     } catch (error) {
-        console.error('Ошибка парсинга JSON:', error);
+        console.error('Ошибка запроса:', error);
         return null;
     }
 }
