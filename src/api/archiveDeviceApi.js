@@ -108,5 +108,17 @@ export async function getArchivePanelState(mac) {
     const res = await fetch(`${API_URL}/panel-state?mac=${encodeURIComponent(mac)}`, {
         headers: getAuthHeaders()
     });
-    return res.json();
+    
+    // Проверяем, есть ли контент для парсинга
+    const text = await res.text();
+    if (!text || text.trim() === '') {
+        return null;
+    }
+    
+    try {
+        return JSON.parse(text);
+    } catch (error) {
+        console.error('Ошибка парсинга JSON:', error);
+        return null;
+    }
 }
