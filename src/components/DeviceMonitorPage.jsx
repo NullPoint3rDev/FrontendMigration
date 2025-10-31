@@ -1,7 +1,31 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Line } from 'react-chartjs-2';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+} from 'chart.js';
 import '../styles/deviceMonitor.css';
 import * as archiveDeviceApi from '../api/archiveDeviceApi';
+
+// Регистрация компонентов Chart.js
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+);
 
 const DeviceMonitorPage = () => {
     const [searchParams] = useSearchParams();
@@ -16,9 +40,9 @@ const DeviceMonitorPage = () => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [messageHistory, setMessageHistory] = useState([]);
     
-    // Состояние для polling (как в archive проекте)
+    // Состояние для polling
+    const [pollingInterval, setPollingInterval] = useState(null);
     const [isPolling, setIsPolling] = useState(false);
-    const [currentTimer, setCurrentTimer] = useState(null);
     
     // Реф для дебаунсинга обновлений
     const updateTimeoutRef = useRef(null);
@@ -26,6 +50,14 @@ const DeviceMonitorPage = () => {
     // Простые состояния как в archive проекте
     const [isConnected, setIsConnected] = useState(false);
     const [hasData, setHasData] = useState(false);
+    
+    // Для задержки показа "отключен" при кратковременных паузах
+    const [disconnectTimeout, setDisconnectTimeout] = useState(null);
+    
+    // Состояние для графиков
+    const [currentChartData, setCurrentChartData] = useState([]);
+    const [voltageChartData, setVoltageChartData] = useState([]);
+    const maxDataPoints = 100; // Максимальное количество точек на графике
 
     // Оптимизированная функция для обновления данных с дебаунсингом
     const updateDeviceData = useCallback((newData) => {
@@ -92,107 +124,170 @@ const DeviceMonitorPage = () => {
             if (updateTimeoutRef.current) {
                 clearTimeout(updateTimeoutRef.current);
             }
-            if (currentTimer) {
-                clearTimeout(currentTimer);
+            if (disconnectTimeout) {
+                clearTimeout(disconnectTimeout);
             }
         };
-    }, [currentTimer]);
+    }, [disconnectTimeout]);
+    
+    // Рефы для отслеживания предыдущих значений
+    const prevCurrentRef = useRef(null);
+    const prevVoltageRef = useRef(null);
+    
+    // Обновление данных графиков при изменении deviceData
+    useEffect(() => {
+        if (Object.keys(deviceData).length > 0 && hasData) {
+            Object.entries(deviceData).forEach(([mac, data]) => {
+                const current = parseFloat(data.Current || data['State.I'] || 0);
+                const voltage = parseFloat(data.Voltage || data['State.U'] || 0);
+                
+                // Проверяем, изменились ли значения перед обновлением
+                const currentChanged = prevCurrentRef.current === null || prevCurrentRef.current !== current;
+                const voltageChanged = prevVoltageRef.current === null || prevVoltageRef.current !== voltage;
+                
+                if (currentChanged && !isNaN(current)) {
+                    const timestamp = new Date();
+                    prevCurrentRef.current = current;
+                    
+                    // Обновляем данные графика тока
+                    setCurrentChartData(prev => {
+                        const newData = [...prev, { x: timestamp, y: current }];
+                        return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
+                    });
+                }
+                
+                if (voltageChanged && !isNaN(voltage)) {
+                    const timestamp = new Date();
+                    prevVoltageRef.current = voltage;
+                    
+                    // Обновляем данные графика напряжения
+                    setVoltageChartData(prev => {
+                        const newData = [...prev, { x: timestamp, y: voltage }];
+                        return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
+                    });
+                }
+            });
+        }
+    }, [deviceData, hasData, maxDataPoints]);
 
     // Убираем сложную синхронизацию - теперь простое состояние
 
     // Простая функция как в archive проекте - просто обновляем состояние
     const updateConnectionStatus = (connected, hasStateData) => {
         console.log('🔄 updateConnectionStatus:', { connected, hasStateData });
-        setIsConnected(connected);
-        setHasData(hasStateData);
         
-        // Если нет данных - очищаем
-        if (!hasStateData) {
-            setDeviceData({});
+        // Если устройство подключено - сразу обновляем состояние
+        if (connected && hasStateData) {
+            // Очищаем таймаут отключения если он есть
+            if (disconnectTimeout) {
+                clearTimeout(disconnectTimeout);
+                setDisconnectTimeout(null);
+            }
+            
+            setIsConnected(true);
+            setHasData(true);
+        } else {
+            // Если устройство отключено - добавляем небольшую задержку (2 секунды)
+            // чтобы избежать мигания при кратковременных паузах
+            if (disconnectTimeout) {
+                clearTimeout(disconnectTimeout);
+            }
+            
+            const timeout = setTimeout(() => {
+                setIsConnected(false);
+                setHasData(false);
+                setDeviceData({}); // Очищаем данные
+                setCurrentChartData([]); // Очищаем график тока
+                setVoltageChartData([]); // Очищаем график напряжения
+                prevCurrentRef.current = null; // Сбрасываем предыдущее значение тока
+                prevVoltageRef.current = null; // Сбрасываем предыдущее значение напряжения
+                setDisconnectTimeout(null);
+            }, 3000); // 3 секунды задержки
+            
+            setDisconnectTimeout(timeout);
         }
     };
 
-    // Функция для опроса состояния устройства (точно как в archive проекте)
+    // Функция для опроса состояния устройства (как в archive проекте)
     const startPolling = () => {
         console.log('🔄 Запуск polling для MAC:', machineMac);
+        
+        // Останавливаем предыдущий polling если он есть
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+        }
         
         setIsConnecting(true);
         setError(null);
         setIsPolling(true);
         
-        // Первый запрос сразу (как в archive проекте)
+        // Первый запрос сразу
         fetchDeviceState();
+        
+        // Устанавливаем интервал опроса каждые 500ms (как в archive проекте)
+        const interval = setInterval(() => {
+            fetchDeviceState();
+        }, 500);
+        
+        setPollingInterval(interval);
     };
     
-    // Функция для остановки polling (как в archive проекте)
+    // Функция для остановки polling
     const stopPolling = () => {
         console.log('🛑 Остановка polling');
         setIsPolling(false);
-        
-        // Очищаем текущий таймер
-        if (currentTimer) {
-            clearTimeout(currentTimer);
-            setCurrentTimer(null);
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
         }
     };
     
     // Функция для получения состояния устройства (точно как в archive проекте)
-    const fetchDeviceState = async () => {
-        if (!isPolling) {
-            return false; // Как в archive: if (!this.visible || this.paused) return false;
-        }
-
-        try {
-            const response = await archiveDeviceApi.getArchivePanelState(machineMac);
-            
-            console.log('🔍 API Response:', response);
-            
-            if (response && response !== null) {
-                console.log('✅ Устройство подключено, обновляем данные');
+        const fetchDeviceState = async () => {
+            try {
+                const response = await archiveDeviceApi.getArchivePanelState(machineMac);
                 
-                // Обрабатываем данные
-                processStructuredData({
-                    mac: machineMac,
-                    state: response
-                });
+                console.log('🔍 API Response:', response);
                 
-                // Просто обновляем состояние - есть данные
-                updateConnectionStatus(true, true);
-                setLastUpdate(new Date());
-                setError(null);
-                setIsConnecting(false);
-                
-                // Добавляем в историю сообщений
-                setMessageHistory(prev => [
-                    {
-                        timestamp: new Date(),
-                        data: JSON.stringify(response),
-                        type: 'received'
-                    },
-                    ...prev.slice(0, 9)
-                ]);
-                
-                // Следующий запрос через 500ms (как в archive: this.timer = setTimeout(this.fetchState, this.refreshMilliseconds))
-                const timer = setTimeout(fetchDeviceState, 500);
-                setCurrentTimer(timer);
-            } else {
-                // Нет данных - просто обновляем состояние
-                console.log('❌ Нет данных от устройства');
+                if (response && response !== null) {
+                    console.log('✅ Устройство подключено, обновляем данные');
+                    
+                    // Обрабатываем данные
+                    processStructuredData({
+                        mac: machineMac,
+                        state: response
+                    });
+                    
+                    // Просто обновляем состояние - есть данные
+                    updateConnectionStatus(true, true);
+                    setLastUpdate(new Date());
+                    setError(null);
+                    setIsConnecting(false);
+                    
+                    // Добавляем в историю сообщений
+                    setMessageHistory(prev => [
+                        {
+                            timestamp: new Date(),
+                            data: JSON.stringify(response),
+                            type: 'received'
+                        },
+                        ...prev.slice(0, 9)
+                    ]);
+                } else {
+                    // Нет данных - просто обновляем состояние
+                    console.log('❌ Нет данных от устройства');
+                    updateConnectionStatus(false, false);
+                    setError('Устройство не найдено');
+                }
+            } catch (err) {
+                console.error('Ошибка получения состояния устройства:', err);
+                // При ошибке - нет данных
                 updateConnectionStatus(false, false);
-                setError('Устройство не найдено');
-                
-                // Следующий запрос через 500ms
-                const timer = setTimeout(fetchDeviceState, 500);
-                setCurrentTimer(timer);
+                setError('Ошибка подключения: ' + err.message);
+                setIsConnecting(false);
             }
-        } catch (err) {
-            console.log('catch'); // Как в archive проекте
-            
-            // При ошибке - следующий запрос через 3 раза реже (как в archive: this.refreshMilliseconds * 3)
-            const timer = setTimeout(fetchDeviceState, 500 * 3);
-            setCurrentTimer(timer);
-        }
-    };
+        };
 
     const processDeviceData = (rawData) => {
         try {
@@ -493,6 +588,101 @@ const DeviceMonitorPage = () => {
         navigate('/equipment');
     };
 
+    // Конфигурация графиков
+    const getChartOptions = (min, max, label) => ({
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true,
+                labels: {
+                    color: '#FFFFFF',
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    }
+                }
+            },
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleColor: '#FFFFFF',
+                bodyColor: '#FFFFFF',
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderWidth: 1
+            }
+        },
+        scales: {
+            x: {
+                display: false,
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.05)'
+                }
+            },
+            y: {
+                min: min,
+                max: max,
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                    color: '#FFFFFF',
+                    font: {
+                        size: 12
+                    }
+                },
+                title: {
+                    display: true,
+                    text: label,
+                    color: '#FFFFFF',
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    }
+                }
+            }
+        },
+        animation: {
+            duration: 0
+        },
+        elements: {
+            point: {
+                radius: 0
+            },
+            line: {
+                tension: 0.4
+            }
+        }
+    });
+
+    // Подготовка данных для графиков
+    const getCurrentChartData = () => ({
+        labels: currentChartData.map((_, index) => ''),
+        datasets: [{
+            label: 'Ток (А)',
+            data: currentChartData.map(d => d.y),
+            borderColor: '#6C63FF',
+            backgroundColor: 'rgba(108, 99, 255, 0.1)',
+            fill: true,
+            borderWidth: 2,
+            pointRadius: 0
+        }]
+    });
+
+    const getVoltageChartData = () => ({
+        labels: voltageChartData.map((_, index) => ''),
+        datasets: [{
+            label: 'Напряжение (В)',
+            data: voltageChartData.map(d => d.y),
+            borderColor: '#FF6584',
+            backgroundColor: 'rgba(255, 101, 132, 0.1)',
+            fill: true,
+            borderWidth: 2,
+            pointRadius: 0
+        }]
+    });
+
     // Archive-style функции управления
 
     return (
@@ -550,67 +740,98 @@ const DeviceMonitorPage = () => {
                     <div className="parameters-grid">
                         {Object.entries(deviceData).map(([mac, data]) => (
                             <div key={mac} className="device-parameters">
-                                {/* Основные параметры в плитках */}
-                                <div className="main-parameters-grid">
-                                    {/* Ток - приоритет новым параметрам, fallback на старые */}
-                                    {(data.Current || data['State.I']) && (
-                                        <div className="main-parameter-card">
-                                            <div className="main-parameter-header">
-                                                <span className="main-parameter-icon">⚡</span>
-                                                <span className="main-parameter-name">Ток (А)</span>
-                                            </div>
-                                            <div className="main-parameter-value">{data.Current || data['State.I']}</div>
-                                        </div>
-                                    )}
-                                    
-                                    {/* Напряжение - приоритет новым параметрам, fallback на старые */}
-                                    {(data.Voltage || data['State.U']) && (
-                                        <div className="main-parameter-card">
-                                            <div className="main-parameter-header">
-                                                <span className="main-parameter-icon">🔋</span>
-                                                <span className="main-parameter-name">Напряжение (В)</span>
-                                            </div>
-                                            <div className="main-parameter-value">{data.Voltage || data['State.U']}</div>
-                                        </div>
-                                    )}
-                                    
-                                </div>
-                                
-                                {/* Остальные параметры в списке */}
-                                <div className="other-parameters-list">
-                                    <h4 className="other-parameters-title">Дополнительные параметры</h4>
-                                    {Object.entries(data).map(([key, value]) => {
-                                        if (key === 'timestamp' || key === 'Current' || key === 'Voltage' || 
-                                            key === 'State.I' || key === 'State.U' ||
-                                            key === 'State.Ctrl' || key === 'State.material' || key === 'State.GasFlow' || 
-                                            key === 'State.Temperature' || key === 'Packet.Index' || key === 'Time.Hours' || 
-                                            key === 'Time.Minutes' || key === 'Time.Seconds' || key === 'Date.Day' || 
-                                            key === 'Date.Month' || key === 'Date.Year') {
-                                            return null;
-                                        }
-                                        
-                                        return (
-                                            <div key={key} className="other-parameter-item">
-                                                <div className="other-parameter-info">
-                                                    <span className="other-parameter-icon">{getParameterIcon(key)}</span>
-                                                    <span className="other-parameter-name">{getParameterDisplayName(key)}</span>
+                                {/* Основная секция с параметрами */}
+                                <div className="main-parameters-container">
+                                    {/* Левая колонка: Ток и Напряжение */}
+                                    <div className="left-parameters-column">
+                                        {/* Ток */}
+                                        {(data.Current || data['State.I']) && (
+                                            <div className="main-parameter-card small">
+                                                <div className="main-parameter-header">
+                                                    <span className="main-parameter-icon">⚡</span>
+                                                    <span className="main-parameter-name">Ток (А)</span>
                                                 </div>
-                                                <div className="other-parameter-value">{value}</div>
+                                                <div className="main-parameter-value">{data.Current || data['State.I']}</div>
                                             </div>
-                                        );
-                                    })}
+                                        )}
+                                        
+                                        {/* Напряжение */}
+                                        {(data.Voltage || data['State.U']) && (
+                                            <div className="main-parameter-card small">
+                                                <div className="main-parameter-header">
+                                                    <span className="main-parameter-icon">🔋</span>
+                                                    <span className="main-parameter-name">Напряжение (В)</span>
+                                                </div>
+                                                <div className="main-parameter-value">{data.Voltage || data['State.U']}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Правая колонка: Дополнительные параметры */}
+                                    <div className="right-parameters-column">
+                                        <div className="other-parameters-list">
+                                            <h4 className="other-parameters-title">Дополнительные параметры</h4>
+                                            {Object.entries(data).map(([key, value]) => {
+                                                if (key === 'timestamp' || key === 'Current' || key === 'Voltage' || 
+                                                    key === 'State.I' || key === 'State.U' ||
+                                                    key === 'State.Ctrl' || key === 'State.material' || key === 'State.GasFlow' || 
+                                                    key === 'State.Temperature' || key === 'Packet.Index' || key === 'Time.Hours' || 
+                                                    key === 'Time.Minutes' || key === 'Time.Seconds' || key === 'Date.Day' || 
+                                                    key === 'Date.Month' || key === 'Date.Year') {
+                                                    return null;
+                                                }
+                                                
+                                                return (
+                                                    <div key={key} className="other-parameter-item">
+                                                        <div className="other-parameter-info">
+                                                            <span className="other-parameter-icon">{getParameterIcon(key)}</span>
+                                                            <span className="other-parameter-name">{getParameterDisplayName(key)}</span>
+                                                        </div>
+                                                        <div className="other-parameter-value">{value}</div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
                                 
-                                {/*<div className="update-time">*/}
-                                {/*    Обновлено: {data.timestamp}*/}
-                                {/*</div>*/}
+                                {/* Графики */}
+                                <div className="charts-container">
+                                    <div className="chart-wrapper">
+                                        <div className="chart-title">График тока</div>
+                                        <div className="chart-box">
+                                            {currentChartData.length > 0 ? (
+                                                <Line
+                                                    data={getCurrentChartData()}
+                                                    options={getChartOptions(0, 500, 'Ток (А)')}
+                                                />
+                                            ) : (
+                                                <div className="chart-placeholder">Ожидание данных...</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="chart-wrapper">
+                                        <div className="chart-title">График напряжения</div>
+                                        <div className="chart-box">
+                                            {voltageChartData.length > 0 ? (
+                                                <Line
+                                                    data={getVoltageChartData()}
+                                                    options={getChartOptions(0, 50.0, 'Напряжение (В)')}
+                                                />
+                                            ) : (
+                                                <div className="chart-placeholder">Ожидание данных...</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>
                 ) : (
                     <div className="no-data">
                         <div className="no-data-icon">
-                            {isConnected ? '⏳' : '🔴'}
+                            {!isConnected && '🔴'}
                         </div>
                         <p className="no-data-text">
                             {isConnected 

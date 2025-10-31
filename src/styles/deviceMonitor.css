@@ -201,6 +201,28 @@
   margin-bottom: 2rem;
 }
 
+/* Контейнер для основной секции параметров */
+.main-parameters-container {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  align-items: flex-start;
+}
+
+/* Левая колонка: Ток и Напряжение */
+.left-parameters-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  flex: 0 0 auto;
+  min-width: 250px;
+}
+
+/* Правая колонка: Дополнительные параметры */
+.right-parameters-column {
+  flex: 1 1 auto;
+}
+
 .main-parameter-card {
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   border-radius: 16px;
@@ -215,6 +237,24 @@
   flex-direction: column;
   justify-content: center;
   box-shadow: 0 8px 32px rgba(108, 99, 255, 0.3);
+}
+
+/* Маленькие карточки для тока и напряжения */
+.main-parameter-card.small {
+  padding: 1.5rem;
+  min-height: 120px;
+}
+
+.main-parameter-card.small .main-parameter-value {
+  font-size: 2.5rem;
+}
+
+.main-parameter-card.small .main-parameter-icon {
+  font-size: 2rem;
+}
+
+.main-parameter-card.small .main-parameter-name {
+  font-size: 1rem;
 }
 
 .main-parameter-card:hover {
@@ -464,12 +504,32 @@
     align-items: stretch;
   }
   
+  .main-parameters-container {
+    flex-direction: column;
+  }
+  
+  .left-parameters-column {
+    min-width: 100%;
+  }
+  
   .main-parameters-grid {
     grid-template-columns: 1fr;
   }
   
   .main-parameter-value {
     font-size: 3rem;
+  }
+  
+  .main-parameter-card.small .main-parameter-value {
+    font-size: 2rem;
+  }
+  
+  .charts-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .chart-box {
+    height: 250px;
   }
   
   .other-parameter-item {
@@ -516,5 +576,54 @@
   font-family: monospace;
   font-size: 0.9rem;
   margin-top: 0.5rem;
+}
+
+/* Стили для графиков */
+.charts-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.chart-wrapper {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  transition: var(--transition);
+}
+
+.chart-wrapper:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--card-shadow);
+}
+
+.chart-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  text-align: center;
+  border-bottom: 2px solid var(--primary);
+  padding-bottom: 0.5rem;
+}
+
+.chart-box {
+  height: 300px;
+  position: relative;
+  width: 100%;
+}
+
+.chart-placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  border: 1px dashed var(--border-color);
 }
 
