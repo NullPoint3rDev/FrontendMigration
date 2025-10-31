@@ -43,41 +43,41 @@ const gradientPlugin = {
         const isCurrentChart = chart.canvas.id === 'current-chart' || 
                                (chart.data.datasets[0] && chart.data.datasets[0].label === 'Ток (А)');
         
-        // Пороговая линия для тока (350A)
-        if (isCurrentChart) {
-            const thresholdValue = 350;
-            const yPos = scales.y.getPixelForValue(thresholdValue);
-            
-            ctx.save();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath();
-            ctx.moveTo(chartArea.left, yPos);
-            ctx.lineTo(chartArea.right, yPos);
-            ctx.stroke();
-            ctx.restore();
-        }
+        // // Пороговая линия для тока (350A)
+        // if (isCurrentChart) {
+        //     const thresholdValue = 350;
+        //     const yPos = scales.y.getPixelForValue(thresholdValue);
+        //
+        //     ctx.save();
+        //     ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        //     ctx.lineWidth = 1.5;
+        //     ctx.setLineDash([5, 5]);
+        //     ctx.beginPath();
+        //     ctx.moveTo(chartArea.left, yPos);
+        //     ctx.lineTo(chartArea.right, yPos);
+        //     ctx.stroke();
+        //     ctx.restore();
+        // }
         
         // Идентифицируем график напряжения
         const isVoltageChart = chart.canvas.id === 'voltage-chart' || 
                                (chart.data.datasets[0] && chart.data.datasets[0].label === 'Напряжение (В)');
         
-        // Пороговая линия для напряжения (35V)
-        if (isVoltageChart) {
-            const thresholdValue = 35;
-            const yPos = scales.y.getPixelForValue(thresholdValue);
-            
-            ctx.save();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath();
-            ctx.moveTo(chartArea.left, yPos);
-            ctx.lineTo(chartArea.right, yPos);
-            ctx.stroke();
-            ctx.restore();
-        }
+        // // Пороговая линия для напряжения (35V)
+        // if (isVoltageChart) {
+        //     const thresholdValue = 35;
+        //     const yPos = scales.y.getPixelForValue(thresholdValue);
+        //
+        //     ctx.save();
+        //     ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        //     ctx.lineWidth = 1.5;
+        //     ctx.setLineDash([5, 5]);
+        //     ctx.beginPath();
+        //     ctx.moveTo(chartArea.left, yPos);
+        //     ctx.lineTo(chartArea.right, yPos);
+        //     ctx.stroke();
+        //     ctx.restore();
+        // }
     }
 };
 
