@@ -15,6 +15,115 @@ import {
 import '../styles/deviceMonitor.css';
 import * as archiveDeviceApi from '../api/archiveDeviceApi';
 
+// Кастомный плагин для градиентов и пороговых линий
+const gradientPlugin = {
+    id: 'gradientPlugin',
+    beforeDatasetsDraw: (chart) => {
+        const ctx = chart.ctx;
+        const chartArea = chart.chartArea;
+        const scales = chart.scales;
+        
+        if (!chartArea || !scales.y) return;
+        
+        // Идентифицируем график по данным или другим способом
+        const isCurrentChart = chart.canvas.id === 'current-chart' || 
+                               (chart.data.datasets[0] && chart.data.datasets[0].label === 'Ток (А)');
+        
+        // Создаем градиент для тока
+        if (isCurrentChart) {
+            const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+            gradient.addColorStop(0, 'rgba(100, 200, 255, 0.8)');
+            gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.4)');
+            gradient.addColorStop(1, 'rgba(100, 200, 255, 0.05)');
+            
+            // Обновляем backgroundColor первого dataset
+            if (chart.data.datasets[0]) {
+                chart.data.datasets[0].backgroundColor = gradient;
+            }
+        }
+        
+        // Идентифицируем график напряжения
+        const isVoltageChart = chart.canvas.id === 'voltage-chart' || 
+                               (chart.data.datasets[0] && chart.data.datasets[0].label === 'Напряжение (В)');
+        
+        // Создаем градиент для напряжения
+        if (isVoltageChart) {
+            const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+            gradient.addColorStop(0, 'rgba(255, 101, 180, 0.8)');
+            gradient.addColorStop(0.5, 'rgba(255, 101, 180, 0.4)');
+            gradient.addColorStop(1, 'rgba(255, 101, 180, 0.05)');
+            
+            // Обновляем backgroundColor первого dataset
+            if (chart.data.datasets[0]) {
+                chart.data.datasets[0].backgroundColor = gradient;
+            }
+        }
+    },
+    afterDatasetsDraw: (chart) => {
+        const ctx = chart.ctx;
+        const chartArea = chart.chartArea;
+        const scales = chart.scales;
+        
+        if (!chartArea || !scales.y) return;
+        
+        // Идентифицируем график
+        const isCurrentChart = chart.canvas.id === 'current-chart' || 
+                               (chart.data.datasets[0] && chart.data.datasets[0].label === 'Ток (А)');
+        
+        // Пороговая линия для тока (350A)
+        if (isCurrentChart) {
+            const thresholdValue = 350;
+            const yPos = scales.y.getPixelForValue(thresholdValue);
+            
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(chartArea.left, yPos);
+            ctx.lineTo(chartArea.right, yPos);
+            ctx.stroke();
+            
+            // Метка порога
+            ctx.fillStyle = 'rgba(100, 200, 255, 0.9)';
+            ctx.fillRect(chartArea.right - 65, yPos - 10, 60, 20);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 11px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('350A', chartArea.right - 35, yPos + 4);
+            ctx.restore();
+        }
+        
+        // Идентифицируем график напряжения
+        const isVoltageChart = chart.canvas.id === 'voltage-chart' || 
+                               (chart.data.datasets[0] && chart.data.datasets[0].label === 'Напряжение (В)');
+        
+        // Пороговая линия для напряжения (35V)
+        if (isVoltageChart) {
+            const thresholdValue = 35;
+            const yPos = scales.y.getPixelForValue(thresholdValue);
+            
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(chartArea.left, yPos);
+            ctx.lineTo(chartArea.right, yPos);
+            ctx.stroke();
+            
+            // Метка порога
+            ctx.fillStyle = 'rgba(255, 101, 180, 0.9)';
+            ctx.fillRect(chartArea.right - 60, yPos - 10, 55, 20);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 11px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('35В', chartArea.right - 32.5, yPos + 4);
+            ctx.restore();
+        }
+    }
+};
+
 // Регистрация компонентов Chart.js
 ChartJS.register(
     CategoryScale,
@@ -24,7 +133,8 @@ ChartJS.register(
     Title,
     Tooltip,
     Legend,
-    Filler
+    Filler,
+    gradientPlugin
 );
 
 const DeviceMonitorPage = () => {
@@ -133,6 +243,10 @@ const DeviceMonitorPage = () => {
     // Рефы для отслеживания предыдущих значений
     const prevCurrentRef = useRef(null);
     const prevVoltageRef = useRef(null);
+    
+    // Рефы для графиков
+    const currentChartInstanceRef = useRef(null);
+    const voltageChartInstanceRef = useRef(null);
     
     // Обновление данных графиков при изменении deviceData
     useEffect(() => {
@@ -588,58 +702,64 @@ const DeviceMonitorPage = () => {
         navigate('/equipment');
     };
 
-    // Конфигурация графиков
-    const getChartOptions = (min, max, label) => ({
+    // Создание градиента для заполнения графика
+    const createGradient = (ctx, chartArea, color1, color2) => {
+        const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+        gradient.addColorStop(0, color1);
+        gradient.addColorStop(1, color2);
+        return gradient;
+    };
+
+    // Конфигурация графиков в стиле скриншота
+    const getChartOptions = (min, max, label, threshold, thresholdLabel, chartRef) => ({
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
             legend: {
-                display: true,
-                labels: {
-                    color: '#FFFFFF',
-                    font: {
-                        size: 14,
-                        weight: 'bold'
-                    }
-                }
+                display: false
             },
             tooltip: {
                 mode: 'index',
                 intersect: false,
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                backgroundColor: 'rgba(0, 0, 0, 0.85)',
                 titleColor: '#FFFFFF',
                 bodyColor: '#FFFFFF',
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-                borderWidth: 1
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 8,
+                displayColors: true,
+                callbacks: {
+                    label: function(context) {
+                        return `${label}: ${context.parsed.y.toFixed(1)}`;
+                    }
+                }
             }
         },
         scales: {
             x: {
                 display: false,
                 grid: {
-                    color: 'rgba(255, 255, 255, 0.05)'
+                    display: false
                 }
             },
             y: {
                 min: min,
                 max: max,
                 grid: {
-                    color: 'rgba(255, 255, 255, 0.05)'
+                    color: 'rgba(255, 255, 255, 0.1)',
+                    lineWidth: 1,
+                    drawBorder: false
                 },
                 ticks: {
-                    color: '#FFFFFF',
+                    color: 'rgba(255, 255, 255, 0.7)',
                     font: {
-                        size: 12
-                    }
+                        size: 11
+                    },
+                    padding: 8
                 },
-                title: {
-                    display: true,
-                    text: label,
-                    color: '#FFFFFF',
-                    font: {
-                        size: 14,
-                        weight: 'bold'
-                    }
+                border: {
+                    display: false
                 }
             }
         },
@@ -648,10 +768,24 @@ const DeviceMonitorPage = () => {
         },
         elements: {
             point: {
-                radius: 0
+                radius: 0,
+                hoverRadius: 4
             },
             line: {
-                tension: 0.4
+                tension: 0.4,
+                borderWidth: 2
+            }
+        },
+        interaction: {
+            intersect: false,
+            mode: 'index'
+        },
+        layout: {
+            padding: {
+                top: 10,
+                bottom: 10,
+                left: 10,
+                right: 10
             }
         }
     });
@@ -662,11 +796,16 @@ const DeviceMonitorPage = () => {
         datasets: [{
             label: 'Ток (А)',
             data: currentChartData.map(d => d.y),
-            borderColor: '#6C63FF',
-            backgroundColor: 'rgba(108, 99, 255, 0.1)',
+            borderColor: '#64C8FF',
+            backgroundColor: 'rgba(100, 200, 255, 0.3)', // Будет заменен градиентом через плагин
             fill: true,
             borderWidth: 2,
-            pointRadius: 0
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            pointHoverBackgroundColor: '#64C8FF',
+            pointHoverBorderColor: '#FFFFFF',
+            pointHoverBorderWidth: 2,
+            tension: 0.4
         }]
     });
 
@@ -675,11 +814,16 @@ const DeviceMonitorPage = () => {
         datasets: [{
             label: 'Напряжение (В)',
             data: voltageChartData.map(d => d.y),
-            borderColor: '#FF6584',
-            backgroundColor: 'rgba(255, 101, 132, 0.1)',
+            borderColor: '#FF65B4',
+            backgroundColor: 'rgba(255, 101, 180, 0.3)', // Будет заменен градиентом через плагин
             fill: true,
             borderWidth: 2,
-            pointRadius: 0
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            pointHoverBackgroundColor: '#FF65B4',
+            pointHoverBorderColor: '#FFFFFF',
+            pointHoverBorderWidth: 2,
+            tension: 0.4
         }]
     });
 
@@ -797,13 +941,19 @@ const DeviceMonitorPage = () => {
                                 
                                 {/* Графики */}
                                 <div className="charts-container">
-                                    <div className="chart-wrapper">
+                                    <div className="chart-wrapper chart-dark">
                                         <div className="chart-title">График тока</div>
                                         <div className="chart-box">
                                             {currentChartData.length > 0 ? (
                                                 <Line
                                                     data={getCurrentChartData()}
-                                                    options={getChartOptions(0, 500, 'Ток (А)')}
+                                                    options={getChartOptions(0, 500, 'Ток (А)', 350, '350A')}
+                                                    ref={(chart) => {
+                                                        if (chart && chart.canvas) {
+                                                            chart.canvas.id = 'current-chart';
+                                                            currentChartInstanceRef.current = chart;
+                                                        }
+                                                    }}
                                                 />
                                             ) : (
                                                 <div className="chart-placeholder">Ожидание данных...</div>
@@ -811,13 +961,19 @@ const DeviceMonitorPage = () => {
                                         </div>
                                     </div>
                                     
-                                    <div className="chart-wrapper">
+                                    <div className="chart-wrapper chart-dark">
                                         <div className="chart-title">График напряжения</div>
                                         <div className="chart-box">
                                             {voltageChartData.length > 0 ? (
                                                 <Line
                                                     data={getVoltageChartData()}
-                                                    options={getChartOptions(0, 50.0, 'Напряжение (В)')}
+                                                    options={getChartOptions(0, 50.0, 'Напряжение (В)', 35, '35В')}
+                                                    ref={(chart) => {
+                                                        if (chart && chart.canvas) {
+                                                            chart.canvas.id = 'voltage-chart';
+                                                            voltageChartInstanceRef.current = chart;
+                                                        }
+                                                    }}
                                                 />
                                             ) : (
                                                 <div className="chart-placeholder">Ожидание данных...</div>

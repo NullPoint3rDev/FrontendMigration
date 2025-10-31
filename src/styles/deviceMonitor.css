@@ -215,7 +215,7 @@
   flex-direction: column;
   gap: 1.5rem;
   flex: 0 0 auto;
-  min-width: 250px;
+  min-width: 300px;
 }
 
 /* Правая колонка: Дополнительные параметры */
@@ -239,22 +239,22 @@
   box-shadow: 0 8px 32px rgba(108, 99, 255, 0.3);
 }
 
-/* Маленькие карточки для тока и напряжения */
+/* Увеличенные карточки для тока и напряжения */
 .main-parameter-card.small {
-  padding: 1.5rem;
-  min-height: 120px;
+  padding: 2.5rem 2rem;
+  min-height: 180px;
 }
 
 .main-parameter-card.small .main-parameter-value {
-  font-size: 2.5rem;
+  font-size: 3.5rem;
 }
 
 .main-parameter-card.small .main-parameter-icon {
-  font-size: 2rem;
+  font-size: 2.5rem;
 }
 
 .main-parameter-card.small .main-parameter-name {
-  font-size: 1rem;
+  font-size: 1.2rem;
 }
 
 .main-parameter-card:hover {
@@ -305,39 +305,39 @@
   animation: pulse 2s infinite;
 }
 
-/* Дополнительные параметры в списке */
+/* Дополнительные параметры в списке - компактный стиль */
 .other-parameters-list {
   background: rgba(255, 255, 255, 0.03);
   border-radius: 12px;
-  padding: 1.5rem;
+  padding: 1rem;
   border: 1px solid var(--border-color);
 }
 
 .other-parameters-title {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 1.5rem 0;
+  margin: 0 0 0.75rem 0;
   text-align: center;
-  border-bottom: 2px solid var(--primary);
-  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--primary);
+  padding-bottom: 0.4rem;
 }
 
 .other-parameter-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
-  margin-bottom: 0.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  border-left: 3px solid var(--primary);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.35rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border-left: 2px solid var(--primary);
   transition: var(--transition);
 }
 
 .other-parameter-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  transform: translateX(5px);
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateX(3px);
 }
 
 .other-parameter-item:last-child {
@@ -347,25 +347,25 @@
 .other-parameter-info {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .other-parameter-icon {
-  font-size: 1.2rem;
+  font-size: 0.9rem;
   opacity: 0.8;
 }
 
 .other-parameter-name {
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--text-secondary);
 }
 
 .other-parameter-value {
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--primary);
-  text-shadow: 0 0 10px rgba(108, 99, 255, 0.3);
+  text-shadow: 0 0 8px rgba(108, 99, 255, 0.3);
 }
 
 .parameter-card {
@@ -594,6 +594,11 @@
   transition: var(--transition);
 }
 
+.chart-wrapper.chart-dark {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .chart-wrapper:hover {
   transform: translateY(-2px);
   box-shadow: var(--card-shadow);
@@ -613,6 +618,13 @@
   height: 300px;
   position: relative;
   width: 100%;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.chart-wrapper.chart-dark .chart-box {
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .chart-placeholder {
