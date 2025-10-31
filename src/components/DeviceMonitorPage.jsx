@@ -880,7 +880,8 @@ const DeviceMonitorPage = () => {
                                                     key === 'State.Ctrl' || key === 'State.material' || key === 'State.GasFlow' || 
                                                     key === 'State.Temperature' || key === 'Packet.Index' || key === 'Time.Hours' || 
                                                     key === 'Time.Minutes' || key === 'Time.Seconds' || key === 'Date.Day' || 
-                                                    key === 'Date.Month' || key === 'Date.Year') {
+                                                    key === 'Date.Month' || key === 'Date.Year' ||
+                                                    key === 'Состояние аппарата') { // Исключаем русский ключ, оставляем WeldingMachineState
                                                     return null;
                                                 }
                                                 
