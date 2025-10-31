@@ -1,641 +1,771 @@
-/* Device Monitor Page Styles */
+/* Device Monitor Page Styles - New Design */
 :root {
-  --primary: #6C63FF;
+  --primary: #FF8A00;
   --secondary: #FF6584;
   --accent: #4CAF50;
-  --background: #1A1A2E;
+  --bg-dark: #1A1A2E;
+  --bg-sidebar: #2D1B4E;
   --surface: #16213E;
   --text-primary: #FFFFFF;
   --text-secondary: rgba(255, 255, 255, 0.7);
   --border-color: rgba(255, 255, 255, 0.1);
-  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.device-monitor-page {
-  padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
-  margin-top: 70px; /* Add margin to account for fixed navbar */
-  min-height: 100vh;
-  background: radial-gradient(circle at top right, #1A1A2E, #16213E);
-  color: var(--text-primary);
-}
-
-.device-monitor-header {
+/* Основной layout с тремя колонками */
+.device-monitor-layout {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-}
-
-.device-monitor-title {
-  font-size: 2.5rem;
-  font-weight: 600;
+  min-height: 100vh;
+  background: var(--bg-dark);
   color: var(--text-primary);
-  margin: 0;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-family: 'Poppins', sans-serif;
 }
 
-.back-btn {
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 0.8rem 1.5rem;
+/* Левая боковая панель навигации */
+.monitor-sidebar {
+  width: 250px;
+  background: var(--bg-sidebar);
+  padding: 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border-color);
+  position: fixed;
+  height: 100vh;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.sidebar-logo {
+  padding: 0 1.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+}
+
+.logo-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 1px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0 1rem;
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
   border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 500;
   cursor: pointer;
   transition: var(--transition);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.back-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
-}
-
-.device-info-card {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 16px;
-  padding: 1.5rem;
-  border: 1px solid var(--border-color);
-  margin-bottom: 2rem;
-  transition: var(--transition);
-}
-
-.device-info-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--card-shadow);
-}
-
-.device-name {
-  font-size: 1.5rem;
-  font-weight: 600;
   color: var(--text-primary);
-  margin: 0;
+  font-size: 0.95rem;
 }
 
-.status-card {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 16px;
-  padding: 1.5rem;
-  border: 1px solid var(--border-color);
-  margin-bottom: 2rem;
-  transition: var(--transition);
+.sidebar-nav-item:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.status-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--card-shadow);
+.sidebar-nav-item.active {
+  color: var(--primary);
+  background: rgba(255, 138, 0, 0.1);
 }
 
-.status-info {
+.sidebar-nav-item.active .nav-label {
+  color: var(--primary);
+}
+
+.nav-icon {
+  font-size: 1.2rem;
+}
+
+.nav-label {
+  flex: 1;
+}
+
+.nav-arrow {
+  font-size: 0.8rem;
+}
+
+.sidebar-submenu {
+  margin-left: 1rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--border-color);
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.submenu-item {
+  padding-left: 2rem;
+}
+
+/* Основной контент */
+.monitor-main-content {
+  margin-left: 250px;
+  flex: 1;
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Средняя панель: Список устройств */
+.device-list-panel {
+  width: 320px;
+  background: rgba(255, 255, 255, 0.03);
+  border-right: 1px solid var(--border-color);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  overflow-y: auto;
+}
+
+.device-filters {
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
-.status-indicator {
+.filter-select {
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.filter-select:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--primary);
+}
+
+.device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.device-list-item {
   display: flex;
   align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.device-list-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-color);
+}
+
+.device-list-item.selected {
+  background: rgba(100, 200, 255, 0.15);
+  border-color: #64C8FF;
+}
+
+.device-icon {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.error-indicator {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
+  background: #FF6584;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 0.8rem;
+}
+
+.device-list-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.device-list-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.device-list-task {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.device-list-operator {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Правая панель: Детальный мониторинг */
+.device-detail-panel {
+  flex: 1;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  overflow-y: auto;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.detail-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detail-device-name {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.detail-job-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.detail-location {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.user-profile-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.user-profile-icon:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Панель управления */
+.control-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 150px;
+}
+
+.control-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.control-select {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.status-badge {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-block;
+  width: fit-content;
+}
+
+.status-badge.welding {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4CAF50;
+}
+
+.control-button {
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+  align-self: flex-end;
+}
+
+.control-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--primary);
+}
+
+.welder-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.welder-name {
+  font-size: 0.9rem;
+}
+
+.welder-status {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.welder-status.online {
+  background: #4CAF50;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+}
+
+.welder-status.offline {
+  background: #9E9E9E;
+}
+
+/* Блок с изображением аппарата и метриками */
+.device-metrics-section {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.device-image-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.device-image {
+  width: 200px;
+  height: 300px;
+  background: linear-gradient(135deg, #2a2a3e, #1a1a2e);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border: 1px solid var(--border-color);
+}
+
+.device-display {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.display-value-top {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.display-value-bottom {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+}
+
+.metrics-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 1rem 0;
+}
+
+.metric-block {
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
 }
 
-.status-icon {
-  font-size: 1.2rem;
+.metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.status-text {
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.reconnect-btn {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
+.metric-label {
   font-size: 0.9rem;
+  color: var(--text-secondary);
   font-weight: 500;
+}
+
+.metric-value-large {
+  font-size: 3rem;
+  font-weight: bold;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.metric-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.metric-range {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.metric-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--primary);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.metric-range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.metric-adjust-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.metric-btn-left,
+.metric-btn-right {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 1.2rem;
   cursor: pointer;
   transition: var(--transition);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
 }
 
-.reconnect-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
+.metric-btn-left:hover,
+.metric-btn-right:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--primary);
 }
 
-.reconnect-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.last-update {
-  margin-top: 1rem;
+.metric-range-display {
   font-size: 0.9rem;
   color: var(--text-secondary);
-  text-align: center;
+  padding: 0 1rem;
 }
 
-.error-message {
-  background: rgba(255, 101, 132, 0.1);
-  border: 1px solid #FF6584;
-  color: #FF6584;
-  padding: 1rem 1.5rem;
-  border-radius: 8px;
-  margin-bottom: 2rem;
-  font-weight: 500;
-}
-
-.device-data-section {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 16px;
-  padding: 2rem;
-  border: 1px solid var(--border-color);
-  transition: var(--transition);
-}
-
-.device-data-section:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--card-shadow);
-}
-
-.section-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 2rem 0;
-  text-align: center;
-}
-
-.parameters-grid {
+.metric-additional-info {
   display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
-
-.device-parameters {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
-
-/* Основные параметры в плитках */
-.main-parameters-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-}
-
-/* Контейнер для основной секции параметров */
-.main-parameters-container {
-  display: flex;
-  gap: 2rem;
-  margin-bottom: 2rem;
-  align-items: flex-start;
-}
-
-/* Левая колонка: Ток и Напряжение */
-.left-parameters-column {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  flex: 0 0 auto;
-  min-width: 300px;
-}
-
-/* Правая колонка: Дополнительные параметры */
-.right-parameters-column {
-  flex: 1 1 auto;
-}
-
-.main-parameter-card {
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  border-radius: 16px;
-  padding: 2rem;
-  text-align: center;
-  border: none;
-  transition: var(--transition);
-  position: relative;
-  overflow: hidden;
-  min-height: 140px;
-  display: flex;
-  flex-direction: column;
+  gap: 1rem;
   justify-content: center;
-  box-shadow: 0 8px 32px rgba(108, 99, 255, 0.3);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }
 
-/* Увеличенные карточки для тока и напряжения */
-.main-parameter-card.small {
-  padding: 2.5rem 2rem;
-  min-height: 180px;
+/* Панель ошибок */
+.errors-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 250px;
 }
 
-.main-parameter-card.small .main-parameter-value {
-  font-size: 3.5rem;
+.error-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: var(--transition);
 }
 
-.main-parameter-card.small .main-parameter-icon {
-  font-size: 2.5rem;
+.error-item.warning {
+  background: rgba(255, 193, 7, 0.1);
+  border-left: 3px solid #FFC107;
 }
 
-.main-parameter-card.small .main-parameter-name {
+.error-item.error {
+  background: rgba(244, 67, 54, 0.1);
+  border-left: 3px solid #F44336;
+}
+
+.error-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.error-icon {
   font-size: 1.2rem;
 }
 
-.main-parameter-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(108, 99, 255, 0.4);
+.error-text {
+  flex: 1;
+  font-size: 0.85rem;
 }
 
-.main-parameter-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.6s;
+.error-toggle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }
 
-.main-parameter-card:hover::before {
-  left: 100%;
+/* Вкладки и графики */
+.tabs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.main-parameter-header {
+.tabs-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  gap: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.main-parameter-icon {
-  font-size: 2.5rem;
-  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+.tab-button {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -0.5rem;
 }
 
-.main-parameter-name {
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.main-parameter-value {
-  font-size: 3.5rem;
-  font-weight: bold;
-  color: white;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
-  animation: pulse 2s infinite;
-}
-
-/* Дополнительные параметры в списке - компактный стиль */
-.other-parameters-list {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
-  padding: 1rem;
-  border: 1px solid var(--border-color);
-}
-
-.other-parameters-title {
-  font-size: 1rem;
-  font-weight: 600;
+.tab-button:hover {
   color: var(--text-primary);
-  margin: 0 0 0.75rem 0;
-  text-align: center;
-  border-bottom: 1px solid var(--primary);
-  padding-bottom: 0.4rem;
 }
 
-.other-parameter-item {
+.tab-button.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.date-picker {
+  margin-left: auto;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.tabs-content {
+  min-height: 400px;
+}
+
+.graphs-tab-content {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 1.5rem;
+}
+
+.graph-params-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.graph-param-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.35rem;
+  padding: 0.5rem;
   background: rgba(255, 255, 255, 0.03);
   border-radius: 6px;
-  border-left: 2px solid var(--primary);
-  transition: var(--transition);
 }
 
-.other-parameter-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  transform: translateX(3px);
-}
-
-.other-parameter-item:last-child {
-  margin-bottom: 0;
-}
-
-.other-parameter-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.other-parameter-icon {
-  font-size: 0.9rem;
-  opacity: 0.8;
-}
-
-.other-parameter-name {
+.param-name {
   font-size: 0.85rem;
-  font-weight: 500;
   color: var(--text-secondary);
+  flex: 1;
 }
 
-.other-parameter-value {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--primary);
-  text-shadow: 0 0 8px rgba(108, 99, 255, 0.3);
+.param-toggles {
+  display: flex;
+  gap: 0.25rem;
 }
 
-.parameter-card {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-  padding: 1.5rem;
-  text-align: center;
-  border: 2px solid var(--primary);
+.param-toggle {
+  width: 32px;
+  height: 24px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
   transition: var(--transition);
+}
+
+.param-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.param-toggle.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.graphs-display {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.graph-container {
   position: relative;
-  overflow: hidden;
-  min-height: 120px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 1rem;
+  min-height: 200px;
 }
 
-.parameter-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 30px rgba(108, 99, 255, 0.3);
-  border-color: var(--secondary);
-}
-
-.parameter-card::before {
-  content: '';
+.graph-controls {
   position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-  transition: left 0.5s;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  z-index: 10;
 }
 
-.parameter-card:hover::before {
-  left: 100%;
-}
-
-.parameter-header {
+.graph-icon {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: var(--transition);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  font-size: 1rem;
 }
 
-.parameter-icon {
-  font-size: 2rem;
+.graph-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--primary);
 }
 
-.parameter-name {
-  font-size: 1.2rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.parameter-value {
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: var(--primary);
-  text-shadow: 0 0 20px rgba(108, 99, 255, 0.5);
-  animation: pulse 2s infinite;
-  word-break: break-word;
-}
-
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.update-time {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  text-align: center;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.no-data {
+.graph-placeholder {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 4rem 2rem;
-  text-align: center;
-}
-
-.no-data-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-  opacity: 0.6;
-}
-
-.no-data-text {
-  font-size: 1.2rem;
+  min-height: 200px;
   color: var(--text-secondary);
-  margin: 0;
-  max-width: 400px;
-}
-
-.no-data-subtext {
   font-size: 0.9rem;
-  color: var(--text-secondary);
-  margin: 0.5rem 0 0 0;
-  opacity: 0.8;
 }
 
+.info-tab-content,
+.activity-tab-content {
+  padding: 2rem;
+  color: var(--text-secondary);
+}
 
 /* Responsive Design */
-@media (max-width: 768px) {
-  .device-monitor-page {
-    padding: 1rem;
+@media (max-width: 1200px) {
+  .device-metrics-section {
+    grid-template-columns: 1fr;
   }
   
-  .device-monitor-header {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
-  
-  .device-monitor-title {
-    font-size: 2rem;
-    text-align: center;
-  }
-  
-  .status-info {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .main-parameters-container {
-    flex-direction: column;
-  }
-  
-  .left-parameters-column {
+  .errors-panel {
     min-width: 100%;
   }
+}
+
+@media (max-width: 768px) {
+  .monitor-sidebar {
+    width: 200px;
+  }
   
-  .main-parameters-grid {
+  .monitor-main-content {
+    margin-left: 200px;
+  }
+  
+  .device-list-panel {
+    width: 250px;
+  }
+  
+  .graphs-tab-content {
     grid-template-columns: 1fr;
   }
-  
-  .main-parameter-value {
-    font-size: 3rem;
-  }
-  
-  .main-parameter-card.small .main-parameter-value {
-    font-size: 2rem;
-  }
-  
-  .charts-container {
-    grid-template-columns: 1fr;
-  }
-  
-  .chart-box {
-    height: 250px;
-  }
-  
-  .other-parameter-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-  
-  .other-parameter-value {
-    align-self: flex-end;
-  }
 }
-
-@media (max-width: 480px) {
-  .device-monitor-title {
-    font-size: 1.8rem;
-  }
-  
-  .main-parameter-card {
-    padding: 1.5rem;
-  }
-  
-  .main-parameter-value {
-    font-size: 2.5rem;
-  }
-  
-  .main-parameter-name {
-    font-size: 1rem;
-  }
-  
-  .other-parameters-list {
-    padding: 1rem;
-  }
-  
-  .other-parameter-item {
-    padding: 0.5rem 0.75rem;
-  }
-}
-
-/* Device Controls Styles */
-
-.device-mac {
-  color: var(--text-secondary);
-  font-family: monospace;
-  font-size: 0.9rem;
-  margin-top: 0.5rem;
-}
-
-/* Стили для графиков */
-.charts-container {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 2rem;
-  margin-top: 2rem;
-}
-
-.chart-wrapper {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 16px;
-  padding: 1.5rem;
-  border: 1px solid var(--border-color);
-  transition: var(--transition);
-}
-
-.chart-wrapper.chart-dark {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.chart-wrapper:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--card-shadow);
-}
-
-.chart-title {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 1rem;
-  text-align: center;
-  border-bottom: 2px solid var(--primary);
-  padding-bottom: 0.5rem;
-}
-
-.chart-box {
-  height: 300px;
-  position: relative;
-  width: 100%;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 10px;
-}
-
-.chart-wrapper.chart-dark .chart-box {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.chart-placeholder {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  font-size: 1.1rem;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 8px;
-  border: 1px dashed var(--border-color);
-}
-
