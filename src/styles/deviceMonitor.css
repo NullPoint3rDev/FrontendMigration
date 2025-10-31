@@ -595,8 +595,8 @@
 }
 
 .chart-wrapper.chart-dark {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .chart-wrapper:hover {
@@ -618,13 +618,13 @@
   height: 300px;
   position: relative;
   width: 100%;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 10px;
 }
 
 .chart-wrapper.chart-dark .chart-box {
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .chart-placeholder {

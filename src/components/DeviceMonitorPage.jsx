@@ -29,35 +29,8 @@ const gradientPlugin = {
         const isCurrentChart = chart.canvas.id === 'current-chart' || 
                                (chart.data.datasets[0] && chart.data.datasets[0].label === 'Ток (А)');
         
-        // Создаем градиент для тока
-        if (isCurrentChart) {
-            const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-            gradient.addColorStop(0, 'rgba(100, 200, 255, 0.8)');
-            gradient.addColorStop(0.5, 'rgba(100, 200, 255, 0.4)');
-            gradient.addColorStop(1, 'rgba(100, 200, 255, 0.05)');
-            
-            // Обновляем backgroundColor первого dataset
-            if (chart.data.datasets[0]) {
-                chart.data.datasets[0].backgroundColor = gradient;
-            }
-        }
-        
-        // Идентифицируем график напряжения
-        const isVoltageChart = chart.canvas.id === 'voltage-chart' || 
-                               (chart.data.datasets[0] && chart.data.datasets[0].label === 'Напряжение (В)');
-        
-        // Создаем градиент для напряжения
-        if (isVoltageChart) {
-            const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-            gradient.addColorStop(0, 'rgba(255, 101, 180, 0.8)');
-            gradient.addColorStop(0.5, 'rgba(255, 101, 180, 0.4)');
-            gradient.addColorStop(1, 'rgba(255, 101, 180, 0.05)');
-            
-            // Обновляем backgroundColor первого dataset
-            if (chart.data.datasets[0]) {
-                chart.data.datasets[0].backgroundColor = gradient;
-            }
-        }
+        // Для осциллограммы градиенты не нужны, но оставляем для совместимости
+        // Графики теперь без заливки (fill: false)
     },
     afterDatasetsDraw: (chart) => {
         const ctx = chart.ctx;
@@ -83,14 +56,6 @@ const gradientPlugin = {
             ctx.moveTo(chartArea.left, yPos);
             ctx.lineTo(chartArea.right, yPos);
             ctx.stroke();
-            
-            // Метка порога
-            ctx.fillStyle = 'rgba(100, 200, 255, 0.9)';
-            ctx.fillRect(chartArea.right - 65, yPos - 10, 60, 20);
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = 'bold 11px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('350A', chartArea.right - 35, yPos + 4);
             ctx.restore();
         }
         
@@ -111,14 +76,6 @@ const gradientPlugin = {
             ctx.moveTo(chartArea.left, yPos);
             ctx.lineTo(chartArea.right, yPos);
             ctx.stroke();
-            
-            // Метка порога
-            ctx.fillStyle = 'rgba(255, 101, 180, 0.9)';
-            ctx.fillRect(chartArea.right - 60, yPos - 10, 55, 20);
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = 'bold 11px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('35В', chartArea.right - 32.5, yPos + 4);
             ctx.restore();
         }
     }
@@ -772,8 +729,8 @@ const DeviceMonitorPage = () => {
                 hoverRadius: 4
             },
             line: {
-                tension: 0.4,
-                borderWidth: 2
+                tension: 0,
+                borderWidth: 1.5
             }
         },
         interaction: {
@@ -790,22 +747,23 @@ const DeviceMonitorPage = () => {
         }
     });
 
-    // Подготовка данных для графиков
+    // Подготовка данных для графиков (в стиле осциллограммы)
     const getCurrentChartData = () => ({
         labels: currentChartData.map((_, index) => ''),
         datasets: [{
             label: 'Ток (А)',
             data: currentChartData.map(d => d.y),
             borderColor: '#64C8FF',
-            backgroundColor: 'rgba(100, 200, 255, 0.3)', // Будет заменен градиентом через плагин
-            fill: true,
-            borderWidth: 2,
+            backgroundColor: 'rgba(100, 200, 255, 0.05)', // Минимальная заливка для осциллограммы
+            fill: false, // Без заливки для осциллограммы
+            borderWidth: 1.5, // Тонкая линия
             pointRadius: 0,
             pointHoverRadius: 4,
             pointHoverBackgroundColor: '#64C8FF',
             pointHoverBorderColor: '#FFFFFF',
             pointHoverBorderWidth: 2,
-            tension: 0.4
+            tension: 0, // Резкие углы, без сглаживания (как осциллограмма)
+            stepped: false
         }]
     });
 
@@ -815,15 +773,16 @@ const DeviceMonitorPage = () => {
             label: 'Напряжение (В)',
             data: voltageChartData.map(d => d.y),
             borderColor: '#FF65B4',
-            backgroundColor: 'rgba(255, 101, 180, 0.3)', // Будет заменен градиентом через плагин
-            fill: true,
-            borderWidth: 2,
+            backgroundColor: 'rgba(255, 101, 180, 0.05)', // Минимальная заливка для осциллограммы
+            fill: false, // Без заливки для осциллограммы
+            borderWidth: 1.5, // Тонкая линия
             pointRadius: 0,
             pointHoverRadius: 4,
             pointHoverBackgroundColor: '#FF65B4',
             pointHoverBorderColor: '#FFFFFF',
             pointHoverBorderWidth: 2,
-            tension: 0.4
+            tension: 0, // Резкие углы, без сглаживания (как осциллограмма)
+            stepped: false
         }]
     });
 
