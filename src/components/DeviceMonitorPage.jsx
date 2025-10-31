@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { Line } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
@@ -14,6 +14,7 @@ import {
 } from 'chart.js';
 import '../styles/deviceMonitor.css';
 import * as archiveDeviceApi from '../api/archiveDeviceApi';
+import * as weldingMachineApi from '../api/weldingMachineApi';
 
 // Кастомный плагин для градиентов и пороговых линий
 const gradientPlugin = {
@@ -95,10 +96,41 @@ ChartJS.register(
 );
 
 const DeviceMonitorPage = () => {
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
-    const machineName = searchParams.get('machine') || 'Неизвестный аппарат';
-    const machineMac = searchParams.get('mac') || 'Неизвестный MAC';
+    const location = useLocation();
+    const selectedMac = searchParams.get('mac');
+    
+    // Состояние для списка устройств
+    const [equipment, setEquipment] = useState([]);
+    const [filteredEquipment, setFilteredEquipment] = useState([]);
+    const [departmentFilter, setDepartmentFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [modelFilter, setModelFilter] = useState('all');
+    const [selectedDevice, setSelectedDevice] = useState(null);
+    
+    // Состояние для навигации (Ресурсы развернуты по умолчанию)
+    const [expandedMenu, setExpandedMenu] = useState({ 'Ресурсы': true });
+    
+    // Состояние для вкладок
+    const [activeTab, setActiveTab] = useState('graphs');
+    
+    // Состояние для параметров графиков
+    const [graphParams, setGraphParams] = useState({
+        current: { line1: true, line2: true },
+        voltage: { line1: true, line2: true },
+        gasFlow: { line1: false, line2: false },
+        wireFlow: { line1: false, line2: false },
+        mainsVoltage: { line1: false, line2: false },
+        radiatorTemp: { line1: false, line2: false },
+        inverterTemp: { line1: false, line2: false },
+        rectifierTemp: { line1: false, line2: false },
+        bvoTemp: { line1: false, line2: false },
+        powerConsumption: { line1: false, line2: false }
+    });
+    
+    const machineName = selectedDevice?.name || searchParams.get('machine') || 'Выберите аппарат';
+    const machineMac = selectedMac || selectedDevice?.mac || '';
     
     const [deviceData, setDeviceData] = useState({});
     // Удаляем старое состояние
@@ -179,9 +211,69 @@ const DeviceMonitorPage = () => {
         }, 50); // Уменьшили дебаунсинг с 100мс до 50мс
     }, []);
 
+    // Загрузка списка оборудования
     useEffect(() => {
-        startPolling();
-        return () => stopPolling();
+        const loadEquipment = async () => {
+            try {
+                const data = await weldingMachineApi.getAllWeldingMachines();
+                setEquipment(Array.isArray(data) ? data : []);
+            } catch (err) {
+                console.error('Ошибка загрузки оборудования:', err);
+                setEquipment([]);
+            }
+        };
+        loadEquipment();
+    }, []);
+    
+    // Фильтрация оборудования
+    useEffect(() => {
+        let filtered = equipment;
+        
+        if (departmentFilter !== 'all') {
+            // Фильтр по подразделению можно добавить позже
+        }
+        
+        if (statusFilter !== 'all') {
+            // Фильтр по статусу можно добавить позже
+        }
+        
+        if (modelFilter !== 'all') {
+            filtered = filtered.filter(item => item.deviceModel === modelFilter);
+        }
+        
+        setFilteredEquipment(filtered);
+    }, [equipment, departmentFilter, statusFilter, modelFilter]);
+    
+    // Выбор устройства при загрузке или изменении URL
+    useEffect(() => {
+        if (selectedMac && equipment.length > 0) {
+            const device = equipment.find(eq => eq.mac === selectedMac);
+            if (device) {
+                setSelectedDevice(device);
+            }
+        } else if (equipment.length > 0 && !selectedDevice && !selectedMac) {
+            // Выбираем первое устройство по умолчанию
+            const firstDevice = equipment[0];
+            setSelectedDevice(firstDevice);
+            if (firstDevice?.mac) {
+                setSearchParams({ mac: firstDevice.mac });
+            }
+        }
+    }, [selectedMac, equipment, selectedDevice]);
+    
+    // Обработчик выбора устройства
+    const handleDeviceSelect = (device) => {
+        setSelectedDevice(device);
+        if (device.mac) {
+            setSearchParams({ mac: device.mac });
+        }
+    };
+    
+    useEffect(() => {
+        if (machineMac) {
+            startPolling();
+            return () => stopPolling();
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [machineMac]);
 
@@ -786,125 +878,480 @@ const DeviceMonitorPage = () => {
         }]
     });
 
-    // Archive-style функции управления
+    // Обработчик переключения меню
+    const toggleMenu = (menuName) => {
+        setExpandedMenu(prev => ({
+            ...prev,
+            [menuName]: !prev[menuName]
+        }));
+    };
+    
+    // Обработчик переключения параметра графика
+    const toggleGraphParam = (paramName, line) => {
+        setGraphParams(prev => ({
+            ...prev,
+            [paramName]: {
+                ...prev[paramName],
+                [line]: !prev[paramName][line]
+            }
+        }));
+    };
+    
+    // Получение данных для текущего устройства
+    const currentDeviceData = deviceData[machineMac] || {};
+    const current = parseFloat(currentDeviceData.Current || currentDeviceData['State.I'] || 0);
+    const voltage = parseFloat(currentDeviceData.Voltage || currentDeviceData['State.U'] || 0);
+    
+    // Навигационное меню (как в дизайне)
+    const navMenu = [
+        { label: 'Главная', path: '/', icon: '🏠' },
+        { 
+            label: 'Предприятие', 
+            path: '/departments',
+            icon: '🏭',
+            expanded: expandedMenu['Предприятие'],
+            toggle: () => toggleMenu('Предприятие')
+        },
+        { 
+            label: 'Ресурсы', 
+            path: '/equipment',
+            icon: '📦',
+            expanded: expandedMenu['Ресурсы'],
+            toggle: () => toggleMenu('Ресурсы'),
+            children: [
+                { label: 'Сварочное оборудование', path: '/equipment', active: true },
+                { label: 'Сетевое оборудование системы мониторинга', path: '/network-equipment' },
+                { label: 'Сварочные материалы', path: '/materials' },
+                { label: 'Технологические карты сварки (WPS)', path: '/wps' }
+            ]
+        },
+        { label: 'Отчёты', path: '/my-reports', icon: '📊' },
+        { label: 'Уведомления', path: '/notifications', icon: '🔔' },
+        { label: 'Настройки', path: '/settings', icon: '⚙️' },
+        { label: 'О программе', path: '/about', icon: 'ℹ️' }
+    ];
 
     return (
-        <div className="device-monitor-page">
-            <div className="device-monitor-header">
-                <h1 className="device-monitor-title">📊 Мониторинг сварочного аппарата</h1>
-                <button className="back-btn" onClick={handleBackToEquipment}>
-                    ← Назад к оборудованию
-                </button>
-            </div>
-            
-            {/* Информация о выбранном аппарате */}
-            <div className="device-info-card">
-                <h2 className="device-name">{machineName}</h2>
-                <div className="device-mac">MAC: {machineMac}</div>
-            </div>
-
-            {/* Статус подключения */}
-            <div className="status-card">
-                <div className="status-info">
-                    <div className="status-indicator">
-                        <span className="status-icon">{getStatusIcon(isConnected ? 'connected' : 'disconnected')}</span>
-                        <span className="status-text">
-                            {isConnected ? 'Подключен' : 'Отключен'}
-                        </span>
-                    </div>
-                    <button 
-                        className="reconnect-btn"
-                        onClick={handleReconnect}
-                        disabled={isConnecting}
-                    >
-                        {isConnecting ? '🔄' : '🔄'} Переподключиться
-                    </button>
+        <div className="device-monitor-layout">
+            {/* Левая боковая панель навигации */}
+            <aside className="monitor-sidebar">
+                <div className="sidebar-logo">
+                    <span className="logo-text">WELDtelecom</span>
                 </div>
-                {lastUpdate && (
-                    <div className="last-update">
-                        Последнее обновление: {lastUpdate.toLocaleTimeString()}
-                    </div>
-                )}
-                
-            </div>
-
-            {/* Ошибки */}
-            {error && !isConnected && (
-                <div className="error-message">
-                    {error}
-                </div>
-            )}
-
-            {/* Данные устройства */}
-            <div className="device-data-section">
-                <h3 className="section-title">⚡ Параметры сварочного аппарата</h3>
-                
-                {Object.keys(deviceData).length > 0 && hasData ? (
-                    <div className="parameters-grid">
-                        {Object.entries(deviceData).map(([mac, data]) => (
-                            <div key={mac} className="device-parameters">
-                                {/* Основная секция с параметрами */}
-                                <div className="main-parameters-container">
-                                    {/* Левая колонка: Ток и Напряжение */}
-                                    <div className="left-parameters-column">
-                                        {/* Ток */}
-                                        {(data.Current || data['State.I']) && (
-                                            <div className="main-parameter-card small">
-                                                <div className="main-parameter-header">
-                                                    <span className="main-parameter-icon">⚡</span>
-                                                    <span className="main-parameter-name">Ток (А)</span>
-                                                </div>
-                                                <div className="main-parameter-value">{data.Current || data['State.I']}</div>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Напряжение */}
-                                        {(data.Voltage || data['State.U']) && (
-                                            <div className="main-parameter-card small">
-                                                <div className="main-parameter-header">
-                                                    <span className="main-parameter-icon">🔋</span>
-                                                    <span className="main-parameter-name">Напряжение (В)</span>
-                                                </div>
-                                                <div className="main-parameter-value">{data.Voltage || data['State.U']}</div>
-                                            </div>
-                                        )}
+                <nav className="sidebar-nav">
+                    {navMenu.map((item) => (
+                        <div key={item.label}>
+                            {item.children ? (
+                                <>
+                                    <div 
+                                        className={`sidebar-nav-item ${item.expanded ? 'expanded' : ''}`}
+                                        onClick={item.toggle}
+                                    >
+                                        <span className="nav-icon">{item.icon}</span>
+                                        <span className="nav-label">{item.label}</span>
+                                        <span className="nav-arrow">{item.expanded ? '▼' : '▶'}</span>
                                     </div>
-                                    
-                                    {/* Правая колонка: Дополнительные параметры */}
-                                    <div className="right-parameters-column">
-                                        <div className="other-parameters-list">
-                                            <h4 className="other-parameters-title">Дополнительные параметры</h4>
-                                            {Object.entries(data).map(([key, value]) => {
-                                                if (key === 'timestamp' || key === 'Current' || key === 'Voltage' || 
-                                                    key === 'State.I' || key === 'State.U' ||
-                                                    key === 'State.Ctrl' || key === 'State.material' || key === 'State.GasFlow' || 
-                                                    key === 'State.Temperature' || key === 'Packet.Index' || key === 'Time.Hours' || 
-                                                    key === 'Time.Minutes' || key === 'Time.Seconds' || key === 'Date.Day' || 
-                                                    key === 'Date.Month' || key === 'Date.Year' ||
-                                                    key === 'Состояние аппарата') { // Исключаем русский ключ, оставляем WeldingMachineState
-                                                    return null;
-                                                }
-                                                
-                                                return (
-                                                    <div key={key} className="other-parameter-item">
-                                                        <div className="other-parameter-info">
-                                                            <span className="other-parameter-icon">{getParameterIcon(key)}</span>
-                                                            <span className="other-parameter-name">{getParameterDisplayName(key)}</span>
-                                                        </div>
-                                                        <div className="other-parameter-value">{value}</div>
-                                                    </div>
-                                                );
-                                            })}
+                                    {item.expanded && (
+                                        <div className="sidebar-submenu">
+                                            {item.children.map((child) => (
+                                                <div
+                                                    key={child.label}
+                                                    className={`sidebar-nav-item submenu-item ${child.active ? 'active' : ''}`}
+                                                    onClick={() => navigate(child.path)}
+                                                >
+                                                    <span className="nav-label">{child.label}</span>
+                                                </div>
+                                            ))}
                                         </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div
+                                    className="sidebar-nav-item"
+                                    onClick={() => navigate(item.path)}
+                                >
+                                    <span className="nav-icon">{item.icon}</span>
+                                    <span className="nav-label">{item.label}</span>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </nav>
+            </aside>
+            
+            {/* Основной контент */}
+            <div className="monitor-main-content">
+                {/* Средняя панель: Список устройств */}
+                <div className="device-list-panel">
+                    {/* Фильтры */}
+                    <div className="device-filters">
+                        <select 
+                            className="filter-select"
+                            value={departmentFilter}
+                            onChange={(e) => setDepartmentFilter(e.target.value)}
+                        >
+                            <option value="all">Все</option>
+                        </select>
+                        <select 
+                            className="filter-select"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                        >
+                            <option value="all">Все</option>
+                            <option value="active">Активные</option>
+                            <option value="inactive">Неактивные</option>
+                        </select>
+                        <select 
+                            className="filter-select"
+                            value={modelFilter}
+                            onChange={(e) => setModelFilter(e.target.value)}
+                        >
+                            <option value="all">Все</option>
+                            {[...new Set(equipment.map(eq => eq.deviceModel))].map(model => (
+                                <option key={model} value={model}>{model}</option>
+                            ))}
+                        </select>
+                    </div>
+                    
+                    {/* Список устройств */}
+                    <div className="device-list">
+                        {filteredEquipment.map((device) => (
+                            <div
+                                key={device.id}
+                                className={`device-list-item ${selectedDevice?.id === device.id ? 'selected' : ''}`}
+                                onClick={() => handleDeviceSelect(device)}
+                            >
+                                <div className="device-icon">
+                                    {device.status === 'error' && <span className="error-indicator">!</span>}
+                                </div>
+                                <div className="device-list-info">
+                                    <div className="device-list-name">{device.name || device.deviceModel}</div>
+                                    <div className="device-list-task">(!) {device.jobNumber || '112 Сборка сварка уголков'}</div>
+                                    <div className="device-list-operator">{device.operator || 'Ильенко С. Е.'}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                
+                {/* Правая панель: Детальный мониторинг */}
+                <div className="device-detail-panel">
+                    {/* Заголовок с информацией об устройстве */}
+                    <div className="detail-header">
+                        <div className="detail-header-left">
+                            <h2 className="detail-device-name">{machineName}</h2>
+                            <div className="detail-job-info">
+                                <span className="job-icon">(!)</span>
+                                <span className="job-text">{selectedDevice?.jobNumber || '112 Сборка сварка уголков'}</span>
+                            </div>
+                            <div className="detail-location">
+                                <span className="location-icon">📍</span>
+                                <span className="location-text">{selectedDevice?.location || 'Цех металообработки №5'}</span>
+                            </div>
+                        </div>
+                        <div className="detail-header-right">
+                            <div className="user-profile-icon">👤</div>
+                        </div>
+                    </div>
+                    
+                    {/* Панель управления */}
+                    <div className="control-panel">
+                        <div className="control-group">
+                            <label className="control-label">Режим работы:</label>
+                            <select className="control-select">
+                                <option>Ограничение</option>
+                            </select>
+                        </div>
+                        <div className="control-group">
+                            <label className="control-label">Состояние:</label>
+                            <div className="status-badge welding">{isConnected ? 'Сварка' : 'Отключен'}</div>
+                        </div>
+                        <button className="control-button">Настройка ограничений</button>
+                        <div className="control-group">
+                            <label className="control-label">Сварщик:</label>
+                            <div className="welder-info">
+                                <span className="welder-name">{selectedDevice?.operator || 'Ильенко С. Е.'}</span>
+                                <span className={`welder-status ${isConnected ? 'online' : 'offline'}`}></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Блок с изображением аппарата и метриками */}
+                    <div className="device-metrics-section">
+                        <div className="device-image-container">
+                            <div className="device-image">
+                                <div className="device-display">
+                                    <div className="display-value-top">130</div>
+                                    <div className="display-value-bottom">19.0</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="metrics-container">
+                            {/* Ток сварки */}
+                            <div className="metric-block">
+                                <div className="metric-header">
+                                    <span className="metric-label">Ток сварки</span>
+                                </div>
+                                <div className="metric-value-large">{current || 450}A</div>
+                                <div className="metric-slider">
+                                    <input 
+                                        type="range" 
+                                        min="5" 
+                                        max="500" 
+                                        value={current || 450}
+                                        className="metric-range"
+                                        readOnly
+                                    />
+                                    <div className="metric-range-labels">
+                                        <span>5</span>
+                                        <span>{current || 450}</span>
+                                        <span>500</span>
                                     </div>
                                 </div>
-                                
-                                {/* Графики */}
-                                <div className="charts-container">
-                                    <div className="chart-wrapper chart-dark">
-                                        <div className="chart-title">График тока</div>
-                                        <div className="chart-box">
-                                            {currentChartData.length > 0 ? (
+                                <div className="metric-adjust-buttons">
+                                    <button className="metric-btn-left">‹</button>
+                                    <span className="metric-range-display">300 - {current || 450}</span>
+                                    <button className="metric-btn-right">›</button>
+                                </div>
+                                <div className="metric-additional-info">
+                                    <span>005</span>
+                                    <span>78</span>
+                                    <span>PULSE</span>
+                                </div>
+                            </div>
+                            
+                            {/* Напряжение сварки */}
+                            <div className="metric-block">
+                                <div className="metric-header">
+                                    <span className="metric-label">Напряжение сварки</span>
+                                </div>
+                                <div className="metric-value-large">{voltage || 30.5}В</div>
+                                <div className="metric-slider">
+                                    <input 
+                                        type="range" 
+                                        min="5" 
+                                        max="50" 
+                                        value={voltage || 30.5}
+                                        className="metric-range"
+                                        readOnly
+                                    />
+                                    <div className="metric-range-labels">
+                                        <span>5</span>
+                                        <span>{voltage || 30.5}</span>
+                                        <span>50</span>
+                                    </div>
+                                </div>
+                                <div className="metric-adjust-buttons">
+                                    <button className="metric-btn-left">‹</button>
+                                    <span className="metric-range-display">10 - {voltage || 35}</span>
+                                    <button className="metric-btn-right">›</button>
+                                </div>
+                                <div className="metric-additional-info">
+                                    <span>ER304</span>
+                                    <span>Ar92</span>
+                                    <span>Ø 1.4</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Список ошибок/предупреждений */}
+                        <div className="errors-panel">
+                            <div className="error-item warning">
+                                <span className="error-icon">⚠️</span>
+                                <span className="error-text">Ошибка БВО</span>
+                                <span className="error-toggle">▼</span>
+                            </div>
+                            <div className="error-item warning">
+                                <span className="error-icon">⚠️</span>
+                                <span className="error-text">Ошибка БВО</span>
+                                <span className="error-toggle">▼</span>
+                            </div>
+                            <div className="error-item error">
+                                <span className="error-icon">🔴</span>
+                                <span className="error-text">Ошибка авторизации</span>
+                                <span className="error-toggle">▼</span>
+                            </div>
+                            <div className="error-item error">
+                                <span className="error-icon">🔴</span>
+                                <span className="error-text">Ошибка авторизации</span>
+                                <span className="error-toggle">▼</span>
+                            </div>
+                            <div className="error-item error">
+                                <span className="error-icon">🔴</span>
+                                <span className="error-text">Ошибка авторизации</span>
+                                <span className="error-toggle">▼</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Вкладки и графики */}
+                    <div className="tabs-section">
+                        <div className="tabs-header">
+                            <button 
+                                className={`tab-button ${activeTab === 'graphs' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('graphs')}
+                            >
+                                Графики
+                            </button>
+                            <button 
+                                className={`tab-button ${activeTab === 'info' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('info')}
+                            >
+                                Информация
+                            </button>
+                            <button 
+                                className={`tab-button ${activeTab === 'activity' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('activity')}
+                            >
+                                Активность
+                            </button>
+                            <div className="date-picker">24.07.2026</div>
+                        </div>
+                        
+                        <div className="tabs-content">
+                            {activeTab === 'graphs' && (
+                                <div className="graphs-tab-content">
+                                    <div className="graph-params-panel">
+                                        <div className="graph-param-item">
+                                            <span className="param-name">Сварочный ток</span>
+                                            <div className="param-toggles">
+                                                <button 
+                                                    className={`param-toggle ${graphParams.current.line1 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('current', 'line1')}
+                                                >~1</button>
+                                                <button 
+                                                    className={`param-toggle ${graphParams.current.line2 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('current', 'line2')}
+                                                >~2</button>
+                                            </div>
+                                        </div>
+                                        <div className="graph-param-item">
+                                            <span className="param-name">Сварочное напряжение</span>
+                                            <div className="param-toggles">
+                                                <button 
+                                                    className={`param-toggle ${graphParams.voltage.line1 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('voltage', 'line1')}
+                                                >~1</button>
+                                                <button 
+                                                    className={`param-toggle ${graphParams.voltage.line2 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('voltage', 'line2')}
+                                                >~2</button>
+                                            </div>
+                                        </div>
+                                        <div className="graph-param-item">
+                                            <span className="param-name">Расход газа</span>
+                                            <div className="param-toggles">
+                                                <button 
+                                                    className={`param-toggle ${graphParams.gasFlow.line1 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('gasFlow', 'line1')}
+                                                >~1</button>
+                                                <button 
+                                                    className={`param-toggle ${graphParams.gasFlow.line2 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('gasFlow', 'line2')}
+                                                >~2</button>
+                                            </div>
+                                        </div>
+                                        <div className="graph-param-item">
+                                            <span className="param-name">Расход проволоки</span>
+                                            <div className="param-toggles">
+                                                <button 
+                                                    className={`param-toggle ${graphParams.wireFlow.line1 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('wireFlow', 'line1')}
+                                                >~1</button>
+                                                <button 
+                                                    className={`param-toggle ${graphParams.wireFlow.line2 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('wireFlow', 'line2')}
+                                                >~2</button>
+                                            </div>
+                                        </div>
+                                        <div className="graph-param-item">
+                                            <span className="param-name">Напряжение сети</span>
+                                            <div className="param-toggles">
+                                                <button 
+                                                    className={`param-toggle ${graphParams.mainsVoltage.line1 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('mainsVoltage', 'line1')}
+                                                >~1</button>
+                                                <button 
+                                                    className={`param-toggle ${graphParams.mainsVoltage.line2 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('mainsVoltage', 'line2')}
+                                                >~2</button>
+                                            </div>
+                                        </div>
+                                        <div className="graph-param-item">
+                                            <span className="param-name">Темп. радиатора</span>
+                                            <div className="param-toggles">
+                                                <button 
+                                                    className={`param-toggle ${graphParams.radiatorTemp.line1 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('radiatorTemp', 'line1')}
+                                                >~1</button>
+                                                <button 
+                                                    className={`param-toggle ${graphParams.radiatorTemp.line2 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('radiatorTemp', 'line2')}
+                                                >~2</button>
+                                            </div>
+                                        </div>
+                                        <div className="graph-param-item">
+                                            <span className="param-name">Темп. инвертора</span>
+                                            <div className="param-toggles">
+                                                <button 
+                                                    className={`param-toggle ${graphParams.inverterTemp.line1 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('inverterTemp', 'line1')}
+                                                >~1</button>
+                                                <button 
+                                                    className={`param-toggle ${graphParams.inverterTemp.line2 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('inverterTemp', 'line2')}
+                                                >~2</button>
+                                            </div>
+                                        </div>
+                                        <div className="graph-param-item">
+                                            <span className="param-name">Темп. выпрямителя</span>
+                                            <div className="param-toggles">
+                                                <button 
+                                                    className={`param-toggle ${graphParams.rectifierTemp.line1 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('rectifierTemp', 'line1')}
+                                                >~1</button>
+                                                <button 
+                                                    className={`param-toggle ${graphParams.rectifierTemp.line2 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('rectifierTemp', 'line2')}
+                                                >~2</button>
+                                            </div>
+                                        </div>
+                                        <div className="graph-param-item">
+                                            <span className="param-name">Темп. БВО</span>
+                                            <div className="param-toggles">
+                                                <button 
+                                                    className={`param-toggle ${graphParams.bvoTemp.line1 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('bvoTemp', 'line1')}
+                                                >~1</button>
+                                                <button 
+                                                    className={`param-toggle ${graphParams.bvoTemp.line2 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('bvoTemp', 'line2')}
+                                                >~2</button>
+                                            </div>
+                                        </div>
+                                        <div className="graph-param-item">
+                                            <span className="param-name">Потр. мощность</span>
+                                            <div className="param-toggles">
+                                                <button 
+                                                    className={`param-toggle ${graphParams.powerConsumption.line1 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('powerConsumption', 'line1')}
+                                                >~1</button>
+                                                <button 
+                                                    className={`param-toggle ${graphParams.powerConsumption.line2 ? 'active' : ''}`}
+                                                    onClick={() => toggleGraphParam('powerConsumption', 'line2')}
+                                                >~2</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="graphs-display">
+                                        {currentChartData.length > 0 ? (
+                                            <div className="graph-container">
+                                                <div className="graph-controls">
+                                                    <button className="graph-icon">🔍</button>
+                                                    <button className="graph-icon">🔄</button>
+                                                </div>
                                                 <Line
                                                     data={getCurrentChartData()}
                                                     options={getChartOptions(0, 500, 'Ток (А)', 350, '350A')}
@@ -915,16 +1362,17 @@ const DeviceMonitorPage = () => {
                                                         }
                                                     }}
                                                 />
-                                            ) : (
-                                                <div className="chart-placeholder">Ожидание данных...</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="chart-wrapper chart-dark">
-                                        <div className="chart-title">График напряжения</div>
-                                        <div className="chart-box">
-                                            {voltageChartData.length > 0 ? (
+                                            </div>
+                                        ) : (
+                                            <div className="graph-placeholder">Ожидание данных...</div>
+                                        )}
+                                        
+                                        {voltageChartData.length > 0 ? (
+                                            <div className="graph-container">
+                                                <div className="graph-controls">
+                                                    <button className="graph-icon">🔍</button>
+                                                    <button className="graph-icon">🔄</button>
+                                                </div>
                                                 <Line
                                                     data={getVoltageChartData()}
                                                     options={getChartOptions(0, 50.0, 'Напряжение (В)', 35, '35В')}
@@ -935,32 +1383,26 @@ const DeviceMonitorPage = () => {
                                                         }
                                                     }}
                                                 />
-                                            ) : (
-                                                <div className="chart-placeholder">Ожидание данных...</div>
-                                            )}
-                                        </div>
+                                            </div>
+                                        ) : (
+                                            <div className="graph-placeholder">Ожидание данных...</div>
+                                        )}
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="no-data">
-                        <div className="no-data-icon">
-                            {!isConnected && '🔴'}
+                            )}
+                            {activeTab === 'info' && (
+                                <div className="info-tab-content">
+                                    <p>Информация об устройстве</p>
+                                </div>
+                            )}
+                            {activeTab === 'activity' && (
+                                <div className="activity-tab-content">
+                                    <p>Активность устройства</p>
+                                </div>
+                            )}
                         </div>
-                        <p className="no-data-text">
-                            {isConnected 
-                                ? 'Ожидание данных от сварочного аппарата...' 
-                                : 'Сварочный аппарат выключен'}
-                        </p>
-                        {!isConnected && (
-                            <p className="no-data-subtext">
-                                Данные не отображаются, так как аппарат не активен
-                            </p>
-                        )}
                     </div>
-                )}
+                </div>
             </div>
         </div>
     );
