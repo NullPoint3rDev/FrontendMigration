@@ -167,6 +167,68 @@
   font-size: 0.9rem;
 }
 
+/* Sorting */
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+.sort-arrow {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid rgba(255, 255, 255, 0.6);
+  margin-left: 8px;
+  transform: translateY(-2px) rotate(180deg); /* default asc */
+  opacity: 0.6;
+  transition: var(--transition);
+}
+
+.sort-arrow.desc {
+  transform: translateY(2px) rotate(0deg);
+}
+
+.sortable:hover .sort-arrow {
+  opacity: 1;
+}
+
+/* Status badges */
+.status-badges {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: 8px;
+  align-items: center;
+}
+
+.status-badge {
+  width: 10px;
+  height: 10px;
+  border-radius: 6px;
+  opacity: 0.25;
+  transition: var(--transition);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.status-badge.off {
+  background: #9E9E9E;
+}
+
+.status-badge.on {
+  background: #4CAF50;
+}
+
+.status-badge.welding {
+  background: #FFB300; /* насыщенный жёлтый */
+}
+
+.status-badge.visible {
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.08);
+}
+
 /* Responsive design for mobile devices */
 @media (max-width: 768px) {
   .equipment-filters {

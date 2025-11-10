@@ -10,6 +10,7 @@ import {
     getAllOrganizationUnits,
     getAllWeldingMachineTypes
 } from '../api/weldingMachineApi';
+import { getArchivePanelState } from '../api/archiveDeviceApi';
 
 // Данные теперь загружаются с API сервера
 
@@ -72,9 +73,12 @@ function WeldingEquipmentPage() {
     const [modelFilter, setModelFilter] = useState('');
     const [organizationUnitFilter, setOrganizationUnitFilter] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [sortField, setSortField] = useState(null);
+    const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
     const currentYear = new Date().getFullYear();
     const navigate = useNavigate();
-    const [deviceDataByMac, setDeviceDataByMac] = useState({});
+    const [deviceStatusesByMac, setDeviceStatusesByMac] = useState({}); // { [mac]: 'off' | 'on' | 'welding' }
+    const [statusIntervalId, setStatusIntervalId] = useState(null);
     const [shownErrors, setShownErrors] = useState(new Set());
 
     // Load welders from localStorage
@@ -183,6 +187,111 @@ function WeldingEquipmentPage() {
         loadWeldingMachineTypes();
     }, []);
 
+    // Poll device statuses every 4s
+    useEffect(() => {
+        // Clear previous
+        if (statusIntervalId) {
+            clearInterval(statusIntervalId);
+        }
+        // Immediate fetch once
+        fetchAllStatuses();
+        const id = setInterval(fetchAllStatuses, 4000);
+        setStatusIntervalId(id);
+        return () => {
+            if (id) clearInterval(id);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [equipment, modelFilter, organizationUnitFilter, searchTerm]);
+
+    const computeStatusFromState = (machine, stateObj) => {
+        // Для CORE используем WeldingMachineState из посылки
+        // Для остальных: сварка если ток > 1А (Current или State.I), иначе включен если есть данные, иначе выключен
+        try {
+            const props = stateObj?.properties || {};
+            const deviceModel = machine?.deviceModel;
+
+            if (deviceModel === 'CORE') {
+                const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState;
+                if (rawState !== undefined && rawState !== null) {
+                    const normalized = String(rawState).toLowerCase();
+                    if (normalized.includes('weld') || normalized.includes('свар')) return 'welding';
+                    if (normalized.includes('on') || normalized.includes('включ')) return 'on';
+                    if (normalized.includes('off') || normalized.includes('выключ')) return 'off';
+                }
+                // Фоллбек по току
+            }
+            const currentRaw = props?.Current?.value ?? props?.Current ?? props?.['State.I']?.value ?? props?.['State.I'];
+            const current = currentRaw != null ? parseFloat(currentRaw) : 0;
+            if (!isNaN(current) && current > 1) return 'welding';
+            // Если есть хоть какие-то данные, считаем "включен", иначе "выключен"
+            return stateObj ? 'on' : 'off';
+        } catch {
+            return 'off';
+        }
+    };
+
+    const fetchAllStatuses = async () => {
+        if (!Array.isArray(equipment) || equipment.length === 0) return;
+        // Берём устройства после фильтров поиска/модели/подразделения чтобы не опрашивать лишнее
+        const list = getFilteredEquipment(false); // без сортировки
+        const macs = list.map(m => m.mac).filter(Boolean);
+        if (macs.length === 0) return;
+
+        // Запрашиваем статусы параллельно
+        const promises = list.map(async (machine) => {
+            try {
+                const state = await getArchivePanelState(machine.mac);
+                const status = computeStatusFromState(machine, state);
+                return [machine.mac, status];
+            } catch {
+                return [machine.mac, 'off'];
+            }
+        });
+        const results = await Promise.all(promises);
+        setDeviceStatusesByMac(prev => {
+            const next = { ...prev };
+            results.forEach(([mac, status]) => {
+                next[mac] = status;
+            });
+            return next;
+        });
+    };
+
+    const toggleSort = (field) => {
+        if (sortField === field) {
+            setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+    };
+
+    const getSorted = (arr) => {
+        if (!sortField) return arr;
+        const sorted = [...arr].sort((a, b) => {
+            const getVal = (item) => {
+                switch (sortField) {
+                    case 'name': return (item.name || '').toLowerCase();
+                    case 'model': {
+                        const model = item.deviceModel === 'MONITORING_BLOCK' ? 'Блок мониторинга' :
+                                      item.deviceModel === 'CORE' ? 'Core' :
+                                      (item.model || '');
+                        return model.toLowerCase();
+                    }
+                    case 'mac': return (item.mac || '').toLowerCase();
+                    case 'unit': return (item.organizationUnit?.name || '').toLowerCase();
+                    default: return '';
+                }
+            };
+            const va = getVal(a);
+            const vb = getVal(b);
+            if (va < vb) return -1;
+            if (va > vb) return 1;
+            return 0;
+        });
+        return sortDirection === 'asc' ? sorted : sorted.reverse();
+    };
+
     const handleSave = async (e) => {
         e.preventDefault();
         const newErrors = {};
@@ -266,7 +375,7 @@ function WeldingEquipmentPage() {
     };
 
     // Функция для фильтрации оборудования
-    const getFilteredEquipment = () => {
+    const getFilteredEquipment = (applySort = true) => {
         let filtered = equipment;
 
         // Фильтр по модели
@@ -274,9 +383,9 @@ function WeldingEquipmentPage() {
             filtered = filtered.filter(item => item.deviceModel === modelFilter);
         }
 
-        // Organization unit filter
+        // Organization unit filter by organizationUnit.name
         if (organizationUnitFilter) {
-            filtered = filtered.filter(item => item.organizationUnit === organizationUnitFilter);
+            filtered = filtered.filter(item => (item.organizationUnit?.name || '') === organizationUnitFilter);
         }
 
         // Фильтр по поисковому запросу
@@ -290,7 +399,7 @@ function WeldingEquipmentPage() {
             );
         }
 
-        return filtered;
+        return applySort ? getSorted(filtered) : filtered;
     };
 
     return (
@@ -335,8 +444,11 @@ function WeldingEquipmentPage() {
                         onChange={(e) => setOrganizationUnitFilter(e.target.value)}
                     >
                         <option value="">Все подразделения</option>
-                        <option value="Alloy">Alloy</option>
-                        <option value="ОГК">ОГК</option>
+                        {organizationUnits.map(unit => (
+                            <option key={unit.id} value={unit.name}>
+                                {unit.name}
+                            </option>
+                        ))}
                     </select>
                 </div>
             </div>
@@ -345,10 +457,22 @@ function WeldingEquipmentPage() {
                 <table className="equipment-table">
                     <thead>
                         <tr>
-                            <th>Название</th>
-                            <th>Модель</th>
-                            <th>MAC</th>
-                            <th>Подразделение</th>
+                            <th onClick={() => toggleSort('name')} className="sortable">
+                                Название
+                                <span className={`sort-arrow ${sortField === 'name' ? sortDirection : ''}`}></span>
+                            </th>
+                            <th onClick={() => toggleSort('model')} className="sortable">
+                                Модель
+                                <span className={`sort-arrow ${sortField === 'model' ? sortDirection : ''}`}></span>
+                            </th>
+                            <th onClick={() => toggleSort('mac')} className="sortable">
+                                MAC
+                                <span className={`sort-arrow ${sortField === 'mac' ? sortDirection : ''}`}></span>
+                            </th>
+                            <th onClick={() => toggleSort('unit')} className="sortable">
+                                Подразделение
+                                <span className={`sort-arrow ${sortField === 'unit' ? sortDirection : ''}`}></span>
+                            </th>
                             <th>Действия</th>
                         </tr>
                     </thead>
@@ -386,6 +510,12 @@ function WeldingEquipmentPage() {
                                         >
                                             <i className="fas fa-trash"></i>
                                         </button>
+                                        {/* Статусные плашки справа от корзины */}
+                                        <div className="status-badges">
+                                            <span className={`status-badge ${deviceStatusesByMac[item.mac] === 'off' ? 'off visible' : 'off'}`} />
+                                            <span className={`status-badge ${deviceStatusesByMac[item.mac] === 'on' ? 'on visible' : 'on'}`} />
+                                            <span className={`status-badge ${deviceStatusesByMac[item.mac] === 'welding' ? 'welding visible' : 'welding'}`} />
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
