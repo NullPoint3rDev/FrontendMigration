@@ -214,11 +214,13 @@ function WeldingEquipmentPage() {
                 const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState;
                 if (rawState !== undefined && rawState !== null) {
                     const normalized = String(rawState).toLowerCase();
+                    // Для Core: ЖЁЛТАЯ плашка (сварка) ТОЛЬКО при явном состоянии "Сварка"
                     if (normalized.includes('weld') || normalized.includes('свар')) return 'welding';
-                    if (normalized.includes('on') || normalized.includes('включ')) return 'on';
+                    if (normalized.includes('on') || normalized.includes('включ') || normalized.includes('ожидан')) return 'on';
                     if (normalized.includes('off') || normalized.includes('выключ')) return 'off';
                 }
-                // Фоллбек по току
+                // Для Core НЕ используем ток как индикатор сварки, если нет явного статуса "Сварка"
+                return stateObj ? 'on' : 'off';
             }
             const currentRaw = props?.Current?.value ?? props?.Current ?? props?.['State.I']?.value ?? props?.['State.I'];
             const current = currentRaw != null ? parseFloat(currentRaw) : 0;
@@ -510,12 +512,12 @@ function WeldingEquipmentPage() {
                                         >
                                             <i className="fas fa-trash"></i>
                                         </button>
-                                        {/* Статусные плашки справа от корзины */}
-                                        <div className="status-badges">
-                                            <span className={`status-badge ${deviceStatusesByMac[item.mac] === 'off' ? 'off visible' : 'off'}`} />
-                                            <span className={`status-badge ${deviceStatusesByMac[item.mac] === 'on' ? 'on visible' : 'on'}`} />
-                                            <span className={`status-badge ${deviceStatusesByMac[item.mac] === 'welding' ? 'welding visible' : 'welding'}`} />
-                                        </div>
+                                        {/* Единственная актуальная плашка статуса справа от корзины */}
+                                        {deviceStatusesByMac[item.mac] && (
+                                            <div className="status-badges">
+                                                <span className={`status-badge ${deviceStatusesByMac[item.mac]} visible`} />
+                                            </div>
+                                        )}
                                     </div>
                                 </td>
                             </tr>
