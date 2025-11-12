@@ -788,146 +788,118 @@ function WeldingEquipmentPage() {
                             </button>
                         </div>
                         <form onSubmit={handleSave}>
-                            <div className="form-group">
-                                <label className="form-label">Название</label>
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value={editData.name || ''}
-                                    onChange={handleInputChange}
-                                    className="form-input"
-                                    placeholder="Введите название"
-                                />
-                                {errors.name && <p className="error-message">{errors.name}</p>}
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Модель устройства *</label>
-                                <select
-                                    name="deviceModel"
-                                    value={editData.deviceModel || ''}
-                                    onChange={handleInputChange}
-                                    className="form-input"
-                                >
-                                    <option value="">Выберите модель устройства</option>
-                                    <option value="MONITORING_BLOCK">Блок мониторинга</option>
-                                    <option value="CORE">Core</option>
-                                </select>
-                                {errors.deviceModel && <p className="error-message">{errors.deviceModel}</p>}
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">MAC-адрес *</label>
-                                <input
-                                    type="text"
-                                    name="mac"
-                                    value={editData.mac || ''}
-                                    onChange={(e) => {
-                                        // Автоматическая нормализация MAC-адреса
-                                        let value = e.target.value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
-                                        if (value.length > 12) {
-                                            value = value.substring(0, 12);
-                                        }
-                                        setEditData({ ...editData, mac: value });
-                                    }}
-                                    className="form-input"
-                                    placeholder="Введите MAC-адрес (12 символов: 0-9, A-F)"
-                                    maxLength={12}
-                                />
-                                {errors.mac && <p className="error-message">{errors.mac}</p>}
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Подразделение</label>
-                                <select
-                                    name="organizationUnit"
-                                    value={editData.organizationUnit?.id || ''}
-                                    onChange={(e) => {
-                                        const selectedUnit = organizationUnits.find(unit => unit.id === parseInt(e.target.value));
-                                        setEditData({ ...editData, organizationUnit: selectedUnit });
-                                    }}
-                                    className="form-input"
-                                >
-                                    <option value="">Выберите подразделение</option>
-                                    {organizationUnits.map(unit => (
-                                        <option key={unit.id} value={unit.id}>
-                                            {unit.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                {errors.organizationUnit && (
-                                    <p className="error-message">{errors.organizationUnit}</p>
-                                )}
-                            </div>
-
-
-
-                            <div className="form-group">
-                                <label className="form-label">Дата ввода в эксплуатацию *</label>
-                                <input
-                                    type="date"
-                                    name="commissionDate"
-                                    value={editData.commissionDate || ''}
-                                    onChange={handleInputChange}
-                                    className="form-input"
-                                    max={todayDateString}
-                                />
-                                {errors.commissionDate && <p className="error-message">{errors.commissionDate}</p>}
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Год выпуска</label>
-                                <input
-                                    type="number"
-                                    name="manufactureYear"
-                                    value={editData.manufactureYear || ''}
-                                    onChange={handleInputChange}
-                                    className="form-input"
-                                    min="1900"
-                                    max={currentYear}
-                                    placeholder="Введите год выпуска"
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Последнее обслуживание</label>
-                                <input
-                                    type="date"
-                                    name="lastService"
-                                    value={editData.lastService || ''}
-                                    onChange={handleInputChange}
-                                    className="form-input"
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Серийный номер</label>
-                                <input
-                                    type="text"
-                                    name="serialNumber"
-                                    value={editData.serialNumber || ''}
-                                    onChange={handleInputChange}
-                                    className="form-input"
-                                    placeholder="Введите серийный номер"
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Инвентарный номер</label>
-                                <input
-                                    type="text"
-                                    name="inventoryNumber"
-                                    value={editData.inventoryNumber || ''}
-                                    onChange={handleInputChange}
-                                    className="form-input"
-                                    placeholder="Введите инвентарный номер"
-                                />
-                            </div>
-
-                            {isCoreSelected && (
+                            {isCoreSelected ? (
                                 <>
-                                    <h3 style={{ marginTop: '1.5rem', fontSize: '1.1rem', fontWeight: 600 }}>Опции Core</h3>
                                     <div className="form-group">
+                                        <label className="form-label">Наименование ИП *</label>
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            value={editData.name || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            placeholder="Введите название"
+                                        />
+                                        {errors.name && <p className="error-message">{errors.name}</p>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Модель ИП *</label>
+                                        <select
+                                            name="deviceModel"
+                                            value={editData.deviceModel || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                        >
+                                            <option value="">Выберите модель устройства</option>
+                                            <option value="MONITORING_BLOCK">Блок мониторинга</option>
+                                            <option value="CORE">Core</option>
+                                        </select>
+                                        {errors.deviceModel && <p className="error-message">{errors.deviceModel}</p>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Подразделение *</label>
+                                        <select
+                                            name="organizationUnit"
+                                            value={editData.organizationUnit?.id || ''}
+                                            onChange={(e) => {
+                                                const selectedUnit = organizationUnits.find(unit => unit.id === parseInt(e.target.value));
+                                                setEditData({ ...editData, organizationUnit: selectedUnit });
+                                            }}
+                                            className="form-input"
+                                        >
+                                            <option value="">Выберите подразделение</option>
+                                            {organizationUnits.map(unit => (
+                                                <option key={unit.id} value={unit.id}>
+                                                    {unit.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {errors.organizationUnit && (
+                                            <p className="error-message">{errors.organizationUnit}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">MAC-адрес *</label>
+                                        <input
+                                            type="text"
+                                            name="mac"
+                                            value={editData.mac || ''}
+                                            onChange={(e) => {
+                                                let value = e.target.value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+                                                if (value.length > 12) {
+                                                    value = value.substring(0, 12);
+                                                }
+                                                setEditData({ ...editData, mac: value });
+                                            }}
+                                            className="form-input"
+                                            placeholder="Введите MAC-адрес (12 символов: 0-9, A-F)"
+                                            maxLength={12}
+                                        />
+                                        {errors.mac && <p className="error-message">{errors.mac}</p>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Серийный номер ИП</label>
+                                        <input
+                                            type="text"
+                                            name="serialNumber"
+                                            value={editData.serialNumber || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            placeholder="Введите серийный номер"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Инвентарный номер ИП</label>
+                                        <input
+                                            type="text"
+                                            name="inventoryNumber"
+                                            value={editData.inventoryNumber || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            placeholder="Введите инвентарный номер"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Дата ввода в эксплуатацию *</label>
+                                        <input
+                                            type="date"
+                                            name="commissionDate"
+                                            value={editData.commissionDate || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            max={todayDateString}
+                                        />
+                                        {errors.commissionDate && <p className="error-message">{errors.commissionDate}</p>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Галочки опций</label>
                                         <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                 <input
@@ -968,6 +940,7 @@ function WeldingEquipmentPage() {
                                         />
                                     </div>
 
+                                    <h3 style={{ marginTop: '1.5rem', fontSize: '1.1rem', fontWeight: 600 }}>Опции Core</h3>
                                     <h3 style={{ marginTop: '1.5rem', fontSize: '1.1rem', fontWeight: 600 }}>Обслуживание</h3>
                                     <div className="form-group">
                                         <label className="form-label">Наработка между ТО (часы)</label>
@@ -1001,6 +974,17 @@ function WeldingEquipmentPage() {
                                         {errors.maintenanceReminderHours && (
                                             <p className="error-message">{errors.maintenanceReminderHours}</p>
                                         )}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Дата последнего ТО</label>
+                                        <input
+                                            type="date"
+                                            name="lastService"
+                                            value={editData.lastService || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                        />
                                     </div>
 
                                     <div className="form-group">
@@ -1043,6 +1027,141 @@ function WeldingEquipmentPage() {
                                                 </option>
                                             ))}
                                         </select>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="form-group">
+                                        <label className="form-label">Название</label>
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            value={editData.name || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            placeholder="Введите название"
+                                        />
+                                        {errors.name && <p className="error-message">{errors.name}</p>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Модель устройства *</label>
+                                        <select
+                                            name="deviceModel"
+                                            value={editData.deviceModel || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                        >
+                                            <option value="">Выберите модель устройства</option>
+                                            <option value="MONITORING_BLOCK">Блок мониторинга</option>
+                                            <option value="CORE">Core</option>
+                                        </select>
+                                        {errors.deviceModel && <p className="error-message">{errors.deviceModel}</p>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">MAC-адрес *</label>
+                                        <input
+                                            type="text"
+                                            name="mac"
+                                            value={editData.mac || ''}
+                                            onChange={(e) => {
+                                                let value = e.target.value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+                                                if (value.length > 12) {
+                                                    value = value.substring(0, 12);
+                                                }
+                                                setEditData({ ...editData, mac: value });
+                                            }}
+                                            className="form-input"
+                                            placeholder="Введите MAC-адрес (12 символов: 0-9, A-F)"
+                                            maxLength={12}
+                                        />
+                                        {errors.mac && <p className="error-message">{errors.mac}</p>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Подразделение</label>
+                                        <select
+                                            name="organizationUnit"
+                                            value={editData.organizationUnit?.id || ''}
+                                            onChange={(e) => {
+                                                const selectedUnit = organizationUnits.find(unit => unit.id === parseInt(e.target.value));
+                                                setEditData({ ...editData, organizationUnit: selectedUnit });
+                                            }}
+                                            className="form-input"
+                                        >
+                                            <option value="">Выберите подразделение</option>
+                                            {organizationUnits.map(unit => (
+                                                <option key={unit.id} value={unit.id}>
+                                                    {unit.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {errors.organizationUnit && (
+                                            <p className="error-message">{errors.organizationUnit}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Дата ввода в эксплуатацию *</label>
+                                        <input
+                                            type="date"
+                                            name="commissionDate"
+                                            value={editData.commissionDate || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            max={todayDateString}
+                                        />
+                                        {errors.commissionDate && <p className="error-message">{errors.commissionDate}</p>}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Год выпуска</label>
+                                        <input
+                                            type="number"
+                                            name="manufactureYear"
+                                            value={editData.manufactureYear || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            min="1900"
+                                            max={currentYear}
+                                            placeholder="Введите год выпуска"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Последнее обслуживание</label>
+                                        <input
+                                            type="date"
+                                            name="lastService"
+                                            value={editData.lastService || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Серийный номер</label>
+                                        <input
+                                            type="text"
+                                            name="serialNumber"
+                                            value={editData.serialNumber || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            placeholder="Введите серийный номер"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Инвентарный номер</label>
+                                        <input
+                                            type="text"
+                                            name="inventoryNumber"
+                                            value={editData.inventoryNumber || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            placeholder="Введите инвентарный номер"
+                                        />
                                     </div>
                                 </>
                             )}
