@@ -10,9 +10,16 @@ import {
     getAllOrganizationUnits,
     getAllWeldingMachineTypes
 } from '../api/weldingMachineApi';
+import { getAllEmployees } from '../api/employeeApi';
 import { getArchivePanelState } from '../api/archiveDeviceApi';
 
 // Данные теперь загружаются с API сервера
+
+const defaultCoreOptions = {
+    gasControl: false,
+    rfid: false,
+    bvo: false,
+};
 
 const navMenu = [
     { label: 'Главная', path: '/' },
@@ -70,6 +77,7 @@ function WeldingEquipmentPage() {
     const [welders, setWelders] = useState([]);
     const [organizationUnits, setOrganizationUnits] = useState([]);
     const [weldingMachineTypes, setWeldingMachineTypes] = useState([]);
+    const [responsibleUsers, setResponsibleUsers] = useState([]);
     const [modelFilter, setModelFilter] = useState('');
     const [organizationUnitFilter, setOrganizationUnitFilter] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
@@ -80,6 +88,27 @@ function WeldingEquipmentPage() {
     const [deviceStatusesByMac, setDeviceStatusesByMac] = useState({}); // { [mac]: 'off' | 'on' | 'welding' }
     const [statusIntervalId, setStatusIntervalId] = useState(null);
     const [shownErrors, setShownErrors] = useState(new Set());
+
+    const todayDateString = new Date().toISOString().split('T')[0];
+
+    const formatDateForInput = (value) => {
+        if (!value) return '';
+        if (typeof value === 'string') {
+            const [datePart] = value.split('T');
+            return datePart;
+        }
+        try {
+            return value.toISOString().split('T')[0];
+        } catch {
+            return '';
+        }
+    };
+
+    const findRootOrganizationUnit = () => {
+        if (!Array.isArray(organizationUnits) || organizationUnits.length === 0) return null;
+        const root = organizationUnits.find(unit => unit.parentId == null || unit.parent_id == null);
+        return root || organizationUnits[0];
+    };
 
     // Load welders from localStorage
     useEffect(() => {
@@ -111,7 +140,77 @@ function WeldingEquipmentPage() {
 
     // Modal logic
     const openEditModal = (item) => {
-        setEditData(item);
+        if (!item) return;
+
+        let coreOptions = { ...defaultCoreOptions };
+        let wtModuleMac = '';
+        let maintenanceTechnicianName = '';
+        let maintenanceTechnicianPass = '';
+        let responsibleUserId = '';
+        let assignedWelders = Array.isArray(item.assignedWelders) ? item.assignedWelders : [];
+        let maintenanceInterval = item.maintenanceInterval ?? item.maintenanceRegulation ?? '';
+        let maintenanceReminderHours = item.userServiceNotifiedBeforeHours ?? '';
+
+        if (item.modules) {
+            try {
+                const parsed = JSON.parse(item.modules);
+                if (parsed && typeof parsed === 'object') {
+                    if (parsed.options) {
+                        coreOptions = {
+                            ...defaultCoreOptions,
+                            ...parsed.options,
+                        };
+                    }
+                    if (parsed.wtModuleMac) wtModuleMac = parsed.wtModuleMac;
+                    if (parsed.maintenance) {
+                        maintenanceTechnicianName = parsed.maintenance.technicianName || maintenanceTechnicianName;
+                        maintenanceTechnicianPass = parsed.maintenance.technicianPass || parsed.maintenance.technicianRfid || maintenanceTechnicianPass;
+                        if (parsed.maintenance.intervalHours != null && maintenanceInterval === '') {
+                            maintenanceInterval = parsed.maintenance.intervalHours;
+                        }
+                        if (parsed.maintenance.reminderHours != null && maintenanceReminderHours === '') {
+                            maintenanceReminderHours = parsed.maintenance.reminderHours;
+                        }
+                    }
+                    if (parsed.responsibleUserId) {
+                        responsibleUserId = String(parsed.responsibleUserId);
+                    }
+                    if (parsed.allowedWelders && Array.isArray(parsed.allowedWelders)) {
+                        assignedWelders = parsed.allowedWelders;
+                    }
+                    if (parsed.maintenanceReminderHours != null && maintenanceReminderHours === '') {
+                        maintenanceReminderHours = parsed.maintenanceReminderHours;
+                    }
+                }
+            } catch (err) {
+                console.warn('Не удалось разобрать поле modules для аппарата', err);
+            }
+        }
+
+        setEditData({
+            ...item,
+            name: item.name || '',
+            deviceModel: typeof item.deviceModel === 'string' && item.deviceModel
+                ? item.deviceModel
+                : (typeof item.model === 'string' && item.model ? item.model : item.deviceModel?.name || item.deviceModel?.code || ''),
+            mac: item.mac || '',
+            commissionDate: formatDateForInput(item.commissionDate || item.dateStartedUsing),
+            manufactureYear: item.manufactureYear || '',
+            lastService: formatDateForInput(item.lastService || item.lastServiceOn),
+            serialNumber: item.serialNumber || '',
+            inventoryNumber: item.inventoryNumber || '',
+            assignedWelders,
+            organizationUnit: item.organizationUnit || (item.organizationUnitId ? { id: item.organizationUnitId, name: item.organizationUnitName } : null),
+            weldingMachineType: item.weldingMachineType || (item.weldingMachineTypeId ? { id: item.weldingMachineTypeId, name: item.weldingMachineTypeName } : null),
+            coreOptions,
+            wtModuleMac,
+            maintenanceInterval: maintenanceInterval === null ? '' : maintenanceInterval,
+            maintenanceReminderHours: maintenanceReminderHours === null ? '' : maintenanceReminderHours,
+            maintenanceTechnicianName,
+            maintenanceTechnicianPass,
+            responsibleUserId,
+            modules: item.modules || null,
+        });
         setErrors({});
         setModalOpen(true);
     };
@@ -123,10 +222,36 @@ function WeldingEquipmentPage() {
     };
 
     const handleInputChange = (e) => {
-        setEditData({ ...editData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+
+        if (name === 'deviceModel') {
+            setEditData(prev => ({
+                ...prev,
+                deviceModel: value,
+                coreOptions: value === 'CORE'
+                    ? { ...(prev.coreOptions || defaultCoreOptions) }
+                    : { ...defaultCoreOptions },
+                wtModuleMac: value === 'CORE' ? prev.wtModuleMac || '' : '',
+                maintenanceInterval: value === 'CORE' ? prev.maintenanceInterval || '' : '',
+                maintenanceReminderHours: value === 'CORE' ? prev.maintenanceReminderHours || '' : '',
+                maintenanceTechnicianName: value === 'CORE' ? prev.maintenanceTechnicianName || '' : '',
+                maintenanceTechnicianPass: value === 'CORE' ? prev.maintenanceTechnicianPass || '' : '',
+                responsibleUserId: value === 'CORE' ? prev.responsibleUserId || '' : '',
+                modules: value === 'CORE' ? prev.modules : null,
+            }));
+            return;
+        }
+
+        if (name === 'responsibleUserId') {
+            setEditData(prev => ({ ...prev, responsibleUserId: value }));
+            return;
+        }
+
+        setEditData(prev => ({ ...prev, [name]: value }));
     };
 
     const openAddModal = () => {
+        const defaultUnit = findRootOrganizationUnit();
         setEditData({
             name: '',
             deviceModel: '',
@@ -140,8 +265,16 @@ function WeldingEquipmentPage() {
             serialNumber: '',
             inventoryNumber: '',
             assignedWelders: [],
-            organizationUnit: null,
-            weldingMachineType: null
+            organizationUnit: defaultUnit ? { id: defaultUnit.id, name: defaultUnit.name } : null,
+            weldingMachineType: null,
+            coreOptions: { ...defaultCoreOptions },
+            wtModuleMac: '',
+            maintenanceInterval: '',
+            maintenanceReminderHours: '',
+            maintenanceTechnicianName: '',
+            maintenanceTechnicianPass: '',
+            responsibleUserId: '',
+            modules: null,
         });
         setErrors({});
         setModalOpen(true);
@@ -181,10 +314,21 @@ function WeldingEquipmentPage() {
         }
     };
 
+    const loadResponsibleUsers = async () => {
+        try {
+            const data = await getAllEmployees();
+            setResponsibleUsers(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Ошибка загрузки ответственных пользователей:', err);
+            setResponsibleUsers([]);
+        }
+    };
+
     useEffect(() => {
         loadEquipment();
         loadOrganizationUnits();
         loadWeldingMachineTypes();
+        loadResponsibleUsers();
     }, []);
 
     // Poll device statuses every 4s
@@ -297,7 +441,8 @@ function WeldingEquipmentPage() {
     const handleSave = async (e) => {
         e.preventDefault();
         const newErrors = {};
-        if (!editData.name) newErrors.name = 'Это поле обязательно';
+        const trimmedName = (editData.name || '').trim();
+        if (!trimmedName) newErrors.name = 'Это поле обязательно';
         if (!editData.deviceModel) newErrors.deviceModel = 'Выберите модель устройства';
         // Приводим MAC к формату: только заглавные буквы, без двоеточий
         let mac = (editData.mac || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
@@ -305,6 +450,43 @@ function WeldingEquipmentPage() {
             newErrors.mac = 'MAC-адрес должен содержать 12 символов (только 0-9, A-F)';
         }
         if (!editData.organizationUnit) newErrors.organizationUnit = 'Выберите подразделение';
+        if (!editData.commissionDate) {
+            newErrors.commissionDate = 'Укажите дату ввода в эксплуатацию';
+        } else {
+            const commissionDateObj = new Date(editData.commissionDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (commissionDateObj > today) {
+                newErrors.commissionDate = 'Дата ввода в эксплуатацию не может быть в будущем';
+            }
+        }
+
+        const selectedUnitId = editData.organizationUnit?.id;
+        if (trimmedName && selectedUnitId) {
+            const duplicateName = equipment.some(machine => {
+                const machineUnitId = machine.organizationUnit?.id || machine.organizationUnitId;
+                return machine.id !== editData.id &&
+                    machineUnitId === selectedUnitId &&
+                    (machine.name || '').trim().toLowerCase() === trimmedName.toLowerCase();
+            });
+            if (duplicateName) {
+                newErrors.name = 'В этом подразделении уже есть аппарат с таким названием';
+            }
+        }
+
+        const maintenanceIntervalValue = editData.maintenanceInterval !== '' && editData.maintenanceInterval != null
+            ? Number(editData.maintenanceInterval)
+            : null;
+        if (maintenanceIntervalValue != null && (Number.isNaN(maintenanceIntervalValue) || maintenanceIntervalValue < 0)) {
+            newErrors.maintenanceInterval = 'Значение должно быть неотрицательным числом';
+        }
+
+        const maintenanceReminderValue = editData.maintenanceReminderHours !== '' && editData.maintenanceReminderHours != null
+            ? Number(editData.maintenanceReminderHours)
+            : null;
+        if (maintenanceReminderValue != null && (Number.isNaN(maintenanceReminderValue) || maintenanceReminderValue < 0)) {
+            newErrors.maintenanceReminderHours = 'Укажите корректное количество часов';
+        }
 
         if (Object.keys(newErrors).length) {
             setErrors(newErrors);
@@ -312,12 +494,59 @@ function WeldingEquipmentPage() {
         }
 
         try {
+            const commissionDateValue = editData.commissionDate
+                ? `${editData.commissionDate}T00:00:00`
+                : null;
+            const lastServiceValue = editData.lastService
+                ? `${editData.lastService}T00:00:00`
+                : null;
+
             const machineData = {
-                ...editData,
+                id: editData.id,
+                name: trimmedName,
+                deviceModel: editData.deviceModel,
                 mac,
+                commissionDate: commissionDateValue,
+                manufactureYear: editData.manufactureYear || '',
+                lastService: lastServiceValue,
+                serialNumber: editData.serialNumber || '',
+                inventoryNumber: editData.inventoryNumber || '',
                 organizationUnit: editData.organizationUnit,
-                weldingMachineType: editData.weldingMachineType
+                weldingMachineType: editData.weldingMachineType,
+                assignedWelders: editData.assignedWelders || [],
+                maintenanceInterval: maintenanceIntervalValue,
+                maintenanceRegulation: maintenanceIntervalValue,
+                userServiceNotifiedBeforeHours: maintenanceReminderValue,
             };
+
+            if (!editData.id) {
+                delete machineData.id;
+            }
+
+            const isCoreSelected = editData.deviceModel === 'CORE';
+
+            if (isCoreSelected) {
+                const corePayload = {
+                    options: {
+                        gasControl: Boolean(editData.coreOptions?.gasControl),
+                        rfid: Boolean(editData.coreOptions?.rfid),
+                        bvo: Boolean(editData.coreOptions?.bvo),
+                    },
+                    wtModuleMac: editData.wtModuleMac || '',
+                    maintenance: {
+                        intervalHours: maintenanceIntervalValue,
+                        lastServiceDate: lastServiceValue,
+                        technicianName: editData.maintenanceTechnicianName || '',
+                        technicianPass: editData.maintenanceTechnicianPass || '',
+                    },
+                    responsibleUserId: editData.responsibleUserId ? Number(editData.responsibleUserId) : null,
+                    allowedWelders: editData.assignedWelders || [],
+                    maintenanceReminderHours: maintenanceReminderValue,
+                };
+                machineData.modules = JSON.stringify(corePayload);
+            } else {
+                machineData.modules = null;
+            }
 
             if (editData.id) {
                 await updateWeldingMachine(editData.id, machineData);
@@ -376,7 +605,20 @@ function WeldingEquipmentPage() {
         });
     };
 
+    const handleCoreOptionToggle = (optionKey) => (e) => {
+        const { checked } = e.target;
+        setEditData(prev => ({
+            ...prev,
+            coreOptions: {
+                ...(prev.coreOptions || { ...defaultCoreOptions }),
+                [optionKey]: checked
+            }
+        }));
+    };
+
     // Функция для фильтрации оборудования
+    const isCoreSelected = editData?.deviceModel === 'CORE';
+
     const getFilteredEquipment = (applySort = true) => {
         let filtered = equipment;
 
@@ -621,14 +863,16 @@ function WeldingEquipmentPage() {
 
 
                             <div className="form-group">
-                                <label className="form-label">Дата ввода в эксплуатацию</label>
+                                <label className="form-label">Дата ввода в эксплуатацию *</label>
                                 <input
                                     type="date"
                                     name="commissionDate"
                                     value={editData.commissionDate || ''}
                                     onChange={handleInputChange}
                                     className="form-input"
+                                    max={todayDateString}
                                 />
+                                {errors.commissionDate && <p className="error-message">{errors.commissionDate}</p>}
                             </div>
 
                             <div className="form-group">
@@ -680,8 +924,136 @@ function WeldingEquipmentPage() {
                                 />
                             </div>
 
+                            {isCoreSelected && (
+                                <>
+                                    <h3 style={{ marginTop: '1.5rem', fontSize: '1.1rem', fontWeight: 600 }}>Опции Core</h3>
+                                    <div className="form-group">
+                                        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={Boolean(editData.coreOptions?.gasControl)}
+                                                    onChange={handleCoreOptionToggle('gasControl')}
+                                                />
+                                                Система контроля газа
+                                            </label>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={Boolean(editData.coreOptions?.rfid)}
+                                                    onChange={handleCoreOptionToggle('rfid')}
+                                                />
+                                                RFID доступ
+                                            </label>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={Boolean(editData.coreOptions?.bvo)}
+                                                    onChange={handleCoreOptionToggle('bvo')}
+                                                />
+                                                БВО
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">MAC / серийный номер модуля WT</label>
+                                        <input
+                                            type="text"
+                                            name="wtModuleMac"
+                                            value={editData.wtModuleMac || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            placeholder="Введите идентификатор модуля WT"
+                                        />
+                                    </div>
+
+                                    <h3 style={{ marginTop: '1.5rem', fontSize: '1.1rem', fontWeight: 600 }}>Обслуживание</h3>
+                                    <div className="form-group">
+                                        <label className="form-label">Наработка между ТО (часы)</label>
+                                        <input
+                                            type="number"
+                                            name="maintenanceInterval"
+                                            value={editData.maintenanceInterval !== undefined && editData.maintenanceInterval !== null ? editData.maintenanceInterval : ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            min="0"
+                                            step="1"
+                                            placeholder="Например, 720"
+                                        />
+                                        {errors.maintenanceInterval && (
+                                            <p className="error-message">{errors.maintenanceInterval}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Напоминание о ТО за (часы)</label>
+                                        <input
+                                            type="number"
+                                            name="maintenanceReminderHours"
+                                            value={editData.maintenanceReminderHours !== undefined && editData.maintenanceReminderHours !== null ? editData.maintenanceReminderHours : ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            min="0"
+                                            step="1"
+                                            placeholder="Например, 24"
+                                        />
+                                        {errors.maintenanceReminderHours && (
+                                            <p className="error-message">{errors.maintenanceReminderHours}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">ФИО, проводившего ТО</label>
+                                        <input
+                                            type="text"
+                                            name="maintenanceTechnicianName"
+                                            value={editData.maintenanceTechnicianName || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                            placeholder="Введите ФИО"
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">RFID пропуск проводившего ТО</label>
+                                        <input
+                                            type="text"
+                                            name="maintenanceTechnicianPass"
+                                            value={editData.maintenanceTechnicianPass || ''}
+                                            readOnly
+                                            className="form-input"
+                                            placeholder="Заполняется автоматически при считывании пропуска"
+                                        />
+                                    </div>
+
+                                    <h3 style={{ marginTop: '1.5rem', fontSize: '1.1rem', fontWeight: 600 }}>Ответственные лица</h3>
+                                    <div className="form-group">
+                                        <label className="form-label">Ответственный за ИП</label>
+                                        <select
+                                            name="responsibleUserId"
+                                            value={editData.responsibleUserId || ''}
+                                            onChange={handleInputChange}
+                                            className="form-input"
+                                        >
+                                            <option value="">Выберите пользователя</option>
+                                            {responsibleUsers.map(user => (
+                                                <option key={user.id} value={user.id}>
+                                                    {user.fullName || user.name || user.username || `Пользователь #${user.id}`}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </>
+                            )}
+
                             <div className="form-group">
-                                <label className="form-label">Назначенные сварщики</label>
+                                <label className="form-label">{isCoreSelected ? 'Допущенные сварщики' : 'Назначенные сварщики'}</label>
+                                {isCoreSelected && (
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #6b7280)', marginTop: '-0.35rem', marginBottom: '0.5rem' }}>
+                                        По умолчанию сварщикам предоставляется полный доступ к ИП. Укажите здесь тех, кто допускается к работе.
+                                    </p>
+                                )}
                                 <select
                                     multiple
                                     name="assignedWelders"
