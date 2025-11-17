@@ -231,7 +231,7 @@
     line-height: 1;
 }
 
-.equipment-table-container {
+.welding-equipment-page .equipment-table-container {
     flex: 1;
     background: linear-gradient(155deg, rgba(32, 25, 39, 0.92), rgba(20, 18, 31, 0.94));
     border: 1px solid rgba(59, 49, 74, 0.55);
@@ -244,21 +244,22 @@
     flex-direction: column;
 }
 
-.equipment-table {
+.welding-equipment-page .equipment-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
     flex: 1;
     min-height: 0;
 }
 
-.equipment-table thead {
+.welding-equipment-page .equipment-table thead {
     background: rgba(28, 22, 34, 0.8);
     position: sticky;
     top: 0;
     z-index: 10;
 }
 
-.equipment-table th {
+.welding-equipment-page .equipment-table th {
     padding: 9px 6px;
     text-align: left;
     font-size: 11px;
@@ -273,27 +274,27 @@
     position: relative;
 }
 
-.equipment-table th:hover {
+.welding-equipment-page .equipment-table th:hover {
     background: rgba(45, 37, 54, 0.3);
 }
 
-.equipment-table th span {
+.welding-equipment-page .equipment-table th span {
     display: inline-flex;
     align-items: center;
     gap: 6px;
 }
 
-.sort-arrow {
+.welding-equipment-page .sort-arrow {
     font-size: 14px;
     color: rgba(188, 183, 197, 0.5);
     transition: color 0.2s ease;
 }
 
-.equipment-table th:hover .sort-arrow {
+.welding-equipment-page .equipment-table th:hover .sort-arrow {
     color: rgba(188, 183, 197, 0.8);
 }
 
-.equipment-table td {
+.welding-equipment-page .equipment-table td {
     padding: 10px 16px;
     font-size: 13px;
     color: #5C6D81;
@@ -301,7 +302,7 @@
     vertical-align: middle;
 }
 
-.equipment-table td:first-child {
+.welding-equipment-page .equipment-table td:first-child {
     padding: 0 0;
 }
 
@@ -321,24 +322,24 @@
 }
 
 
-.table-row {
+.welding-equipment-page .table-row {
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
-.table-row:hover {
+.welding-equipment-page .table-row:hover {
     background: rgba(45, 37, 54, 0.4) !important;
 }
 
-.equipment-table tbody tr.table-row-compact:hover {
+.welding-equipment-page .equipment-table tbody tr.table-row-compact:hover {
     background-color: rgba(45, 37, 54, 0.4) !important;
 }
 
-.table-row:last-child td {
+.welding-equipment-page .table-row:last-child td {
     border-bottom: none;
 }
 
-.status-badge {
+.welding-equipment-page .status-badge {
     display: inline-flex;
     align-items: center;
     font-size: 13px;
@@ -346,55 +347,56 @@
     white-space: nowrap;
 }
 
-.status-badge.welding {
+.welding-equipment-page .status-badge.welding {
     color: #FEB63E;
 }
 
-.status-badge.on {
+.welding-equipment-page .status-badge.on {
     color: #39956C;
 }
 
-.status-badge.error {
+.welding-equipment-page .status-badge.error {
     color: #EC2B3C;
 }
 
 /* Scrollbar Styles */
-.equipment-table-container::-webkit-scrollbar {
+.welding-equipment-page .equipment-table-container::-webkit-scrollbar {
     width: 6px;
     height: 6px;
 }
 
-.equipment-table-container::-webkit-scrollbar-track {
+.welding-equipment-page .equipment-table-container::-webkit-scrollbar-track {
     background: rgba(28, 22, 34, 0.5);
 }
 
-.equipment-table-container::-webkit-scrollbar-thumb {
+.welding-equipment-page .equipment-table-container::-webkit-scrollbar-thumb {
     background: rgba(82, 69, 94, 0.5);
     border-radius: 3px;
 }
 
-.equipment-table-container::-webkit-scrollbar-thumb:hover {
+.welding-equipment-page .equipment-table-container::-webkit-scrollbar-thumb:hover {
     background: rgba(94, 83, 112, 0.7);
 }
 
 /* Компактные строки для таблицы - как на эталонном фото */
-.equipment-table tbody tr.table-row-compact {
+.welding-equipment-page .equipment-table tbody tr.table-row-compact {
     height: 28px !important;
     min-height: 28px !important;
     max-height: 28px !important;
     line-height: 1.0 !important;
+    display: table-row !important;
 }
 
 /* Чередование цветов строк */
-.equipment-table tbody tr.table-row-compact:nth-child(odd) {
+.welding-equipment-page .equipment-table tbody tr.table-row-compact:nth-child(odd) {
     background-color: #122536 !important;
 }
 
-.equipment-table tbody tr.table-row-compact:nth-child(even) {
+.welding-equipment-page .equipment-table tbody tr.table-row-compact:nth-child(even) {
     background-color: #1A1420 !important;
 }
 
-.equipment-table tbody tr.table-row-compact td {
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td {
     padding: 2px 10px !important;
     height: 28px !important;
     min-height: 28px !important;
@@ -403,13 +405,14 @@
     font-size: 12px !important;
     vertical-align: middle !important;
     white-space: nowrap !important;
+    display: table-cell !important;
 }
 
-.equipment-table tbody tr.table-row-compact td:first-child {
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td:first-child {
     padding: 0 10px !important;
 }
 
-.model-cell-table {
+.welding-equipment-page .model-cell-table {
     display: flex !important;
     align-items: center !important;
     gap: 6px !important;
@@ -420,20 +423,20 @@
     line-height: 28px !important;
 }
 
-.model-text {
+.welding-equipment-page .model-text {
     display: inline-flex !important;
     align-items: center !important;
 }
 
-.model-part-first {
+.welding-equipment-page .model-part-first {
     color: #FFFFFF !important;
 }
 
-.model-part-second {
+.welding-equipment-page .model-part-second {
     color: #DC6F1C !important;
 }
 
-.status-indicator {
+.welding-equipment-page .status-indicator {
     width: 6px !important;
     height: 6px !important;
     border-radius: 50% !important;
@@ -443,7 +446,7 @@
     padding: 0 !important;
 }
 
-.machine-thumbnail-small {
+.welding-equipment-page .machine-thumbnail-small {
     width: 44px !important;
     height: 44px !important;
     object-fit: contain !important;
@@ -451,7 +454,7 @@
     flex-shrink: 0 !important;
 }
 
-.equipment-table tbody tr.table-row-compact td span {
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td span {
     line-height: 28px !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -459,6 +462,6 @@
     display: inline-block !important;
 }
 
-.status-badge.off {
+.welding-equipment-page .status-badge.off {
     color: rgba(188, 183, 197, 0.5) !important;
 }
