@@ -917,8 +917,8 @@ function WeldingEquipmentPage() {
                 </div>
 
                 {viewMode === 'table' && (
-                    <div className="equipment-table-container">
-                        <table className="equipment-table">
+                    <div className="equipment-table-container equipment-table-compact">
+                        <table className="equipment-table-compact-view">
                             <thead>
                                 <tr>
                                     <th onClick={() => toggleSort('model')}>
@@ -957,13 +957,13 @@ function WeldingEquipmentPage() {
                                     return (
                                         <tr 
                                             key={item.id} 
-                                            className="table-row table-row-compact"
+                                            className="compact-table-row"
                                             onClick={() => handleControl(item)}
                                         >
                                             <td>
-                                                <div className="model-cell-table">
+                                                <div className="compact-model-cell">
                                                     <span 
-                                                        className="status-indicator" 
+                                                        className="compact-status-indicator" 
                                                         style={{ backgroundColor: getStatusIndicatorColor(status) }}
                                                     />
                                                     <span>{getModelDisplay(item)}</span>
@@ -975,7 +975,7 @@ function WeldingEquipmentPage() {
                                             <td>{getWelderDisplay(item)}</td>
                                             <td>{getLastActivation(item) || 'Нет данных'}</td>
                                             <td>
-                                                <span className={`status-badge ${status}`}>
+                                                <span className={`compact-status-badge ${status}`}>
                                                     {status === 'welding' ? 'Сварка' : 
                                                      status === 'on' ? 'Включен' : 
                                                      status === 'error' ? 'Ошибка' : 
@@ -991,8 +991,8 @@ function WeldingEquipmentPage() {
                 )}
 
                 {viewMode === 'tiles' && (
-                    <div className="equipment-table-container">
-                        <table className="equipment-table">
+                    <div className="equipment-table-container equipment-table-tiles">
+                        <table className="equipment-table-tiles-view">
                             <thead>
                                 <tr>
                                     <th onClick={() => toggleSort('model')}>
@@ -1031,11 +1031,11 @@ function WeldingEquipmentPage() {
                                     return (
                                         <tr 
                                             key={item.id} 
-                                            className="table-row"
+                                            className="tiles-table-row"
                                             onClick={() => handleControl(item)}
                                         >
                                             <td>
-                                                <div className="model-cell">
+                                                <div className="tiles-model-cell">
                                                     <img 
                                                         src={machineImage} 
                                                         alt={getModelDisplay(item)}
@@ -1050,7 +1050,7 @@ function WeldingEquipmentPage() {
                                             <td>{getWelderDisplay(item)}</td>
                                             <td>{getLastActivation(item) || 'Нет данных'}</td>
                                             <td>
-                                                <span className={`status-badge ${status}`}>
+                                                <span className={`tiles-status-badge ${status}`}>
                                                     {status === 'welding' ? 'Сварка' : 
                                                      status === 'on' ? 'Включен' : 
                                                      status === 'error' ? 'Ошибка' : 

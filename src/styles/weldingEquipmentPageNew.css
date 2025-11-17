@@ -294,23 +294,128 @@
     padding: 0 0;
 }
 
-/* В режиме плиток строки выше из-за фото */
-.welding-equipment-page .equipment-table tbody tr:has(.model-cell) td {
+/* Стили для режима "Плитки" - используются отдельные классы */
+.welding-equipment-page .equipment-table-tiles {
+    flex: 1;
+    background: linear-gradient(155deg, rgba(32, 25, 39, 0.92), rgba(20, 18, 31, 0.94));
+    border: 1px solid rgba(59, 49, 74, 0.55);
+    box-shadow: 0 14px 30px rgba(6, 9, 18, 0.55);
+    border-radius: 5px;
+    overflow: hidden;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.welding-equipment-page .equipment-table-tiles-view {
+    width: 100%;
+    border-collapse: collapse;
+    flex: 1 1;
+    min-height: 0;
+}
+
+.welding-equipment-page .equipment-table-tiles-view thead {
+    background: rgba(28, 22, 34, 0.8);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.welding-equipment-page .equipment-table-tiles-view th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6C7386;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid rgba(59, 49, 74, 0.55);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+}
+
+.welding-equipment-page .equipment-table-tiles-view th:hover {
+    background: rgba(45, 37, 54, 0.3);
+}
+
+.welding-equipment-page .equipment-table-tiles-view th span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.welding-equipment-page .equipment-table-tiles-view .sort-arrow {
+    font-size: 14px;
+    color: rgba(188, 183, 197, 0.5);
+    transition: color 0.2s ease;
+}
+
+.welding-equipment-page .equipment-table-tiles-view th:hover .sort-arrow {
+    color: rgba(188, 183, 197, 0.8);
+}
+
+.welding-equipment-page .equipment-table-tiles-view tbody tr.tiles-table-row {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.welding-equipment-page .equipment-table-tiles-view tbody tr.tiles-table-row:hover {
+    background: rgba(45, 37, 54, 0.4);
+}
+
+.welding-equipment-page .equipment-table-tiles-view tbody tr.tiles-table-row:last-child td {
+    border-bottom: none;
+}
+
+.welding-equipment-page .equipment-table-tiles-view tbody tr.tiles-table-row td {
     padding: 10px 16px;
+    font-size: 13px;
+    color: #5C6D81;
+    border-bottom: 1px solid rgba(59, 49, 74, 0.3);
+    vertical-align: middle;
 }
 
-.welding-equipment-page .equipment-table tbody tr:has(.model-cell) {
-    min-height: 60px;
+.welding-equipment-page .equipment-table-tiles-view tbody tr.tiles-table-row td:first-child {
+    padding: 0 0;
 }
 
-/* Удалено - дублирование, стили уже определены выше */
-
-.welding-equipment-page .model-cell {
+.welding-equipment-page .tiles-model-cell {
     display: flex;
     align-items: center;
     gap: 6px;
     min-height: 60px;
     padding: 0 3px;
+}
+
+.welding-equipment-page .tiles-status-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    color: rgba(188, 183, 197, 0.5) !important;
+}
+
+.welding-equipment-page .tiles-status-badge.welding {
+    color: #FEB63E !important;
+}
+
+.welding-equipment-page .tiles-status-badge.on {
+    color: #39956C !important;
+}
+
+.welding-equipment-page .tiles-status-badge.error {
+    color: #EC2B3C !important;
+}
+
+.welding-equipment-page .tiles-status-badge.off {
+    color: rgba(188, 183, 197, 0.5) !important;
+}
+
+.welding-equipment-page .equipment-table-tiles-view tbody {
+    overflow-y: auto;
 }
 
 /* Стили для model-cell-table в табличном режиме вынесены в weldingEquipmentTable.css */
