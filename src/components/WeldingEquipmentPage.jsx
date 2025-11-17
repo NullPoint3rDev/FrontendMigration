@@ -975,10 +975,6 @@ function WeldingEquipmentPage() {
                                         >
                                             <td>
                                                 <div className="model-cell-table">
-                                                    <span 
-                                                        className="status-indicator" 
-                                                        style={{ backgroundColor: getStatusIndicatorColor(status) }}
-                                                    />
                                                     <img
                                                         src={machineImage}
                                                         alt={modelDisplay}
@@ -999,10 +995,9 @@ function WeldingEquipmentPage() {
                                             <td>{getLastActivation(item) || 'Нет данных'}</td>
                                             <td>
                                                 <span className={`status-badge ${status}`}>
-                                                    {status === 'welding' ? 'Сварка' : 
-                                                     status === 'on' ? 'Включен' : 
-                                                     status === 'error' ? 'Ошибка' : 
-                                                     'Выключен'}
+                                                    {status === 'welding' ? 'Сварка' :
+                                                     status === 'on' ? 'Вкл' :
+                                                     status === 'error' ? 'Ошибка' : 'Выкл'}
                                                 </span>
                                             </td>
                                         </tr>
