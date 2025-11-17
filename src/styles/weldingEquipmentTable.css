@@ -15,8 +15,17 @@
     font-size: 12px !important;
 }
 
+/* Чередование цветов строк */
+.welding-equipment-page .equipment-table tbody tr.table-row-compact:nth-child(odd) {
+    background-color: #122536 !important;
+}
+
+.welding-equipment-page .equipment-table tbody tr.table-row-compact:nth-child(even) {
+    background-color: #1A1420 !important;
+}
+
 .welding-equipment-page .equipment-table tbody tr.table-row-compact td {
-    padding: 0 10px !important;
+    padding: 2px 10px !important;
     line-height: 28px !important;
     height: 28px !important;
     min-height: 28px !important;
@@ -38,11 +47,32 @@
     max-height: 28px !important;
     line-height: 28px !important;
     margin: 0 !important;
-    gap: 4px !important;
+    gap: 6px !important;
     align-items: center !important;
     overflow: hidden !important;
     box-sizing: border-box !important;
     display: flex !important;
+}
+
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td .model-text {
+    display: inline-flex !important;
+    align-items: center !important;
+}
+
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td .model-part-first {
+    color: #FFFFFF !important;
+}
+
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td .model-part-second {
+    color: #DC6F1C !important;
+}
+
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td .machine-thumbnail-small {
+    width: 44px !important;
+    height: 44px !important;
+    object-fit: contain !important;
+    object-position: center !important;
+    flex-shrink: 0 !important;
 }
 
 /* Все span внутри td */
@@ -62,6 +92,7 @@
 .welding-equipment-page .equipment-table tbody tr.table-row-compact td .status-indicator {
     width: 6px !important;
     height: 6px !important;
+    border-radius: 50% !important;
     margin: 0 !important;
     padding: 0 !important;
     vertical-align: middle !important;
@@ -127,7 +158,7 @@
 
 /* Переопределяем для компактных строк */
 .welding-equipment-page .equipment-table tbody tr.table-row-compact td:first-child {
-    padding: 2px 10px !important;
+    padding: 0 10px !important;
     height: 28px !important;
     min-height: 28px !important;
     max-height: 28px !important;
@@ -167,5 +198,9 @@
 
 .welding-equipment-page .equipment-table tbody tr.table-row-compact {
     border-spacing: 0 !important;
+}
+
+.welding-equipment-page .equipment-table tbody tr.table-row-compact:hover {
+    background-color: rgba(45, 37, 54, 0.4) !important;
 }
 

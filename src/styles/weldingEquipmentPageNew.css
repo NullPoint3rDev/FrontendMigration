@@ -301,6 +301,11 @@
     vertical-align: middle;
 }
 
+/* Исключаем компактные строки из общих стилей */
+.equipment-table tbody tr:not(.table-row-compact) td {
+    padding: 10px 16px;
+}
+
 .equipment-table td:first-child {
     padding: 0 0;
 }
@@ -377,7 +382,9 @@
 }
 
 /* Компактные строки для таблицы - как на эталонном фото */
-.equipment-table tbody tr.table-row-compact {
+/* ПРИМЕЧАНИЕ: Основные стили для компактных строк находятся в weldingEquipmentTable.css */
+/* Эти стили используются как резервные, если weldingEquipmentTable.css не загружен */
+.welding-equipment-page .equipment-table tbody tr.table-row-compact {
     height: 28px !important;
     min-height: 28px !important;
     max-height: 28px !important;
@@ -385,15 +392,15 @@
 }
 
 /* Чередование цветов строк */
-.equipment-table tbody tr.table-row-compact:nth-child(odd) {
+.welding-equipment-page .equipment-table tbody tr.table-row-compact:nth-child(odd) {
     background-color: #122536 !important;
 }
 
-.equipment-table tbody tr.table-row-compact:nth-child(even) {
+.welding-equipment-page .equipment-table tbody tr.table-row-compact:nth-child(even) {
     background-color: #1A1420 !important;
 }
 
-.equipment-table tbody tr.table-row-compact td {
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td {
     padding: 2px 10px !important;
     height: 28px !important;
     min-height: 28px !important;
@@ -404,11 +411,14 @@
     white-space: nowrap !important;
 }
 
-.equipment-table tbody tr.table-row-compact td:first-child {
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td:first-child {
     padding: 0 10px !important;
 }
 
-.model-cell-table {
+/* ПРИМЕЧАНИЕ: Стили для model-cell-table, model-text, model-part-first, model-part-second, */
+/* status-indicator, machine-thumbnail-small находятся в weldingEquipmentTable.css */
+/* Эти стили используются как резервные */
+.welding-equipment-page .model-cell-table {
     display: flex !important;
     align-items: center !important;
     gap: 6px !important;
@@ -419,20 +429,20 @@
     line-height: 28px !important;
 }
 
-.model-text {
+.welding-equipment-page .model-text {
     display: inline-flex !important;
     align-items: center !important;
 }
 
-.model-part-first {
+.welding-equipment-page .model-part-first {
     color: #FFFFFF !important;
 }
 
-.model-part-second {
+.welding-equipment-page .model-part-second {
     color: #DC6F1C !important;
 }
 
-.status-indicator {
+.welding-equipment-page .status-indicator {
     width: 6px !important;
     height: 6px !important;
     border-radius: 50% !important;
@@ -442,7 +452,7 @@
     padding: 0 !important;
 }
 
-.machine-thumbnail-small {
+.welding-equipment-page .machine-thumbnail-small {
     width: 44px !important;
     height: 44px !important;
     object-fit: contain !important;
@@ -450,7 +460,7 @@
     flex-shrink: 0 !important;
 }
 
-.equipment-table tbody tr.table-row-compact td span {
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td span {
     line-height: 28px !important;
     margin: 0 !important;
     padding: 0 !important;
