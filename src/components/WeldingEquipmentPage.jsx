@@ -956,7 +956,7 @@ function WeldingEquipmentPage() {
                                     return (
                                         <tr 
                                             key={item.id} 
-                                            className="table-row"
+                                            className="table-row table-row-compact"
                                             onClick={() => handleControl(item)}
                                         >
                                             <td>
