@@ -702,6 +702,18 @@ function WeldingEquipmentPage() {
         }
     };
 
+    // Разделяем модель на "CORE" и остальную часть для цветового оформления
+    const formatModel = (modelName) => {
+        if (modelName && modelName.startsWith('CORE ')) {
+            const parts = modelName.split(' ', 2);
+            return {
+                first: parts[0], // "CORE"
+                second: parts[1] ? parts.slice(1).join(' ') : '' // "PRO 500", "Synergy 500", etc.
+            };
+        }
+        return { first: modelName || '', second: '' };
+    };
+
     // Подготовка данных для фильтров
     const buildDepartmentTree = () => {
         const tree = [];
@@ -954,6 +966,8 @@ function WeldingEquipmentPage() {
                             <tbody>
                                 {getFilteredEquipment().map((item) => {
                                     const status = deviceStatusesByMac[item.mac] || 'off';
+                                    const modelDisplay = getModelDisplay(item);
+                                    const modelParts = formatModel(modelDisplay);
                                     return (
                                         <tr 
                                             key={item.id} 
@@ -966,7 +980,17 @@ function WeldingEquipmentPage() {
                                                         className="status-indicator" 
                                                         style={{ backgroundColor: getStatusIndicatorColor(status) }}
                                                     />
-                                                    <span>{getModelDisplay(item)}</span>
+                                                    <img
+                                                        src={machineImage}
+                                                        alt={modelDisplay}
+                                                        className="machine-thumbnail-small"
+                                                    />
+                                                    <span className="model-text">
+                                                        <span className="model-part-first">{modelParts.first}</span>
+                                                        {modelParts.second && (
+                                                            <span className="model-part-second"> {modelParts.second}</span>
+                                                        )}
+                                                    </span>
                                                 </div>
                                             </td>
                                             <td>{item.name}</td>
