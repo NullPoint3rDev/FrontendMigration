@@ -72,7 +72,9 @@
   color: var(--text-secondary);
 }
 
-/* Table Styles */
+/* Table Styles - DEPRECATED: Use weldingEquipmentPageNew.css for WeldingEquipmentPage */
+/* These styles are kept for backward compatibility with other pages that use equipmentPage.css */
+/* Note: These styles will NOT apply to .welding-equipment-page due to higher specificity in weldingEquipmentPageNew.css */
 .equipment-table {
   width: 100%;
   border-collapse: collapse;

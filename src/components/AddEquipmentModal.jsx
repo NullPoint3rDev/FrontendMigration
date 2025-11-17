@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import '../styles/AddEquipmentModal.css'
+import '../styles/addEquipmentModal.css'
 import machineImage from '../images/2 копия.png'
 
 const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organizationUnits = [] }) => {
