@@ -819,6 +819,49 @@ const DeviceMonitorPage = () => {
         return params;
     };
 
+    // Функции для получения значений flag numeric
+    const getMemoryCellNumber = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return '—';
+        const data = deviceData[machineMac];
+        if (!data) return '—';
+        return data['Номер ячейки памяти'] || data.memoryCellNumber || '—';
+    };
+
+    const getWeldingMaterial = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return '—';
+        const data = deviceData[machineMac];
+        if (!data) return '—';
+        return data['Материал проволоки'] || data.weldingMaterial || '—';
+    };
+
+    const getWeldingMode = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return '—';
+        const data = deviceData[machineMac];
+        if (!data) return '—';
+        return data['Метод сварки'] || data.weldingMode || '—';
+    };
+
+    const getBurnerMode = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return '—';
+        const data = deviceData[machineMac];
+        if (!data) return '—';
+        return data['Режим горелки'] || data.burnerMode || '—';
+    };
+
+    const getWeldingGas = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return '—';
+        const data = deviceData[machineMac];
+        if (!data) return '—';
+        return data['Газ'] || data.weldingGas || '—';
+    };
+
+    const getWeldingWireDiameter = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return '—';
+        const data = deviceData[machineMac];
+        if (!data) return '—';
+        return data['Диаметр проволоки'] || data.weldingWireDiameter || '—';
+    };
+
     const getErrors = () => {
         if (Object.keys(deviceData).length === 0 || !hasData) return [];
         const data = deviceData[machineMac];
@@ -971,12 +1014,12 @@ const DeviceMonitorPage = () => {
                             </div>
 
                             <div className="control-flags">
-                                <span className="flag numeric">005</span>
-                                <span className="flag numeric">78</span>
-                                <span className="flag accent numeric">PULSE</span>
-                                <span className="flag negative numeric">ER304</span>
-                                <span className="flag numeric">Ar92</span>
-                                <span className="flag numeric">1.4</span>
+                                <span className="flag numeric">{getMemoryCellNumber()}</span>
+                                <span className="flag numeric">{getWeldingMaterial()}</span>
+                                <span className="flag accent numeric">{getWeldingMode()}</span>
+                                <span className="flag negative numeric">{getBurnerMode()}</span>
+                                <span className="flag numeric">{getWeldingGas()}</span>
+                                <span className="flag numeric">{getWeldingWireDiameter()}</span>
                             </div>
                         </div>
                     </section>
