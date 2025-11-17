@@ -1,3 +1,13 @@
+/* Стили для App - как в MaximDesignWT2 */
+.app {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    background: #0b0d1d;
+    overflow: hidden;
+}
+
+/* Для других страниц, которые не используют .app */
 .App {
   min-height: 100vh;
   background: radial-gradient(circle at top right, #1A1A2E, #16213E);
@@ -18,23 +28,8 @@
   font-size: 1.75rem;
 }
 
-/* Global styles */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
 :root {
   --primary: #6C63FF;
   --secondary: #FF6584;
   --gradient: linear-gradient(135deg, var(--primary), var(--secondary));
-}
-
-body {
-  font-family: 'Poppins', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
-  margin: 0;
 } 
