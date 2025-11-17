@@ -456,6 +456,11 @@ const DeviceMonitorPage = () => {
                 const mac = data.mac || machineMac; // берём из payload, fallback на выбранный MAC
                 const params = {};
 
+                // Сохраняем errorCode из корня state, если он есть
+                if (data.state.errorCode !== undefined && data.state.errorCode !== null) {
+                    params.errorCode = data.state.errorCode;
+                }
+
                 // Извлекаем ВСЕ параметры из структурированных данных
                 Object.entries(data.state.properties).forEach(([key, prop]) => {
                     if (prop && prop.value) {
@@ -942,9 +947,53 @@ const DeviceMonitorPage = () => {
         if (!data) return [];
 
         const errors = [];
-        if (data.Errors1) errors.push({ code: 'E01', time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), date: new Date().toLocaleDateString('ru-RU'), severity: 'error', message: data.Errors1 });
-        if (data.Errors2) errors.push({ code: 'E02', time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), date: new Date().toLocaleDateString('ru-RU'), severity: 'warning', message: data.Errors2 });
-        if (data.Errors3) errors.push({ code: 'E03', time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), date: new Date().toLocaleDateString('ru-RU'), severity: 'error', message: data.Errors3 });
+        
+        // Получаем timestamp из данных
+        const getTimestamp = () => {
+            if (data.lastDatetimeUpdate) {
+                return new Date(data.lastDatetimeUpdate);
+            }
+            if (data.timestamp) {
+                return new Date(data.timestamp);
+            }
+            if (data.dateCreated) {
+                return new Date(data.dateCreated);
+            }
+            return new Date();
+        };
+        
+        const errorDate = getTimestamp();
+        const timeStr = errorDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = errorDate.toLocaleDateString('ru-RU');
+        
+        // Получаем ошибки из разных возможных источников
+        // 1. errorCode из корня объекта
+        const errorCode = data['errorCode'] || data.errorCode;
+        if (errorCode !== undefined && errorCode !== null && errorCode !== 'null' && String(errorCode) !== '0' && String(errorCode).trim() !== '') {
+            errors.push({
+                code: `E${String(errorCode).padStart(2, '0')}`,
+                time: timeStr,
+                date: dateStr,
+                severity: 'error',
+                message: `Ошибка ${errorCode}`
+            });
+        }
+        
+        // 2. Свойство "Ошибки" из properties
+        const errorsProperty = data['Ошибки'] || data['Errors'] || data.errors;
+        if (errorsProperty && 
+            errorsProperty !== 'Нет ошибок' && 
+            errorsProperty !== 'No errors' && 
+            String(errorsProperty).trim() !== '' &&
+            String(errorsProperty).toLowerCase() !== 'null') {
+            errors.push({
+                code: 'ERR',
+                time: timeStr,
+                date: dateStr,
+                severity: 'error',
+                message: String(errorsProperty)
+            });
+        }
         return errors;
     };
 
