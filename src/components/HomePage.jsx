@@ -1,5 +1,6 @@
 import React from 'react';
 import '../styles/main_page.css';
+import wtImage from '../assets/images/wt.webp';
 
 const HomePage = () => {
     return (
@@ -8,7 +9,7 @@ const HomePage = () => {
                 Добро пожаловать в систему управления сварочным процессом WELDTelecom
             </h2>
             <img
-                src={require('../assets/images/wt.webp')}
+                src={wtImage}
                 alt="Интерфейс WELDTelecom"
                 style={{
                     maxWidth: '1800px',
