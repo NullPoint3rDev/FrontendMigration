@@ -525,7 +525,10 @@ const DeviceMonitorPage = () => {
                 updateDeviceData({
                     [mac]: {
                         ...params,
-                        timestamp: data.timestamp || new Date().toLocaleTimeString()
+                        timestamp: data.timestamp || new Date().toLocaleTimeString(),
+                        lastDatetimeUpdate: data.state.lastDatetimeUpdate || data.state.dateCreated || null,
+                        localServerPacketDatetime: data.state.localServerPacketDatetime || null,
+                        dateCreated: data.state.dateCreated || null
                     }
                 });
 
@@ -948,17 +951,37 @@ const DeviceMonitorPage = () => {
 
         const errors = [];
         
-        // Получаем timestamp из данных
+        // Получаем timestamp из данных с правильной обработкой
         const getTimestamp = () => {
+            // Пробуем разные источники timestamp
+            let timestamp = null;
+            
             if (data.lastDatetimeUpdate) {
-                return new Date(data.lastDatetimeUpdate);
+                timestamp = data.lastDatetimeUpdate;
+            } else if (data.localServerPacketDatetime) {
+                timestamp = data.localServerPacketDatetime;
+            } else if (data.dateCreated) {
+                timestamp = data.dateCreated;
+            } else if (data.timestamp) {
+                timestamp = data.timestamp;
             }
-            if (data.timestamp) {
-                return new Date(data.timestamp);
+            
+            if (timestamp) {
+                // Если это строка в формате ISO, парсим её
+                if (typeof timestamp === 'string') {
+                    const parsed = new Date(timestamp);
+                    // Проверяем, что дата валидна
+                    if (!isNaN(parsed.getTime())) {
+                        return parsed;
+                    }
+                }
+                // Если это уже Date объект
+                if (timestamp instanceof Date && !isNaN(timestamp.getTime())) {
+                    return timestamp;
+                }
             }
-            if (data.dateCreated) {
-                return new Date(data.dateCreated);
-            }
+            
+            // Fallback на текущую дату
             return new Date();
         };
         
