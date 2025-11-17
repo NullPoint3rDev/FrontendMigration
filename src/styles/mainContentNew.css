@@ -288,12 +288,39 @@
     color: #FCAC3D;
 }
 
+/* Цвета в зависимости от состояния сварки */
+.metric-value.welding-active.primary,
+.metric-value.welding-active.secondary {
+    color: #FCAC3D !important; /* Желтый цвет при сварке */
+}
+
+.metric-value.welding-inactive.primary,
+.metric-value.welding-inactive.secondary {
+    color: #FFFFFF !important; /* Белый цвет когда сварки нет */
+}
+
+.metric-value.welding-inactive.primary .value,
+.metric-value.welding-inactive.secondary .value {
+    color: #FFFFFF !important; /* Белый цвет для значения когда сварки нет */
+}
+
 .metric-system.primary {
     color: #FCAC3D;
 }
 
 .metric-system.secondary {
     color: #FCAC3D;
+}
+
+/* Цвета для metric-system в зависимости от состояния сварки */
+.metric-value.welding-active .metric-system.primary,
+.metric-value.welding-active .metric-system.secondary {
+    color: #FCAC3D !important; /* Желтый цвет при сварке */
+}
+
+.metric-value.welding-inactive .metric-system.primary,
+.metric-value.welding-inactive .metric-system.secondary {
+    color: #FFFFFF !important; /* Белый цвет когда сварки нет */
 }
 
 .metric-scale {

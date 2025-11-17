@@ -528,7 +528,8 @@ const DeviceMonitorPage = () => {
                         timestamp: data.timestamp || new Date().toLocaleTimeString(),
                         lastDatetimeUpdate: data.state.lastDatetimeUpdate || data.state.dateCreated || null,
                         localServerPacketDatetime: data.state.localServerPacketDatetime || null,
-                        dateCreated: data.state.dateCreated || null
+                        dateCreated: data.state.dateCreated || null,
+                        status: data.state.status || null // Сохраняем status для определения состояния сварки
                     }
                 });
 
@@ -1045,6 +1046,50 @@ const DeviceMonitorPage = () => {
         return Math.min((voltage / 50) * 100, 100);
     };
 
+    // Функция для определения, идет ли сварка
+    const isWelding = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return false;
+        const data = deviceData[machineMac];
+        if (!data) return false;
+        
+        // 1. Проверяем status из корня объекта (приоритет)
+        const status = data.status || data.Status;
+        if (status) {
+            const statusLower = String(status).toLowerCase();
+            if (statusLower === 'welding' || statusLower === 'сварка') {
+                return true;
+            }
+            // Если статус явно не "сварка", возвращаем false
+            if (statusLower === 'offline' || statusLower === 'off' || statusLower === 'выключен') {
+                return false;
+            }
+        }
+        
+        // 2. Проверяем состояние аппарата из properties
+        const weldingMachineState = data['Состояние аппарата'] || data['WeldingMachineState'] || data.weldingMachineState;
+        if (weldingMachineState) {
+            const stateLower = String(weldingMachineState).toLowerCase();
+            // Проверяем, содержит ли состояние информацию о сварке
+            if (stateLower.includes('сварка') || stateLower.includes('welding') || 
+                stateLower.includes('сварочн') || stateLower.includes('weld')) {
+                return true;
+            }
+            // Если явно указано, что сварки нет
+            if (stateLower.includes('ожидан') || stateLower.includes('waiting') || 
+                stateLower.includes('выключ') || stateLower.includes('off')) {
+                return false;
+            }
+        }
+        
+        // 3. Проверяем, есть ли ненулевой ток сварки (как дополнительный индикатор)
+        const current = parseFloat(data.Current || data['State.I'] || 0);
+        if (current > 1) { // Порог больше 1А для уверенности
+            return true;
+        }
+        
+        return false;
+    };
+
     // Телеметрия каналы
     const telemetryChannels = [
         { label: 'Сварочный ток', color: '#3ec7ff', active: true, tile1: true, tile2: false },
@@ -1067,6 +1112,7 @@ const DeviceMonitorPage = () => {
     const welderName = getWelderName();
     const currentProgress = getCurrentProgress();
     const voltageProgress = getVoltageProgress();
+    const isWeldingActive = isWelding();
 
     // Форматирование даты
     const formatDate = () => {
@@ -1119,7 +1165,7 @@ const DeviceMonitorPage = () => {
                                     <div className="metric-header">
                                         <span>Ток сварки</span>
                                     </div>
-                                    <div className="metric-value primary numeric">
+                                    <div className={`metric-value primary numeric ${isWeldingActive ? 'welding-active' : 'welding-inactive'}`}>
                                         <span className="value">{currentValue}</span>
                                         <span className="metric-system primary">A</span>
                                     </div>
@@ -1140,7 +1186,7 @@ const DeviceMonitorPage = () => {
                                     <div className="metric-header">
                                         <span>Напряжение сварки</span>
                                     </div>
-                                    <div className="metric-value secondary numeric">
+                                    <div className={`metric-value secondary numeric ${isWeldingActive ? 'welding-active' : 'welding-inactive'}`}>
                                         <span className="value">{voltageValue}</span>
                                         <span className="metric-system secondary">B</span>
                                     </div>
