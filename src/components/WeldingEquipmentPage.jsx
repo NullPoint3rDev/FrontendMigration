@@ -917,8 +917,8 @@ function WeldingEquipmentPage() {
                 </div>
 
                 {viewMode === 'table' && (
-                    <div className="equipment-table-container equipment-table-compact">
-                        <table className="equipment-table-compact-view">
+                    <div className="equipment-table-container">
+                        <table className="equipment-table">
                             <thead>
                                 <tr>
                                     <th onClick={() => toggleSort('model')}>
@@ -957,13 +957,13 @@ function WeldingEquipmentPage() {
                                     return (
                                         <tr 
                                             key={item.id} 
-                                            className="compact-table-row"
+                                            className="table-row table-row-compact"
                                             onClick={() => handleControl(item)}
                                         >
                                             <td>
-                                                <div className="compact-model-cell">
+                                                <div className="model-cell-table">
                                                     <span 
-                                                        className="compact-status-indicator" 
+                                                        className="status-indicator" 
                                                         style={{ backgroundColor: getStatusIndicatorColor(status) }}
                                                     />
                                                     <span>{getModelDisplay(item)}</span>
@@ -975,7 +975,7 @@ function WeldingEquipmentPage() {
                                             <td>{getWelderDisplay(item)}</td>
                                             <td>{getLastActivation(item) || 'Нет данных'}</td>
                                             <td>
-                                                <span className={`compact-status-badge ${status}`}>
+                                                <span className={`status-badge ${status}`}>
                                                     {status === 'welding' ? 'Сварка' : 
                                                      status === 'on' ? 'Включен' : 
                                                      status === 'error' ? 'Ошибка' : 

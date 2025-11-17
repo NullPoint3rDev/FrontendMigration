@@ -71,15 +71,34 @@
 
 /* Status badge */
 .welding-equipment-page .equipment-table tbody tr.table-row-compact td .status-badge {
-    line-height: 1.0 !important;
+    line-height: 28px !important;
     padding: 0 !important;
     margin: 0 !important;
-    height: auto !important;
+    height: 28px !important;
     min-height: 0 !important;
-    max-height: 20px !important;
+    max-height: 28px !important;
     display: inline-flex !important;
     align-items: center !important;
     overflow: hidden !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    white-space: nowrap !important;
+}
+
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td .status-badge.welding {
+    color: #FEB63E !important;
+}
+
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td .status-badge.on {
+    color: #39956C !important;
+}
+
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td .status-badge.error {
+    color: #EC2B3C !important;
+}
+
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td .status-badge.off {
+    color: rgba(188, 183, 197, 0.5) !important;
 }
 
 /* Альтернативный селектор через :has() для совместимости */
@@ -124,7 +143,7 @@
 
 /* АГРЕССИВНЫЕ СТИЛИ: Убираем все возможные отступы и высоты */
 .welding-equipment-page .equipment-table tbody tr.table-row-compact td * {
-    line-height: 1.0 !important;
+    line-height: 28px !important;
     margin: 0 !important;
     box-sizing: border-box !important;
     max-height: 28px !important;
