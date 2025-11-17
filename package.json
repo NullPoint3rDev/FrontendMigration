@@ -25,7 +25,8 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "dev": "cross-env REACT_APP_API_URL=http://95.172.58.219:8084/api PORT=3001 react-scripts start",
-    "start-external": "cross-env REACT_APP_API_URL=http://95.172.58.219:8084/api HOST=0.0.0.0 PORT=3001 react-scripts start"
+    "start-external": "cross-env REACT_APP_API_URL=http://95.172.58.219:8084/api HOST=0.0.0.0 PORT=3001 react-scripts start",
+    "test-home": "cross-env HOST=0.0.0.0 PORT=5437 react-scripts start"
   },
   "eslintConfig": {
     "extends": [
