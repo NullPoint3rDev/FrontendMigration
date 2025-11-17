@@ -988,7 +988,6 @@ const DeviceMonitorPage = () => {
     ];
 
     const systemParameters = getSystemParameters();
-    const highlightParameter = { label: 'Входящая мощность', value: getInputPower() };
     const incidentLog = getErrors();
     const currentValue = getCurrentValue();
     const voltageValue = getVoltageValue();
@@ -1100,10 +1099,6 @@ const DeviceMonitorPage = () => {
                 </div>
 
                 <section className="card status-card" aria-label="Параметры системы">
-                    <div className="status-card__header">
-                        <span>{highlightParameter.label}</span>
-                        <span className="status-value highlight">{highlightParameter.value}</span>
-                    </div>
                     <div className="status-list">
                         {systemParameters.length > 0 ? (
                             systemParameters.map((row) => (
