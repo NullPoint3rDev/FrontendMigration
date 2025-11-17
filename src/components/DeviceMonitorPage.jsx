@@ -127,6 +127,12 @@ const DeviceMonitorPage = () => {
     const [voltageChartData, setVoltageChartData] = useState([]);
     const maxDataPoints = 100; // Максимальное количество точек на графике
 
+    // Состояние для таймера сварки
+    const [weldingStartTime, setWeldingStartTime] = useState(null); // Время начала сварки
+    const [weldingEndTime, setWeldingEndTime] = useState(null); // Время окончания сварки (для показа еще 2 секунды)
+    const [lastWeldingDuration, setLastWeldingDuration] = useState(0); // Последняя длительность сварки
+    const [currentTime, setCurrentTime] = useState(Date.now()); // Текущее время для обновления таймера
+
     // Оптимизированная функция для обновления данных с дебаунсингом
     const updateDeviceData = useCallback((newData) => {
         // Очищаем предыдущий таймаут
@@ -186,6 +192,14 @@ const DeviceMonitorPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [machineMac]);
 
+    // Обновление текущего времени каждую секунду для таймера
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentTime(Date.now());
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
     // Очистка таймаутов при размонтировании
     useEffect(() => {
         return () => {
@@ -205,6 +219,52 @@ const DeviceMonitorPage = () => {
     // Рефы для графиков
     const currentChartInstanceRef = useRef(null);
     const voltageChartInstanceRef = useRef(null);
+
+    // Отслеживание состояния сварки для таймера
+    useEffect(() => {
+        if (Object.keys(deviceData).length === 0 || !hasData) {
+            // Нет данных - обнуляем таймер
+            if (weldingStartTime) {
+                const duration = Date.now() - weldingStartTime;
+                setLastWeldingDuration(duration);
+                setWeldingEndTime(Date.now());
+                setWeldingStartTime(null);
+            }
+            return;
+        }
+        const data = deviceData[machineMac];
+        if (!data) return;
+
+        const isCurrentlyWelding = isWelding();
+
+        if (isCurrentlyWelding) {
+            // Сварка началась или продолжается
+            if (!weldingStartTime) {
+                // Сварка только началась
+                setWeldingStartTime(Date.now());
+                setWeldingEndTime(null);
+                setLastWeldingDuration(0);
+            }
+        } else {
+            // Сварка не идет
+            if (weldingStartTime) {
+                // Сварка только что закончилась
+                const duration = Date.now() - weldingStartTime;
+                setLastWeldingDuration(duration);
+                setWeldingEndTime(Date.now());
+                setWeldingStartTime(null);
+            } else if (weldingEndTime) {
+                // Проверяем, прошло ли 2 секунды после окончания сварки
+                const timeSinceEnd = Date.now() - weldingEndTime;
+                if (timeSinceEnd >= 2000) {
+                    // Прошло 2 секунды, обнуляем таймер
+                    setWeldingEndTime(null);
+                    setLastWeldingDuration(0);
+                }
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [deviceData, hasData, machineMac, currentTime]);
 
     // Обновление данных графиков при изменении deviceData
     useEffect(() => {
@@ -812,8 +872,32 @@ const DeviceMonitorPage = () => {
     };
 
     const getWeldingTimer = () => {
-        // Пока возвращаем статическое значение, можно добавить логику для расчета времени сварки
-        return '00:51:17';
+        const isCurrentlyWelding = isWelding();
+        
+        if (isCurrentlyWelding && weldingStartTime) {
+            // Сварка идет - показываем текущее время сварки
+            const duration = Date.now() - weldingStartTime;
+            return formatDuration(duration);
+        } else if (weldingEndTime && lastWeldingDuration > 0) {
+            // Сварка только что закончилась - показываем последнее время еще 2 секунды
+            const timeSinceEnd = Date.now() - weldingEndTime;
+            if (timeSinceEnd < 2000) {
+                return formatDuration(lastWeldingDuration);
+            }
+        }
+        
+        // Сварки нет - показываем нули
+        return '00:00:00';
+    };
+
+    // Функция для форматирования длительности в формат ЧЧ:ММ:СС
+    const formatDuration = (milliseconds) => {
+        const totalSeconds = Math.floor(milliseconds / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
 
     const getSystemParameters = () => {
@@ -1113,6 +1197,9 @@ const DeviceMonitorPage = () => {
     const currentProgress = getCurrentProgress();
     const voltageProgress = getVoltageProgress();
     const isWeldingActive = isWelding();
+    
+    // Определяем, нужно ли показывать таймер желтым (сварка идет или только что закончилась)
+    const isTimerActive = isWeldingActive || (weldingEndTime && (currentTime - weldingEndTime < 2000));
 
     // Форматирование даты
     const formatDate = () => {
@@ -1143,7 +1230,9 @@ const DeviceMonitorPage = () => {
                         <div className="welding-timer-label">Сварка</div>
                         <div className="welding-timer-display">
                             <span className="welding-timer-icon">⚡</span>
-                            <span className="welding-timer-time">{weldingTimer}</span>
+                            <span className={`welding-timer-time ${isTimerActive ? 'welding-active' : 'welding-inactive'}`}>
+                                {weldingTimer}
+                            </span>
                         </div>
                     </div>
                 </section>

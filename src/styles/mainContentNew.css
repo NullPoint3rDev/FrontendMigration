@@ -151,6 +151,14 @@
     line-height: 1;
 }
 
+.welding-timer-time.welding-active {
+    color: #fbb56b !important; /* Желтый цвет при сварке */
+}
+
+.welding-timer-time.welding-inactive {
+    color: #FFFFFF !important; /* Белый цвет когда сварки нет */
+}
+
 .control-card {
     display: flex;
     flex-direction: column;
