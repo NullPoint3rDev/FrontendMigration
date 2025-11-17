@@ -323,28 +323,29 @@
     border-bottom: none;
 }
 
-.status-badge {
+.welding-equipment-page .status-badge {
     display: inline-flex;
     align-items: center;
     font-size: 12px;
     font-weight: 500;
     white-space: nowrap;
+    color: rgba(188, 183, 197, 0.5) !important; /* базовый цвет по умолчанию */
 }
 
-.status-badge.welding {
-    color: #FEB63E;
+.welding-equipment-page .status-badge.welding {
+    color: #FEB63E !important;
 }
 
-.status-badge.on {
-    color: #39956C;
+.welding-equipment-page .status-badge.on {
+    color: #39956C !important;
 }
 
-.status-badge.error {
-    color: #EC2B3C;
+.welding-equipment-page .status-badge.error {
+    color: #EC2B3C !important;
 }
 
-.status-badge.off {
-    color: rgba(188, 183, 197, 0.5);
+.welding-equipment-page .status-badge.off {
+    color: rgba(188, 183, 197, 0.5) !important;
 }
 
 /* Scrollbar Styles */
