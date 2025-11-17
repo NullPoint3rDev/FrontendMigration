@@ -991,8 +991,8 @@ function WeldingEquipmentPage() {
                 )}
 
                 {viewMode === 'tiles' && (
-                    <div className="equipment-table-container equipment-table-tiles">
-                        <table className="equipment-table-tiles-view">
+                    <div className="equipment-table-container">
+                        <table className="equipment-table">
                             <thead>
                                 <tr>
                                     <th onClick={() => toggleSort('model')}>
@@ -1031,11 +1031,11 @@ function WeldingEquipmentPage() {
                                     return (
                                         <tr 
                                             key={item.id} 
-                                            className="tiles-table-row"
+                                            className="table-row"
                                             onClick={() => handleControl(item)}
                                         >
                                             <td>
-                                                <div className="tiles-model-cell">
+                                                <div className="model-cell">
                                                     <img 
                                                         src={machineImage} 
                                                         alt={getModelDisplay(item)}
@@ -1050,7 +1050,7 @@ function WeldingEquipmentPage() {
                                             <td>{getWelderDisplay(item)}</td>
                                             <td>{getLastActivation(item) || 'Нет данных'}</td>
                                             <td>
-                                                <span className={`tiles-status-badge ${status}`}>
+                                                <span className={`status-badge ${status}`}>
                                                     {status === 'welding' ? 'Сварка' : 
                                                      status === 'on' ? 'Включен' : 
                                                      status === 'error' ? 'Ошибка' : 
