@@ -813,9 +813,83 @@ const DeviceMonitorPage = () => {
         if (!data) return [];
 
         const params = [];
-        if (data['State.Ctrl']) params.push({ label: 'Управление', value: data['State.Ctrl'], muted: true });
-        if (data.WeldingVoltage) params.push({ label: 'Напряжение зав. кратера', value: `${data.WeldingVoltage} В` });
-        // Добавляем другие параметры по необходимости
+
+        // 1. Состояние аппарата
+        const weldingMachineState = data['Состояние аппарата'] || data['WeldingMachineState'] || data.weldingMachineState;
+        if (weldingMachineState) {
+            params.push({ label: 'Состояние аппарата', value: weldingMachineState });
+        }
+
+        // 2. Сварочное задание
+        const jobNumber = data['Номер сварочного задания'] || data['JobNumber'] || data.jobNumber;
+        if (jobNumber !== undefined && jobNumber !== null) {
+            params.push({ label: 'Сварочное задание', value: String(jobNumber) });
+        }
+
+        // 3. Индуктивность
+        const inductance = data['Inductance'] || data.inductance;
+        if (inductance !== undefined && inductance !== null) {
+            params.push({ label: 'Индуктивность', value: String(inductance) });
+        }
+
+        // 4. Напряжение фазы A
+        const voltagePhaseA = data['Напряжение фазы А'] || data['VoltagePhaseA'] || data.voltagePhaseA;
+        if (voltagePhaseA !== undefined && voltagePhaseA !== null) {
+            params.push({ label: 'Напряжение фазы А', value: `${voltagePhaseA} В` });
+        }
+
+        // 5. Напряжение фазы В
+        const voltagePhaseB = data['Напряжение фазы В'] || data['VoltagePhaseB'] || data.voltagePhaseB;
+        if (voltagePhaseB !== undefined && voltagePhaseB !== null) {
+            params.push({ label: 'Напряжение фазы В', value: `${voltagePhaseB} В` });
+        }
+
+        // 6. Напряжение фазы С
+        const voltagePhaseC = data['Напряжение фазы С'] || data['VoltagePhaseC'] || data.voltagePhaseC;
+        if (voltagePhaseC !== undefined && voltagePhaseC !== null) {
+            params.push({ label: 'Напряжение фазы С', value: `${voltagePhaseC} В` });
+        }
+
+        // 7. Температура охлаждающей жидкости на входе
+        const chillerTemperature1 = data['Температура охлаждающей жидкости на входе'] || 
+                                   data['ChillerTemperature1'] || 
+                                   data.chillerTemperature1;
+        if (chillerTemperature1 !== undefined && chillerTemperature1 !== null) {
+            params.push({ label: 'Входящая темп. охл. жидкости', value: `${chillerTemperature1} °C` });
+        }
+
+        // 8. Температура охлаждающей жидкости на выходе
+        const chillerTemperature2 = data['Температура охлаждающей жидкости на выходе'] || 
+                                   data['ChillerTemperature2'] || 
+                                   data.chillerTemperature2;
+        if (chillerTemperature2 !== undefined && chillerTemperature2 !== null) {
+            params.push({ label: 'Исходящая темп. охл. жидкости', value: `${chillerTemperature2} °C` });
+        }
+
+        // 9. Температура первичной обмотки
+        const primaryCoilTemperature = data['Температура первичной обмотки'] || 
+                                      data['PrimaryCoilTemperature'] || 
+                                      data.primaryCoilTemperature;
+        if (primaryCoilTemperature !== undefined && primaryCoilTemperature !== null) {
+            params.push({ label: 'Температура первичной обмотки', value: `${primaryCoilTemperature} °C` });
+        }
+
+        // 10. Температура вторичной обмотки
+        const secondaryCoilTemperature = data['Температура вторичной обмотки'] || 
+                                        data['SecondaryCoilTemperature'] || 
+                                        data.secondaryCoilTemperature;
+        if (secondaryCoilTemperature !== undefined && secondaryCoilTemperature !== null) {
+            params.push({ label: 'Температура вторичной обмотки', value: `${secondaryCoilTemperature} °C` });
+        }
+
+        // 11. Расход проволоки
+        const wireConsumption = data['Расход проволоки'] || 
+                               data['WireConsumption'] || 
+                               data.wireConsumption;
+        if (wireConsumption !== undefined && wireConsumption !== null) {
+            params.push({ label: 'Расход проволоки', value: `${wireConsumption} м/мин` });
+        }
+
         return params;
     };
 
