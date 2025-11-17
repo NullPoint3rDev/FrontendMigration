@@ -48,18 +48,30 @@ body {
 table {
     border-collapse: collapse !important;
     border-spacing: 0 !important;
+    width: 100% !important;
 }
 
 td, th {
-    padding: 0;
-    margin: 0;
-    border: none;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    vertical-align: middle !important;
 }
 
 /* Убираем дефолтные стили Material-UI для таблиц */
 .MuiCssBaseline-root table,
 .MuiCssBaseline-root td,
 .MuiCssBaseline-root th {
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Переопределяем Material-UI для всех таблиц в приложении */
+* table,
+* td,
+* th {
     border-collapse: collapse !important;
     border-spacing: 0 !important;
 }

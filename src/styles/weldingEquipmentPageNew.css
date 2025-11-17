@@ -245,11 +245,22 @@
 }
 
 .welding-equipment-page .equipment-table {
-    width: 100%;
+    width: 100% !important;
     border-collapse: collapse !important;
     border-spacing: 0 !important;
-    flex: 1;
-    min-height: 0;
+    flex: 1 !important;
+    min-height: 0 !important;
+    /* Переопределяем Material-UI */
+    border: none !important;
+}
+
+/* Агрессивное переопределение Material-UI для таблиц */
+.welding-equipment-page .equipment-table,
+.welding-equipment-page .equipment-table *,
+.MuiCssBaseline-root .welding-equipment-page .equipment-table,
+.MuiCssBaseline-root .welding-equipment-page .equipment-table * {
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
 }
 
 .welding-equipment-page .equipment-table thead {
@@ -406,6 +417,18 @@
     vertical-align: middle !important;
     white-space: nowrap !important;
     display: table-cell !important;
+    /* Переопределяем Material-UI */
+    border: none !important;
+    margin: 0 !important;
+}
+
+/* Агрессивное переопределение Material-UI для ячеек */
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td,
+.MuiCssBaseline-root .welding-equipment-page .equipment-table tbody tr.table-row-compact td {
+    padding: 2px 10px !important;
+    height: 28px !important;
+    border: none !important;
+    margin: 0 !important;
 }
 
 .welding-equipment-page .equipment-table tbody tr.table-row-compact td:first-child {
@@ -464,4 +487,49 @@
 
 .welding-equipment-page .status-badge.off {
     color: rgba(188, 183, 197, 0.5) !important;
+}
+
+/* КРИТИЧЕСКИ ВАЖНО: Эти стили должны быть в конце файла для максимальной специфичности */
+/* Переопределяем Material-UI CssBaseline с максимальной специфичностью */
+body .welding-equipment-page .equipment-table,
+body .welding-equipment-page .equipment-table tbody,
+body .welding-equipment-page .equipment-table tbody tr,
+body .welding-equipment-page .equipment-table tbody tr td,
+body .welding-equipment-page .equipment-table tbody tr th {
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+}
+
+body .welding-equipment-page .equipment-table tbody tr.table-row-compact {
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    line-height: 1.0 !important;
+    display: table-row !important;
+}
+
+body .welding-equipment-page .equipment-table tbody tr.table-row-compact:nth-child(odd) {
+    background-color: #122536 !important;
+}
+
+body .welding-equipment-page .equipment-table tbody tr.table-row-compact:nth-child(even) {
+    background-color: #1A1420 !important;
+}
+
+body .welding-equipment-page .equipment-table tbody tr.table-row-compact td {
+    padding: 2px 10px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    line-height: 28px !important;
+    font-size: 12px !important;
+    vertical-align: middle !important;
+    white-space: nowrap !important;
+    display: table-cell !important;
+    border: none !important;
+    margin: 0 !important;
+}
+
+body .welding-equipment-page .equipment-table tbody tr.table-row-compact td:first-child {
+    padding: 0 10px !important;
 }
