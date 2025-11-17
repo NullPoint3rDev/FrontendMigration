@@ -12,8 +12,9 @@ import {
     Legend,
     Filler
 } from 'chart.js';
-import '../styles/deviceMonitor.css';
+import '../styles/mainContentNew.css';
 import * as archiveDeviceApi from '../api/archiveDeviceApi';
+import machineImage from '../images/Untitled 3 копия.png';
 
 // Кастомный плагин для градиентов и пороговых линий
 const gradientPlugin = {
@@ -753,13 +754,13 @@ const DeviceMonitorPage = () => {
         datasets: [{
             label: 'Ток (А)',
             data: currentChartData.map(d => d.y),
-            borderColor: '#64C8FF',
-            backgroundColor: 'rgba(100, 200, 255, 0.05)', // Минимальная заливка для осциллограммы
+            borderColor: '#3ec7ff',
+            backgroundColor: 'rgba(62, 199, 255, 0.05)', // Минимальная заливка для осциллограммы
             fill: false, // Без заливки для осциллограммы
-            borderWidth: 1.5, // Тонкая линия
+            borderWidth: 3, // Толщина линии как в дизайне
             pointRadius: 0,
             pointHoverRadius: 4,
-            pointHoverBackgroundColor: '#64C8FF',
+            pointHoverBackgroundColor: '#3ec7ff',
             pointHoverBorderColor: '#FFFFFF',
             pointHoverBorderWidth: 2,
             tension: 0, // Резкие углы, без сглаживания (как осциллограмма)
@@ -772,13 +773,13 @@ const DeviceMonitorPage = () => {
         datasets: [{
             label: 'Напряжение (В)',
             data: voltageChartData.map(d => d.y),
-            borderColor: '#FF65B4',
-            backgroundColor: 'rgba(255, 101, 180, 0.05)', // Минимальная заливка для осциллограммы
+            borderColor: '#ff61c8',
+            backgroundColor: 'rgba(255, 97, 200, 0.05)', // Минимальная заливка для осциллограммы
             fill: false, // Без заливки для осциллограммы
-            borderWidth: 1.5, // Тонкая линия
+            borderWidth: 3, // Толщина линии как в дизайне
             pointRadius: 0,
             pointHoverRadius: 4,
-            pointHoverBackgroundColor: '#FF65B4',
+            pointHoverBackgroundColor: '#ff61c8',
             pointHoverBorderColor: '#FFFFFF',
             pointHoverBorderWidth: 2,
             tension: 0, // Резкие углы, без сглаживания (как осциллограмма)
@@ -786,183 +787,448 @@ const DeviceMonitorPage = () => {
         }]
     });
 
-    // Archive-style функции управления
+    // Функции для форматирования данных
+    const getCurrentValue = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return '0';
+        const data = deviceData[machineMac];
+        if (!data) return '0';
+        return data.Current || data['State.I'] || '0';
+    };
+
+    const getVoltageValue = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return '0';
+        const data = deviceData[machineMac];
+        if (!data) return '0';
+        return data.Voltage || data['State.U'] || '0';
+    };
+
+    const getWeldingTimer = () => {
+        // Пока возвращаем статическое значение, можно добавить логику для расчета времени сварки
+        return '00:51:17';
+    };
+
+    const getSystemParameters = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return [];
+        const data = deviceData[machineMac];
+        if (!data) return [];
+
+        const params = [];
+        if (data['State.Ctrl']) params.push({ label: 'Управление', value: data['State.Ctrl'], muted: true });
+        if (data.WeldingVoltage) params.push({ label: 'Напряжение зав. кратера', value: `${data.WeldingVoltage} В` });
+        // Добавляем другие параметры по необходимости
+        return params;
+    };
+
+    const getErrors = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return [];
+        const data = deviceData[machineMac];
+        if (!data) return [];
+
+        const errors = [];
+        if (data.Errors1) errors.push({ code: 'E01', time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), date: new Date().toLocaleDateString('ru-RU'), severity: 'error', message: data.Errors1 });
+        if (data.Errors2) errors.push({ code: 'E02', time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), date: new Date().toLocaleDateString('ru-RU'), severity: 'warning', message: data.Errors2 });
+        if (data.Errors3) errors.push({ code: 'E03', time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }), date: new Date().toLocaleDateString('ru-RU'), severity: 'error', message: data.Errors3 });
+        return errors;
+    };
+
+    const getWelderName = () => {
+        // Можно получить из данных или оставить статическим
+        return 'Ильенко С.Е.';
+    };
+
+    const getInputPower = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return '0 кВт';
+        const data = deviceData[machineMac];
+        if (!data) return '0 кВт';
+        // Можно рассчитать из напряжения и тока или взять из данных
+        return '5,6 кВт';
+    };
+
+    const getCurrentProgress = () => {
+        const current = parseFloat(getCurrentValue());
+        if (isNaN(current)) return 0;
+        return Math.min((current / 500) * 100, 100);
+    };
+
+    const getVoltageProgress = () => {
+        const voltage = parseFloat(getVoltageValue());
+        if (isNaN(voltage)) return 0;
+        return Math.min((voltage / 50) * 100, 100);
+    };
+
+    // Телеметрия каналы
+    const telemetryChannels = [
+        { label: 'Сварочный ток', color: '#3ec7ff', active: true, tile1: true, tile2: false },
+        { label: 'Сварочное напряжение', color: '#ff61c8', active: true, tile1: false, tile2: true },
+        { label: 'Расход газа', color: '#2fe4a8', active: false, tile1: false, tile2: false },
+        { label: 'Расход проволоки', color: '#ffae64', active: false, tile1: false, tile2: false },
+        { label: 'Напряжение сети', color: '#a07dff', active: false, tile1: false, tile2: false },
+        { label: 'Темп. радиатора', color: '#66d1ff', active: false, tile1: false, tile2: false },
+        { label: 'Темп. инвертора', color: '#7cffb2', active: false, tile1: false, tile2: false },
+        { label: 'Темп. выпрямителя', color: '#ffc96a', active: false, tile1: false, tile2: false },
+        { label: 'Темп. БВО', color: '#f1ca06', active: true, tile1: true, tile2: true },
+        { label: 'Потр. мощность', color: '#6d8bff', active: false, tile1: false, tile2: false }
+    ];
+
+    const systemParameters = getSystemParameters();
+    const highlightParameter = { label: 'Входящая мощность', value: getInputPower() };
+    const incidentLog = getErrors();
+    const currentValue = getCurrentValue();
+    const voltageValue = getVoltageValue();
+    const weldingTimer = getWeldingTimer();
+    const welderName = getWelderName();
+    const currentProgress = getCurrentProgress();
+    const voltageProgress = getVoltageProgress();
+
+    // Форматирование даты
+    const formatDate = () => {
+        if (lastUpdate) {
+            return lastUpdate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+        return new Date().toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
 
     return (
-        <div className="device-monitor-page">
-            <div className="device-monitor-header">
-                <h1 className="device-monitor-title">📊 Мониторинг сварочного аппарата</h1>
-                <button className="back-btn" onClick={handleBackToEquipment}>
-                    ← Назад к оборудованию
-                </button>
-            </div>
-
-            {/* Информация о выбранном аппарате */}
-            <div className="device-info-card">
-                <h2 className="device-name">{machineName}</h2>
-                <div className="device-mac">MAC: {machineMac}</div>
-            </div>
-
-            {/* Статус подключения */}
-            <div className="status-card">
-                <div className="status-info">
-                    <div className="status-indicator">
-                        <span className="status-icon">{getStatusIcon(isConnected ? 'connected' : 'disconnected')}</span>
-                        <span className="status-text">
-                            {isConnected ? 'Подключен' : 'Отключен'}
-                        </span>
+        <main className="main-panel">
+            <div className="top-grid">
+                <section className="machine-section" aria-label="Сварочный аппарат">
+                    <div className="machine-title">
+                        <span className="machine-title-main">CORE</span>
+                        <span className="machine-title-accent">PRO 500</span>
                     </div>
-                    <button
-                        className="reconnect-btn"
-                        onClick={handleReconnect}
-                        disabled={isConnecting}
-                    >
-                        {isConnecting ? '🔄' : '🔄'} Переподключиться
-                    </button>
-                </div>
-                {lastUpdate && (
-                    <div className="last-update">
-                        Последнее обновление: {lastUpdate.toLocaleTimeString()}
+                    <div className="machine-visual-container">
+                        <div className="machine-visual">
+                            <img 
+                                src={machineImage} 
+                                alt="CORE PRO 500 сварочный аппарат"
+                                className="machine-image"
+                            />
+                        </div>
                     </div>
-                )}
+                    <div className="welding-timer">
+                        <div className="welding-timer-label">Сварка</div>
+                        <div className="welding-timer-display">
+                            <span className="welding-timer-icon">⚡</span>
+                            <span className="welding-timer-time">{weldingTimer}</span>
+                        </div>
+                    </div>
+                </section>
 
-            </div>
+                <div className="control-section">
+                    <div className="card control-mode-tile">
+                        <span className="control-label">Режим работы</span>
+                        <span className="control-value">Без ограничений</span>
+                    </div>
 
-            {/* Ошибки */}
-            {error && !isConnected && (
-                <div className="error-message">
-                    {error}
-                </div>
-            )}
+                    <div className="card control-config-tile">
+                        <span className="config-label">Настройка ограничений</span>
+                    </div>
 
-            {/* Данные устройства */}
-            <div className="device-data-section">
-                <h3 className="section-title">⚡ Параметры сварочного аппарата</h3>
-
-                {Object.keys(deviceData).length > 0 && hasData ? (
-                    <div className="parameters-grid">
-                        {Object.entries(deviceData).map(([mac, data]) => (
-                            <div key={mac} className="device-parameters">
-                                {/* Основная секция с параметрами */}
-                                <div className="main-parameters-container">
-                                    {/* Левая колонка: Ток и Напряжение */}
-                                    <div className="left-parameters-column">
-                                        {/* Ток */}
-                                        {(data.Current || data['State.I']) && (
-                                            <div className="main-parameter-card small">
-                                                <div className="main-parameter-header">
-                                                    <span className="main-parameter-icon">⚡</span>
-                                                    <span className="main-parameter-name">Ток (А)</span>
-                                                </div>
-                                                <div className="main-parameter-value">{data.Current || data['State.I']}</div>
-                                            </div>
-                                        )}
-
-                                        {/* Напряжение */}
-                                        {(data.Voltage || data['State.U']) && (
-                                            <div className="main-parameter-card small">
-                                                <div className="main-parameter-header">
-                                                    <span className="main-parameter-icon">🔋</span>
-                                                    <span className="main-parameter-name">Напряжение (В)</span>
-                                                </div>
-                                                <div className="main-parameter-value">{data.Voltage || data['State.U']}</div>
-                                            </div>
-                                        )}
+                    <section className="card control-card" aria-label="Параметры сварки">
+                        <div className="control-metrics">
+                            <div className="metrics-content">
+                                <div className="metric-block">
+                                    <div className="metric-header">
+                                        <span>Ток сварки</span>
                                     </div>
-
-                                    {/* Правая колонка: Дополнительные параметры */}
-                                    <div className="right-parameters-column">
-                                        <div className="other-parameters-list">
-                                            <h4 className="other-parameters-title">Дополнительные параметры</h4>
-                                            {Object.entries(data).map(([key, value]) => {
-                                                if (key === 'timestamp' || key === 'Current' || key === 'Voltage' ||
-                                                    key === 'State.I' || key === 'State.U' ||
-                                                    key === 'State.Ctrl' || key === 'State.material' || key === 'State.GasFlow' ||
-                                                    key === 'State.Temperature' || key === 'Packet.Index' || key === 'Time.Hours' ||
-                                                    key === 'Time.Minutes' || key === 'Time.Seconds' || key === 'Date.Day' ||
-                                                    key === 'Date.Month' || key === 'Date.Year' ||
-                                                    key === 'Состояние аппарата') { // Исключаем русский ключ, оставляем WeldingMachineState
-                                                    return null;
-                                                }
-
-                                                return (
-                                                    <div key={key} className="other-parameter-item">
-                                                        <div className="other-parameter-info">
-                                                            <span className="other-parameter-icon">{getParameterIcon(key)}</span>
-                                                            <span className="other-parameter-name">{getParameterDisplayName(key)}</span>
-                                                        </div>
-                                                        <div className="other-parameter-value">{value}</div>
-                                                    </div>
-                                                );
-                                            })}
+                                    <div className="metric-value primary numeric">
+                                        <span className="value">{currentValue}</span>
+                                        <span className="metric-system primary">A</span>
+                                    </div>
+                                    <div className="metric-scale">
+                                        <span className="scale-range-min">5</span>
+                                        <div className="scale-bar">
+                                            <div className="scale-progress" style={{ width: `${currentProgress}%` }} />
                                         </div>
+                                        <span className="scale-range-max">500</span>
+                                    </div>
+                                    <div className="metric-limits">
+                                        <span className="limit-min">&lt; 300 &gt;</span>
+                                        <span className="limit-max">&lt; 450 &gt;</span>
                                     </div>
                                 </div>
 
-                                {/* Графики */}
-                                <div className="charts-container">
-                                    <div className="chart-wrapper chart-dark">
-                                        <div className="chart-title">График тока</div>
-                                        <div className="chart-box">
-                                            {currentChartData.length > 0 ? (
-                                                <Line
-                                                    data={getCurrentChartData()}
-                                                    options={getChartOptions(0, 500, 'Ток (А)', 350, '350A')}
-                                                    ref={(chart) => {
-                                                        if (chart && chart.canvas) {
-                                                            chart.canvas.id = 'current-chart';
-                                                            currentChartInstanceRef.current = chart;
-                                                        }
-                                                    }}
-                                                />
-                                            ) : (
-                                                <div className="chart-placeholder">Ожидание данных...</div>
-                                            )}
-                                        </div>
+                                <div className="metric-block">
+                                    <div className="metric-header">
+                                        <span>Напряжение сварки</span>
                                     </div>
-
-                                    <div className="chart-wrapper chart-dark">
-                                        <div className="chart-title">График напряжения</div>
-                                        <div className="chart-box">
-                                            {voltageChartData.length > 0 ? (
-                                                <Line
-                                                    data={getVoltageChartData()}
-                                                    options={getChartOptions(0, 50.0, 'Напряжение (В)', 35, '35В')}
-                                                    ref={(chart) => {
-                                                        if (chart && chart.canvas) {
-                                                            chart.canvas.id = 'voltage-chart';
-                                                            voltageChartInstanceRef.current = chart;
-                                                        }
-                                                    }}
-                                                />
-                                            ) : (
-                                                <div className="chart-placeholder">Ожидание данных...</div>
-                                            )}
+                                    <div className="metric-value secondary numeric">
+                                        <span className="value">{voltageValue}</span>
+                                        <span className="metric-system secondary">B</span>
+                                    </div>
+                                    <div className="metric-scale">
+                                        <span className="scale-range-min">5</span>
+                                        <div className="scale-bar">
+                                            <div className="scale-progress secondary" style={{ width: `${voltageProgress}%` }} />
                                         </div>
+                                        <span className="scale-range-max">50</span>
+                                    </div>
+                                    <div className="metric-limits">
+                                        <span className="limit-min">&lt; 10 &gt;</span>
+                                        <span className="limit-max">&lt; 35 &gt;</span>
                                     </div>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="no-data">
-                        <div className="no-data-icon">
-                            {!isConnected && '🔴'}
+
+                            <div className="control-flags">
+                                <span className="flag numeric">005</span>
+                                <span className="flag numeric">78</span>
+                                <span className="flag accent numeric">PULSE</span>
+                                <span className="flag negative numeric">ER304</span>
+                                <span className="flag numeric">Ar92</span>
+                                <span className="flag numeric">1.4</span>
+                            </div>
                         </div>
-                        <p className="no-data-text">
-                            {isConnected
-                                ? 'Ожидание данных от сварочного аппарата...'
-                                : 'Сварочный аппарат выключен'}
-                        </p>
-                        {!isConnected && (
-                            <p className="no-data-subtext">
-                                Данные не отображаются, так как аппарат не активен
-                            </p>
+                    </section>
+                </div>
+
+                <section className="card status-card" aria-label="Параметры системы">
+                    <div className="status-card__header">
+                        <span>{highlightParameter.label}</span>
+                        <span className="status-value highlight">{highlightParameter.value}</span>
+                    </div>
+                    <div className="status-list">
+                        {systemParameters.length > 0 ? (
+                            systemParameters.map((row) => (
+                                <div key={row.label} className="status-row">
+                                    <span className="status-label">{row.label}</span>
+                                    <span className={`status-value ${row.muted ? 'muted' : ''} numeric`}>
+                                        {row.value}
+                                    </span>
+                                </div>
+                            ))
+                        ) : (
+                            <>
+                                <div className="status-row">
+                                    <span className="status-label">Управление</span>
+                                    <span className="status-value muted numeric">Руч.</span>
+                                </div>
+                                <div className="status-row">
+                                    <span className="status-label">Напряжение зав. кратера</span>
+                                    <span className="status-value numeric">42 В</span>
+                                </div>
+                                <div className="status-row">
+                                    <span className="status-label">Входящая темп. охл. жидкости</span>
+                                    <span className="status-value numeric">40 °C</span>
+                                </div>
+                                <div className="status-row">
+                                    <span className="status-label">Исходящая темп. охл. жидкости</span>
+                                    <span className="status-value numeric">51 °C</span>
+                                </div>
+                                <div className="status-row">
+                                    <span className="status-label">Индуктивность</span>
+                                    <span className="status-value numeric">4</span>
+                                </div>
+                                <div className="status-row">
+                                    <span className="status-label">Напряжение фазы А</span>
+                                    <span className="status-value numeric">120 В</span>
+                                </div>
+                                <div className="status-row">
+                                    <span className="status-label">Напряжение фазы B</span>
+                                    <span className="status-value numeric">56 В</span>
+                                </div>
+                                <div className="status-row">
+                                    <span className="status-label">Напряжение фазы C</span>
+                                    <span className="status-value numeric">11 В</span>
+                                </div>
+                            </>
                         )}
                     </div>
-                )}
+                </section>
+
+                <div className="welder-section">
+                    <div className="card welder-header-tile">
+                        <span className="welder-label">Сварщик</span>
+                        <div className="welder-header-content">
+                            <span className="welder-name">{welderName}</span>
+                            <span className="welder-indicator">
+                                <span className="indicator-dot" />
+                                <span>Онлайн</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <section className="card welder-alerts-card" aria-label="Неисправности">
+                        <div className="welder-alerts">
+                            {incidentLog.length > 0 ? (
+                                incidentLog.map((item) => (
+                                    <div key={item.code} className={`alert-card ${item.severity}`}>
+                                        <div className="alert-code">
+                                            <span>{item.code}</span>
+                                            <div className="alert-timestamp">
+                                                <span>{item.time}</span>
+                                                <span>{item.date}</span>
+                                            </div>
+                                        </div>
+                                        <div className="alert-body">
+                                            <span className="alert-title">{item.message}</span>
+                                            {item.description && <p className="alert-description">{item.description}</p>}
+                                        </div>
+                                        <button type="button" className="alert-toggle" aria-label="Подробнее" />
+                                    </div>
+                                ))
+                            ) : (
+                                <div style={{ padding: '8px', color: 'rgba(188, 183, 197, 0.5)', fontSize: '11px' }}>
+                                    Нет ошибок
+                                </div>
+                            )}
+                        </div>
+                    </section>
+                </div>
             </div>
-        </div>
+
+            <section className="bottom-panel">
+                <div className="bottom-panel__body">
+                    <div className="telemetry-controls">
+                        <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
+                            <div className="tabs">
+                                <button className="tab active">Графики</button>
+                                <button className="tab">Информация</button>
+                            </div>
+                            <div className="telemetry-header">
+                                <button type="button" className="back-button" onClick={handleBackToEquipment}>
+                                    <span className="back-arrow">←</span>
+                                </button>
+                                <div className="date-box">
+                                    <span className="date-text">{formatDate()}</span>
+                                </div>
+                            </div>
+                            {telemetryChannels.map((channel) => (
+                                <div
+                                    key={channel.label}
+                                    className={`telemetry-item ${channel.active ? 'active' : ''}`}
+                                >
+                                    <span className="telemetry-label">{channel.label}</span>
+                                    <div className="telemetry-tiles">
+                                        <button
+                                            type="button"
+                                            className={`telemetry-tile ${channel.active && channel.tile1 ? 'active' : ''}`}
+                                            style={{ color: channel.active && channel.tile1 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                        >
+                                            <span className="wave-icon">~</span>
+                                            <span className="tile-number">1</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`telemetry-tile ${channel.active && channel.tile2 ? 'active' : ''}`}
+                                            style={{ color: channel.active && channel.tile2 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                        >
+                                            <span className="wave-icon">~</span>
+                                            <span className="tile-number">2</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="chart-stack">
+                        <div className="chart-card large">
+                            <div className="chart-card__header">
+                                <div>
+                                </div>
+                            </div>
+                            <div className="chart-wrapper">
+                                <div className="chart-canvas">
+                                    {currentChartData.length > 0 ? (
+                                        <Line
+                                            data={getCurrentChartData()}
+                                            options={getChartOptions(0, 500, 'Ток (А)', 350, '350A')}
+                                            ref={(chart) => {
+                                                if (chart && chart.canvas) {
+                                                    chart.canvas.id = 'current-chart';
+                                                    currentChartInstanceRef.current = chart;
+                                                }
+                                            }}
+                                        />
+                                    ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'rgba(188, 183, 197, 0.5)' }}>
+                                            Ожидание данных...
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="chart-axis">
+                                    <span>08:00</span>
+                                    <span>10:00</span>
+                                    <span>12:00</span>
+                                    <span>14:00</span>
+                                    <span>16:00</span>
+                                    <span>18:00</span>
+                                    <span>20:00</span>
+                                    <span>22:00</span>
+                                </div>
+                            </div>
+                            <div className="chart-controls">
+                                <button type="button" className="chart-control-btn" title="Увеличить">
+                                    <span>+</span>
+                                </button>
+                                <button type="button" className="chart-control-btn" title="Уменьшить">
+                                    <span>−</span>
+                                </button>
+                                <button type="button" className="chart-control-btn" title="Обновить">
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                        <path d="M7 1V3M7 11V13M1 7H3M11 7H13M2.343 2.343L3.757 3.757M10.243 10.243L11.657 11.657M2.343 11.657L3.757 10.243M10.243 3.757L11.657 2.343" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                        <circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="chart-card medium">
+                            <div className="chart-card__header">
+                                <div>
+                                </div>
+                                <div className="chart-legend">
+                                </div>
+                            </div>
+                            <div className="chart-wrapper">
+                                <div className="chart-canvas">
+                                    {voltageChartData.length > 0 ? (
+                                        <Line
+                                            data={getVoltageChartData()}
+                                            options={getChartOptions(0, 50.0, 'Напряжение (В)', 35, '35В')}
+                                            ref={(chart) => {
+                                                if (chart && chart.canvas) {
+                                                    chart.canvas.id = 'voltage-chart';
+                                                    voltageChartInstanceRef.current = chart;
+                                                }
+                                            }}
+                                        />
+                                    ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'rgba(188, 183, 197, 0.5)' }}>
+                                            Ожидание данных...
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="chart-axis">
+                                    <span>08:00</span>
+                                    <span>10:00</span>
+                                    <span>12:00</span>
+                                    <span>14:00</span>
+                                    <span>16:00</span>
+                                    <span>18:00</span>
+                                    <span>20:00</span>
+                                    <span>22:00</span>
+                                </div>
+                            </div>
+                            <div className="chart-controls">
+                                <button type="button" className="chart-control-btn" title="Увеличить">
+                                    <span>+</span>
+                                </button>
+                                <button type="button" className="chart-control-btn" title="Уменьшить">
+                                    <span>−</span>
+                                </button>
+                                <button type="button" className="chart-control-btn" title="Обновить">
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                        <path d="M7 1V3M7 11V13M1 7H3M11 7H13M2.343 2.343L3.757 3.757M10.243 10.243L11.657 11.657M2.343 11.657L3.757 10.243M10.243 3.757L11.657 2.343" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                        <circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
     );
 };
 

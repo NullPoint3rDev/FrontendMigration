@@ -1,8 +1,9 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
 import HomePage from './components/HomePage';
 import WeldingEquipmentPage from './components/WeldingEquipmentPage';
 import DepartmentsPage from './components/DepartmentsPage';
@@ -50,6 +51,18 @@ const PrivateRoute = ({ children }) => {
     return token ? children : <Navigate to="/login" />;
 };
 
+const Layout = ({ children }) => {
+    const location = useLocation();
+    const useSidebar = location.pathname === '/equipment' || location.pathname === '/device-monitor';
+    
+    return (
+        <>
+            {useSidebar ? <Sidebar /> : <Navbar />}
+            {children}
+        </>
+    );
+};
+
 function App() {
     return (
         <ThemeProvider theme={theme}>
@@ -59,8 +72,8 @@ function App() {
                     <Route path="/login" element={<AuthPage />} />
                     <Route path="/*" element={
                         <PrivateRoute>
-                            <Navbar />
-                            <Routes>
+                            <Layout>
+                                <Routes>
                                 <Route path="/" element={<HomePage />} />
                                 <Route path="/about" element={<AboutPage />} />
                                 
@@ -103,7 +116,8 @@ function App() {
                                 
                                 {/* Профиль пользователя */}
                                 <Route path="/profile" element={<UserProfilePage />} />
-                            </Routes>
+                                </Routes>
+                            </Layout>
                         </PrivateRoute>
                     } />
                 </Routes>

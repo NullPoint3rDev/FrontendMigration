@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import '../styles/equipmentPage.css';
+import '../styles/weldingEquipmentPageNew.css';
 import { useNavigate } from 'react-router-dom';
+import AddEquipmentModal from './AddEquipmentModal';
+import machineImage from '../images/Untitled 3 копия.png';
 // WebSocket отключен — используем только polling API
 import { 
     createWeldingMachine, 
@@ -83,6 +85,12 @@ function WeldingEquipmentPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortField, setSortField] = useState(null);
     const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
+    const [viewMode, setViewMode] = useState('table'); // 'tiles' or 'table'
+    const [expandedFilters, setExpandedFilters] = useState({
+        department: false,
+        status: false,
+        model: false
+    });
     const currentYear = new Date().getFullYear();
     const navigate = useNavigate();
     const [deviceStatusesByMac, setDeviceStatusesByMac] = useState({}); // { [mac]: 'off' | 'on' | 'welding' }
@@ -419,13 +427,16 @@ function WeldingEquipmentPage() {
                 switch (sortField) {
                     case 'name': return (item.name || '').toLowerCase();
                     case 'model': {
-                        const model = item.deviceModel === 'MONITORING_BLOCK' ? 'Блок мониторинга' :
-                                      item.deviceModel === 'CORE' ? 'Core' :
-                                      (item.model || '');
-                        return model.toLowerCase();
+                        return getModelDisplay(item).toLowerCase();
                     }
                     case 'mac': return (item.mac || '').toLowerCase();
                     case 'unit': return (item.organizationUnit?.name || '').toLowerCase();
+                    case 'inventory': return (item.inventoryNumber || '').toLowerCase();
+                    case 'welder': return getWelderDisplay(item).toLowerCase();
+                    case 'status': {
+                        const status = deviceStatusesByMac[item.mac] || 'off';
+                        return status;
+                    }
                     default: return '';
                 }
             };
@@ -619,6 +630,13 @@ function WeldingEquipmentPage() {
     // Функция для фильтрации оборудования
     const isCoreSelected = editData?.deviceModel === 'CORE';
 
+    const toggleFilter = (filterName) => {
+        setExpandedFilters(prev => ({
+            ...prev,
+            [filterName]: !prev[filterName]
+        }));
+    };
+
     const getFilteredEquipment = (applySort = true) => {
         let filtered = equipment;
 
@@ -646,589 +664,355 @@ function WeldingEquipmentPage() {
         return applySort ? getSorted(filtered) : filtered;
     };
 
-    return (
-        <div className="equipment-page">
-            <div className="equipment-header">
-                <h1 className="equipment-title">Сварочное оборудование</h1>
-                <button className="add-equipment-btn" onClick={openAddModal}>
-                    <i className="fas fa-plus"></i>
-                    Добавить оборудование
-                </button>
-            </div>
+    // Функция для получения модели аппарата для отображения
+    const getModelDisplay = (item) => {
+        if (item.deviceModel === 'MONITORING_BLOCK') return 'Блок Мониторинга';
+        if (item.deviceModel === 'CORE') return 'CORE PRO 500';
+        return item.model || item.deviceModel?.name || 'Не указана';
+    };
 
-            {/* Фильтры */}
-            <div className="equipment-filters">
-                <div className="filter-group">
-                    <label className="filter-label">Поиск:</label>
-                    <input
-                        type="text"
-                        className="filter-input"
-                        placeholder="Поиск по названию, MAC, серийному номеру..."
+    // Функция для получения сварщика
+    const getWelderDisplay = (item) => {
+        if (item.assignedWelders && Array.isArray(item.assignedWelders) && item.assignedWelders.length > 0) {
+            return item.assignedWelders[0];
+        }
+        return 'Не назначен';
+    };
+
+    // Функция для получения последнего включения
+    const getLastActivation = (item) => {
+        // Можно использовать данные из deviceStatusesByMac или другие поля
+        // Пока возвращаем пустую строку, если нет данных
+        return '';
+    };
+
+    // Подготовка данных для фильтров
+    const buildDepartmentTree = () => {
+        const tree = [];
+        const rootUnits = organizationUnits.filter(unit => !unit.parentId && !unit.parent_id);
+        
+        rootUnits.forEach(root => {
+            const children = organizationUnits.filter(unit => 
+                (unit.parentId === root.id || unit.parent_id === root.id)
+            );
+            if (children.length > 0) {
+                tree.push({
+                    id: root.id,
+                    label: root.name,
+                    children: children.map(child => ({
+                        id: child.id,
+                        label: child.name
+                    }))
+                });
+            } else {
+                tree.push({
+                    id: root.id,
+                    label: root.name
+                });
+            }
+        });
+        return tree;
+    };
+
+    const departments = buildDepartmentTree();
+
+    const statuses = [
+        { id: 'all', label: 'Все' },
+        { id: 'on', label: 'Включен' },
+        { id: 'welding', label: 'Сварка' },
+        { id: 'error', label: 'Ошибка' },
+        { id: 'off', label: 'Выключен' }
+    ];
+
+    const models = [
+        { id: 'all', label: 'Все' },
+        { id: 'CORE', label: 'CORE PRO 500' },
+        { id: 'MONITORING_BLOCK', label: 'Блок Мониторинга' }
+    ];
+
+    return (
+        <div className="welding-equipment-page">
+            <div className="filters-column">
+                <div className="filter-tile">
+                    <input 
+                        type="text" 
+                        className="search-input" 
+                        placeholder="Поиск..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <div className="filter-group">
-                    <label className="filter-label">Модель:</label>
-                    <select
-                        className="filter-select"
-                        value={modelFilter}
-                        onChange={(e) => setModelFilter(e.target.value)}
+
+                <div className="filter-tile">
+                    <button 
+                        className="filter-tile-header"
+                        onClick={() => toggleFilter('department')}
                     >
-                        <option value="">Все модели</option>
-                        <option value="MONITORING_BLOCK">Блок мониторинга</option>
-                        <option value="CORE">Core</option>
-                    </select>
+                        <span>Подразделение</span>
+                        <span className="filter-arrow">{expandedFilters.department ? '▾' : '▸'}</span>
+                    </button>
+                    {expandedFilters.department && (
+                        <div className="filter-tile-content">
+                            {departments.map(dept => (
+                                <div key={dept.id} className="filter-option">
+                                    {dept.children ? (
+                                        <>
+                                            <label className="filter-checkbox">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={organizationUnitFilter === dept.label}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setOrganizationUnitFilter(dept.label);
+                                                        } else {
+                                                            setOrganizationUnitFilter('');
+                                                        }
+                                                    }}
+                                                />
+                                                <span>{dept.label}</span>
+                                            </label>
+                                            <div className="filter-sub-options">
+                                                {dept.children.map(child => (
+                                                    <label key={child.id} className="filter-checkbox sub">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={organizationUnitFilter === child.label}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setOrganizationUnitFilter(child.label);
+                                                                } else {
+                                                                    setOrganizationUnitFilter('');
+                                                                }
+                                                            }}
+                                                        />
+                                                        <span>{child.label}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <label className="filter-checkbox">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={organizationUnitFilter === dept.label}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setOrganizationUnitFilter(dept.label);
+                                                    } else {
+                                                        setOrganizationUnitFilter('');
+                                                    }
+                                                }}
+                                            />
+                                            <span>{dept.label}</span>
+                                        </label>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
-                <div className="filter-group">
-                    <label className="filter-label">Подразделение:</label>
-                    <select
-                        className="filter-select"
-                        value={organizationUnitFilter}
-                        onChange={(e) => setOrganizationUnitFilter(e.target.value)}
+
+                <div className="filter-tile">
+                    <button 
+                        className="filter-tile-header"
+                        onClick={() => toggleFilter('status')}
                     >
-                        <option value="">Все подразделения</option>
-                        {organizationUnits.map(unit => (
-                            <option key={unit.id} value={unit.name}>
-                                {unit.name}
-                            </option>
-                        ))}
-                    </select>
+                        <span>Состояние</span>
+                        <span className="filter-arrow">{expandedFilters.status ? '▾' : '▸'}</span>
+                    </button>
+                    {expandedFilters.status && (
+                        <div className="filter-tile-content">
+                            {statuses.map(status => (
+                                <label key={status.id} className="filter-checkbox">
+                                    <input type="checkbox" />
+                                    <span>{status.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="filter-tile">
+                    <button 
+                        className="filter-tile-header"
+                        onClick={() => toggleFilter('model')}
+                    >
+                        <span>Модель аппарата</span>
+                        <span className="filter-arrow">{expandedFilters.model ? '▾' : '▸'}</span>
+                    </button>
+                    {expandedFilters.model && (
+                        <div className="filter-tile-content">
+                            {models.map(model => (
+                                <label key={model.id} className="filter-checkbox">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={modelFilter === model.id || (model.id === 'all' && !modelFilter)}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                if (model.id === 'all') {
+                                                    setModelFilter('');
+                                                } else {
+                                                    setModelFilter(model.id);
+                                                }
+                                            } else {
+                                                setModelFilter('');
+                                            }
+                                        }}
+                                    />
+                                    <span>{model.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {getFilteredEquipment().length > 0 ? (
-                <table className="equipment-table">
-                    <thead>
-                        <tr>
-                            <th onClick={() => toggleSort('name')} className="sortable">
-                                Название
-                                <span className={`sort-arrow ${sortField === 'name' ? sortDirection : ''}`}></span>
-                            </th>
-                            <th onClick={() => toggleSort('model')} className="sortable">
-                                Модель
-                                <span className={`sort-arrow ${sortField === 'model' ? sortDirection : ''}`}></span>
-                            </th>
-                            <th onClick={() => toggleSort('mac')} className="sortable">
-                                MAC
-                                <span className={`sort-arrow ${sortField === 'mac' ? sortDirection : ''}`}></span>
-                            </th>
-                            <th onClick={() => toggleSort('unit')} className="sortable">
-                                Подразделение
-                                <span className={`sort-arrow ${sortField === 'unit' ? sortDirection : ''}`}></span>
-                            </th>
-                            <th>Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {getFilteredEquipment().map((item) => (
-                            <tr key={item.id}>
-                                <td>{item.name}</td>
-                                <td>
-                                    {item.deviceModel === 'MONITORING_BLOCK' ? 'Блок мониторинга' : 
-                                     item.deviceModel === 'CORE' ? 'Core' : 
-                                     item.model || 'Не указана'}
-                                </td>
-                                <td>{item.mac}</td>
-                                <td>{item.organizationUnit?.name || 'Не указано'}</td>
-                                <td>
-                                    <div className="action-buttons">
-                                        <button
-                                            className="action-btn edit-btn"
-                                            onClick={() => openEditModal(item)}
-                                            title="Редактировать"
-                                        >
-                                            <i className="fas fa-edit"></i>
-                                        </button>
-                                        <button
-                                            className="action-btn control-btn"
-                                            onClick={() => handleControl(item)}
-                                            title="Управление"
-                                        >
-                                            <i className="fas fa-cog"></i>
-                                        </button>
-                                        <button
-                                            className="action-btn delete-btn"
-                                            onClick={() => handleDelete(item.id)}
-                                            title="Удалить"
-                                        >
-                                            <i className="fas fa-trash"></i>
-                                        </button>
-                                        {/* Единственная актуальная плашка статуса справа от корзины */}
-                                        {deviceStatusesByMac[item.mac] && (
-                                            <div className="status-badges">
-                                                <span className={`status-badge ${deviceStatusesByMac[item.mac]} visible`} />
-                                            </div>
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            ) : (
-                <div className="no-equipment">
-                    <div className="no-equipment-content">
-                        <i className="fas fa-tools" style={{ fontSize: '3rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}></i>
-                        <h3>Нет оборудования</h3>
-                        <p>Добавьте первое устройство, нажав кнопку "Добавить оборудование"</p>
+            <div className="equipment-content-column">
+                <div className="content-header">
+                    <div className="add-device-tile">
+                        <button className="add-device-btn" onClick={openAddModal}>
+                            <span className="add-icon">+</span>
+                            <span>Добавить аппарат</span>
+                        </button>
+                    </div>
+                    <div className="view-toggle">
+                        <button 
+                            className={`view-btn ${viewMode === 'tiles' ? 'active' : ''}`}
+                            onClick={() => setViewMode('tiles')}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                                <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                                <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                                <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                            </svg>
+                            <span>Плитки</span>
+                        </button>
+                        <button 
+                            className={`view-btn ${viewMode === 'table' ? 'active' : ''}`}
+                            onClick={() => setViewMode('table')}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M2 4H14M2 8H14M2 12H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                            </svg>
+                            <span>Таблица</span>
+                        </button>
                     </div>
                 </div>
-            )}
 
-            {modalOpen && (
-                <div className="modal-overlay" onClick={closeModal}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">
-                                {editData.id ? 'Редактировать оборудование' : 'Добавить оборудование'}
-                            </h2>
-                            <button className="close-btn" onClick={closeModal}>
-                                <i className="fas fa-times"></i>
-                            </button>
+                {viewMode === 'table' && (
+                    <div className="equipment-table-container">
+                        <table className="equipment-table">
+                            <thead>
+                                <tr>
+                                    <th onClick={() => toggleSort('model')}>
+                                        <span>Модель</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('name')}>
+                                        <span>Название</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('unit')}>
+                                        <span>Подразделение</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('inventory')}>
+                                        <span>Инвентарный номер</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('welder')}>
+                                        <span>Сварщик</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th>
+                                        <span>Последнее включение</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('status')}>
+                                        <span>Статус</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {getFilteredEquipment().map((item) => (
+                                    <tr 
+                                        key={item.id} 
+                                        className="table-row"
+                                        onClick={() => handleControl(item)}
+                                    >
+                                        <td>
+                                            <div className="model-cell">
+                                                <img 
+                                                    src={machineImage} 
+                                                    alt={getModelDisplay(item)}
+                                                    className="machine-thumbnail"
+                                                />
+                                                <span>{getModelDisplay(item)}</span>
+                                            </div>
+                                        </td>
+                                        <td>{item.name}</td>
+                                        <td>{item.organizationUnit?.name || 'Не указано'}</td>
+                                        <td>{item.inventoryNumber || 'Не указан'}</td>
+                                        <td>{getWelderDisplay(item)}</td>
+                                        <td>{getLastActivation(item) || 'Нет данных'}</td>
+                                        <td>
+                                            <span className={`status-badge ${deviceStatusesByMac[item.mac] || 'off'}`}>
+                                                {deviceStatusesByMac[item.mac] === 'welding' ? 'Сварка' : 
+                                                 deviceStatusesByMac[item.mac] === 'on' ? 'Включен' : 
+                                                 deviceStatusesByMac[item.mac] === 'error' ? 'Ошибка' : 
+                                                 'Выключен'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {viewMode === 'tiles' && (
+                    <div className="no-equipment">
+                        <div className="no-equipment-content">
+                            <h3>Режим плиток пока не реализован</h3>
+                            <p>Переключитесь на режим таблицы</p>
                         </div>
-                        <form onSubmit={handleSave}>
-                            {isCoreSelected ? (
-                                <>
-                                    <div className="form-group">
-                                        <label className="form-label">Наименование ИП *</label>
-                                        <input
-                                            type="text"
-                                            name="name"
-                                            value={editData.name || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            placeholder="Введите название"
-                                        />
-                                        {errors.name && <p className="error-message">{errors.name}</p>}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Модель ИП *</label>
-                                        <select
-                                            name="deviceModel"
-                                            value={editData.deviceModel || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                        >
-                                            <option value="">Выберите модель устройства</option>
-                                            <option value="MONITORING_BLOCK">Блок мониторинга</option>
-                                            <option value="CORE">Core</option>
-                                        </select>
-                                        {errors.deviceModel && <p className="error-message">{errors.deviceModel}</p>}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Подразделение *</label>
-                                        <select
-                                            name="organizationUnit"
-                                            value={editData.organizationUnit?.id || ''}
-                                            onChange={(e) => {
-                                                const selectedUnit = organizationUnits.find(unit => unit.id === parseInt(e.target.value));
-                                                setEditData({ ...editData, organizationUnit: selectedUnit });
-                                            }}
-                                            className="form-input"
-                                        >
-                                            <option value="">Выберите подразделение</option>
-                                            {organizationUnits.map(unit => (
-                                                <option key={unit.id} value={unit.id}>
-                                                    {unit.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {errors.organizationUnit && (
-                                            <p className="error-message">{errors.organizationUnit}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">MAC-адрес *</label>
-                                        <input
-                                            type="text"
-                                            name="mac"
-                                            value={editData.mac || ''}
-                                            onChange={(e) => {
-                                                let value = e.target.value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
-                                                if (value.length > 12) {
-                                                    value = value.substring(0, 12);
-                                                }
-                                                setEditData({ ...editData, mac: value });
-                                            }}
-                                            className="form-input"
-                                            placeholder="Введите MAC-адрес (12 символов: 0-9, A-F)"
-                                            maxLength={12}
-                                        />
-                                        {errors.mac && <p className="error-message">{errors.mac}</p>}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Серийный номер ИП</label>
-                                        <input
-                                            type="text"
-                                            name="serialNumber"
-                                            value={editData.serialNumber || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            placeholder="Введите серийный номер"
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Инвентарный номер ИП</label>
-                                        <input
-                                            type="text"
-                                            name="inventoryNumber"
-                                            value={editData.inventoryNumber || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            placeholder="Введите инвентарный номер"
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Дата ввода в эксплуатацию *</label>
-                                        <input
-                                            type="date"
-                                            name="commissionDate"
-                                            value={editData.commissionDate || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            max={todayDateString}
-                                        />
-                                        {errors.commissionDate && <p className="error-message">{errors.commissionDate}</p>}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Галочки опций</label>
-                                        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={Boolean(editData.coreOptions?.gasControl)}
-                                                    onChange={handleCoreOptionToggle('gasControl')}
-                                                />
-                                                Система контроля газа
-                                            </label>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={Boolean(editData.coreOptions?.rfid)}
-                                                    onChange={handleCoreOptionToggle('rfid')}
-                                                />
-                                                RFID доступ
-                                            </label>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={Boolean(editData.coreOptions?.bvo)}
-                                                    onChange={handleCoreOptionToggle('bvo')}
-                                                />
-                                                БВО
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">MAC / серийный номер модуля WT</label>
-                                        <input
-                                            type="text"
-                                            name="wtModuleMac"
-                                            value={editData.wtModuleMac || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            placeholder="Введите идентификатор модуля WT"
-                                        />
-                                    </div>
-
-                                    <h3 style={{ marginTop: '1.5rem', fontSize: '1.1rem', fontWeight: 600 }}>Опции Core</h3>
-                                    <h3 style={{ marginTop: '1.5rem', fontSize: '1.1rem', fontWeight: 600 }}>Обслуживание</h3>
-                                    <div className="form-group">
-                                        <label className="form-label">Наработка между ТО (часы)</label>
-                                        <input
-                                            type="number"
-                                            name="maintenanceInterval"
-                                            value={editData.maintenanceInterval !== undefined && editData.maintenanceInterval !== null ? editData.maintenanceInterval : ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            min="0"
-                                            step="1"
-                                            placeholder="Например, 720"
-                                        />
-                                        {errors.maintenanceInterval && (
-                                            <p className="error-message">{errors.maintenanceInterval}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Напоминание о ТО за (часы)</label>
-                                        <input
-                                            type="number"
-                                            name="maintenanceReminderHours"
-                                            value={editData.maintenanceReminderHours !== undefined && editData.maintenanceReminderHours !== null ? editData.maintenanceReminderHours : ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            min="0"
-                                            step="1"
-                                            placeholder="Например, 24"
-                                        />
-                                        {errors.maintenanceReminderHours && (
-                                            <p className="error-message">{errors.maintenanceReminderHours}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Дата последнего ТО</label>
-                                        <input
-                                            type="date"
-                                            name="lastService"
-                                            value={editData.lastService || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">ФИО, проводившего ТО</label>
-                                        <input
-                                            type="text"
-                                            name="maintenanceTechnicianName"
-                                            value={editData.maintenanceTechnicianName || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            placeholder="Введите ФИО"
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">RFID пропуск проводившего ТО</label>
-                                        <input
-                                            type="text"
-                                            name="maintenanceTechnicianPass"
-                                            value={editData.maintenanceTechnicianPass || ''}
-                                            readOnly
-                                            className="form-input"
-                                            placeholder="Заполняется автоматически при считывании пропуска"
-                                        />
-                                    </div>
-
-                                    <h3 style={{ marginTop: '1.5rem', fontSize: '1.1rem', fontWeight: 600 }}>Ответственные лица</h3>
-                                    <div className="form-group">
-                                        <label className="form-label">Ответственный за ИП</label>
-                                        <select
-                                            name="responsibleUserId"
-                                            value={editData.responsibleUserId || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                        >
-                                            <option value="">Выберите пользователя</option>
-                                            {responsibleUsers.map(user => (
-                                                <option key={user.id} value={user.id}>
-                                                    {user.fullName || user.name || user.username || `Пользователь #${user.id}`}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="form-group">
-                                        <label className="form-label">Название</label>
-                                        <input
-                                            type="text"
-                                            name="name"
-                                            value={editData.name || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            placeholder="Введите название"
-                                        />
-                                        {errors.name && <p className="error-message">{errors.name}</p>}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Модель устройства *</label>
-                                        <select
-                                            name="deviceModel"
-                                            value={editData.deviceModel || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                        >
-                                            <option value="">Выберите модель устройства</option>
-                                            <option value="MONITORING_BLOCK">Блок мониторинга</option>
-                                            <option value="CORE">Core</option>
-                                        </select>
-                                        {errors.deviceModel && <p className="error-message">{errors.deviceModel}</p>}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">MAC-адрес *</label>
-                                        <input
-                                            type="text"
-                                            name="mac"
-                                            value={editData.mac || ''}
-                                            onChange={(e) => {
-                                                let value = e.target.value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
-                                                if (value.length > 12) {
-                                                    value = value.substring(0, 12);
-                                                }
-                                                setEditData({ ...editData, mac: value });
-                                            }}
-                                            className="form-input"
-                                            placeholder="Введите MAC-адрес (12 символов: 0-9, A-F)"
-                                            maxLength={12}
-                                        />
-                                        {errors.mac && <p className="error-message">{errors.mac}</p>}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Подразделение</label>
-                                        <select
-                                            name="organizationUnit"
-                                            value={editData.organizationUnit?.id || ''}
-                                            onChange={(e) => {
-                                                const selectedUnit = organizationUnits.find(unit => unit.id === parseInt(e.target.value));
-                                                setEditData({ ...editData, organizationUnit: selectedUnit });
-                                            }}
-                                            className="form-input"
-                                        >
-                                            <option value="">Выберите подразделение</option>
-                                            {organizationUnits.map(unit => (
-                                                <option key={unit.id} value={unit.id}>
-                                                    {unit.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {errors.organizationUnit && (
-                                            <p className="error-message">{errors.organizationUnit}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Дата ввода в эксплуатацию *</label>
-                                        <input
-                                            type="date"
-                                            name="commissionDate"
-                                            value={editData.commissionDate || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            max={todayDateString}
-                                        />
-                                        {errors.commissionDate && <p className="error-message">{errors.commissionDate}</p>}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Год выпуска</label>
-                                        <input
-                                            type="number"
-                                            name="manufactureYear"
-                                            value={editData.manufactureYear || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            min="1900"
-                                            max={currentYear}
-                                            placeholder="Введите год выпуска"
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Последнее обслуживание</label>
-                                        <input
-                                            type="date"
-                                            name="lastService"
-                                            value={editData.lastService || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Серийный номер</label>
-                                        <input
-                                            type="text"
-                                            name="serialNumber"
-                                            value={editData.serialNumber || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            placeholder="Введите серийный номер"
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label className="form-label">Инвентарный номер</label>
-                                        <input
-                                            type="text"
-                                            name="inventoryNumber"
-                                            value={editData.inventoryNumber || ''}
-                                            onChange={handleInputChange}
-                                            className="form-input"
-                                            placeholder="Введите инвентарный номер"
-                                        />
-                                    </div>
-                                </>
-                            )}
-
-                            <div className="form-group">
-                                <label className="form-label">{isCoreSelected ? 'Допущенные сварщики' : 'Назначенные сварщики'}</label>
-                                {isCoreSelected && (
-                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #6b7280)', marginTop: '-0.35rem', marginBottom: '0.5rem' }}>
-                                        По умолчанию сварщикам предоставляется полный доступ к ИП. Укажите здесь тех, кто допускается к работе.
-                                    </p>
-                                )}
-                                <select
-                                    multiple
-                                    name="assignedWelders"
-                                    value={editData.assignedWelders || []}
-                                    onChange={handleWelderSelection}
-                                    className="welder-select"
-                                >
-                                    {welders.map(welder => (
-                                        <option key={welder.id} value={welder.name}>
-                                            {welder.name} (RFID: {welder?.rfidCode || 'Не указан'})
-                                        </option>
-                                    ))}
-                                </select>
-                                <button
-                                    type="button"
-                                    className="select-all-btn"
-                                    onClick={handleSelectAllWelders}
-                                >
-                                    Выбрать всех сварщиков
-                                </button>
-                            </div>
-
-                            {editData.assignedWelders && editData.assignedWelders.length > 0 && (
-                                <div className="assigned-welders">
-                                    <label className="form-label">Текущие назначения:</label>
-                                    {editData.assignedWelders.map(welderName => {
-                                        const welder = welders.find(w => w.name === welderName);
-                                        return (
-                                            <div
-                                                key={welderName}
-                                                className="assigned-welder"
-                                                onClick={() => navigateToWelderProfile(welder?.id)}
-                                            >
-                                                <div>{welderName}</div>
-                                                <div className="rfid-code">
-                                                    RFID: {welder?.rfidCode || 'Не указан'}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-
-                            <div className="modal-actions">
-                                <button type="submit" className="save-btn">
-                                    <i className="fas fa-save"></i>
-                                    Сохранить
-                                </button>
-                                <button type="button" className="cancel-btn" onClick={closeModal}>
-                                    Отмена
-                                </button>
-                            </div>
-                        </form>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
+
+            <AddEquipmentModal 
+                isOpen={modalOpen}
+                onClose={closeModal}
+                welders={welders}
+                organizationUnits={organizationUnits}
+                onSave={async (data) => {
+                    // Преобразуем данные из AddEquipmentModal в формат для handleSave
+                    const newEditData = {
+                        ...editData,
+                        name: data.name || '',
+                        deviceModel: data.model === 'CORE PRO 500' ? 'CORE' : 
+                                     data.model === 'Блок Мониторинга' ? 'MONITORING_BLOCK' : 
+                                     data.model || '',
+                        mac: data.macAddress || '',
+                        commissionDate: data.commissioningDate || '',
+                        serialNumber: data.serialNumber || '',
+                        inventoryNumber: data.inventoryNumber || '',
+                        organizationUnit: organizationUnits.find(unit => unit.name === data.department) || null,
+                        coreOptions: {
+                            gasControl: data.options?.gasControl || false,
+                            rfid: data.options?.rfid || false,
+                            bvo: data.options?.bvo || false
+                        },
+                        assignedWelders: data.approvedWelders || []
+                    };
+                    setEditData(newEditData);
+                    // Вызываем handleSave
+                    const fakeEvent = { preventDefault: () => {} };
+                    await handleSave(fakeEvent);
+                }}
+            />
         </div>
     );
 }
