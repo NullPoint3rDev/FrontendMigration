@@ -686,6 +686,21 @@ function WeldingEquipmentPage() {
         return '';
     };
 
+    // Функция для получения цвета индикатора по статусу
+    const getStatusIndicatorColor = (status) => {
+        switch (status) {
+            case 'welding':
+                return '#FEB63E'; // оранжевый
+            case 'on':
+                return '#39956C'; // зеленый
+            case 'error':
+                return '#EC2B3C'; // красный
+            case 'off':
+            default:
+                return '#5C6D81'; // серый
+        }
+    };
+
     // Подготовка данных для фильтров
     const buildDepartmentTree = () => {
         const tree = [];
@@ -900,78 +915,157 @@ function WeldingEquipmentPage() {
                     </div>
                 </div>
 
-                <div className="equipment-table-container">
-                    <table className="equipment-table">
-                        <thead>
-                            <tr>
-                                <th onClick={() => toggleSort('model')}>
-                                    <span>Модель</span>
-                                    <span className="sort-arrow">▾</span>
-                                </th>
-                                <th onClick={() => toggleSort('name')}>
-                                    <span>Название</span>
-                                    <span className="sort-arrow">▾</span>
-                                </th>
-                                <th onClick={() => toggleSort('unit')}>
-                                    <span>Подразделение</span>
-                                    <span className="sort-arrow">▾</span>
-                                </th>
-                                <th onClick={() => toggleSort('inventory')}>
-                                    <span>Инвентарный номер</span>
-                                    <span className="sort-arrow">▾</span>
-                                </th>
-                                <th onClick={() => toggleSort('welder')}>
-                                    <span>Сварщик</span>
-                                    <span className="sort-arrow">▾</span>
-                                </th>
-                                <th>
-                                    <span>Последнее включение</span>
-                                    <span className="sort-arrow">▾</span>
-                                </th>
-                                <th onClick={() => toggleSort('status')}>
-                                    <span>Статус</span>
-                                    <span className="sort-arrow">▾</span>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {getFilteredEquipment().map((item) => (
-                                <tr 
-                                    key={item.id} 
-                                    className="table-row"
-                                    onClick={() => handleControl(item)}
-                                >
-                                    <td>
-                                        <div className="model-cell">
-                                            <img 
-                                                src={machineImage} 
-                                                alt={getModelDisplay(item)}
-                                                className="machine-thumbnail"
-                                            />
-                                            <span>{getModelDisplay(item)}</span>
-                                        </div>
-                                    </td>
-                                    <td>{item.name}</td>
-                                    <td>{item.organizationUnit?.name || 'Не указано'}</td>
-                                    <td>{item.inventoryNumber || 'Не указан'}</td>
-                                    <td>{getWelderDisplay(item)}</td>
-                                    <td>{getLastActivation(item) || 'Нет данных'}</td>
-                                    <td>
-                                        <span className={`status-badge ${deviceStatusesByMac[item.mac] || 'off'}`}>
-                                            {deviceStatusesByMac[item.mac] === 'welding' ? 'Сварка' : 
-                                             deviceStatusesByMac[item.mac] === 'on' ? 'Включен' : 
-                                             deviceStatusesByMac[item.mac] === 'error' ? 'Ошибка' : 
-                                             'Выключен'}
-                                        </span>
-                                    </td>
+                {viewMode === 'table' && (
+                    <div className="equipment-table-container">
+                        <table className="equipment-table">
+                            <thead>
+                                <tr>
+                                    <th onClick={() => toggleSort('model')}>
+                                        <span>Модель</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('name')}>
+                                        <span>Название</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('unit')}>
+                                        <span>Подразделение</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('inventory')}>
+                                        <span>Инвентарный номер</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('welder')}>
+                                        <span>Сварщик</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th>
+                                        <span>Последнее включение</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('status')}>
+                                        <span>Статус</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                {getFilteredEquipment().map((item) => {
+                                    const status = deviceStatusesByMac[item.mac] || 'off';
+                                    return (
+                                        <tr 
+                                            key={item.id} 
+                                            className="table-row"
+                                            onClick={() => handleControl(item)}
+                                        >
+                                            <td>
+                                                <div className="model-cell-table">
+                                                    <span 
+                                                        className="status-indicator" 
+                                                        style={{ backgroundColor: getStatusIndicatorColor(status) }}
+                                                    />
+                                                    <span>{getModelDisplay(item)}</span>
+                                                </div>
+                                            </td>
+                                            <td>{item.name}</td>
+                                            <td>{item.organizationUnit?.name || 'Не указано'}</td>
+                                            <td>{item.inventoryNumber || 'Не указан'}</td>
+                                            <td>{getWelderDisplay(item)}</td>
+                                            <td>{getLastActivation(item) || 'Нет данных'}</td>
+                                            <td>
+                                                <span className={`status-badge ${status}`}>
+                                                    {status === 'welding' ? 'Сварка' : 
+                                                     status === 'on' ? 'Включен' : 
+                                                     status === 'error' ? 'Ошибка' : 
+                                                     'Выключен'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {viewMode === 'tiles' && (
+                    <div className="equipment-table-container">
+                        <table className="equipment-table">
+                            <thead>
+                                <tr>
+                                    <th onClick={() => toggleSort('model')}>
+                                        <span>Модель</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('name')}>
+                                        <span>Название</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('unit')}>
+                                        <span>Подразделение</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('inventory')}>
+                                        <span>Инвентарный номер</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('welder')}>
+                                        <span>Сварщик</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th>
+                                        <span>Последнее включение</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th onClick={() => toggleSort('status')}>
+                                        <span>Статус</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {getFilteredEquipment().map((item) => {
+                                    const status = deviceStatusesByMac[item.mac] || 'off';
+                                    return (
+                                        <tr 
+                                            key={item.id} 
+                                            className="table-row"
+                                            onClick={() => handleControl(item)}
+                                        >
+                                            <td>
+                                                <div className="model-cell">
+                                                    <img 
+                                                        src={machineImage} 
+                                                        alt={getModelDisplay(item)}
+                                                        className="machine-thumbnail"
+                                                    />
+                                                    <span>{getModelDisplay(item)}</span>
+                                                </div>
+                                            </td>
+                                            <td>{item.name}</td>
+                                            <td>{item.organizationUnit?.name || 'Не указано'}</td>
+                                            <td>{item.inventoryNumber || 'Не указан'}</td>
+                                            <td>{getWelderDisplay(item)}</td>
+                                            <td>{getLastActivation(item) || 'Нет данных'}</td>
+                                            <td>
+                                                <span className={`status-badge ${status}`}>
+                                                    {status === 'welding' ? 'Сварка' : 
+                                                     status === 'on' ? 'Включен' : 
+                                                     status === 'error' ? 'Ошибка' : 
+                                                     'Выключен'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
 
-            <AddEquipmentModal 
+            <AddEquipmentModal  
                 isOpen={modalOpen}
                 onClose={closeModal}
                 welders={welders}
