@@ -248,7 +248,7 @@
     width: 100% !important;
     border-collapse: collapse !important;
     border-spacing: 0 !important;
-    flex: 1 !important;
+    /* Убираем flex: 1, чтобы таблица не растягивалась */
     min-height: 0 !important;
     /* Переопределяем Material-UI */
     border: none !important;
@@ -305,7 +305,8 @@
     color: rgba(188, 183, 197, 0.8);
 }
 
-.welding-equipment-page .equipment-table td {
+/* Общее правило для td - НЕ применяется к компактным строкам */
+.welding-equipment-page .equipment-table td:not(.table-row-compact td) {
     padding: 10px 16px;
     font-size: 13px;
     color: #5C6D81;
@@ -506,7 +507,7 @@
 .equipment-table {
     width: 100%;
     border-collapse: collapse;
-    flex: 1;
+    /* Убираем flex: 1, чтобы таблица не растягивалась на всю высоту */
     min-height: 0;
 }
 
