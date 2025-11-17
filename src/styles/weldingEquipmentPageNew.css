@@ -290,29 +290,35 @@
 
 /* Компактные строки для табличного режима - как filter-tile */
 .welding-equipment-page .equipment-table tbody tr.table-row-compact {
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    line-height: 1.0 !important;
+    display: table-row !important;
 }
 
-/* Компактные строки - минимальные отступы как у filter-tile */
 .welding-equipment-page .equipment-table tbody tr.table-row-compact td {
     padding: 2px 10px !important;
     line-height: 1.0 !important;
-    height: auto !important;
-    min-height: 0 !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
     vertical-align: middle !important;
     font-size: 12px !important;
     margin: 0 !important;
+    overflow: hidden !important;
 }
 
 .welding-equipment-page .equipment-table tbody tr.table-row-compact .model-cell-table {
     padding: 2px 10px !important;
     min-height: 0 !important;
-    height: auto !important;
+    height: 24px !important;
+    max-height: 24px !important;
     line-height: 1.0 !important;
     margin: 0 !important;
     gap: 4px !important;
+    align-items: center !important;
+    overflow: hidden !important;
 }
 
 /* Убираем все лишние отступы и высоты для текстовых элементов */
@@ -333,18 +339,22 @@
 
 /* Альтернативный селектор через :has() для совместимости */
 .welding-equipment-page .equipment-table tbody tr:has(.model-cell-table) {
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    line-height: 1.0 !important;
 }
 
 .welding-equipment-page .equipment-table tbody tr:has(.model-cell-table) td {
     padding: 2px 10px !important;
     line-height: 1.0 !important;
-    height: auto !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
     vertical-align: middle !important;
     font-size: 12px !important;
     margin: 0 !important;
+    overflow: hidden !important;
 }
 
 .welding-equipment-page .equipment-table td:first-child {
@@ -427,9 +437,31 @@
     overflow-y: auto;
 }
 
+/* Ограничиваем высоту строк в tbody для компактных строк */
+.welding-equipment-page .equipment-table tbody tr.table-row-compact {
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+}
+
+.welding-equipment-page .equipment-table tbody tr.table-row-compact td {
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    overflow: hidden !important;
+}
+
 .welding-equipment-page .table-row {
     cursor: pointer;
     transition: all 0.2s ease;
+}
+
+/* Переопределяем для компактных строк */
+.welding-equipment-page .table-row.table-row-compact {
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    line-height: 1.0 !important;
 }
 
 .welding-equipment-page .table-row:hover {
