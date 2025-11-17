@@ -1227,7 +1227,9 @@ const DeviceMonitorPage = () => {
                         </div>
                     </div>
                     <div className="welding-timer">
-                        <div className="welding-timer-label">Сварка</div>
+                        {isTimerActive && (
+                            <div className="welding-timer-label">Сварка</div>
+                        )}
                         <div className="welding-timer-display">
                             <span className="welding-timer-icon">⚡</span>
                             <span className={`welding-timer-time ${isTimerActive ? 'welding-active' : 'welding-inactive'}`}>
