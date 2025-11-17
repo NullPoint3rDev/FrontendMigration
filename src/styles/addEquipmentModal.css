@@ -298,8 +298,9 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     margin-top: 8px;
-    color: #21151f;
 }
+
+
 
 .save-button:active {
     transform: translateY(0);
