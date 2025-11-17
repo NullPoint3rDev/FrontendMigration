@@ -76,6 +76,15 @@ td, th {
     border-spacing: 0 !important;
 }
 
+/* Фиксированные размеры для #root как в MaximDesignWT2 */
+/* Переопределяем стили из main_page.css */
+#root {
+    width: 1700px !important;
+    height: 1080px !important;
+    overflow: hidden !important;
+    margin: 0 auto !important;
+}
+
 /* Для страницы сварочного оборудования используем фиксированные размеры как в MaximDesignWT2 */
 .welding-equipment-page {
     display: flex;

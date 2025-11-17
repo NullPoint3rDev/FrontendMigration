@@ -61,11 +61,9 @@ const Layout = ({ children }) => {
         // Для страницы оборудования не используем Material-UI вообще, чтобы избежать конфликтов
         if (isEquipmentPage) {
             return (
-                <div className="app" style={{ isolation: 'isolate' }}>
+                <div className="app">
                     <Sidebar />
-                    <div style={{ isolation: 'isolate', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                        {children}
-                    </div>
+                    {children}
                 </div>
             );
         }
