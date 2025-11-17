@@ -58,12 +58,14 @@ const Layout = ({ children }) => {
     const isEquipmentPage = location.pathname === '/equipment';
     
     if (useSidebar) {
-        // Для страницы оборудования не используем CssBaseline, чтобы избежать конфликтов
+        // Для страницы оборудования не используем Material-UI вообще, чтобы избежать конфликтов
         if (isEquipmentPage) {
             return (
-                <div className="app">
+                <div className="app" style={{ isolation: 'isolate' }}>
                     <Sidebar />
-                    {children}
+                    <div style={{ isolation: 'isolate', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        {children}
+                    </div>
                 </div>
             );
         }

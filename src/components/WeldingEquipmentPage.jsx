@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import '../styles/weldingEquipmentPageNew.css';
+import './WeldingEquipmentPage.css';
 import { useNavigate } from 'react-router-dom';
 import AddEquipmentModal from './AddEquipmentModal';
 import machineImage from '../images/Untitled 3 копия.png';
