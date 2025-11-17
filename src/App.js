@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import ScopedCssBaseline from '@mui/material/ScopedCssBaseline';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import HomePage from './components/HomePage';
@@ -54,12 +55,24 @@ const PrivateRoute = ({ children }) => {
 const Layout = ({ children }) => {
     const location = useLocation();
     const useSidebar = location.pathname === '/equipment' || location.pathname === '/device-monitor';
+    const isEquipmentPage = location.pathname === '/equipment';
     
     if (useSidebar) {
+        // Для страницы оборудования не используем CssBaseline, чтобы избежать конфликтов
+        if (isEquipmentPage) {
+            return (
+                <div className="app">
+                    <Sidebar />
+                    {children}
+                </div>
+            );
+        }
         return (
             <div className="app">
                 <Sidebar />
-                {children}
+                <ScopedCssBaseline>
+                    {children}
+                </ScopedCssBaseline>
             </div>
         );
     }
@@ -67,7 +80,9 @@ const Layout = ({ children }) => {
     return (
         <>
             <Navbar />
-            {children}
+            <ScopedCssBaseline>
+                {children}
+            </ScopedCssBaseline>
         </>
     );
 };
@@ -75,7 +90,7 @@ const Layout = ({ children }) => {
 function App() {
     return (
         <ThemeProvider theme={theme}>
-            <CssBaseline />
+            {/* CssBaseline убран, чтобы избежать конфликтов со стилями таблиц */}
             <Router>
                 <Routes>
                     <Route path="/login" element={<AuthPage />} />
