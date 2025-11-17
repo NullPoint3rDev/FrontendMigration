@@ -279,12 +279,32 @@
 }
 
 .welding-equipment-page .equipment-table td {
-    padding: 6px 10px;
+    padding: 4px 10px;
     font-size: 12px;
     color: #5C6D81;
     border-bottom: 1px solid rgba(59, 49, 74, 0.3);
     vertical-align: middle;
-    line-height: 1.4;
+    line-height: 1.2;
+}
+
+/* Компактные строки для табличного режима */
+.welding-equipment-page .equipment-table tbody tr:has(.model-cell-table) {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none;
+}
+
+.welding-equipment-page .equipment-table tbody tr:has(.model-cell-table) td {
+    padding: 2px 10px !important;
+    line-height: 1.1 !important;
+    height: auto !important;
+    vertical-align: middle !important;
+}
+
+.welding-equipment-page .equipment-table tbody tr:has(.model-cell-table) .model-cell-table {
+    padding: 2px 10px !important;
+    min-height: 0 !important;
+    height: auto !important;
 }
 
 .welding-equipment-page .equipment-table td:first-child {
@@ -300,13 +320,7 @@
     min-height: 60px;
 }
 
-.welding-equipment-page .equipment-table tbody tr:has(.model-cell-table) td {
-    padding: 6px 10px;
-}
-
-.welding-equipment-page .equipment-table tbody tr:has(.model-cell-table) {
-    min-height: 32px;
-}
+/* Удалено - дублирование, стили уже определены выше */
 
 .welding-equipment-page .model-cell {
     display: flex;
@@ -321,6 +335,8 @@
     align-items: center;
     gap: 8px;
     padding: 0 10px;
+    min-height: 0;
+    height: auto;
 }
 
 .welding-equipment-page .status-indicator {
