@@ -244,10 +244,10 @@
 }
 
 .welding-equipment-page .equipment-table th {
-    padding: 12px 16px;
-    text-align: left;
-    font-size: 12px;
-    font-weight: 600;
+    padding: 9px 6px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
     color: #6C7386;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -279,8 +279,8 @@
 }
 
 .welding-equipment-page .equipment-table td {
-    padding: 10px 16px;
-    font-size: 13px;
+    padding: 0 10px;
+    font-size: 12px;
     color: #5C6D81;
     border-bottom: 1px solid rgba(59, 49, 74, 0.3);
     vertical-align: middle;
@@ -293,9 +293,9 @@
 .welding-equipment-page .model-cell {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
     min-height: 60px;
-    padding: 0 16px;
+    padding: 0 3px;
 }
 
 .welding-equipment-page .machine-thumbnail {
@@ -326,7 +326,7 @@
 .status-badge {
     display: inline-flex;
     align-items: center;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     white-space: nowrap;
 }
