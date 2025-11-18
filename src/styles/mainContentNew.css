@@ -3,13 +3,14 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 10px 14px 10px 0;
+    padding: 10px 8px 10px 8px;
     margin: 0;
     background: radial-gradient(circle at 18% 12%, rgba(35, 58, 92, 0.28), rgba(11, 18, 33, 0.92) 54%), #122536;
     color: #f0f4ff;
     overflow: hidden;
     min-height: 0;
     box-sizing: border-box;
+    width: 100%;
 }
 
 .numeric {
@@ -29,15 +30,14 @@
 
 .top-grid {
     display: grid;
-    grid-template-columns: 200px 520px 450px 430px;
+    grid-template-columns: 200px 520px 450px 1fr;
     gap: 8px;
     flex: 0 0 auto;
     min-height: 0;
     align-content: stretch;
     padding: 0;
     margin: 0;
-    margin-left: -16px;
-    width: calc(100% + 16px);
+    width: 100%;
     box-sizing: border-box;
 }
 
@@ -55,8 +55,7 @@
     grid-column: 1;
     padding: 0;
     margin: 0;
-    margin-left: -16px;
-    width: calc(100% + 16px);
+    width: 100%;
 }
 
 .machine-title {
