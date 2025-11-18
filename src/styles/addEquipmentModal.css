@@ -1,47 +1,70 @@
+/* Изоляция модального окна от глобальных стилей */
 .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    backdrop-filter: blur(4px);
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0, 0, 0, 0.2) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 1000 !important;
+    backdrop-filter: blur(4px) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    isolation: isolate !important;
 }
 
 .modal-content {
-    background: #122536;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 1200px;
-    max-height: 90vh;
-    overflow-y: auto;
-    position: relative;
-    padding: 32px;
-    box-sizing: border-box;
+    background: #122536 !important;
+    border-radius: 8px !important;
+    width: 90% !important;
+    max-width: 1200px !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    position: relative !important;
+    padding: 32px !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    border: none !important;
+    isolation: isolate !important;
+    /* Переопределяем глобальные стили для таблиц */
+}
+
+/* Переопределяем глобальные стили для элементов внутри модального окна */
+.modal-content * {
+    box-sizing: border-box !important;
+}
+
+.modal-content input,
+.modal-content select,
+.modal-content button,
+.modal-content label {
+    margin: 0 !important;
+    font-family: 'Roboto', sans-serif !important;
 }
 
 .modal-close {
-    position: absolute;
-    top: 16px;
-    left: 16px;
-    width: 32px;
-    height: 32px;
-    background: rgba(28, 22, 34, 0.8);
-    border: 1px solid rgba(82, 69, 94, 0.4);
-    border-radius: 4px;
-    color: rgba(188, 183, 197, 0.75);
-    font-size: 20px;
-    line-height: 1;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
+    position: absolute !important;
+    top: 16px !important;
+    left: 16px !important;
+    width: 32px !important;
+    height: 32px !important;
+    background: rgba(28, 22, 34, 0.8) !important;
+    border: 1px solid rgba(82, 69, 94, 0.4) !important;
+    border-radius: 4px !important;
+    color: rgba(188, 183, 197, 0.75) !important;
+    font-size: 20px !important;
+    line-height: 1 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 10 !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 .modal-close:hover {
@@ -102,16 +125,19 @@
 }
 
 .model-item {
-    padding: 10px 14px;
-    background: rgba(28, 22, 34, 0.6);
-    border: 1px solid rgba(82, 69, 94, 0.4);
-    border-radius: 4px;
-    color: rgba(217, 214, 223, 0.8);
-    font-size: 13px;
-    text-align: left;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-family: 'Roboto', sans-serif;
+    padding: 10px 14px !important;
+    background: rgba(28, 22, 34, 0.6) !important;
+    border: 1px solid rgba(82, 69, 94, 0.4) !important;
+    border-radius: 4px !important;
+    color: rgba(217, 214, 223, 0.8) !important;
+    font-size: 13px !important;
+    text-align: left !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    font-family: 'Roboto', sans-serif !important;
+    margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
 }
 
 .model-item:hover {
@@ -152,25 +178,31 @@
 }
 
 .form-field label {
-    font-size: 12px;
-    font-weight: 500;
-    color: rgba(242, 241, 244, 0.8);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-family: 'Roboto', sans-serif;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: rgba(242, 241, 244, 0.8) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+    font-family: 'Roboto', sans-serif !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
 }
 
 .form-field input,
 .form-field select {
-    padding: 10px 12px;
-    background: #1C1622;
-    border: 1px solid rgba(82, 69, 94, 0.4);
-    border-radius: 4px;
-    color: #d9d6df;
-    font-size: 13px;
-    outline: none;
-    transition: all 0.2s ease;
-    font-family: inherit;
+    padding: 10px 12px !important;
+    background: #1C1622 !important;
+    border: 1px solid rgba(82, 69, 94, 0.4) !important;
+    border-radius: 4px !important;
+    color: #d9d6df !important;
+    font-size: 13px !important;
+    outline: none !important;
+    transition: all 0.2s ease !important;
+    font-family: inherit !important;
+    margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
 }
 
 .form-field input:focus,
@@ -259,17 +291,20 @@
 }
 
 .option-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    background: #1C1622;
-    border: 1px solid rgba(82, 69, 94, 0.4);
-    border-radius: 4px;
-    color: rgba(217, 214, 223, 0.7);
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 16px !important;
+    background: #1C1622 !important;
+    border: 1px solid rgba(82, 69, 94, 0.4) !important;
+    border-radius: 4px !important;
+    color: rgba(217, 214, 223, 0.7) !important;
+    font-size: 13px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    font-family: 'Roboto', sans-serif !important;
 }
 
 .option-btn:hover {
@@ -277,7 +312,7 @@
 }
 
 .option-btn.active {
-    color: #FC6D0D;
+    color: #FC6D0D !important;
 }
 
 .option-icon {
@@ -287,17 +322,20 @@
 }
 
 .save-button {
-    padding: 14px 24px;
-    background: #F6B243;
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-top: 8px;
+    padding: 14px 24px !important;
+    background: #F6B243 !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+    margin-top: 8px !important;
+    color: #1C1622 !important;
+    font-family: 'Roboto', sans-serif !important;
+    box-sizing: border-box !important;
 }
 
 
