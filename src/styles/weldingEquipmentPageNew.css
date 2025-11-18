@@ -352,23 +352,23 @@
 }
 
 .welding-equipment-page .status-badge {
-    display: inline-flex;
-    align-items: center;
-    font-size: 13px;
-    font-weight: 500;
-    white-space: nowrap;
+    display: inline-flex !important;
+    align-items: center !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    white-space: nowrap !important;
 }
 
 .welding-equipment-page .status-badge.welding {
-    color: #FEB63E;
+    color: #FEB63E !important;
 }
 
 .welding-equipment-page .status-badge.on {
-    color: #39956C;
+    color: #39956C !important;
 }
 
 .welding-equipment-page .status-badge.error {
-    color: #EC2B3C;
+    color: #EC2B3C !important;
 }
 
 /* Scrollbar Styles */
@@ -487,6 +487,31 @@
 }
 
 .welding-equipment-page .status-badge.off {
+    color: rgba(188, 183, 197, 0.5) !important;
+}
+
+/* Дополнительные стили для статусов без префикса (для совместимости) */
+.status-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    white-space: nowrap !important;
+}
+
+.status-badge.welding {
+    color: #FEB63E !important;
+}
+
+.status-badge.on {
+    color: #39956C !important;
+}
+
+.status-badge.error {
+    color: #EC2B3C !important;
+}
+
+.status-badge.off {
     color: rgba(188, 183, 197, 0.5) !important;
 }
 
