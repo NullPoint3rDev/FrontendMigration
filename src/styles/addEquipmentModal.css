@@ -147,10 +147,10 @@
 }
 
 .model-item.active {
-    background: rgba(246, 184, 67, 0.15);
-    border-color: #F6B843;
-    color: #F6B843;
-    font-weight: 600;
+    background: rgba(246, 184, 67, 0.15) !important;
+    border-color: #F6B843 !important;
+    color: #F6B843 !important;
+    font-weight: 600 !important;
 }
 
 .modal-right {
