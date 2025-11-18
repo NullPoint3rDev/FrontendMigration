@@ -522,12 +522,67 @@ function WeldingEquipmentPage() {
 
         console.log('✅ handleSave: Валидация пройдена, начинаем сохранение...');
         try {
-            const commissionDateValue = dataToUse.commissionDate
-                ? `${dataToUse.commissionDate}T00:00:00`
-                : null;
-            const lastServiceValue = dataToUse.lastService
-                ? `${dataToUse.lastService}T00:00:00`
-                : null;
+            // Функция для преобразования даты из формата DD.MM.YYYY в ISO формат YYYY-MM-DD
+            const convertDateToISO = (dateString) => {
+                if (!dateString) return null;
+                console.log('🟡 convertDateToISO: Входная дата:', dateString);
+                
+                // Если дата уже в формате ISO (YYYY-MM-DD), возвращаем как есть
+                if (/^\d{4}-\d{2}-\d{2}/.test(dateString)) {
+                    const result = `${dateString}T00:00:00`;
+                    console.log('🟡 convertDateToISO: Дата уже в ISO формате, результат:', result);
+                    return result;
+                }
+                
+                // Если дата в формате DD.MM.YYYY, преобразуем в YYYY-MM-DD
+                if (/^\d{2}\.\d{2}\.\d{4}/.test(dateString)) {
+                    const [day, month, year] = dateString.split('.');
+                    const result = `${year}-${month}-${day}T00:00:00`;
+                    console.log('🟡 convertDateToISO: Преобразовано из DD.MM.YYYY, результат:', result);
+                    return result;
+                }
+                
+                // Пробуем распарсить как Date и преобразовать
+                try {
+                    const date = new Date(dateString);
+                    if (!isNaN(date.getTime())) {
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        const result = `${year}-${month}-${day}T00:00:00`;
+                        console.log('🟡 convertDateToISO: Преобразовано через Date, результат:', result);
+                        return result;
+                    }
+                } catch (e) {
+                    console.error('❌ convertDateToISO: Ошибка преобразования даты:', dateString, e);
+                }
+                return null;
+            };
+
+            const commissionDateValue = convertDateToISO(dataToUse.commissionDate);
+            const lastServiceValue = convertDateToISO(dataToUse.lastService);
+            
+            console.log('🟡 handleSave: Преобразованная дата ввода в эксплуатацию:', commissionDateValue);
+            console.log('🟡 handleSave: Преобразованная дата последнего ТО:', lastServiceValue);
+
+            // Подготавливаем organizationUnit - бэкенд ожидает объект с id и name
+            let organizationUnitForApi = null;
+            if (dataToUse.organizationUnit) {
+                // Если это объект с id, отправляем объект с id и name
+                if (dataToUse.organizationUnit.id) {
+                    organizationUnitForApi = {
+                        id: dataToUse.organizationUnit.id,
+                        name: dataToUse.organizationUnit.name || ''
+                    };
+                } else {
+                    // Если только объект без id, отправляем как есть
+                    organizationUnitForApi = dataToUse.organizationUnit;
+                }
+            }
+            
+            console.log('🟡 handleSave: organizationUnit для API:', organizationUnitForApi);
+            console.log('🟡 handleSave: commissionDateValue:', commissionDateValue);
+            console.log('🟡 handleSave: lastServiceValue:', lastServiceValue);
 
             const machineData = {
                 id: dataToUse.id,
@@ -535,11 +590,11 @@ function WeldingEquipmentPage() {
                 deviceModel: dataToUse.deviceModel,
                 mac,
                 commissionDate: commissionDateValue,
-                manufactureYear: dataToUse.manufactureYear || '',
+                manufactureYear: dataToUse.manufactureYear || null,
                 lastService: lastServiceValue,
                 serialNumber: dataToUse.serialNumber || '',
                 inventoryNumber: dataToUse.inventoryNumber || '',
-                organizationUnit: dataToUse.organizationUnit,
+                organizationUnit: organizationUnitForApi,
                 weldingMachineType: dataToUse.weldingMachineType,
                 assignedWelders: dataToUse.assignedWelders || [],
                 maintenanceInterval: maintenanceIntervalValue,
