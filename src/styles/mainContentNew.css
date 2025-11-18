@@ -31,7 +31,7 @@
 
 .top-grid {
     display: grid;
-    grid-template-columns: 200px 520px 450px 430px;
+    grid-template-columns: 200px 520px 450px 1fr;
     gap: 8px;
     flex: 0 0 auto;
     min-height: 0;
