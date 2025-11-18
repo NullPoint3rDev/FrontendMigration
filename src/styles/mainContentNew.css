@@ -1,15 +1,19 @@
-.main-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 14px 10px 0;
-    margin: 0;
-    background: radial-gradient(circle at 18% 12%, rgba(35, 58, 92, 0.28), rgba(11, 18, 33, 0.92) 54%), #122536;
-    color: #f0f4ff;
-    overflow: hidden;
-    min-height: 0;
-    box-sizing: border-box;
+/* Стили для DeviceMonitorPage - переопределяем глобальные стили из main_page.css */
+.app .main-panel,
+#root .app .main-panel {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding: 10px 14px 10px 0 !important;
+    margin: 0 !important;
+    background: radial-gradient(circle at 18% 12%, rgba(35, 58, 92, 0.28), rgba(11, 18, 33, 0.92) 54%), #122536 !important;
+    color: #f0f4ff !important;
+    overflow: hidden !important;
+    min-height: 0 !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: none !important;
 }
 
 .numeric {
@@ -27,18 +31,21 @@
     overflow: hidden;
 }
 
-.top-grid {
-    display: grid;
-    grid-template-columns: 200px 520px 450px 1fr;
-    gap: 8px;
-    flex: 0 0 auto;
-    min-height: 0;
-    align-content: stretch;
-    padding: 0;
-    margin: 0;
-    margin-left: -16px;
-    width: calc(100% + 16px);
-    box-sizing: border-box;
+/* Стили для top-grid - переопределяем глобальные стили */
+.app .main-panel .top-grid,
+#root .app .main-panel .top-grid {
+    display: grid !important;
+    grid-template-columns: 200px 520px 450px 1fr !important;
+    gap: 8px !important;
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+    align-content: stretch !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    margin-left: -16px !important;
+    width: calc(100% + 16px) !important;
+    box-sizing: border-box !important;
+    max-width: none !important;
 }
 
 .control-section {
