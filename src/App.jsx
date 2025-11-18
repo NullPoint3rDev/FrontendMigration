@@ -70,9 +70,7 @@ const Layout = ({ children }) => {
         return (
             <div className="app">
                 <Sidebar />
-                <ScopedCssBaseline>
-                    {children}
-                </ScopedCssBaseline>
+                {children}
             </div>
         );
     }
