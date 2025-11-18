@@ -526,6 +526,13 @@ const DeviceMonitorPage = () => {
                 const mac = data.mac || machineMac; // берём из payload, fallback на выбранный MAC
                 const params = {};
 
+                // Сохраняем status из корня state (это ключевое поле для определения состояния сварки!)
+                // status может быть: "Offline", "Welding", "On", "Error" и т.д.
+                if (data.state.status !== undefined && data.state.status !== null) {
+                    params.status = data.state.status;
+                    console.log('🔍 Сохраняем status в params:', data.state.status);
+                }
+
                 // Сохраняем errorCode из корня state, если он есть
                 if (data.state.errorCode !== undefined && data.state.errorCode !== null) {
                     params.errorCode = data.state.errorCode;
@@ -592,16 +599,29 @@ const DeviceMonitorPage = () => {
 
                 // console.log('🔍 Обновляем данные устройства:', params); // Убрали лишний лог
 
+                // Убеждаемся, что status сохраняется (приоритет params.status, если он был установлен выше)
+                const finalStatus = params.status || data.state.status || null;
+                
+                console.log('🔍 processStructuredData - finalStatus:', finalStatus);
+                console.log('🔍 processStructuredData - data.state.status:', data.state.status);
+                console.log('🔍 processStructuredData - params.status:', params.status);
+                
                 updateDeviceData({
                     [mac]: {
                         ...params,
+                        status: finalStatus, // Сохраняем status для определения состояния сварки
                         timestamp: data.timestamp || new Date().toLocaleTimeString(),
                         lastDatetimeUpdate: data.state.lastDatetimeUpdate || data.state.dateCreated || null,
                         localServerPacketDatetime: data.state.localServerPacketDatetime || null,
-                        dateCreated: data.state.dateCreated || null,
-                        status: data.state.status || null // Сохраняем status для определения состояния сварки
+                        dateCreated: data.state.dateCreated || null
                     }
                 });
+                
+                if (finalStatus) {
+                    console.log('✅ Status сохранен в deviceData:', finalStatus);
+                } else {
+                    console.log('⚠️ Status не был сохранен (null или undefined)');
+                }
 
             }
         } catch (err) {
@@ -1151,52 +1171,80 @@ const DeviceMonitorPage = () => {
         if (Object.keys(deviceData).length === 0 || !hasData) return false;
         const data = deviceData[machineMac];
         if (!data) return false;
-
-        // 1. Проверяем status из корня объекта (приоритет)
-        const status = data.status || data.Status || data.state || data.State;
+        
+        // Отладка: выводим все ключи и значения, связанные с состоянием
+        const stateKeys = Object.keys(data).filter(key => 
+            key.toLowerCase().includes('state') || 
+            key.toLowerCase().includes('status') ||
+            key.toLowerCase().includes('состояние') ||
+            key.toLowerCase().includes('welding')
+        );
+        if (stateKeys.length > 0) {
+            console.log('🔍 Ключи состояния:', stateKeys);
+            stateKeys.forEach(key => {
+                console.log(`  ${key}:`, data[key]);
+            });
+        }
+        
+        // 1. Проверяем status из корня объекта (приоритет) - это основное поле!
+        const status = data.status || data.Status;
         if (status) {
             const statusLower = String(status).toLowerCase().trim();
-            if (statusLower === 'welding' || statusLower === 'сварка' ||
-                statusLower === 'weld' || statusLower.includes('сварка')) {
+            console.log('🔍 Проверка status:', status, '->', statusLower);
+            // Проверяем различные варианты статуса "Сварка"
+            if (statusLower === 'welding' || statusLower === 'сварка' || 
+                statusLower === 'weld' || 
+                statusLower.includes('сварка') || 
+                statusLower.includes('welding')) {
+                console.log('✅ Сварка обнаружена по status:', status);
                 return true;
             }
             // Если статус явно не "сварка", возвращаем false
-            if (statusLower === 'offline' || statusLower === 'off' ||
+            if (statusLower === 'offline' || statusLower === 'off' || 
                 statusLower === 'выключен' || statusLower === 'выкл' ||
                 statusLower === 'on' || statusLower === 'вкл') {
+                console.log('❌ Статус не сварка:', status);
                 return false;
             }
+        } else {
+            console.log('⚠️ status не найден в данных');
         }
-
+        
         // 2. Проверяем состояние аппарата из properties (различные варианты ключей)
-        const weldingMachineState = data['Состояние аппарата'] ||
-            data['WeldingMachineState'] ||
-            data.weldingMachineState ||
-            data['State.WeldingMachineState'] ||
-            data.properties?.['WeldingMachineState'] ||
-            data.properties?.['Состояние аппарата'];
+        const weldingMachineState = data['Состояние аппарата'] || 
+                                   data['WeldingMachineState'] || 
+                                   data.weldingMachineState ||
+                                   data['State.WeldingMachineState'] ||
+                                   data.properties?.['WeldingMachineState'] ||
+                                   data.properties?.['Состояние аппарата'];
         if (weldingMachineState) {
             const stateLower = String(weldingMachineState).toLowerCase().trim();
+            console.log('🔍 Проверка WeldingMachineState:', weldingMachineState, '->', stateLower);
             // Проверяем, содержит ли состояние информацию о сварке
             if (stateLower === 'сварка' || stateLower === 'welding' ||
-                stateLower.includes('сварка') || stateLower.includes('welding') ||
+                stateLower.includes('сварка') || stateLower.includes('welding') || 
                 stateLower.includes('сварочн') || stateLower.includes('weld')) {
+                console.log('✅ Сварка обнаружена по WeldingMachineState');
                 return true;
             }
             // Если явно указано, что сварки нет
-            if (stateLower.includes('ожидан') || stateLower.includes('waiting') ||
+            if (stateLower.includes('ожидан') || stateLower.includes('waiting') || 
                 stateLower.includes('выключ') || stateLower.includes('off') ||
                 stateLower === 'выкл' || stateLower === 'off') {
                 return false;
             }
+        } else {
+            console.log('⚠️ WeldingMachineState не найден в данных');
         }
-
+        
         // 3. Проверяем, есть ли ненулевой ток сварки (как дополнительный индикатор)
         const current = parseFloat(data.Current || data['State.I'] || 0);
         if (current > 1) { // Порог больше 1А для уверенности
+            console.log('✅ Сварка обнаружена по току:', current);
             return true;
         }
-
+        
+        console.log('❌ Сварка не обнаружена');
         return false;
     };
 
