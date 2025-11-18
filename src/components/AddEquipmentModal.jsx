@@ -80,9 +80,9 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                     options: selectedOptions
                 });
                 await onSave({
-                    model: selectedModel,
-                    ...formData,
-                    options: selectedOptions
+                model: selectedModel,
+                ...formData,
+                options: selectedOptions
                 });
                 console.log('✅ AddEquipmentModal: onSave завершен успешно');
                 
@@ -112,9 +112,12 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                 onClose()
             } catch (error) {
                 console.error('❌ AddEquipmentModal: Ошибка в onSave:', error);
+                console.error('❌ AddEquipmentModal: error.errors:', error.errors);
+                console.error('❌ AddEquipmentModal: typeof error.errors:', typeof error.errors);
                 
                 // Если ошибка содержит объект с полями ошибок
                 if (error.errors && typeof error.errors === 'object') {
+                    console.log('✅ AddEquipmentModal: Обрабатываем ошибки валидации:', error.errors);
                     // Маппим ошибки: organizationUnit -> department, mac -> macAddress, commissionDate -> commissioningDate
                     const mappedErrors = {};
                     Object.keys(error.errors).forEach(key => {
@@ -131,11 +134,14 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                             mappedErrors[key] = error.errors[key];
                         }
                     });
+                    console.log('✅ AddEquipmentModal: Маппированные ошибки:', mappedErrors);
                     setErrors(mappedErrors);
                 } else if (error.message) {
                     // Если это общая ошибка API
+                    console.log('⚠️ AddEquipmentModal: Устанавливаем общую ошибку API:', error.message);
                     setApiError(error.message);
                 } else {
+                    console.log('⚠️ AddEquipmentModal: Устанавливаем общую ошибку по умолчанию');
                     setApiError('Произошла ошибка при сохранении оборудования');
                 }
                 // Не закрываем модальное окно при ошибке
@@ -218,7 +224,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                     <select 
                                         value={formData.department}
                                         onChange={(e) => handleInputChange('department', e.target.value)}
-                                        className={errors.organizationUnit ? 'error' : ''}
+                                        className={errors.department ? 'error' : ''}
                                     >
                                         <option value="">Выберите подразделение</option>
                                         {organizationUnits.map(unit => (
@@ -227,7 +233,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                             </option>
                                         ))}
                                     </select>
-                                    {errors.organizationUnit && <span className="error-message">{errors.organizationUnit}</span>}
+                                    {errors.department && <span className="error-message">{errors.department}</span>}
                                 </div>
                                 <div className="form-field">
                                     <label>Ввод в эксплуатацию*</label>
@@ -237,7 +243,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                             value={formData.commissioningDate}
                                             onChange={(e) => handleInputChange('commissioningDate', e.target.value)}
                                             placeholder="DD.MM.YYYY"
-                                            className={errors.commissionDate ? 'error' : ''}
+                                            className={errors.commissioningDate ? 'error' : ''}
                                         />
                                         <svg className="calendar-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
                                             <rect x="3" y="4" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
@@ -245,7 +251,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                             <path d="M6 2V5M10 2V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                                         </svg>
                                     </div>
-                                    {errors.commissionDate && <span className="error-message">{errors.commissionDate}</span>}
+                                    {errors.commissioningDate && <span className="error-message">{errors.commissioningDate}</span>}
                                 </div>
                                 <div className="form-field">
                                     <label>МАС - адрес*</label>
@@ -253,9 +259,9 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                         type="text"
                                         value={formData.macAddress}
                                         onChange={(e) => handleInputChange('macAddress', e.target.value)}
-                                        className={errors.mac ? 'error' : ''}
+                                        className={errors.macAddress ? 'error' : ''}
                                     />
-                                    {errors.mac && <span className="error-message">{errors.mac}</span>}
+                                    {errors.macAddress && <span className="error-message">{errors.macAddress}</span>}
                                 </div>
                                 <div className="form-field">
                                     <label>Серийный номер</label>

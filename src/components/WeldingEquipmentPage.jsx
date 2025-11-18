@@ -849,9 +849,9 @@ function WeldingEquipmentPage() {
         <div className="welding-equipment-page">
             <div className="filters-column">
                 <div className="filter-tile search-input">
-                    <input
-                        type="text"
-                        className="search-input"
+                    <input 
+                        type="text" 
+                        className="search-input" 
                         placeholder="Поиск..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -859,7 +859,7 @@ function WeldingEquipmentPage() {
                 </div>
 
                 <div className="filter-tile">
-                    <button
+                    <button 
                         className="filter-tile-header"
                         onClick={() => toggleFilter('department')}
                     >
@@ -873,8 +873,8 @@ function WeldingEquipmentPage() {
                                     {dept.children ? (
                                         <>
                                             <label className="filter-checkbox">
-                                                <input
-                                                    type="checkbox"
+                                                <input 
+                                                    type="checkbox" 
                                                     checked={organizationUnitFilter === dept.label}
                                                     onChange={(e) => {
                                                         if (e.target.checked) {
@@ -889,8 +889,8 @@ function WeldingEquipmentPage() {
                                             <div className="filter-sub-options">
                                                 {dept.children.map(child => (
                                                     <label key={child.id} className="filter-checkbox sub">
-                                                        <input
-                                                            type="checkbox"
+                                                        <input 
+                                                            type="checkbox" 
                                                             checked={organizationUnitFilter === child.label}
                                                             onChange={(e) => {
                                                                 if (e.target.checked) {
@@ -907,8 +907,8 @@ function WeldingEquipmentPage() {
                                         </>
                                     ) : (
                                         <label className="filter-checkbox">
-                                            <input
-                                                type="checkbox"
+                                            <input 
+                                                type="checkbox" 
                                                 checked={organizationUnitFilter === dept.label}
                                                 onChange={(e) => {
                                                     if (e.target.checked) {
@@ -928,7 +928,7 @@ function WeldingEquipmentPage() {
                 </div>
 
                 <div className="filter-tile">
-                    <button
+                    <button 
                         className="filter-tile-header"
                         onClick={() => toggleFilter('status')}
                     >
@@ -948,7 +948,7 @@ function WeldingEquipmentPage() {
                 </div>
 
                 <div className="filter-tile">
-                    <button
+                    <button 
                         className="filter-tile-header"
                         onClick={() => toggleFilter('model')}
                     >
@@ -959,8 +959,8 @@ function WeldingEquipmentPage() {
                         <div className="filter-tile-content">
                             {models.map(model => (
                                 <label key={model.id} className="filter-checkbox">
-                                    <input
-                                        type="checkbox"
+                                    <input 
+                                        type="checkbox" 
                                         checked={modelFilter === model.id || (model.id === 'all' && !modelFilter)}
                                         onChange={(e) => {
                                             if (e.target.checked) {
@@ -991,7 +991,7 @@ function WeldingEquipmentPage() {
                         </button>
                     </div>
                     <div className="view-toggle">
-                        <button
+                        <button 
                             className={`view-btn ${viewMode === 'tiles' ? 'active' : ''}`}
                             onClick={() => setViewMode('tiles')}
                         >
@@ -1003,7 +1003,7 @@ function WeldingEquipmentPage() {
                             </svg>
                             <span>Таблица</span>
                         </button>
-                        <button
+                        <button 
                             className={`view-btn ${viewMode === 'table' ? 'active' : ''}`}
                             onClick={() => setViewMode('table')}
                         >
@@ -1016,8 +1016,8 @@ function WeldingEquipmentPage() {
                 </div>
 
                 {viewMode === 'table' && (
-                <div className="equipment-table-container">
-                    <table className="equipment-table">
+                    <div className="equipment-table-container">
+                        <table className="equipment-table">
                             <thead>
                                 <tr>
                                     <th onClick={() => toggleSort('model')}>
@@ -1056,15 +1056,15 @@ function WeldingEquipmentPage() {
                                     const modelDisplay = getModelDisplay(item);
                                     const modelParts = formatModel(modelDisplay);
                                     return (
-                                        <tr
-                                            key={item.id}
+                                        <tr 
+                                            key={item.id} 
                                             className="table-row table-row-compact"
                                             onClick={() => handleControl(item)}
                                         >
                                             <td>
                                                 <div className="model-cell-table">
-                                                    <img
-                                                        src={machineImage}
+                                                    <img 
+                                                        src={machineImage} 
                                                         alt={modelDisplay}
                                                         className="machine-thumbnail-small"
                                                     />
@@ -1083,7 +1083,7 @@ function WeldingEquipmentPage() {
                                             <td>{getLastActivation(item) || 'Нет данных'}</td>
                                             <td>
                                                 <span className={`status-badge ${status}`}>
-                                                    {status === 'welding' ? 'Сварка' :
+                                                    {status === 'welding' ? 'Сварка' : 
                                                      status === 'on' ? 'Вкл' :
                                                      status === 'error' ? 'Ошибка' : 'Выкл'}
                                                 </span>
@@ -1097,7 +1097,7 @@ function WeldingEquipmentPage() {
                 )}
             </div>
 
-            <AddEquipmentModal
+            <AddEquipmentModal  
                 isOpen={modalOpen}
                 onClose={closeModal}
                 welders={welders}
@@ -1105,7 +1105,7 @@ function WeldingEquipmentPage() {
                 onSave={async (data) => {
                     try {
                         console.log('🟢 WeldingEquipmentPage: onSave вызван с данными:', data);
-                        // Преобразуем данные из AddEquipmentModal в формат для handleSave
+                    // Преобразуем данные из AddEquipmentModal в формат для handleSave
                         // Преобразуем модель: "Core" -> "CORE", "Блок мониторинга" -> "MONITORING_BLOCK"
                         let deviceModel = '';
                         if (data.model === 'Core') {
@@ -1118,40 +1118,43 @@ function WeldingEquipmentPage() {
 
                         console.log('🟢 WeldingEquipmentPage: Преобразованная модель:', deviceModel);
 
-                        const newEditData = {
-                            ...editData,
-                            name: data.name || '',
+                    const newEditData = {
+                        ...editData,
+                        name: data.name || '',
                             deviceModel: deviceModel,
-                            mac: data.macAddress || '',
-                            commissionDate: data.commissioningDate || '',
-                            serialNumber: data.serialNumber || '',
-                            inventoryNumber: data.inventoryNumber || '',
-                            organizationUnit: organizationUnits.find(unit => unit.name === data.department) || null,
-                            coreOptions: {
-                                gasControl: data.options?.gasControl || false,
-                                rfid: data.options?.rfid || false,
-                                bvo: data.options?.bvo || false
-                            },
-                            assignedWelders: data.approvedWelders || []
-                        };
+                        mac: data.macAddress || '',
+                        commissionDate: data.commissioningDate || '',
+                        serialNumber: data.serialNumber || '',
+                        inventoryNumber: data.inventoryNumber || '',
+                        organizationUnit: organizationUnits.find(unit => unit.name === data.department) || null,
+                        coreOptions: {
+                            gasControl: data.options?.gasControl || false,
+                            rfid: data.options?.rfid || false,
+                            bvo: data.options?.bvo || false
+                        },
+                        assignedWelders: data.approvedWelders || []
+                    };
                         console.log('🟢 WeldingEquipmentPage: newEditData:', newEditData);
-                        setEditData(newEditData);
+                    setEditData(newEditData);
                         
                         // Вызываем handleSave с переданными данными напрямую
                         console.log('🟢 WeldingEquipmentPage: Вызываем handleSave с данными...');
-                        const fakeEvent = { preventDefault: () => {} };
+                    const fakeEvent = { preventDefault: () => {} };
                         await handleSave(fakeEvent, newEditData);
                         console.log('✅ WeldingEquipmentPage: handleSave завершен');
                     } catch (error) {
                         console.error('❌ WeldingEquipmentPage: Ошибка в onSave:', error);
-                        // Создаем объект ошибки с полями для отображения в модальном окне
-                        const errorObj = new Error(error.message || 'Произошла ошибка при сохранении');
+                        console.error('❌ WeldingEquipmentPage: error.errors:', error.errors);
+                        // Сохраняем исходную ошибку, если у неё уже есть errors
                         if (error.errors) {
-                            errorObj.errors = error.errors;
-                        } else if (error.message) {
-                            errorObj.errors = { api: error.message };
+                            // Если ошибка уже содержит объект errors, просто пробрасываем её дальше
+                            throw error;
+                        } else {
+                            // Если это общая ошибка API без errors, создаем объект ошибки
+                            const errorObj = new Error(error.message || 'Произошла ошибка при сохранении');
+                            errorObj.errors = { api: error.message || 'Произошла ошибка при сохранении' };
+                            throw errorObj;
                         }
-                        throw errorObj; // Пробрасываем ошибку, чтобы модальное окно не закрылось
                     }
                 }}
             />
