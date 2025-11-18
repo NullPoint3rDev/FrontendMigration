@@ -3,7 +3,7 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 8px;
+    padding: 10px 14px 10px 0;
     margin: 0;
     background: radial-gradient(circle at 18% 12%, rgba(35, 58, 92, 0.28), rgba(11, 18, 33, 0.92) 54%), #122536;
     color: #f0f4ff;
@@ -31,14 +31,15 @@
 
 .top-grid {
     display: grid;
-    grid-template-columns: 200px 520px 450px minmax(0, 1fr);
+    grid-template-columns: 200px 520px 450px 430px;
     gap: 8px;
     flex: 0 0 auto;
     min-height: 0;
     align-content: stretch;
     padding: 0;
     margin: 0;
-    width: 100%;
+    margin-left: -16px;
+    width: calc(100% + 16px);
     box-sizing: border-box;
 }
 
@@ -47,8 +48,6 @@
     flex-direction: column;
     gap: 6px;
     grid-column: 2;
-    min-width: 0;
-    width: 100%;
 }
 
 .machine-section {
@@ -58,7 +57,8 @@
     grid-column: 1;
     padding: 0;
     margin: 0;
-    width: 100%;
+    margin-left: -16px;
+    width: calc(100% + 16px);
 }
 
 .machine-title {
@@ -440,8 +440,6 @@
     overflow: hidden;
     grid-column: 3;
     justify-content: space-between;
-    min-width: 0;
-    width: 100%;
 }
 
 .status-card__header {
@@ -529,8 +527,6 @@
     gap: 6px;
     grid-column: 4;
     height: 100%;
-    min-width: 0;
-    width: 100%;
 }
 
 .welder-header-tile {
@@ -1190,11 +1186,11 @@
 
 @media (max-width: 1600px) {
     .main-panel {
-        padding: 8px;
+        padding: 24px;
     }
 
     .top-grid {
-        grid-template-columns: 200px 520px 450px minmax(0, 1fr);
+        grid-template-columns: 320px 1fr 0.9fr 0.9fr;
     }
 
     .bottom-panel__body {
@@ -1204,7 +1200,7 @@
 
 @media (max-width: 1400px) {
     .main-panel {
-        padding: 8px;
+        padding: 20px;
     }
 
     .card {
