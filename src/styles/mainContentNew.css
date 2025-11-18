@@ -301,7 +301,12 @@
 /* Цвета в зависимости от состояния сварки */
 .metric-value.welding-active.primary,
 .metric-value.welding-active.secondary {
-    color: #FCAC3D !important; /* Желтый цвет при сварке */
+    color: #FCAC3D !important; /* Желтый/оранжевый цвет при сварке */
+}
+
+.metric-value.welding-active.primary .value,
+.metric-value.welding-active.secondary .value {
+    color: #FCAC3D !important; /* Желтый/оранжевый цвет для значения при сварке */
 }
 
 .metric-value.welding-inactive.primary,

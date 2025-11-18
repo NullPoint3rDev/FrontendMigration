@@ -233,18 +233,28 @@ const DeviceMonitorPage = () => {
             return;
         }
         const data = deviceData[machineMac];
-        if (!data) return;
+        if (!data) {
+            // Нет данных для этого аппарата - обнуляем таймер
+            if (weldingStartTime) {
+                const duration = Date.now() - weldingStartTime;
+                setLastWeldingDuration(duration);
+                setWeldingEndTime(Date.now());
+                setWeldingStartTime(null);
+            }
+            return;
+        }
 
         const isCurrentlyWelding = isWelding();
 
         if (isCurrentlyWelding) {
             // Сварка началась или продолжается
             if (!weldingStartTime) {
-                // Сварка только началась
+                // Сварка только началась - устанавливаем время начала
                 setWeldingStartTime(Date.now());
                 setWeldingEndTime(null);
                 setLastWeldingDuration(0);
             }
+            // Если сварка продолжается, ничего не делаем - таймер уже работает
         } else {
             // Сварка не идет
             if (weldingStartTime) {
@@ -873,11 +883,17 @@ const DeviceMonitorPage = () => {
 
     const getWeldingTimer = () => {
         const isCurrentlyWelding = isWelding();
-        
-        if (isCurrentlyWelding && weldingStartTime) {
-            // Сварка идет - показываем текущее время сварки
-            const duration = Date.now() - weldingStartTime;
-            return formatDuration(duration);
+
+        // Если сварка идет и есть время начала - показываем текущее время
+        if (isCurrentlyWelding) {
+            if (weldingStartTime) {
+                const duration = Date.now() - weldingStartTime;
+                return formatDuration(duration);
+            } else {
+                // Сварка идет, но время начала еще не установлено - показываем 00:00:00
+                // Это временное состояние, пока useEffect не обновит weldingStartTime
+                return '00:00:00';
+            }
         } else if (weldingEndTime && lastWeldingDuration > 0) {
             // Сварка только что закончилась - показываем последнее время еще 2 секунды
             const timeSinceEnd = Date.now() - weldingEndTime;
@@ -885,7 +901,7 @@ const DeviceMonitorPage = () => {
                 return formatDuration(lastWeldingDuration);
             }
         }
-        
+
         // Сварки нет - показываем нули
         return '00:00:00';
     };
@@ -896,7 +912,7 @@ const DeviceMonitorPage = () => {
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
-        
+
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
 
@@ -944,41 +960,41 @@ const DeviceMonitorPage = () => {
         }
 
         // 7. Температура охлаждающей жидкости на входе
-        const chillerTemperature1 = data['Температура охлаждающей жидкости на входе'] || 
-                                   data['ChillerTemperature1'] || 
-                                   data.chillerTemperature1;
+        const chillerTemperature1 = data['Температура охлаждающей жидкости на входе'] ||
+            data['ChillerTemperature1'] ||
+            data.chillerTemperature1;
         if (chillerTemperature1 !== undefined && chillerTemperature1 !== null) {
             params.push({ label: 'Входящая темп. охл. жидкости', value: `${chillerTemperature1} °C` });
         }
 
         // 8. Температура охлаждающей жидкости на выходе
-        const chillerTemperature2 = data['Температура охлаждающей жидкости на выходе'] || 
-                                   data['ChillerTemperature2'] || 
-                                   data.chillerTemperature2;
+        const chillerTemperature2 = data['Температура охлаждающей жидкости на выходе'] ||
+            data['ChillerTemperature2'] ||
+            data.chillerTemperature2;
         if (chillerTemperature2 !== undefined && chillerTemperature2 !== null) {
             params.push({ label: 'Исходящая темп. охл. жидкости', value: `${chillerTemperature2} °C` });
         }
 
         // 9. Температура первичной обмотки
-        const primaryCoilTemperature = data['Температура первичной обмотки'] || 
-                                      data['PrimaryCoilTemperature'] || 
-                                      data.primaryCoilTemperature;
+        const primaryCoilTemperature = data['Температура первичной обмотки'] ||
+            data['PrimaryCoilTemperature'] ||
+            data.primaryCoilTemperature;
         if (primaryCoilTemperature !== undefined && primaryCoilTemperature !== null) {
             params.push({ label: 'Температура первичной обмотки', value: `${primaryCoilTemperature} °C` });
         }
 
         // 10. Температура вторичной обмотки
-        const secondaryCoilTemperature = data['Температура вторичной обмотки'] || 
-                                        data['SecondaryCoilTemperature'] || 
-                                        data.secondaryCoilTemperature;
+        const secondaryCoilTemperature = data['Температура вторичной обмотки'] ||
+            data['SecondaryCoilTemperature'] ||
+            data.secondaryCoilTemperature;
         if (secondaryCoilTemperature !== undefined && secondaryCoilTemperature !== null) {
             params.push({ label: 'Температура вторичной обмотки', value: `${secondaryCoilTemperature} °C` });
         }
 
         // 11. Расход проволоки
-        const wireConsumption = data['Расход проволоки'] || 
-                               data['WireConsumption'] || 
-                               data.wireConsumption;
+        const wireConsumption = data['Расход проволоки'] ||
+            data['WireConsumption'] ||
+            data.wireConsumption;
         if (wireConsumption !== undefined && wireConsumption !== null) {
             params.push({ label: 'Расход проволоки', value: `${wireConsumption} м/мин` });
         }
@@ -1035,12 +1051,12 @@ const DeviceMonitorPage = () => {
         if (!data) return [];
 
         const errors = [];
-        
+
         // Получаем timestamp из данных с правильной обработкой
         const getTimestamp = () => {
             // Пробуем разные источники timestamp
             let timestamp = null;
-            
+
             if (data.lastDatetimeUpdate) {
                 timestamp = data.lastDatetimeUpdate;
             } else if (data.localServerPacketDatetime) {
@@ -1050,7 +1066,7 @@ const DeviceMonitorPage = () => {
             } else if (data.timestamp) {
                 timestamp = data.timestamp;
             }
-            
+
             if (timestamp) {
                 // Если это строка в формате ISO, парсим её
                 if (typeof timestamp === 'string') {
@@ -1065,15 +1081,15 @@ const DeviceMonitorPage = () => {
                     return timestamp;
                 }
             }
-            
+
             // Fallback на текущую дату
             return new Date();
         };
-        
+
         const errorDate = getTimestamp();
         const timeStr = errorDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
         const dateStr = errorDate.toLocaleDateString('ru-RU');
-        
+
         // Получаем ошибки из разных возможных источников
         // 1. errorCode из корня объекта
         const errorCode = data['errorCode'] || data.errorCode;
@@ -1086,12 +1102,12 @@ const DeviceMonitorPage = () => {
                 message: `Ошибка ${errorCode}`
             });
         }
-        
+
         // 2. Свойство "Ошибки" из properties
         const errorsProperty = data['Ошибки'] || data['Errors'] || data.errors;
-        if (errorsProperty && 
-            errorsProperty !== 'Нет ошибок' && 
-            errorsProperty !== 'No errors' && 
+        if (errorsProperty &&
+            errorsProperty !== 'Нет ошибок' &&
+            errorsProperty !== 'No errors' &&
             String(errorsProperty).trim() !== '' &&
             String(errorsProperty).toLowerCase() !== 'null') {
             errors.push({
@@ -1135,42 +1151,52 @@ const DeviceMonitorPage = () => {
         if (Object.keys(deviceData).length === 0 || !hasData) return false;
         const data = deviceData[machineMac];
         if (!data) return false;
-        
+
         // 1. Проверяем status из корня объекта (приоритет)
-        const status = data.status || data.Status;
+        const status = data.status || data.Status || data.state || data.State;
         if (status) {
-            const statusLower = String(status).toLowerCase();
-            if (statusLower === 'welding' || statusLower === 'сварка') {
+            const statusLower = String(status).toLowerCase().trim();
+            if (statusLower === 'welding' || statusLower === 'сварка' ||
+                statusLower === 'weld' || statusLower.includes('сварка')) {
                 return true;
             }
             // Если статус явно не "сварка", возвращаем false
-            if (statusLower === 'offline' || statusLower === 'off' || statusLower === 'выключен') {
+            if (statusLower === 'offline' || statusLower === 'off' ||
+                statusLower === 'выключен' || statusLower === 'выкл' ||
+                statusLower === 'on' || statusLower === 'вкл') {
                 return false;
             }
         }
-        
-        // 2. Проверяем состояние аппарата из properties
-        const weldingMachineState = data['Состояние аппарата'] || data['WeldingMachineState'] || data.weldingMachineState;
+
+        // 2. Проверяем состояние аппарата из properties (различные варианты ключей)
+        const weldingMachineState = data['Состояние аппарата'] ||
+            data['WeldingMachineState'] ||
+            data.weldingMachineState ||
+            data['State.WeldingMachineState'] ||
+            data.properties?.['WeldingMachineState'] ||
+            data.properties?.['Состояние аппарата'];
         if (weldingMachineState) {
-            const stateLower = String(weldingMachineState).toLowerCase();
+            const stateLower = String(weldingMachineState).toLowerCase().trim();
             // Проверяем, содержит ли состояние информацию о сварке
-            if (stateLower.includes('сварка') || stateLower.includes('welding') || 
+            if (stateLower === 'сварка' || stateLower === 'welding' ||
+                stateLower.includes('сварка') || stateLower.includes('welding') ||
                 stateLower.includes('сварочн') || stateLower.includes('weld')) {
                 return true;
             }
             // Если явно указано, что сварки нет
-            if (stateLower.includes('ожидан') || stateLower.includes('waiting') || 
-                stateLower.includes('выключ') || stateLower.includes('off')) {
+            if (stateLower.includes('ожидан') || stateLower.includes('waiting') ||
+                stateLower.includes('выключ') || stateLower.includes('off') ||
+                stateLower === 'выкл' || stateLower === 'off') {
                 return false;
             }
         }
-        
+
         // 3. Проверяем, есть ли ненулевой ток сварки (как дополнительный индикатор)
         const current = parseFloat(data.Current || data['State.I'] || 0);
         if (current > 1) { // Порог больше 1А для уверенности
             return true;
         }
-        
+
         return false;
     };
 
@@ -1197,7 +1223,7 @@ const DeviceMonitorPage = () => {
     const currentProgress = getCurrentProgress();
     const voltageProgress = getVoltageProgress();
     const isWeldingActive = isWelding();
-    
+
     // Определяем, нужно ли показывать таймер желтым (сварка идет или только что закончилась)
     const isTimerActive = isWeldingActive || (weldingEndTime && (currentTime - weldingEndTime < 2000));
 
@@ -1219,8 +1245,8 @@ const DeviceMonitorPage = () => {
                     </div>
                     <div className="machine-visual-container">
                         <div className="machine-visual">
-                            <img 
-                                src={machineImage} 
+                            <img
+                                src={machineImage}
                                 alt="CORE PRO 500 сварочный аппарат"
                                 className="machine-image"
                             />
