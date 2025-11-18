@@ -761,9 +761,9 @@ function WeldingEquipmentPage() {
         <div className="welding-equipment-page">
             <div className="filters-column">
                 <div className="filter-tile search-input">
-                    <input 
-                        type="text" 
-                        className="search-input" 
+                    <input
+                        type="text"
+                        className="search-input"
                         placeholder="Поиск..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -771,7 +771,7 @@ function WeldingEquipmentPage() {
                 </div>
 
                 <div className="filter-tile">
-                    <button 
+                    <button
                         className="filter-tile-header"
                         onClick={() => toggleFilter('department')}
                     >
@@ -785,8 +785,8 @@ function WeldingEquipmentPage() {
                                     {dept.children ? (
                                         <>
                                             <label className="filter-checkbox">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     checked={organizationUnitFilter === dept.label}
                                                     onChange={(e) => {
                                                         if (e.target.checked) {
@@ -801,8 +801,8 @@ function WeldingEquipmentPage() {
                                             <div className="filter-sub-options">
                                                 {dept.children.map(child => (
                                                     <label key={child.id} className="filter-checkbox sub">
-                                                        <input 
-                                                            type="checkbox" 
+                                                        <input
+                                                            type="checkbox"
                                                             checked={organizationUnitFilter === child.label}
                                                             onChange={(e) => {
                                                                 if (e.target.checked) {
@@ -819,8 +819,8 @@ function WeldingEquipmentPage() {
                                         </>
                                     ) : (
                                         <label className="filter-checkbox">
-                                            <input 
-                                                type="checkbox" 
+                                            <input
+                                                type="checkbox"
                                                 checked={organizationUnitFilter === dept.label}
                                                 onChange={(e) => {
                                                     if (e.target.checked) {
@@ -840,7 +840,7 @@ function WeldingEquipmentPage() {
                 </div>
 
                 <div className="filter-tile">
-                    <button 
+                    <button
                         className="filter-tile-header"
                         onClick={() => toggleFilter('status')}
                     >
@@ -860,7 +860,7 @@ function WeldingEquipmentPage() {
                 </div>
 
                 <div className="filter-tile">
-                    <button 
+                    <button
                         className="filter-tile-header"
                         onClick={() => toggleFilter('model')}
                     >
@@ -871,8 +871,8 @@ function WeldingEquipmentPage() {
                         <div className="filter-tile-content">
                             {models.map(model => (
                                 <label key={model.id} className="filter-checkbox">
-                                    <input 
-                                        type="checkbox" 
+                                    <input
+                                        type="checkbox"
                                         checked={modelFilter === model.id || (model.id === 'all' && !modelFilter)}
                                         onChange={(e) => {
                                             if (e.target.checked) {
@@ -903,7 +903,7 @@ function WeldingEquipmentPage() {
                         </button>
                     </div>
                     <div className="view-toggle">
-                        <button 
+                        <button
                             className={`view-btn ${viewMode === 'tiles' ? 'active' : ''}`}
                             onClick={() => setViewMode('tiles')}
                         >
@@ -913,16 +913,16 @@ function WeldingEquipmentPage() {
                                 <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
                                 <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
                             </svg>
-                            <span>Плитки</span>
+                            <span>Таблица</span>
                         </button>
-                        <button 
+                        <button
                             className={`view-btn ${viewMode === 'table' ? 'active' : ''}`}
                             onClick={() => setViewMode('table')}
                         >
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                 <path d="M2 4H14M2 8H14M2 12H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                             </svg>
-                            <span>Таблица</span>
+                            <span>Плитки</span>
                         </button>
                     </div>
                 </div>
@@ -968,8 +968,8 @@ function WeldingEquipmentPage() {
                                     const modelDisplay = getModelDisplay(item);
                                     const modelParts = formatModel(modelDisplay);
                                     return (
-                                        <tr 
-                                            key={item.id} 
+                                        <tr
+                                            key={item.id}
                                             className="table-row table-row-compact"
                                             onClick={() => handleControl(item)}
                                         >
@@ -1009,7 +1009,7 @@ function WeldingEquipmentPage() {
                 )}
             </div>
 
-            <AddEquipmentModal  
+            <AddEquipmentModal
                 isOpen={modalOpen}
                 onClose={closeModal}
                 welders={welders}
@@ -1019,8 +1019,8 @@ function WeldingEquipmentPage() {
                     const newEditData = {
                         ...editData,
                         name: data.name || '',
-                        deviceModel: data.model === 'CORE PRO 500' ? 'CORE' : 
-                                     data.model === 'Блок Мониторинга' ? 'MONITORING_BLOCK' : 
+                        deviceModel: data.model === 'CORE PRO 500' ? 'CORE' :
+                                     data.model === 'Блок Мониторинга' ? 'MONITORING_BLOCK' :
                                      data.model || '',
                         mac: data.macAddress || '',
                         commissionDate: data.commissioningDate || '',

@@ -243,13 +243,10 @@
 }
 
 .equipment-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    border-spacing: 0 !important;
+    width: 100%;
+    border-collapse: collapse;
     flex: 1;
     min-height: 0;
-    /* Изолируем от Material-UI */
-    isolation: isolate;
 }
 
 .equipment-table thead {
