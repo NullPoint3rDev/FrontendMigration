@@ -1198,16 +1198,19 @@ const DeviceMonitorPage = () => {
             const stateLower = String(weldingMachineState).toLowerCase().trim();
             console.log('🔍 Проверка WeldingMachineState (приоритет):', weldingMachineState, '->', stateLower);
             // Проверяем, содержит ли состояние информацию о сварке
+            // ВАЖНО: только явное указание "Сварка" или "Welding", не "Аппарат включен"
             if (stateLower === 'сварка' || stateLower === 'welding' ||
                 stateLower.includes('сварка') || stateLower.includes('welding') || 
                 stateLower.includes('сварочн') || stateLower.includes('weld')) {
                 console.log('✅ Сварка обнаружена по WeldingMachineState:', weldingMachineState);
                 return true;
             }
-            // Если явно указано, что сварки нет
+            // Если явно указано, что сварки нет (включен, ожидание, выключен и т.д.)
             if (stateLower.includes('ожидан') || stateLower.includes('waiting') || 
                 stateLower.includes('выключ') || stateLower.includes('off') ||
-                stateLower === 'выкл' || stateLower === 'off') {
+                stateLower.includes('включен') || stateLower.includes('on') ||
+                stateLower === 'выкл' || stateLower === 'off' ||
+                stateLower === 'аппарат включен') {
                 console.log('❌ WeldingMachineState указывает на отсутствие сварки:', weldingMachineState);
                 return false;
             }
@@ -1238,10 +1241,12 @@ const DeviceMonitorPage = () => {
             console.log('⚠️ status не найден в данных');
         }
         
-        // 3. Проверяем, есть ли ненулевой ток сварки (как дополнительный индикатор)
+        // 3. Проверяем ток сварки ТОЛЬКО если WeldingMachineState не определен или неоднозначен
+        // НЕ используем ток как основной индикатор, так как аппарат может быть включен без сварки
         const current = parseFloat(data.Current || data['State.I'] || 0);
-        if (current > 1) { // Порог больше 1А для уверенности
-            console.log('✅ Сварка обнаружена по току:', current);
+        if (current > 1 && !weldingMachineState) {
+            // Только если WeldingMachineState не определен, используем ток как индикатор
+            console.log('✅ Сварка обнаружена по току (WeldingMachineState не определен):', current);
             return true;
         }
         
