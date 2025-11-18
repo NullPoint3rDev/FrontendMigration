@@ -46,15 +46,27 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         }))
     }
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (onSave) {
-            onSave({
-                model: selectedModel,
-                ...formData,
-                options: selectedOptions
-            })
+            try {
+                console.log('🔵 AddEquipmentModal: Вызываем onSave с данными:', {
+                    model: selectedModel,
+                    ...formData,
+                    options: selectedOptions
+                });
+                await onSave({
+                    model: selectedModel,
+                    ...formData,
+                    options: selectedOptions
+                });
+                console.log('✅ AddEquipmentModal: onSave завершен успешно');
+            } catch (error) {
+                console.error('❌ AddEquipmentModal: Ошибка в onSave:', error);
+                // Не закрываем модальное окно при ошибке
+                return;
+            }
         }
-        // Сбрасываем форму после сохранения
+        // Сбрасываем форму после успешного сохранения
         setSelectedModel('Core')
         setFormData({
             name: '',

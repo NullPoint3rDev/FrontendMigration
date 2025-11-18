@@ -449,34 +449,49 @@ function WeldingEquipmentPage() {
         return sortDirection === 'asc' ? sorted : sorted.reverse();
     };
 
-    const handleSave = async (e) => {
+    const handleSave = async (e, customEditData = null) => {
         e.preventDefault();
+        // Используем переданные данные или текущее состояние
+        const dataToUse = customEditData || editData;
+        console.log('🟡 handleSave: Начало, editData:', dataToUse);
         const newErrors = {};
-        const trimmedName = (editData.name || '').trim();
-        if (!trimmedName) newErrors.name = 'Это поле обязательно';
-        if (!editData.deviceModel) newErrors.deviceModel = 'Выберите модель устройства';
+        const trimmedName = (dataToUse.name || '').trim();
+        if (!trimmedName) {
+            newErrors.name = 'Это поле обязательно';
+            console.log('❌ handleSave: Ошибка валидации - нет названия');
+        }
+        if (!dataToUse.deviceModel) {
+            newErrors.deviceModel = 'Выберите модель устройства';
+            console.log('❌ handleSave: Ошибка валидации - нет модели');
+        }
         // Приводим MAC к формату: только заглавные буквы, без двоеточий
-        let mac = (editData.mac || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+        let mac = (dataToUse.mac || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
         if (!mac || mac.length !== 12) {
             newErrors.mac = 'MAC-адрес должен содержать 12 символов (только 0-9, A-F)';
+            console.log('❌ handleSave: Ошибка валидации - некорректный MAC:', mac);
         }
-        if (!editData.organizationUnit) newErrors.organizationUnit = 'Выберите подразделение';
-        if (!editData.commissionDate) {
+        if (!dataToUse.organizationUnit) {
+            newErrors.organizationUnit = 'Выберите подразделение';
+            console.log('❌ handleSave: Ошибка валидации - нет подразделения');
+        }
+        if (!dataToUse.commissionDate) {
             newErrors.commissionDate = 'Укажите дату ввода в эксплуатацию';
+            console.log('❌ handleSave: Ошибка валидации - нет даты ввода в эксплуатацию');
         } else {
-            const commissionDateObj = new Date(editData.commissionDate);
+            const commissionDateObj = new Date(dataToUse.commissionDate);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             if (commissionDateObj > today) {
                 newErrors.commissionDate = 'Дата ввода в эксплуатацию не может быть в будущем';
+                console.log('❌ handleSave: Ошибка валидации - дата в будущем');
             }
         }
 
-        const selectedUnitId = editData.organizationUnit?.id;
+        const selectedUnitId = dataToUse.organizationUnit?.id;
         if (trimmedName && selectedUnitId) {
             const duplicateName = equipment.some(machine => {
                 const machineUnitId = machine.organizationUnit?.id || machine.organizationUnitId;
-                return machine.id !== editData.id &&
+                return machine.id !== dataToUse.id &&
                     machineUnitId === selectedUnitId &&
                     (machine.name || '').trim().toLowerCase() === trimmedName.toLowerCase();
             });
@@ -485,73 +500,75 @@ function WeldingEquipmentPage() {
             }
         }
 
-        const maintenanceIntervalValue = editData.maintenanceInterval !== '' && editData.maintenanceInterval != null
-            ? Number(editData.maintenanceInterval)
+        const maintenanceIntervalValue = dataToUse.maintenanceInterval !== '' && dataToUse.maintenanceInterval != null
+            ? Number(dataToUse.maintenanceInterval)
             : null;
         if (maintenanceIntervalValue != null && (Number.isNaN(maintenanceIntervalValue) || maintenanceIntervalValue < 0)) {
             newErrors.maintenanceInterval = 'Значение должно быть неотрицательным числом';
         }
 
-        const maintenanceReminderValue = editData.maintenanceReminderHours !== '' && editData.maintenanceReminderHours != null
-            ? Number(editData.maintenanceReminderHours)
+        const maintenanceReminderValue = dataToUse.maintenanceReminderHours !== '' && dataToUse.maintenanceReminderHours != null
+            ? Number(dataToUse.maintenanceReminderHours)
             : null;
         if (maintenanceReminderValue != null && (Number.isNaN(maintenanceReminderValue) || maintenanceReminderValue < 0)) {
             newErrors.maintenanceReminderHours = 'Укажите корректное количество часов';
         }
 
         if (Object.keys(newErrors).length) {
+            console.log('❌ handleSave: Есть ошибки валидации:', newErrors);
             setErrors(newErrors);
             return;
         }
 
+        console.log('✅ handleSave: Валидация пройдена, начинаем сохранение...');
         try {
-            const commissionDateValue = editData.commissionDate
-                ? `${editData.commissionDate}T00:00:00`
+            const commissionDateValue = dataToUse.commissionDate
+                ? `${dataToUse.commissionDate}T00:00:00`
                 : null;
-            const lastServiceValue = editData.lastService
-                ? `${editData.lastService}T00:00:00`
+            const lastServiceValue = dataToUse.lastService
+                ? `${dataToUse.lastService}T00:00:00`
                 : null;
 
             const machineData = {
-                id: editData.id,
+                id: dataToUse.id,
                 name: trimmedName,
-                deviceModel: editData.deviceModel,
+                deviceModel: dataToUse.deviceModel,
                 mac,
                 commissionDate: commissionDateValue,
-                manufactureYear: editData.manufactureYear || '',
+                manufactureYear: dataToUse.manufactureYear || '',
                 lastService: lastServiceValue,
-                serialNumber: editData.serialNumber || '',
-                inventoryNumber: editData.inventoryNumber || '',
-                organizationUnit: editData.organizationUnit,
-                weldingMachineType: editData.weldingMachineType,
-                assignedWelders: editData.assignedWelders || [],
+                serialNumber: dataToUse.serialNumber || '',
+                inventoryNumber: dataToUse.inventoryNumber || '',
+                organizationUnit: dataToUse.organizationUnit,
+                weldingMachineType: dataToUse.weldingMachineType,
+                assignedWelders: dataToUse.assignedWelders || [],
                 maintenanceInterval: maintenanceIntervalValue,
                 maintenanceRegulation: maintenanceIntervalValue,
                 userServiceNotifiedBeforeHours: maintenanceReminderValue,
             };
 
-            if (!editData.id) {
+            if (!dataToUse.id) {
                 delete machineData.id;
             }
 
-            const isCoreSelected = editData.deviceModel === 'CORE';
+            const isCoreSelected = dataToUse.deviceModel === 'CORE';
 
             if (isCoreSelected) {
                 const corePayload = {
                     options: {
-                        gasControl: Boolean(editData.coreOptions?.gasControl),
-                        rfid: Boolean(editData.coreOptions?.rfid),
-                        bvo: Boolean(editData.coreOptions?.bvo),
+                        gasControl: Boolean(dataToUse.coreOptions?.gasControl),
+                        rfid: Boolean(dataToUse.coreOptions?.rfid),
+                        bvo: Boolean(dataToUse.coreOptions?.bvo),
                     },
-                    wtModuleMac: editData.wtModuleMac || '',
+                    wtModuleMac: dataToUse.wtModuleMac || '',
                     maintenance: {
                         intervalHours: maintenanceIntervalValue,
                         lastServiceDate: lastServiceValue,
-                        technicianName: editData.maintenanceTechnicianName || '',
-                        technicianPass: editData.maintenanceTechnicianPass || '',
+                        technicianName: dataToUse.maintenanceTechnicianName || '',
+                        technicianPass: dataToUse.maintenanceTechnicianPass || '',
                     },
-                    responsibleUserId: editData.responsibleUserId ? Number(editData.responsibleUserId) : null,
-                    allowedWelders: editData.assignedWelders || [],
+                    responsibleUserId: dataToUse.responsibleUserId ? Number(dataToUse.responsibleUserId) : null,
+                    allowedWelders: dataToUse.assignedWelders || [],
                     maintenanceReminderHours: maintenanceReminderValue,
                 };
                 machineData.modules = JSON.stringify(corePayload);
@@ -559,14 +576,22 @@ function WeldingEquipmentPage() {
                 machineData.modules = null;
             }
 
-            if (editData.id) {
-                await updateWeldingMachine(editData.id, machineData);
+            if (dataToUse.id) {
+                console.log('🟡 handleSave: Обновляем существующее оборудование, ID:', dataToUse.id);
+                console.log('🟡 handleSave: Данные для отправки:', machineData);
+                await updateWeldingMachine(dataToUse.id, machineData);
+                console.log('✅ handleSave: Оборудование успешно обновлено');
                 alert('Оборудование успешно обновлено');
             } else {
-                await createWeldingMachine(machineData);
+                console.log('🟡 handleSave: Создаем новое оборудование');
+                console.log('🟡 handleSave: Данные для отправки:', machineData);
+                const result = await createWeldingMachine(machineData);
+                console.log('✅ handleSave: Оборудование успешно создано, ответ сервера:', result);
                 alert('Оборудование успешно создано');
             }
+            console.log('🟡 handleSave: Загружаем обновленный список оборудования...');
             await loadEquipment();
+            console.log('✅ handleSave: Список оборудования обновлен');
             closeModal();
         } catch (err) {
             console.error('Ошибка сохранения оборудования:', err);
@@ -1015,37 +1040,49 @@ function WeldingEquipmentPage() {
                 welders={welders}
                 organizationUnits={organizationUnits}
                 onSave={async (data) => {
-                    // Преобразуем данные из AddEquipmentModal в формат для handleSave
-                    // Преобразуем модель: "Core" -> "CORE", "Блок мониторинга" -> "MONITORING_BLOCK"
-                    let deviceModel = '';
-                    if (data.model === 'Core') {
-                        deviceModel = 'CORE';
-                    } else if (data.model === 'Блок мониторинга') {
-                        deviceModel = 'MONITORING_BLOCK';
-                    } else {
-                        deviceModel = data.model || '';
-                    }
+                    try {
+                        console.log('🟢 WeldingEquipmentPage: onSave вызван с данными:', data);
+                        // Преобразуем данные из AddEquipmentModal в формат для handleSave
+                        // Преобразуем модель: "Core" -> "CORE", "Блок мониторинга" -> "MONITORING_BLOCK"
+                        let deviceModel = '';
+                        if (data.model === 'Core') {
+                            deviceModel = 'CORE';
+                        } else if (data.model === 'Блок мониторинга') {
+                            deviceModel = 'MONITORING_BLOCK';
+                        } else {
+                            deviceModel = data.model || '';
+                        }
 
-                    const newEditData = {
-                        ...editData,
-                        name: data.name || '',
-                        deviceModel: deviceModel,
-                        mac: data.macAddress || '',
-                        commissionDate: data.commissioningDate || '',
-                        serialNumber: data.serialNumber || '',
-                        inventoryNumber: data.inventoryNumber || '',
-                        organizationUnit: organizationUnits.find(unit => unit.name === data.department) || null,
-                        coreOptions: {
-                            gasControl: data.options?.gasControl || false,
-                            rfid: data.options?.rfid || false,
-                            bvo: data.options?.bvo || false
-                        },
-                        assignedWelders: data.approvedWelders || []
-                    };
-                    setEditData(newEditData);
-                    // Вызываем handleSave
-                    const fakeEvent = { preventDefault: () => {} };
-                    await handleSave(fakeEvent);
+                        console.log('🟢 WeldingEquipmentPage: Преобразованная модель:', deviceModel);
+
+                        const newEditData = {
+                            ...editData,
+                            name: data.name || '',
+                            deviceModel: deviceModel,
+                            mac: data.macAddress || '',
+                            commissionDate: data.commissioningDate || '',
+                            serialNumber: data.serialNumber || '',
+                            inventoryNumber: data.inventoryNumber || '',
+                            organizationUnit: organizationUnits.find(unit => unit.name === data.department) || null,
+                            coreOptions: {
+                                gasControl: data.options?.gasControl || false,
+                                rfid: data.options?.rfid || false,
+                                bvo: data.options?.bvo || false
+                            },
+                            assignedWelders: data.approvedWelders || []
+                        };
+                        console.log('🟢 WeldingEquipmentPage: newEditData:', newEditData);
+                        setEditData(newEditData);
+                        
+                        // Вызываем handleSave с переданными данными напрямую
+                        console.log('🟢 WeldingEquipmentPage: Вызываем handleSave с данными...');
+                        const fakeEvent = { preventDefault: () => {} };
+                        await handleSave(fakeEvent, newEditData);
+                        console.log('✅ WeldingEquipmentPage: handleSave завершен');
+                    } catch (error) {
+                        console.error('❌ WeldingEquipmentPage: Ошибка в onSave:', error);
+                        throw error; // Пробрасываем ошибку, чтобы модальное окно не закрылось
+                    }
                 }}
             />
         </div>
