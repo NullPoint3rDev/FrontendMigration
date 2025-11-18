@@ -77,24 +77,22 @@ td, th {
 }
 
 /* Фиксированные размеры для #root как в MaximDesignWT2 */
-/* Переопределяем стили из main_page.css - эти стили должны применяться ПОСЛЕ main_page.css */
-html #root,
-body #root {
+/* Переопределяем стили из main_page.css */
+#root {
     width: 1700px !important;
     height: 1080px !important;
     overflow: hidden !important;
     margin: 0 auto !important;
-    /*display: block !important;*/
-    /*flex-direction: unset !important;*/
+    display: block !important;
+    flex-direction: unset !important;
 }
 
 /* Для страницы с sidebar переопределяем display */
-html #root .app,
-body #root .app {
+#root .app {
     display: flex !important;
     width: 100% !important;
-    height: 100% !important;
     max-width: 100% !important;
+    height: 100% !important;
 }
 
 /* Для страницы сварочного оборудования используем фиксированные размеры как в MaximDesignWT2 */
@@ -109,4 +107,3 @@ body #root .app {
     padding: 8px;
     box-sizing: border-box;
 }
-
