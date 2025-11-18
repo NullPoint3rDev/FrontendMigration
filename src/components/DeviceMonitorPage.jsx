@@ -1186,31 +1186,8 @@ const DeviceMonitorPage = () => {
             });
         }
         
-        // 1. Проверяем status из корня объекта (приоритет) - это основное поле!
-        const status = data.status || data.Status;
-        if (status) {
-            const statusLower = String(status).toLowerCase().trim();
-            console.log('🔍 Проверка status:', status, '->', statusLower);
-            // Проверяем различные варианты статуса "Сварка"
-            if (statusLower === 'welding' || statusLower === 'сварка' || 
-                statusLower === 'weld' || 
-                statusLower.includes('сварка') || 
-                statusLower.includes('welding')) {
-                console.log('✅ Сварка обнаружена по status:', status);
-                return true;
-            }
-            // Если статус явно не "сварка", возвращаем false
-            if (statusLower === 'offline' || statusLower === 'off' || 
-                statusLower === 'выключен' || statusLower === 'выкл' ||
-                statusLower === 'on' || statusLower === 'вкл') {
-                console.log('❌ Статус не сварка:', status);
-                return false;
-            }
-        } else {
-            console.log('⚠️ status не найден в данных');
-        }
-        
-        // 2. Проверяем состояние аппарата из properties (различные варианты ключей)
+        // 1. ПРИОРИТЕТ: Проверяем состояние аппарата из properties (это основное поле для определения сварки!)
+        // status из корня может быть "Offline" даже когда идет сварка, поэтому проверяем WeldingMachineState первым
         const weldingMachineState = data['Состояние аппарата'] || 
                                    data['WeldingMachineState'] || 
                                    data.weldingMachineState ||
@@ -1219,22 +1196,46 @@ const DeviceMonitorPage = () => {
                                    data.properties?.['Состояние аппарата'];
         if (weldingMachineState) {
             const stateLower = String(weldingMachineState).toLowerCase().trim();
-            console.log('🔍 Проверка WeldingMachineState:', weldingMachineState, '->', stateLower);
+            console.log('🔍 Проверка WeldingMachineState (приоритет):', weldingMachineState, '->', stateLower);
             // Проверяем, содержит ли состояние информацию о сварке
             if (stateLower === 'сварка' || stateLower === 'welding' ||
                 stateLower.includes('сварка') || stateLower.includes('welding') || 
                 stateLower.includes('сварочн') || stateLower.includes('weld')) {
-                console.log('✅ Сварка обнаружена по WeldingMachineState');
+                console.log('✅ Сварка обнаружена по WeldingMachineState:', weldingMachineState);
                 return true;
             }
             // Если явно указано, что сварки нет
             if (stateLower.includes('ожидан') || stateLower.includes('waiting') || 
                 stateLower.includes('выключ') || stateLower.includes('off') ||
                 stateLower === 'выкл' || stateLower === 'off') {
+                console.log('❌ WeldingMachineState указывает на отсутствие сварки:', weldingMachineState);
                 return false;
             }
         } else {
             console.log('⚠️ WeldingMachineState не найден в данных');
+        }
+        
+        // 2. Проверяем status из корня объекта (вторичная проверка)
+        // ВАЖНО: status из корня может быть "Offline" даже при сварке, поэтому это вторичная проверка
+        const status = data.status || data.Status;
+        if (status) {
+            const statusLower = String(status).toLowerCase().trim();
+            console.log('🔍 Проверка status (вторичная):', status, '->', statusLower);
+            // Проверяем различные варианты статуса "Сварка"
+            if (statusLower === 'welding' || statusLower === 'сварка' || 
+                statusLower === 'weld' || 
+                statusLower.includes('сварка') || 
+                statusLower.includes('welding')) {
+                console.log('✅ Сварка обнаружена по status:', status);
+                return true;
+            }
+            // Если статус явно не "сварка", но это не критично, так как приоритет у WeldingMachineState
+            if (statusLower === 'offline' || statusLower === 'off' || 
+                statusLower === 'выключен' || statusLower === 'выкл') {
+                console.log('⚠️ status = "Offline", но проверяем WeldingMachineState выше');
+            }
+        } else {
+            console.log('⚠️ status не найден в данных');
         }
         
         // 3. Проверяем, есть ли ненулевой ток сварки (как дополнительный индикатор)
