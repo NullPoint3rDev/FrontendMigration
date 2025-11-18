@@ -517,7 +517,10 @@ function WeldingEquipmentPage() {
         if (Object.keys(newErrors).length) {
             console.log('❌ handleSave: Есть ошибки валидации:', newErrors);
             setErrors(newErrors);
-            return;
+            // Бросаем ошибку с объектом ошибок для отображения в модальном окне
+            const validationError = new Error('Ошибки валидации');
+            validationError.errors = newErrors;
+            throw validationError;
         }
 
         console.log('✅ handleSave: Валидация пройдена, начинаем сохранение...');
@@ -651,7 +654,12 @@ function WeldingEquipmentPage() {
         } catch (err) {
             console.error('Ошибка сохранения оборудования:', err);
             setErrors({ api: err.message });
-            alert('Ошибка сохранения оборудования: ' + err.message);
+            // Бросаем ошибку дальше, чтобы она попала в модальное окно
+            const apiError = new Error(err.message || 'Ошибка сохранения оборудования');
+            if (err.errors) {
+                apiError.errors = err.errors;
+            }
+            throw apiError;
         }
     };
 
@@ -1136,7 +1144,14 @@ function WeldingEquipmentPage() {
                         console.log('✅ WeldingEquipmentPage: handleSave завершен');
                     } catch (error) {
                         console.error('❌ WeldingEquipmentPage: Ошибка в onSave:', error);
-                        throw error; // Пробрасываем ошибку, чтобы модальное окно не закрылось
+                        // Создаем объект ошибки с полями для отображения в модальном окне
+                        const errorObj = new Error(error.message || 'Произошла ошибка при сохранении');
+                        if (error.errors) {
+                            errorObj.errors = error.errors;
+                        } else if (error.message) {
+                            errorObj.errors = { api: error.message };
+                        }
+                        throw errorObj; // Пробрасываем ошибку, чтобы модальное окно не закрылось
                     }
                 }}
             />

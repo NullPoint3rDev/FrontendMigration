@@ -25,6 +25,9 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         gasControl: false
     })
 
+    const [errors, setErrors] = useState({})
+    const [apiError, setApiError] = useState('')
+
     const models = [
         'Core',
         'Блок мониторинга'
@@ -37,6 +40,24 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
             ...prev,
             [field]: value
         }))
+        // Очищаем ошибку для этого поля при изменении
+        // Маппим поля: department -> organizationUnit, macAddress -> mac, commissioningDate -> commissionDate
+        const errorKey = field === 'department' ? 'organizationUnit' : 
+                        field === 'macAddress' ? 'mac' : 
+                        field === 'commissioningDate' ? 'commissionDate' : field;
+        
+        if (errors[field] || errors[errorKey]) {
+            setErrors(prev => {
+                const newErrors = { ...prev }
+                delete newErrors[field]
+                delete newErrors[errorKey]
+                return newErrors
+            })
+        }
+        // Очищаем общую ошибку API
+        if (apiError) {
+            setApiError('')
+        }
     }
 
     const toggleOption = (option) => {
@@ -47,6 +68,10 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
     }
 
     const handleSave = async () => {
+        // Очищаем предыдущие ошибки
+        setErrors({})
+        setApiError('')
+
         if (onSave) {
             try {
                 console.log('🔵 AddEquipmentModal: Вызываем onSave с данными:', {
@@ -60,34 +85,62 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                     options: selectedOptions
                 });
                 console.log('✅ AddEquipmentModal: onSave завершен успешно');
+                
+                // Сбрасываем форму после успешного сохранения
+                setSelectedModel('Core')
+                setFormData({
+                    name: '',
+                    department: '',
+                    commissioningDate: '',
+                    macAddress: '',
+                    serialNumber: '',
+                    inventoryNumber: '',
+                    responsiblePerson: '',
+                    lastMaintenanceDate: '',
+                    operatingHours: '',
+                    maintenancePerson: '',
+                    maintenancePass: '',
+                    approvedWelders: []
+                })
+                setSelectedOptions({
+                    rfid: false,
+                    bvo: false,
+                    gasControl: false
+                })
+                setErrors({})
+                setApiError('')
+                onClose()
             } catch (error) {
                 console.error('❌ AddEquipmentModal: Ошибка в onSave:', error);
+                
+                // Если ошибка содержит объект с полями ошибок
+                if (error.errors && typeof error.errors === 'object') {
+                    // Маппим ошибки: organizationUnit -> department, mac -> macAddress, commissionDate -> commissioningDate
+                    const mappedErrors = {};
+                    Object.keys(error.errors).forEach(key => {
+                        if (key === 'organizationUnit') {
+                            mappedErrors.department = error.errors[key];
+                        } else if (key === 'mac') {
+                            mappedErrors.macAddress = error.errors[key];
+                        } else if (key === 'commissionDate') {
+                            mappedErrors.commissioningDate = error.errors[key];
+                        } else if (key === 'api') {
+                            // Общая ошибка API
+                            setApiError(error.errors[key]);
+                        } else {
+                            mappedErrors[key] = error.errors[key];
+                        }
+                    });
+                    setErrors(mappedErrors);
+                } else if (error.message) {
+                    // Если это общая ошибка API
+                    setApiError(error.message);
+                } else {
+                    setApiError('Произошла ошибка при сохранении оборудования');
+                }
                 // Не закрываем модальное окно при ошибке
-                return;
             }
         }
-        // Сбрасываем форму после успешного сохранения
-        setSelectedModel('Core')
-        setFormData({
-            name: '',
-            department: '',
-            commissioningDate: '',
-            macAddress: '',
-            serialNumber: '',
-            inventoryNumber: '',
-            responsiblePerson: '',
-            lastMaintenanceDate: '',
-            operatingHours: '',
-            maintenancePerson: '',
-            maintenancePass: '',
-            approvedWelders: []
-        })
-        setSelectedOptions({
-            rfid: false,
-            bvo: false,
-            gasControl: false
-        })
-        onClose()
     }
 
     const handleClose = () => {
@@ -112,6 +165,8 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
             bvo: false,
             gasControl: false
         })
+        setErrors({})
+        setApiError('')
         onClose()
     }
 
@@ -154,13 +209,16 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                         type="text"
                                         value={formData.name}
                                         onChange={(e) => handleInputChange('name', e.target.value)}
+                                        className={errors.name ? 'error' : ''}
                                     />
+                                    {errors.name && <span className="error-message">{errors.name}</span>}
                                 </div>
                                 <div className="form-field">
                                     <label>Подразделение*</label>
                                     <select 
                                         value={formData.department}
                                         onChange={(e) => handleInputChange('department', e.target.value)}
+                                        className={errors.organizationUnit ? 'error' : ''}
                                     >
                                         <option value="">Выберите подразделение</option>
                                         {organizationUnits.map(unit => (
@@ -169,6 +227,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                             </option>
                                         ))}
                                     </select>
+                                    {errors.organizationUnit && <span className="error-message">{errors.organizationUnit}</span>}
                                 </div>
                                 <div className="form-field">
                                     <label>Ввод в эксплуатацию*</label>
@@ -177,6 +236,8 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                             type="text"
                                             value={formData.commissioningDate}
                                             onChange={(e) => handleInputChange('commissioningDate', e.target.value)}
+                                            placeholder="DD.MM.YYYY"
+                                            className={errors.commissionDate ? 'error' : ''}
                                         />
                                         <svg className="calendar-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
                                             <rect x="3" y="4" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
@@ -184,6 +245,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                             <path d="M6 2V5M10 2V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                                         </svg>
                                     </div>
+                                    {errors.commissionDate && <span className="error-message">{errors.commissionDate}</span>}
                                 </div>
                                 <div className="form-field">
                                     <label>МАС - адрес*</label>
@@ -191,7 +253,9 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                         type="text"
                                         value={formData.macAddress}
                                         onChange={(e) => handleInputChange('macAddress', e.target.value)}
+                                        className={errors.mac ? 'error' : ''}
                                     />
+                                    {errors.mac && <span className="error-message">{errors.mac}</span>}
                                 </div>
                                 <div className="form-field">
                                     <label>Серийный номер</label>
@@ -337,6 +401,18 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                 </button>
                             </div>
                         </div>
+
+                        {apiError && (
+                            <div className="api-error-message">
+                                {apiError}
+                            </div>
+                        )}
+
+                        {errors.deviceModel && (
+                            <div className="api-error-message">
+                                {errors.deviceModel}
+                            </div>
+                        )}
 
                         <button className="save-button" onClick={handleSave}>
                             Добавить оборудование
