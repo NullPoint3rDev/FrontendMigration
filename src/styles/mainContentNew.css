@@ -31,7 +31,7 @@
 
 .top-grid {
     display: grid;
-    grid-template-columns: 200px 520px 450px 430px;
+    grid-template-columns: minmax(200px, 1fr) minmax(520px, 2.6fr) minmax(450px, 2.25fr) minmax(430px, 2.15fr);
     gap: 8px;
     flex: 0 0 auto;
     min-height: 0;
@@ -1190,7 +1190,7 @@
     }
 
     .top-grid {
-        grid-template-columns: 320px 1fr 0.9fr 0.9fr;
+        grid-template-columns: minmax(200px, 1fr) minmax(520px, 2.6fr) minmax(450px, 2.25fr) minmax(430px, 2.15fr);
     }
 
     .bottom-panel__body {
@@ -1208,7 +1208,7 @@
     }
 
     .top-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: minmax(200px, 1fr) minmax(520px, 2.6fr) minmax(450px, 2.25fr) minmax(430px, 2.15fr);
     }
 
     .bottom-panel__body {
