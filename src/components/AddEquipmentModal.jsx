@@ -3,7 +3,7 @@ import '../styles/addEquipmentModal.css'
 import machineImage from '../images/2 копия.png'
 
 const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organizationUnits = [] }) => {
-    const [selectedModel, setSelectedModel] = useState('CORE PRO 500')
+    const [selectedModel, setSelectedModel] = useState('Core')
     const [formData, setFormData] = useState({
         name: '',
         department: '',
@@ -26,11 +26,8 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
     })
 
     const models = [
-        'CORE PRO 500',
-        'CORE Synergy 500',
-        'CORE Synergy 250',
-        'CORE Edik 1000',
-        'Блок Мониторинга'
+        'Core',
+        'Блок мониторинга'
     ]
 
     if (!isOpen) return null
@@ -57,13 +54,59 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                 options: selectedOptions
             })
         }
+        // Сбрасываем форму после сохранения
+        setSelectedModel('Core')
+        setFormData({
+            name: '',
+            department: '',
+            commissioningDate: '',
+            macAddress: '',
+            serialNumber: '',
+            inventoryNumber: '',
+            responsiblePerson: '',
+            lastMaintenanceDate: '',
+            operatingHours: '',
+            maintenancePerson: '',
+            maintenancePass: '',
+            approvedWelders: []
+        })
+        setSelectedOptions({
+            rfid: false,
+            bvo: false,
+            gasControl: false
+        })
+        onClose()
+    }
+
+    const handleClose = () => {
+        // Сбрасываем форму при закрытии
+        setSelectedModel('Core')
+        setFormData({
+            name: '',
+            department: '',
+            commissioningDate: '',
+            macAddress: '',
+            serialNumber: '',
+            inventoryNumber: '',
+            responsiblePerson: '',
+            lastMaintenanceDate: '',
+            operatingHours: '',
+            maintenancePerson: '',
+            maintenancePass: '',
+            approvedWelders: []
+        })
+        setSelectedOptions({
+            rfid: false,
+            bvo: false,
+            gasControl: false
+        })
         onClose()
     }
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay" onClick={handleClose}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <button className="modal-close" onClick={onClose}>×</button>
+                <button className="modal-close" onClick={handleClose}>×</button>
                 
                 <div className="modal-body">
                     <div className="modal-left">

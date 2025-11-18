@@ -1016,12 +1016,20 @@ function WeldingEquipmentPage() {
                 organizationUnits={organizationUnits}
                 onSave={async (data) => {
                     // Преобразуем данные из AddEquipmentModal в формат для handleSave
+                    // Преобразуем модель: "Core" -> "CORE", "Блок мониторинга" -> "MONITORING_BLOCK"
+                    let deviceModel = '';
+                    if (data.model === 'Core') {
+                        deviceModel = 'CORE';
+                    } else if (data.model === 'Блок мониторинга') {
+                        deviceModel = 'MONITORING_BLOCK';
+                    } else {
+                        deviceModel = data.model || '';
+                    }
+
                     const newEditData = {
                         ...editData,
                         name: data.name || '',
-                        deviceModel: data.model === 'CORE PRO 500' ? 'CORE' :
-                                     data.model === 'Блок Мониторинга' ? 'MONITORING_BLOCK' :
-                                     data.model || '',
+                        deviceModel: deviceModel,
                         mac: data.macAddress || '',
                         commissionDate: data.commissioningDate || '',
                         serialNumber: data.serialNumber || '',
