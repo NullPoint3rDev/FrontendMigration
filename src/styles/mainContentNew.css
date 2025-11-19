@@ -790,6 +790,10 @@
     align-items: flex-start;
     height: 100%;
     justify-content: flex-start;
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    overflow: hidden;
 }
 
 .telemetry-controls .tabs {
@@ -945,9 +949,12 @@
     display: flex;
     flex-direction: column;
     gap: 3px;
-    overflow: visible;
+    overflow: hidden;
     flex: 1;
     min-height: 0;
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
 }
 
 .chart-card {
@@ -959,11 +966,14 @@
     border-radius: 0;
     background: transparent;
     border: none;
-    overflow: visible;
+    overflow: hidden;
     flex: 1;
     min-height: 0;
+    min-width: 0;
+    max-width: 100%;
     align-items: stretch;
     margin-left: -60px;
+    box-sizing: border-box;
 }
 
 .chart-wrapper {
@@ -971,6 +981,7 @@
     flex-direction: column;
     flex: 1;
     min-width: 0;
+    max-width: 100%;
     gap: 0;
 }
 
