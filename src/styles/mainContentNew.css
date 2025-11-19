@@ -996,8 +996,9 @@
     background: transparent;
     border: none;
     overflow: hidden;
-    flex: 0 0 auto;
-    min-height: 300px;
+    flex: 1;
+    min-height: 0;
+    max-height: 50%;
     align-items: stretch;
     margin-left: -60px;
 }
