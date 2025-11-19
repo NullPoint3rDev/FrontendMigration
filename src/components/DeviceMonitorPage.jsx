@@ -5,6 +5,7 @@ import {
     Chart as ChartJS,
     CategoryScale,
     LinearScale,
+    TimeScale,
     PointElement,
     LineElement,
     Title,
@@ -86,6 +87,7 @@ const gradientPlugin = {
 ChartJS.register(
     CategoryScale,
     LinearScale,
+    TimeScale,
     PointElement,
     LineElement,
     Title,
@@ -306,11 +308,12 @@ const DeviceMonitorPage = () => {
                     // Добавляем точку со значением 0 для тока с резким переходом
                     setCurrentChartData(prev => {
                         let newData = [...prev];
-                        // Добавляем промежуточную точку со старым значением для вертикальной линии
+                        // Добавляем точку со старым значением в текущий момент времени
+                        // чтобы продлить горизонтальную линию до момента окончания сварки
                         if (prev.length > 0 && prevCurrentVal !== 0) {
-                            const prevTimestamp = new Date(timestamp.getTime() - 1);
-                            newData.push({ x: prevTimestamp, y: prevCurrentVal });
+                            newData.push({ x: timestamp, y: prevCurrentVal });
                         }
+                        // Затем добавляем точку с 0 для резкого вертикального падения
                         newData.push({ x: timestamp, y: 0 });
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
@@ -319,11 +322,12 @@ const DeviceMonitorPage = () => {
                     // Добавляем точку со значением 0 для напряжения с резким переходом
                     setVoltageChartData(prev => {
                         let newData = [...prev];
-                        // Добавляем промежуточную точку со старым значением для вертикальной линии
+                        // Добавляем точку со старым значением в текущий момент времени
+                        // чтобы продлить горизонтальную линию до момента окончания сварки
                         if (prev.length > 0 && prevVoltageVal !== 0) {
-                            const prevTimestamp = new Date(timestamp.getTime() - 1);
-                            newData.push({ x: prevTimestamp, y: prevVoltageVal });
+                            newData.push({ x: timestamp, y: prevVoltageVal });
                         }
+                        // Затем добавляем точку с 0 для резкого вертикального падения
                         newData.push({ x: timestamp, y: 0 });
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
@@ -343,27 +347,25 @@ const DeviceMonitorPage = () => {
                     // Сварка только что началась - резко поднимаемся от 0 к значению
                     const timestamp = new Date();
                     prevWeldingStateRef.current = isCurrentlyWelding;
-                    
+
                     // Для тока: добавляем точку с 0, затем точку с реальным значением
                     if (!isNaN(currentValue) && currentValue !== 0) {
                         setCurrentChartData(prev => {
                             let newData = [...prev];
                             // Добавляем точку с 0 для резкого подъема
-                            const prevTimestamp = new Date(timestamp.getTime() - 1);
-                            newData.push({ x: prevTimestamp, y: 0 });
+                            newData.push({ x: timestamp, y: 0 });
                             newData.push({ x: timestamp, y: currentValue });
                             prevCurrentRef.current = currentValue;
                             return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                         });
                     }
-                    
+
                     // Для напряжения: добавляем точку с 0, затем точку с реальным значением
                     if (!isNaN(voltageValue) && voltageValue !== 0) {
                         setVoltageChartData(prev => {
                             let newData = [...prev];
                             // Добавляем точку с 0 для резкого подъема
-                            const prevTimestamp = new Date(timestamp.getTime() - 1);
-                            newData.push({ x: prevTimestamp, y: 0 });
+                            newData.push({ x: timestamp, y: 0 });
                             newData.push({ x: timestamp, y: voltageValue });
                             prevVoltageRef.current = voltageValue;
                             return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
@@ -372,52 +374,62 @@ const DeviceMonitorPage = () => {
                     return; // Выходим, чтобы не дублировать обновления
                 }
 
-                if (currentChanged && !isNaN(currentValue)) {
+                // Всегда добавляем точки для тока (даже если значение не изменилось, чтобы линия шла горизонтально)
+                if (!isNaN(currentValue) && isCurrentlyWelding) {
                     const timestamp = new Date();
                     const prevValue = prevCurrentRef.current !== null ? prevCurrentRef.current : 0;
-                    prevCurrentRef.current = currentValue;
-
-                    // Обновляем данные графика тока с резким переходом
+                    
                     setCurrentChartData(prev => {
                         let newData = [...prev];
                         
-                        // Если значение изменилось, добавляем промежуточную точку со старым значением
-                        // для создания резкого вертикального перехода
+                        // Если значение изменилось и есть предыдущие данные
                         if (prev.length > 0 && prevValue !== currentValue) {
-                            // Добавляем точку со старым значением с минимальным смещением времени
-                            // для создания вертикальной линии
-                            const prevTimestamp = new Date(timestamp.getTime() - 1);
-                            newData.push({ x: prevTimestamp, y: prevValue });
+                            // Добавляем точку в текущий момент времени со старым значением
+                            // чтобы продлить горизонтальную линию до момента изменения
+                            newData.push({ x: timestamp, y: prevValue });
+                            // Затем добавляем точку в тот же момент времени с новым значением
+                            // для создания резкого вертикального перехода
+                            newData.push({ x: timestamp, y: currentValue });
+                        } else if (prev.length > 0 && prevValue === currentValue) {
+                            // Если значение не изменилось, добавляем точку с тем же значением
+                            // чтобы линия продолжала идти горизонтально
+                            newData.push({ x: timestamp, y: currentValue });
+                        } else {
+                            // Это первая точка
+                            newData.push({ x: timestamp, y: currentValue });
                         }
                         
-                        // Добавляем точку с новым значением
-                        newData.push({ x: timestamp, y: currentValue });
-                        
+                        prevCurrentRef.current = currentValue;
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
                 }
 
-                if (voltageChanged && !isNaN(voltageValue)) {
+                // Всегда добавляем точки для напряжения (даже если значение не изменилось, чтобы линия шла горизонтально)
+                if (!isNaN(voltageValue) && isCurrentlyWelding) {
                     const timestamp = new Date();
                     const prevValue = prevVoltageRef.current !== null ? prevVoltageRef.current : 0;
-                    prevVoltageRef.current = voltageValue;
-
-                    // Обновляем данные графика напряжения с резким переходом
+                    
                     setVoltageChartData(prev => {
                         let newData = [...prev];
                         
-                        // Если значение изменилось, добавляем промежуточную точку со старым значением
-                        // для создания резкого вертикального перехода
+                        // Если значение изменилось и есть предыдущие данные
                         if (prev.length > 0 && prevValue !== voltageValue) {
-                            // Добавляем точку со старым значением с минимальным смещением времени
-                            // для создания вертикальной линии
-                            const prevTimestamp = new Date(timestamp.getTime() - 1);
-                            newData.push({ x: prevTimestamp, y: prevValue });
+                            // Добавляем точку в текущий момент времени со старым значением
+                            // чтобы продлить горизонтальную линию до момента изменения
+                            newData.push({ x: timestamp, y: prevValue });
+                            // Затем добавляем точку в тот же момент времени с новым значением
+                            // для создания резкого вертикального перехода
+                            newData.push({ x: timestamp, y: voltageValue });
+                        } else if (prev.length > 0 && prevValue === voltageValue) {
+                            // Если значение не изменилось, добавляем точку с тем же значением
+                            // чтобы линия продолжала идти горизонтально
+                            newData.push({ x: timestamp, y: voltageValue });
+                        } else {
+                            // Это первая точка
+                            newData.push({ x: timestamp, y: voltageValue });
                         }
                         
-                        // Добавляем точку с новым значением
-                        newData.push({ x: timestamp, y: voltageValue });
-                        
+                        prevVoltageRef.current = voltageValue;
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
                 }
@@ -914,9 +926,16 @@ const DeviceMonitorPage = () => {
         },
         scales: {
             x: {
+                type: 'time',
                 display: false,
                 grid: {
                     display: false
+                },
+                time: {
+                    unit: 'second',
+                    displayFormats: {
+                        second: 'HH:mm:ss'
+                    }
                 }
             },
             y: {
