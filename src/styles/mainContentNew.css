@@ -775,12 +775,15 @@
 
 .bottom-panel__body {
     display: grid;
-    grid-template-columns: 180px 1fr;
+    grid-template-columns: 180px minmax(0, 1fr);
     gap: 8px;
     align-items: stretch;
     flex: 1;
     min-height: 0;
     overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .telemetry-controls {
@@ -953,8 +956,9 @@
     flex: 1;
     min-height: 0;
     min-width: 0;
-    max-width: 100%;
     width: 100%;
+    padding-right: 60px;
+    box-sizing: border-box;
 }
 
 .chart-card {
@@ -969,8 +973,6 @@
     overflow: hidden;
     flex: 1;
     min-height: 0;
-    min-width: 0;
-    max-width: 100%;
     align-items: stretch;
     margin-left: -60px;
     box-sizing: border-box;
@@ -981,7 +983,6 @@
     flex-direction: column;
     flex: 1;
     min-width: 0;
-    max-width: 100%;
     gap: 0;
 }
 
