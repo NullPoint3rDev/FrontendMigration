@@ -76,11 +76,14 @@ td, th {
     border-spacing: 0 !important;
 }
 
-/* Фиксированные размеры для #root как в MaximDesignWT2 */
-/* Переопределяем стили из main_page.css */
+/* Адаптивные размеры для #root - переопределяем стили из main_page.css */
 #root {
-    width: 1700px !important;
-    height: 1080px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 1920px !important;
+    height: 100vh !important;
+    max-height: 1080px !important;
     overflow: hidden !important;
     margin: 0 auto !important;
 }
