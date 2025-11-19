@@ -995,8 +995,8 @@
     border-radius: 0;
     background: transparent;
     border: none;
-    overflow: visible;
-    flex: 0 0 auto;
+    overflow: hidden;
+    flex: 0 0 50%;
     min-height: 0;
     align-items: stretch;
     margin-left: -60px;
@@ -1036,8 +1036,7 @@
 .chart-canvas {
     position: relative;
     flex: 1;
-    min-height: 200px;
-    max-height: 300px;
+    min-height: 0;
     border-radius: 14px;
     overflow: hidden;
     background: linear-gradient(180deg, rgba(30, 25, 37, 0.95), rgba(26, 21, 32, 0.96));
@@ -1086,8 +1085,6 @@
     text-transform: uppercase;
     padding: 0 4px;
     margin-top: 1px;
-    flex-shrink: 0;
-    height: auto;
 }
 
 .chart-marker {
