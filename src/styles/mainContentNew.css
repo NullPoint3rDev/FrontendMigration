@@ -12,6 +12,8 @@
     min-height: 0;
     box-sizing: border-box;
     min-width: 0;
+    width: 100%;
+    max-width: 100%;
 }
 
 .numeric {
@@ -31,7 +33,7 @@
 
 .top-grid {
     display: grid;
-    grid-template-columns: 200px 520px 450px 430px;
+    grid-template-columns: minmax(180px, 1fr) minmax(400px, 1.3fr) minmax(350px, 1.1fr) minmax(350px, 1fr);
     gap: 8px;
     flex: 0 0 auto;
     min-height: 0;
@@ -41,6 +43,7 @@
     margin-left: -16px;
     width: calc(100% + 16px);
     box-sizing: border-box;
+    max-width: 100%;
 }
 
 .control-section {
@@ -48,6 +51,8 @@
     flex-direction: column;
     gap: 6px;
     grid-column: 2;
+    min-width: 0;
+    width: 100%;
 }
 
 .machine-section {
@@ -59,6 +64,7 @@
     margin: 0;
     margin-left: -16px;
     width: calc(100% + 16px);
+    min-width: 0;
 }
 
 .machine-title {
@@ -445,6 +451,8 @@
     overflow: hidden;
     grid-column: 3;
     justify-content: space-between;
+    min-width: 0;
+    width: 100%;
 }
 
 .status-card__header {
@@ -532,6 +540,8 @@
     gap: 6px;
     grid-column: 4;
     height: 100%;
+    min-width: 0;
+    width: 100%;
 }
 
 .welder-header-tile {
@@ -1195,7 +1205,7 @@
     }
 
     .top-grid {
-        grid-template-columns: 320px 1fr 0.9fr 0.9fr;
+        grid-template-columns: minmax(180px, 1fr) minmax(400px, 1.3fr) minmax(350px, 1.1fr) minmax(350px, 1fr);
     }
 
     .bottom-panel__body {
@@ -1213,7 +1223,7 @@
     }
 
     .top-grid {
-        grid-template-columns: minmax(200px, 1fr) minmax(520px, 2.6fr) minmax(450px, 2.25fr) minmax(430px, 2.15fr);
+        grid-template-columns: minmax(180px, 1fr) minmax(400px, 1.3fr) minmax(350px, 1.1fr) minmax(350px, 1fr);
     }
 
     .bottom-panel__body {
