@@ -300,17 +300,31 @@ const DeviceMonitorPage = () => {
                 if (weldingStateChanged && !isCurrentlyWelding) {
                     // Сварка только что закончилась - резко падаем к 0
                     const timestamp = new Date();
+                    const prevCurrentVal = prevCurrentRef.current !== null ? prevCurrentRef.current : 0;
+                    const prevVoltageVal = prevVoltageRef.current !== null ? prevVoltageRef.current : 0;
                     
-                    // Добавляем точку со значением 0 для тока
+                    // Добавляем точку со значением 0 для тока с резким переходом
                     setCurrentChartData(prev => {
-                        const newData = [...prev, { x: timestamp, y: 0 }];
+                        let newData = [...prev];
+                        // Добавляем промежуточную точку со старым значением для вертикальной линии
+                        if (prev.length > 0 && prevCurrentVal !== 0) {
+                            const prevTimestamp = new Date(timestamp.getTime() - 1);
+                            newData.push({ x: prevTimestamp, y: prevCurrentVal });
+                        }
+                        newData.push({ x: timestamp, y: 0 });
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
                     prevCurrentRef.current = 0;
                     
-                    // Добавляем точку со значением 0 для напряжения
+                    // Добавляем точку со значением 0 для напряжения с резким переходом
                     setVoltageChartData(prev => {
-                        const newData = [...prev, { x: timestamp, y: 0 }];
+                        let newData = [...prev];
+                        // Добавляем промежуточную точку со старым значением для вертикальной линии
+                        if (prev.length > 0 && prevVoltageVal !== 0) {
+                            const prevTimestamp = new Date(timestamp.getTime() - 1);
+                            newData.push({ x: prevTimestamp, y: prevVoltageVal });
+                        }
+                        newData.push({ x: timestamp, y: 0 });
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
                     prevVoltageRef.current = 0;
@@ -326,27 +340,84 @@ const DeviceMonitorPage = () => {
 
                 // Если состояние сварки изменилось (началась сварка), тоже обновляем
                 if (weldingStateChanged && isCurrentlyWelding) {
+                    // Сварка только что началась - резко поднимаемся от 0 к значению
+                    const timestamp = new Date();
                     prevWeldingStateRef.current = isCurrentlyWelding;
+                    
+                    // Для тока: добавляем точку с 0, затем точку с реальным значением
+                    if (!isNaN(currentValue) && currentValue !== 0) {
+                        setCurrentChartData(prev => {
+                            let newData = [...prev];
+                            // Добавляем точку с 0 для резкого подъема
+                            const prevTimestamp = new Date(timestamp.getTime() - 1);
+                            newData.push({ x: prevTimestamp, y: 0 });
+                            newData.push({ x: timestamp, y: currentValue });
+                            prevCurrentRef.current = currentValue;
+                            return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
+                        });
+                    }
+                    
+                    // Для напряжения: добавляем точку с 0, затем точку с реальным значением
+                    if (!isNaN(voltageValue) && voltageValue !== 0) {
+                        setVoltageChartData(prev => {
+                            let newData = [...prev];
+                            // Добавляем точку с 0 для резкого подъема
+                            const prevTimestamp = new Date(timestamp.getTime() - 1);
+                            newData.push({ x: prevTimestamp, y: 0 });
+                            newData.push({ x: timestamp, y: voltageValue });
+                            prevVoltageRef.current = voltageValue;
+                            return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
+                        });
+                    }
+                    return; // Выходим, чтобы не дублировать обновления
                 }
 
                 if (currentChanged && !isNaN(currentValue)) {
                     const timestamp = new Date();
+                    const prevValue = prevCurrentRef.current !== null ? prevCurrentRef.current : 0;
                     prevCurrentRef.current = currentValue;
 
-                    // Обновляем данные графика тока
+                    // Обновляем данные графика тока с резким переходом
                     setCurrentChartData(prev => {
-                        const newData = [...prev, { x: timestamp, y: currentValue }];
+                        let newData = [...prev];
+                        
+                        // Если значение изменилось, добавляем промежуточную точку со старым значением
+                        // для создания резкого вертикального перехода
+                        if (prev.length > 0 && prevValue !== currentValue) {
+                            // Добавляем точку со старым значением с минимальным смещением времени
+                            // для создания вертикальной линии
+                            const prevTimestamp = new Date(timestamp.getTime() - 1);
+                            newData.push({ x: prevTimestamp, y: prevValue });
+                        }
+                        
+                        // Добавляем точку с новым значением
+                        newData.push({ x: timestamp, y: currentValue });
+                        
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
                 }
 
                 if (voltageChanged && !isNaN(voltageValue)) {
                     const timestamp = new Date();
+                    const prevValue = prevVoltageRef.current !== null ? prevVoltageRef.current : 0;
                     prevVoltageRef.current = voltageValue;
 
-                    // Обновляем данные графика напряжения
+                    // Обновляем данные графика напряжения с резким переходом
                     setVoltageChartData(prev => {
-                        const newData = [...prev, { x: timestamp, y: voltageValue }];
+                        let newData = [...prev];
+                        
+                        // Если значение изменилось, добавляем промежуточную точку со старым значением
+                        // для создания резкого вертикального перехода
+                        if (prev.length > 0 && prevValue !== voltageValue) {
+                            // Добавляем точку со старым значением с минимальным смещением времени
+                            // для создания вертикальной линии
+                            const prevTimestamp = new Date(timestamp.getTime() - 1);
+                            newData.push({ x: prevTimestamp, y: prevValue });
+                        }
+                        
+                        // Добавляем точку с новым значением
+                        newData.push({ x: timestamp, y: voltageValue });
+                        
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
                 }
@@ -897,10 +968,9 @@ const DeviceMonitorPage = () => {
 
     // Подготовка данных для графиков (в стиле осциллограммы)
     const getCurrentChartData = () => ({
-        labels: currentChartData.map((_, index) => ''),
         datasets: [{
             label: 'Ток (А)',
-            data: currentChartData.map(d => d.y),
+            data: currentChartData.map(d => ({ x: d.x, y: d.y })),
             borderColor: '#3ec7ff',
             backgroundColor: 'rgba(62, 199, 255, 0.05)', // Минимальная заливка для осциллограммы
             fill: false, // Без заливки для осциллограммы
@@ -916,10 +986,9 @@ const DeviceMonitorPage = () => {
     });
 
     const getVoltageChartData = () => ({
-        labels: voltageChartData.map((_, index) => ''),
         datasets: [{
             label: 'Напряжение (В)',
-            data: voltageChartData.map(d => d.y),
+            data: voltageChartData.map(d => ({ x: d.x, y: d.y })),
             borderColor: '#ff61c8',
             backgroundColor: 'rgba(255, 97, 200, 0.05)', // Минимальная заливка для осциллограммы
             fill: false, // Без заливки для осциллограммы
