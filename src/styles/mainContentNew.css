@@ -12,8 +12,6 @@
     min-height: 0;
     box-sizing: border-box;
     min-width: 0;
-    width: 100%;
-    max-width: 100%;
 }
 
 .numeric {
@@ -33,18 +31,16 @@
 
 .top-grid {
     display: grid;
-    grid-template-columns: minmax(180px, 1fr) minmax(400px, 1.3fr) minmax(350px, 1.1fr) minmax(280px, 1fr);
+    grid-template-columns: 200px 520px 450px 430px;
     gap: 8px;
     flex: 0 0 auto;
     min-height: 0;
-    max-height: fit-content;
     align-content: stretch;
     padding: 0;
     margin: 0;
     margin-left: -16px;
     width: calc(100% + 16px);
     box-sizing: border-box;
-    max-width: 100%;
 }
 
 .control-section {
@@ -52,8 +48,6 @@
     flex-direction: column;
     gap: 6px;
     grid-column: 2;
-    min-width: 0;
-    width: 100%;
 }
 
 .machine-section {
@@ -65,7 +59,6 @@
     margin: 0;
     margin-left: -16px;
     width: calc(100% + 16px);
-    min-width: 0;
 }
 
 .machine-title {
@@ -452,8 +445,6 @@
     overflow: hidden;
     grid-column: 3;
     justify-content: space-between;
-    min-width: 0;
-    width: 100%;
 }
 
 .status-card__header {
@@ -541,10 +532,6 @@
     gap: 6px;
     grid-column: 4;
     height: 100%;
-    min-width: 0;
-    width: 100%;
-    max-width: 100%;
-    overflow: hidden;
 }
 
 .welder-header-tile {
@@ -708,9 +695,8 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    flex: 1 1 0;
+    flex: 1;
     min-height: 0;
-    overflow: hidden;
 }
 
 .bottom-panel__header {
@@ -792,10 +778,9 @@
     grid-template-columns: 180px 1fr;
     gap: 8px;
     align-items: stretch;
-    flex: 1 1 0;
+    flex: 1;
     min-height: 0;
     overflow: hidden;
-    height: 100%;
 }
 
 .telemetry-controls {
@@ -960,10 +945,9 @@
     display: flex;
     flex-direction: column;
     gap: 3px;
-    overflow: hidden;
-    flex: 1 1 0;
+    overflow: visible;
+    flex: 1;
     min-height: 0;
-    height: 100%;
 }
 
 .chart-card {
@@ -975,7 +959,7 @@
     border-radius: 0;
     background: transparent;
     border: none;
-    overflow: hidden;
+    overflow: visible;
     flex: 1;
     min-height: 0;
     align-items: stretch;
@@ -987,7 +971,6 @@
     flex-direction: column;
     flex: 1;
     min-width: 0;
-    min-height: 0;
     gap: 0;
 }
 
@@ -1016,7 +999,7 @@
 .chart-canvas {
     position: relative;
     flex: 1;
-    min-height: 150px;
+    min-height: 140px;
     border-radius: 14px;
     overflow: hidden;
     background: linear-gradient(180deg, rgba(30, 25, 37, 0.95), rgba(26, 21, 32, 0.96));
@@ -1065,7 +1048,6 @@
     text-transform: uppercase;
     padding: 0 4px;
     margin-top: 1px;
-    flex-shrink: 0;
 }
 
 .chart-marker {
@@ -1213,7 +1195,7 @@
     }
 
     .top-grid {
-        grid-template-columns: minmax(180px, 1fr) minmax(400px, 1.3fr) minmax(350px, 1.1fr) minmax(280px, 1fr);
+        grid-template-columns: 320px 1fr 0.9fr 0.9fr;
     }
 
     .bottom-panel__body {
@@ -1231,7 +1213,7 @@
     }
 
     .top-grid {
-        grid-template-columns: minmax(180px, 1fr) minmax(400px, 1.3fr) minmax(350px, 1.1fr) minmax(280px, 1fr);
+        grid-template-columns: minmax(200px, 1fr) minmax(520px, 2.6fr) minmax(450px, 2.25fr) minmax(430px, 2.15fr);
     }
 
     .bottom-panel__body {
