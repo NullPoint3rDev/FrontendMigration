@@ -5,7 +5,6 @@ import {
     Chart as ChartJS,
     CategoryScale,
     LinearScale,
-    TimeScale,
     PointElement,
     LineElement,
     Title,
@@ -87,7 +86,6 @@ const gradientPlugin = {
 ChartJS.register(
     CategoryScale,
     LinearScale,
-    TimeScale,
     PointElement,
     LineElement,
     Title,
@@ -285,7 +283,7 @@ const DeviceMonitorPage = () => {
             Object.entries(deviceData).forEach(([mac, data]) => {
                 // Проверяем, идет ли сварка
                 const isCurrentlyWelding = isWelding();
-                
+
                 const current = parseFloat(data.Current || data['State.I'] || 0);
                 const voltage = parseFloat(data.Voltage || data['State.U'] || 0);
 
@@ -294,45 +292,29 @@ const DeviceMonitorPage = () => {
                 const voltageValue = isCurrentlyWelding ? voltage : 0;
 
                 // Проверяем, изменилось ли состояние сварки
-                const weldingStateChanged = prevWeldingStateRef.current !== null && 
-                                          prevWeldingStateRef.current !== isCurrentlyWelding;
-                
-                // Если состояние сварки изменилось (особенно переход от true к false), 
+                const weldingStateChanged = prevWeldingStateRef.current !== null &&
+                    prevWeldingStateRef.current !== isCurrentlyWelding;
+
+                // Если состояние сварки изменилось (особенно переход от true к false),
                 // нужно сразу добавить точку со значением 0 для резкого падения
                 if (weldingStateChanged && !isCurrentlyWelding) {
                     // Сварка только что закончилась - резко падаем к 0
                     const timestamp = new Date();
-                    const prevCurrentVal = prevCurrentRef.current !== null ? prevCurrentRef.current : 0;
-                    const prevVoltageVal = prevVoltageRef.current !== null ? prevVoltageRef.current : 0;
-                    
-                    // Добавляем точку со значением 0 для тока с резким переходом
+
+                    // Добавляем точку со значением 0 для тока
                     setCurrentChartData(prev => {
-                        let newData = [...prev];
-                        // Добавляем точку со старым значением в текущий момент времени
-                        // чтобы продлить горизонтальную линию до момента окончания сварки
-                        if (prev.length > 0 && prevCurrentVal !== 0) {
-                            newData.push({ x: timestamp, y: prevCurrentVal });
-                        }
-                        // Затем добавляем точку с 0 для резкого вертикального падения
-                        newData.push({ x: timestamp, y: 0 });
+                        const newData = [...prev, { x: timestamp, y: 0 }];
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
                     prevCurrentRef.current = 0;
-                    
-                    // Добавляем точку со значением 0 для напряжения с резким переходом
+
+                    // Добавляем точку со значением 0 для напряжения
                     setVoltageChartData(prev => {
-                        let newData = [...prev];
-                        // Добавляем точку со старым значением в текущий момент времени
-                        // чтобы продлить горизонтальную линию до момента окончания сварки
-                        if (prev.length > 0 && prevVoltageVal !== 0) {
-                            newData.push({ x: timestamp, y: prevVoltageVal });
-                        }
-                        // Затем добавляем точку с 0 для резкого вертикального падения
-                        newData.push({ x: timestamp, y: 0 });
+                        const newData = [...prev, { x: timestamp, y: 0 }];
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
                     prevVoltageRef.current = 0;
-                    
+
                     // Обновляем предыдущее состояние сварки
                     prevWeldingStateRef.current = isCurrentlyWelding;
                     return;
@@ -344,96 +326,31 @@ const DeviceMonitorPage = () => {
 
                 // Если состояние сварки изменилось (началась сварка), тоже обновляем
                 if (weldingStateChanged && isCurrentlyWelding) {
-                    // Сварка только что началась - резко поднимаемся от 0 к значению
-                    const timestamp = new Date();
                     prevWeldingStateRef.current = isCurrentlyWelding;
-
-                    // Для тока: добавляем точку с 0, затем точку с реальным значением
-                    if (!isNaN(currentValue) && currentValue !== 0) {
-                        setCurrentChartData(prev => {
-                            let newData = [...prev];
-                            // Добавляем точку с 0 для резкого подъема
-                            newData.push({ x: timestamp, y: 0 });
-                            newData.push({ x: timestamp, y: currentValue });
-                            prevCurrentRef.current = currentValue;
-                            return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
-                        });
-                    }
-
-                    // Для напряжения: добавляем точку с 0, затем точку с реальным значением
-                    if (!isNaN(voltageValue) && voltageValue !== 0) {
-                        setVoltageChartData(prev => {
-                            let newData = [...prev];
-                            // Добавляем точку с 0 для резкого подъема
-                            newData.push({ x: timestamp, y: 0 });
-                            newData.push({ x: timestamp, y: voltageValue });
-                            prevVoltageRef.current = voltageValue;
-                            return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
-                        });
-                    }
-                    return; // Выходим, чтобы не дублировать обновления
                 }
 
-                // Всегда добавляем точки для тока (даже если значение не изменилось, чтобы линия шла горизонтально)
-                if (!isNaN(currentValue) && isCurrentlyWelding) {
+                if (currentChanged && !isNaN(currentValue)) {
                     const timestamp = new Date();
-                    const prevValue = prevCurrentRef.current !== null ? prevCurrentRef.current : 0;
-                    
+                    prevCurrentRef.current = currentValue;
+
+                    // Обновляем данные графика тока
                     setCurrentChartData(prev => {
-                        let newData = [...prev];
-                        
-                        // Если значение изменилось и есть предыдущие данные
-                        if (prev.length > 0 && prevValue !== currentValue) {
-                            // Добавляем точку в текущий момент времени со старым значением
-                            // чтобы продлить горизонтальную линию до момента изменения
-                            newData.push({ x: timestamp, y: prevValue });
-                            // Затем добавляем точку в тот же момент времени с новым значением
-                            // для создания резкого вертикального перехода
-                            newData.push({ x: timestamp, y: currentValue });
-                        } else if (prev.length > 0 && prevValue === currentValue) {
-                            // Если значение не изменилось, добавляем точку с тем же значением
-                            // чтобы линия продолжала идти горизонтально
-                            newData.push({ x: timestamp, y: currentValue });
-                        } else {
-                            // Это первая точка
-                            newData.push({ x: timestamp, y: currentValue });
-                        }
-                        
-                        prevCurrentRef.current = currentValue;
+                        const newData = [...prev, { x: timestamp, y: currentValue }];
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
                 }
 
-                // Всегда добавляем точки для напряжения (даже если значение не изменилось, чтобы линия шла горизонтально)
-                if (!isNaN(voltageValue) && isCurrentlyWelding) {
+                if (voltageChanged && !isNaN(voltageValue)) {
                     const timestamp = new Date();
-                    const prevValue = prevVoltageRef.current !== null ? prevVoltageRef.current : 0;
-                    
+                    prevVoltageRef.current = voltageValue;
+
+                    // Обновляем данные графика напряжения
                     setVoltageChartData(prev => {
-                        let newData = [...prev];
-                        
-                        // Если значение изменилось и есть предыдущие данные
-                        if (prev.length > 0 && prevValue !== voltageValue) {
-                            // Добавляем точку в текущий момент времени со старым значением
-                            // чтобы продлить горизонтальную линию до момента изменения
-                            newData.push({ x: timestamp, y: prevValue });
-                            // Затем добавляем точку в тот же момент времени с новым значением
-                            // для создания резкого вертикального перехода
-                            newData.push({ x: timestamp, y: voltageValue });
-                        } else if (prev.length > 0 && prevValue === voltageValue) {
-                            // Если значение не изменилось, добавляем точку с тем же значением
-                            // чтобы линия продолжала идти горизонтально
-                            newData.push({ x: timestamp, y: voltageValue });
-                        } else {
-                            // Это первая точка
-                            newData.push({ x: timestamp, y: voltageValue });
-                        }
-                        
-                        prevVoltageRef.current = voltageValue;
+                        const newData = [...prev, { x: timestamp, y: voltageValue }];
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
                 }
-                
+
                 // Обновляем предыдущее состояние сварки, если оно еще не было обновлено
                 if (!weldingStateChanged) {
                     prevWeldingStateRef.current = isCurrentlyWelding;
@@ -732,7 +649,7 @@ const DeviceMonitorPage = () => {
 
                 // Убеждаемся, что status сохраняется (приоритет params.status, если он был установлен выше)
                 const finalStatus = params.status || data.state.status || null;
-                
+
                 console.log('🔍 processStructuredData - finalStatus:', finalStatus);
                 console.log('🔍 processStructuredData - data.state.status:', data.state.status);
                 console.log('🔍 processStructuredData - params.status:', params.status);
@@ -747,7 +664,7 @@ const DeviceMonitorPage = () => {
                         dateCreated: data.state.dateCreated || null
                     }
                 });
-                
+
                 if (finalStatus) {
                     console.log('✅ Status сохранен в deviceData:', finalStatus);
                 } else {
@@ -926,16 +843,9 @@ const DeviceMonitorPage = () => {
         },
         scales: {
             x: {
-                type: 'time',
                 display: false,
                 grid: {
                     display: false
-                },
-                time: {
-                    unit: 'second',
-                    displayFormats: {
-                        second: 'HH:mm:ss'
-                    }
                 }
             },
             y: {
@@ -987,9 +897,10 @@ const DeviceMonitorPage = () => {
 
     // Подготовка данных для графиков (в стиле осциллограммы)
     const getCurrentChartData = () => ({
+        labels: currentChartData.map((_, index) => ''),
         datasets: [{
             label: 'Ток (А)',
-            data: currentChartData.map(d => ({ x: d.x, y: d.y })),
+            data: currentChartData.map(d => d.y),
             borderColor: '#3ec7ff',
             backgroundColor: 'rgba(62, 199, 255, 0.05)', // Минимальная заливка для осциллограммы
             fill: false, // Без заливки для осциллограммы
@@ -1005,9 +916,10 @@ const DeviceMonitorPage = () => {
     });
 
     const getVoltageChartData = () => ({
+        labels: voltageChartData.map((_, index) => ''),
         datasets: [{
             label: 'Напряжение (В)',
-            data: voltageChartData.map(d => ({ x: d.x, y: d.y })),
+            data: voltageChartData.map(d => d.y),
             borderColor: '#ff61c8',
             backgroundColor: 'rgba(255, 97, 200, 0.05)', // Минимальная заливка для осциллограммы
             fill: false, // Без заливки для осциллограммы
@@ -1039,12 +951,12 @@ const DeviceMonitorPage = () => {
 
     const getWeldingTimer = () => {
         const isCurrentlyWelding = isWelding();
-        
+
         // Если сварка идет и есть время начала - показываем текущее время
         if (isCurrentlyWelding) {
             if (weldingStartTime) {
-            const duration = Date.now() - weldingStartTime;
-            return formatDuration(duration);
+                const duration = Date.now() - weldingStartTime;
+                return formatDuration(duration);
             } else {
                 // Сварка идет, но время начала еще не установлено - показываем 00:00:00
                 // Это временное состояние, пока useEffect не обновит weldingStartTime
@@ -1057,7 +969,7 @@ const DeviceMonitorPage = () => {
                 return formatDuration(lastWeldingDuration);
             }
         }
-        
+
         // Сварки нет - показываем нули
         return '00:00:00';
     };
@@ -1068,7 +980,7 @@ const DeviceMonitorPage = () => {
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
-        
+
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
 
@@ -1116,41 +1028,41 @@ const DeviceMonitorPage = () => {
         }
 
         // 7. Температура охлаждающей жидкости на входе
-        const chillerTemperature1 = data['Температура охлаждающей жидкости на входе'] || 
-                                   data['ChillerTemperature1'] || 
-                                   data.chillerTemperature1;
+        const chillerTemperature1 = data['Температура охлаждающей жидкости на входе'] ||
+            data['ChillerTemperature1'] ||
+            data.chillerTemperature1;
         if (chillerTemperature1 !== undefined && chillerTemperature1 !== null) {
             params.push({ label: 'Входящая темп. охл. жидкости', value: `${chillerTemperature1} °C` });
         }
 
         // 8. Температура охлаждающей жидкости на выходе
-        const chillerTemperature2 = data['Температура охлаждающей жидкости на выходе'] || 
-                                   data['ChillerTemperature2'] || 
-                                   data.chillerTemperature2;
+        const chillerTemperature2 = data['Температура охлаждающей жидкости на выходе'] ||
+            data['ChillerTemperature2'] ||
+            data.chillerTemperature2;
         if (chillerTemperature2 !== undefined && chillerTemperature2 !== null) {
             params.push({ label: 'Исходящая темп. охл. жидкости', value: `${chillerTemperature2} °C` });
         }
 
         // 9. Температура первичной обмотки
-        const primaryCoilTemperature = data['Температура первичной обмотки'] || 
-                                      data['PrimaryCoilTemperature'] || 
-                                      data.primaryCoilTemperature;
+        const primaryCoilTemperature = data['Температура первичной обмотки'] ||
+            data['PrimaryCoilTemperature'] ||
+            data.primaryCoilTemperature;
         if (primaryCoilTemperature !== undefined && primaryCoilTemperature !== null) {
             params.push({ label: 'Температура первичной обмотки', value: `${primaryCoilTemperature} °C` });
         }
 
         // 10. Температура вторичной обмотки
-        const secondaryCoilTemperature = data['Температура вторичной обмотки'] || 
-                                        data['SecondaryCoilTemperature'] || 
-                                        data.secondaryCoilTemperature;
+        const secondaryCoilTemperature = data['Температура вторичной обмотки'] ||
+            data['SecondaryCoilTemperature'] ||
+            data.secondaryCoilTemperature;
         if (secondaryCoilTemperature !== undefined && secondaryCoilTemperature !== null) {
             params.push({ label: 'Температура вторичной обмотки', value: `${secondaryCoilTemperature} °C` });
         }
 
         // 11. Расход проволоки
-        const wireConsumption = data['Расход проволоки'] || 
-                               data['WireConsumption'] || 
-                               data.wireConsumption;
+        const wireConsumption = data['Расход проволоки'] ||
+            data['WireConsumption'] ||
+            data.wireConsumption;
         if (wireConsumption !== undefined && wireConsumption !== null) {
             params.push({ label: 'Расход проволоки', value: `${wireConsumption} м/мин` });
         }
@@ -1207,12 +1119,12 @@ const DeviceMonitorPage = () => {
         if (!data) return [];
 
         const errors = [];
-        
+
         // Получаем timestamp из данных с правильной обработкой
         const getTimestamp = () => {
             // Пробуем разные источники timestamp
             let timestamp = null;
-            
+
             if (data.lastDatetimeUpdate) {
                 timestamp = data.lastDatetimeUpdate;
             } else if (data.localServerPacketDatetime) {
@@ -1222,7 +1134,7 @@ const DeviceMonitorPage = () => {
             } else if (data.timestamp) {
                 timestamp = data.timestamp;
             }
-            
+
             if (timestamp) {
                 // Если это строка в формате ISO, парсим её
                 if (typeof timestamp === 'string') {
@@ -1237,15 +1149,15 @@ const DeviceMonitorPage = () => {
                     return timestamp;
                 }
             }
-            
+
             // Fallback на текущую дату
             return new Date();
         };
-        
+
         const errorDate = getTimestamp();
         const timeStr = errorDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
         const dateStr = errorDate.toLocaleDateString('ru-RU');
-        
+
         // Получаем ошибки из разных возможных источников
         // 1. errorCode из корня объекта
         const errorCode = data['errorCode'] || data.errorCode;
@@ -1258,12 +1170,12 @@ const DeviceMonitorPage = () => {
                 message: `Ошибка ${errorCode}`
             });
         }
-        
+
         // 2. Свойство "Ошибки" из properties
         const errorsProperty = data['Ошибки'] || data['Errors'] || data.errors;
-        if (errorsProperty && 
-            errorsProperty !== 'Нет ошибок' && 
-            errorsProperty !== 'No errors' && 
+        if (errorsProperty &&
+            errorsProperty !== 'Нет ошибок' &&
+            errorsProperty !== 'No errors' &&
             String(errorsProperty).trim() !== '' &&
             String(errorsProperty).toLowerCase() !== 'null') {
             errors.push({
@@ -1307,10 +1219,10 @@ const DeviceMonitorPage = () => {
         if (Object.keys(deviceData).length === 0 || !hasData) return false;
         const data = deviceData[machineMac];
         if (!data) return false;
-        
+
         // Отладка: выводим все ключи и значения, связанные с состоянием
-        const stateKeys = Object.keys(data).filter(key => 
-            key.toLowerCase().includes('state') || 
+        const stateKeys = Object.keys(data).filter(key =>
+            key.toLowerCase().includes('state') ||
             key.toLowerCase().includes('status') ||
             key.toLowerCase().includes('состояние') ||
             key.toLowerCase().includes('welding')
@@ -1321,28 +1233,28 @@ const DeviceMonitorPage = () => {
                 console.log(`  ${key}:`, data[key]);
             });
         }
-        
+
         // 1. ПРИОРИТЕТ: Проверяем состояние аппарата из properties (это основное поле для определения сварки!)
         // status из корня может быть "Offline" даже когда идет сварка, поэтому проверяем WeldingMachineState первым
-        const weldingMachineState = data['Состояние аппарата'] || 
-                                   data['WeldingMachineState'] || 
-                                   data.weldingMachineState ||
-                                   data['State.WeldingMachineState'] ||
-                                   data.properties?.['WeldingMachineState'] ||
-                                   data.properties?.['Состояние аппарата'];
+        const weldingMachineState = data['Состояние аппарата'] ||
+            data['WeldingMachineState'] ||
+            data.weldingMachineState ||
+            data['State.WeldingMachineState'] ||
+            data.properties?.['WeldingMachineState'] ||
+            data.properties?.['Состояние аппарата'];
         if (weldingMachineState) {
             const stateLower = String(weldingMachineState).toLowerCase().trim();
             console.log('🔍 Проверка WeldingMachineState (приоритет):', weldingMachineState, '->', stateLower);
             // Проверяем, содержит ли состояние информацию о сварке
             // ВАЖНО: только явное указание "Сварка" или "Welding", не "Аппарат включен"
             if (stateLower === 'сварка' || stateLower === 'welding' ||
-                stateLower.includes('сварка') || stateLower.includes('welding') || 
+                stateLower.includes('сварка') || stateLower.includes('welding') ||
                 stateLower.includes('сварочн') || stateLower.includes('weld')) {
                 console.log('✅ Сварка обнаружена по WeldingMachineState:', weldingMachineState);
                 return true;
             }
             // Если явно указано, что сварки нет (включен, ожидание, выключен и т.д.)
-            if (stateLower.includes('ожидан') || stateLower.includes('waiting') || 
+            if (stateLower.includes('ожидан') || stateLower.includes('waiting') ||
                 stateLower.includes('выключ') || stateLower.includes('off') ||
                 stateLower.includes('включен') || stateLower.includes('on') ||
                 stateLower === 'выкл' || stateLower === 'off' ||
@@ -1353,7 +1265,7 @@ const DeviceMonitorPage = () => {
         } else {
             console.log('⚠️ WeldingMachineState не найден в данных');
         }
-        
+
         // 2. Проверяем status из корня объекта (вторичная проверка)
         // ВАЖНО: status из корня может быть "Offline" даже при сварке, поэтому это вторичная проверка
         const status = data.status || data.Status;
@@ -1361,22 +1273,22 @@ const DeviceMonitorPage = () => {
             const statusLower = String(status).toLowerCase().trim();
             console.log('🔍 Проверка status (вторичная):', status, '->', statusLower);
             // Проверяем различные варианты статуса "Сварка"
-            if (statusLower === 'welding' || statusLower === 'сварка' || 
-                statusLower === 'weld' || 
-                statusLower.includes('сварка') || 
+            if (statusLower === 'welding' || statusLower === 'сварка' ||
+                statusLower === 'weld' ||
+                statusLower.includes('сварка') ||
                 statusLower.includes('welding')) {
                 console.log('✅ Сварка обнаружена по status:', status);
                 return true;
             }
             // Если статус явно не "сварка", но это не критично, так как приоритет у WeldingMachineState
-            if (statusLower === 'offline' || statusLower === 'off' || 
+            if (statusLower === 'offline' || statusLower === 'off' ||
                 statusLower === 'выключен' || statusLower === 'выкл') {
                 console.log('⚠️ status = "Offline", но проверяем WeldingMachineState выше');
             }
         } else {
             console.log('⚠️ status не найден в данных');
         }
-        
+
         // 3. Проверяем ток сварки ТОЛЬКО если WeldingMachineState не определен или неоднозначен
         // НЕ используем ток как основной индикатор, так как аппарат может быть включен без сварки
         const current = parseFloat(data.Current || data['State.I'] || 0);
@@ -1385,7 +1297,7 @@ const DeviceMonitorPage = () => {
             console.log('✅ Сварка обнаружена по току (WeldingMachineState не определен):', current);
             return true;
         }
-        
+
         console.log('❌ Сварка не обнаружена');
         return false;
     };
@@ -1413,7 +1325,7 @@ const DeviceMonitorPage = () => {
     const currentProgress = getCurrentProgress();
     const voltageProgress = getVoltageProgress();
     const isWeldingActive = isWelding();
-    
+
     // Определяем, нужно ли показывать таймер желтым (сварка идет или только что закончилась)
     const isTimerActive = isWeldingActive || (weldingEndTime && (currentTime - weldingEndTime < 2000));
 
@@ -1435,8 +1347,8 @@ const DeviceMonitorPage = () => {
                     </div>
                     <div className="machine-visual-container">
                         <div className="machine-visual">
-                            <img 
-                                src={machineImage} 
+                            <img
+                                src={machineImage}
                                 alt="CORE PRO 500 сварочный аппарат"
                                 className="machine-image"
                             />
