@@ -21,7 +21,6 @@
 
 .filter-tile {
     background: #122536;
-    border: 1px solid rgba(59, 49, 74, 0.55);
     box-shadow: 0 14px 30px rgba(6, 9, 18, 0.55);
     border-radius: 5px;
     padding: 12px;
@@ -31,7 +30,7 @@
 }
 
 .search-input {
-    width: 99%;
+    width: 100%;
     padding: 4px 0;
     background: #122536;
     font-size: 13px;
@@ -63,7 +62,7 @@
 }
 
 .filter-arrow {
-    font-size: 12px;
+    font-size: 22px;
     color: #F9FFFF;
 }
 
@@ -95,13 +94,12 @@
 }
 
 .filter-checkbox input[type="checkbox"] {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     cursor: pointer;
     accent-color: #F0B942;
     flex-shrink: 0;
     background-color: #1A1420;
-    border: 1px solid rgba(59, 49, 74, 0.55);
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
@@ -234,9 +232,9 @@
 .welding-equipment-page .equipment-table-container {
     flex: 1;
     background: linear-gradient(155deg, rgba(32, 25, 39, 0.92), rgba(20, 18, 31, 0.94));
-    border: 1px solid rgba(59, 49, 74, 0.55);
-    box-shadow: 0 14px 30px rgba(6, 9, 18, 0.55);
-    border-radius: 5px;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0;
     overflow-y: auto;
     overflow-x: hidden;
     min-height: 0;
@@ -271,13 +269,15 @@
 }
 
 .welding-equipment-page .equipment-table th {
-    padding: 9px 6px;
-    text-align: left;
-    font-size: 11px;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    line-height: 0.2 !important;
+    text-align: center;
+    font-size: 12px;
     font-weight: 500;
     color: #6C7386;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.02em;
     border-bottom: 1px solid rgba(59, 49, 74, 0.55);
     white-space: nowrap;
     cursor: pointer;
@@ -292,11 +292,11 @@
 .welding-equipment-page .equipment-table th span {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 1px;
 }
 
 .welding-equipment-page .sort-arrow {
-    font-size: 14px;
+    font-size: 19px;
     color: rgba(188, 183, 197, 0.5);
     transition: color 0.2s ease;
 }
