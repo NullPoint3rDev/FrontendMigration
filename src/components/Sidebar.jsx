@@ -1,6 +1,13 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import '../styles/sidebar.css'
+import MainPageLogo from '../images/MainPageLogo.png'
+import OrganizationLogo from '../images/OrganizationLogo.png'
+import ResourcesLogo from '../images/ResourcesLogo.png'
+import ReportsLogo from '../images/ReportsLogo.png'
+import NotificationsLogo from '../images/NotificationsLogo.png'
+import SettingsLogo from '../images/SettingsLogo.png'
+import AboutLogo from '../images/AboutLogo.png'
 
 const Sidebar = () => {
     const navigate = useNavigate()
@@ -22,18 +29,18 @@ const Sidebar = () => {
 
             <nav className="sidebar-menu" aria-label="Основная навигация">
                 <button className="menu-link" onClick={() => navigate('/')}>
-                    <span className="menu-icon home" />
+                    <img src={MainPageLogo} alt="Главная" className="menu-icon" />
                     <span className="menu-text">Главная</span>
                 </button>
 
                 <button className="menu-link" onClick={() => navigate('/departments')}>
-                    <span className="menu-icon factory" />
+                    <img src={OrganizationLogo} alt="Предприятие" className="menu-icon" />
                     <span className="menu-text">Предприятие</span>
                 </button>
 
                 <div className="menu-group active">
                     <button className="menu-link expanded">
-                        <span className="menu-icon resources" />
+                        <img src={ResourcesLogo} alt="Ресурсы" className="menu-icon" />
                         <div className="menu-text-group">
                             <span className="menu-text">Ресурсы</span>
                         </div>
@@ -73,23 +80,22 @@ const Sidebar = () => {
                 </div>
 
                 <button className="menu-link" onClick={() => navigate('/my-reports')}>
-                    <span className="menu-icon reports" />
+                    <img src={ReportsLogo} alt="Отчеты" className="menu-icon" />
                     <span className="menu-text">Отчеты</span>
                 </button>
 
                 <button className="menu-link" onClick={() => navigate('/notifications')}>
-                    <span className="menu-icon alerts" />
+                    <img src={NotificationsLogo} alt="Уведомления" className="menu-icon" />
                     <span className="menu-text">Уведомления</span>
-                    <span className="menu-pill">12</span>
                 </button>
 
                 <button className="menu-link" onClick={() => navigate('/settings')}>
-                    <span className="menu-icon settings" />
+                    <img src={SettingsLogo} alt="Настройки" className="menu-icon" />
                     <span className="menu-text">Настройки</span>
                 </button>
 
                 <button className="menu-link" onClick={() => navigate('/about')}>
-                    <span className="menu-icon info" />
+                    <img src={AboutLogo} alt="О программе" className="menu-icon" />
                     <span className="menu-text">О программе</span>
                 </button>
             </nav>

@@ -153,61 +153,9 @@
     width: 18px;
     height: 18px;
     border-radius: 6px;
-    position: relative;
     flex-shrink: 0;
-}
-
-.menu-icon::before,
-.menu-icon::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    opacity: 0.85;
-}
-
-.menu-icon.home::before {
-    background: linear-gradient(135deg, #8f95ac, #626a83);
-}
-
-.menu-icon.home::after {
-    width: 8px;
-    height: 8px;
-    border-radius: 2px;
-    background: rgba(26, 20, 32, 0.9);
-    transform: translate(4px, 4px);
-}
-
-.menu-icon.factory::before {
-    background: linear-gradient(135deg, #8f95ac, #626a83);
-}
-
-.menu-icon.factory::after {
-    width: 10px;
-    height: 4px;
-    border-radius: 1px;
-    background: rgba(26, 20, 32, 0.9);
-    transform: translate(3px, 9px);
-}
-
-.menu-icon.resources::before {
-    background: linear-gradient(135deg, #b2acb6, #817a86);
-}
-
-.menu-icon.reports::before {
-    background: linear-gradient(135deg, #8f95ac, #626a83);
-}
-
-.menu-icon.alerts::before {
-    background: linear-gradient(135deg, #d49362, #8a5a35);
-}
-
-.menu-icon.settings::before {
-    background: linear-gradient(135deg, #8f95ac, #626a83);
-}
-
-.menu-icon.info::before {
-    background: linear-gradient(135deg, #8f95ac, #626a83);
+    object-fit: contain;
+    display: block;
 }
 
 .submenu {
