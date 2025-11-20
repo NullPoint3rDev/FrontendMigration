@@ -177,9 +177,9 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
     }
 
     return (
-        <div className="modal-overlay" onClick={handleClose}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <button className="modal-close" onClick={handleClose}>×</button>
+        <div className="modal-overlay">
+            <div className="modal-content">
+                <button className="modal-close" onClick={onClose}>×</button>
                 
                 <div className="modal-body">
                     <div className="modal-left">

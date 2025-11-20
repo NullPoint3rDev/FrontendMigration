@@ -47,10 +47,10 @@
 
 .modal-close {
     position: absolute !important;
-    top: 16px !important;
-    left: 16px !important;
-    width: 32px !important;
-    height: 32px !important;
+    top: 4px !important;
+    right: 4px !important;
+    width: 30px !important;
+    height: 30px !important;
     background: rgba(28, 22, 34, 0.8) !important;
     border: 1px solid rgba(82, 69, 94, 0.4) !important;
     border-radius: 4px !important;
