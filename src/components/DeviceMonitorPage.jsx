@@ -1508,11 +1508,7 @@ const DeviceMonitorPage = () => {
         <main className="main-panel">
             <div className="top-grid">
                 <section className="machine-section" aria-label="Сварочный аппарат">
-                    <div className="machine-title">
-                        <span className="machine-title-main">CORE</span>
-                        <span className="machine-title-accent">PRO 500</span>
-                    </div>
-                    <div className="machine-info-tiles">
+                    <div className="machine-header">
                         <button 
                             type="button" 
                             className="machine-info-back-tile"
@@ -1521,6 +1517,12 @@ const DeviceMonitorPage = () => {
                         >
                             <span className="machine-info-icon">←</span>
                         </button>
+                    <div className="machine-title">
+                        <span className="machine-title-main">CORE</span>
+                        <span className="machine-title-accent">PRO 500</span>
+                        </div>
+                    </div>
+                    <div className="machine-info-tiles">
                         <div className="machine-info-row">
                             <div className="machine-info-icon-tile">
                                 <span className="machine-info-icon">✎</span>

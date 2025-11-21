@@ -67,6 +67,14 @@
     box-sizing: border-box;
 }
 
+.machine-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    margin: 0 0 10px 0;
+}
+
 .machine-title {
     display: flex;
     align-items: center;
@@ -74,8 +82,8 @@
     font-size: 22px;
     font-weight: 700;
     letter-spacing: 0.06em;
-    padding: 10px;
-    margin: 0 0 10px 0;
+    padding: 0;
+    margin: 0;
 }
 
 .machine-title-main {
