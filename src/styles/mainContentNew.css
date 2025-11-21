@@ -73,6 +73,8 @@
     gap: 8px;
     padding: 10px;
     margin: 0 0 10px 0;
+    position: relative;
+    z-index: 10;
 }
 
 .machine-title {
@@ -104,6 +106,8 @@
     gap: 4px;
     padding: 0 10px;
     margin-bottom: 8px;
+    position: relative;
+    z-index: 10;
 }
 
 .machine-info-back-tile {
@@ -120,6 +124,8 @@
     margin: 0;
     transition: all 0.2s ease;
     flex-shrink: 0;
+    position: relative;
+    z-index: 11;
 }
 
 .machine-info-back-tile:hover {
@@ -194,6 +200,7 @@
     border-radius: 0;
     overflow: visible;
     background: transparent;
+    z-index: 1;
 }
 
 .machine-image {
@@ -204,6 +211,9 @@
     padding: 0;
     margin: 0;
     display: block;
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
 }
 
 .welding-timer {
