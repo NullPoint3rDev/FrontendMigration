@@ -124,6 +124,9 @@ const DeviceMonitorPage = () => {
     // Для задержки показа "отключен" при кратковременных паузах
     const [disconnectTimeout, setDisconnectTimeout] = useState(null);
 
+    // Состояние для отображения списка телеметрии
+    const [isTelemetryListExpanded, setIsTelemetryListExpanded] = useState(true);
+
     // Состояние для графиков
     const [currentChartData, setCurrentChartData] = useState([]);
     const [voltageChartData, setVoltageChartData] = useState([]);
@@ -974,6 +977,10 @@ const DeviceMonitorPage = () => {
         navigate('/equipment');
     };
 
+    const toggleTelemetryList = () => {
+        setIsTelemetryListExpanded(prev => !prev);
+    };
+
     // Создание градиента для заполнения графика
     const createGradient = (ctx, chartArea, color1, color2) => {
         const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
@@ -1722,19 +1729,25 @@ const DeviceMonitorPage = () => {
             <section className="bottom-panel">
                 <div className="bottom-panel__body">
                     <div className="telemetry-controls">
-                        <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
-                            <div className="tabs">
-                                <button className="tab active">Графики</button>
-                                <button className="tab">Информация</button>
-                            </div>
-                            <div className="telemetry-header">
-                                <button type="button" className="back-button" onClick={handleBackToEquipment}>
-                                    <span className="back-arrow">←</span>
-                                </button>
-                                <div className="date-box">
-                                    <span className="date-text">{formatDate()}</span>
+                        {isTelemetryListExpanded && (
+                            <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
+                                <div className="tabs">
+                                    <button className="tab active">Графики</button>
+                                    <button className="tab">Информация</button>
                                 </div>
-                            </div>
+                                <div className="telemetry-header">
+                                    <button 
+                                        type="button" 
+                                        className="back-button" 
+                                        onClick={toggleTelemetryList}
+                                        title={isTelemetryListExpanded ? "Скрыть список телеметрии" : "Показать список телеметрии"}
+                                    >
+                                        <span className="back-arrow">{isTelemetryListExpanded ? '←' : '→'}</span>
+                                    </button>
+                                    <div className="date-box">
+                                        <span className="date-text">{formatDate()}</span>
+                                    </div>
+                                </div>
                             {telemetryChannels.map((channel) => (
                                 <div
                                     key={channel.label}
@@ -1762,6 +1775,7 @@ const DeviceMonitorPage = () => {
                                 </div>
                             ))}
                         </div>
+                        )}
                     </div>
                     <div className="chart-stack">
                         <div className="chart-card large">
