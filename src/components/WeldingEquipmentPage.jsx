@@ -87,9 +87,9 @@ function WeldingEquipmentPage() {
     const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
     const [viewMode, setViewMode] = useState('table'); // 'tiles' or 'table'
     const [expandedFilters, setExpandedFilters] = useState({
-        department: false,
-        status: false,
-        model: false
+        department: true,
+        status: true,
+        model: true
     });
     const currentYear = new Date().getFullYear();
     const navigate = useNavigate();
@@ -680,7 +680,13 @@ function WeldingEquipmentPage() {
 
     // Action buttons
     const handleControl = (item) => {
-        navigate(`/device-monitor?machine=${encodeURIComponent(item.name)}&mac=${encodeURIComponent(item.mac)}`);
+        const params = new URLSearchParams({
+            machine: item.name || '',
+            mac: item.mac || '',
+            name: item.name || '',
+            organizationUnit: item.organizationUnit?.name || ''
+        });
+        navigate(`/device-monitor?${params.toString()}`);
     };
 
     const navigateToWelderProfile = (welderId) => {
@@ -868,6 +874,18 @@ function WeldingEquipmentPage() {
                     </button>
                     {expandedFilters.department && (
                         <div className="filter-tile-content">
+                            <label className="filter-checkbox">
+                                <input 
+                                    type="checkbox" 
+                                    checked={!organizationUnitFilter || organizationUnitFilter === ''}
+                                    onChange={(e) => {
+                                        if (e.target.checked) {
+                                            setOrganizationUnitFilter('');
+                                        }
+                                    }}
+                                />
+                                <span>Все</span>
+                            </label>
                             {departments.map(dept => (
                                 <div key={dept.id} className="filter-option">
                                     {dept.children ? (

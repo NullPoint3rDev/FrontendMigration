@@ -100,6 +100,8 @@ const DeviceMonitorPage = () => {
     const navigate = useNavigate();
     const machineName = searchParams.get('machine') || 'Неизвестный аппарат';
     const machineMac = searchParams.get('mac') || 'Неизвестный MAC';
+    const equipmentName = searchParams.get('name') || machineName;
+    const organizationUnit = searchParams.get('organizationUnit') || '';
 
     const [deviceData, setDeviceData] = useState({});
     // Удаляем старое состояние
@@ -221,6 +223,26 @@ const DeviceMonitorPage = () => {
     const currentChartInstanceRef = useRef(null);
     const voltageChartInstanceRef = useRef(null);
 
+    // Рефы для отслеживания времени последнего обновления графика
+    const lastChartUpdateTimeRef = useRef(null);
+    const chartUpdateIntervalRef = useRef(null);
+    
+    // Refs для хранения актуальных данных в интервале
+    const deviceDataRef = useRef(deviceData);
+    const machineMacRef = useRef(machineMac);
+    const hasDataRef = useRef(hasData);
+    const currentChartDataRef = useRef(currentChartData);
+    const voltageChartDataRef = useRef(voltageChartData);
+    
+    // Обновляем refs при изменении данных
+    useEffect(() => {
+        deviceDataRef.current = deviceData;
+        machineMacRef.current = machineMac;
+        hasDataRef.current = hasData;
+        currentChartDataRef.current = currentChartData;
+        voltageChartDataRef.current = voltageChartData;
+    }, [deviceData, machineMac, hasData, currentChartData, voltageChartData]);
+
     // Отслеживание состояния сварки для таймера
     useEffect(() => {
         if (Object.keys(deviceData).length === 0 || !hasData) {
@@ -277,87 +299,232 @@ const DeviceMonitorPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [deviceData, hasData, machineMac, currentTime]);
 
-    // Обновление данных графиков при изменении deviceData
+    // Обновление данных графиков при изменении состояния сварки
     useEffect(() => {
-        if (Object.keys(deviceData).length > 0 && hasData) {
-            Object.entries(deviceData).forEach(([mac, data]) => {
-                // Проверяем, идет ли сварка
-                const isCurrentlyWelding = isWelding();
+        if (Object.keys(deviceData).length === 0 || !hasData) {
+            // Нет данных - очищаем графики
+            setCurrentChartData([]);
+            setVoltageChartData([]);
+            prevCurrentRef.current = null;
+            prevVoltageRef.current = null;
+            prevWeldingStateRef.current = null;
+            lastChartUpdateTimeRef.current = null;
+            // Останавливаем интервал обновления
+            if (chartUpdateIntervalRef.current) {
+                clearInterval(chartUpdateIntervalRef.current);
+                chartUpdateIntervalRef.current = null;
+            }
+            return;
+        }
 
+        const data = deviceData[machineMac];
+        if (!data) {
+            // Нет данных для этого аппарата - очищаем графики
+            setCurrentChartData([]);
+            setVoltageChartData([]);
+            prevCurrentRef.current = null;
+            prevVoltageRef.current = null;
+            prevWeldingStateRef.current = null;
+            lastChartUpdateTimeRef.current = null;
+            // Останавливаем интервал обновления
+            if (chartUpdateIntervalRef.current) {
+                clearInterval(chartUpdateIntervalRef.current);
+                chartUpdateIntervalRef.current = null;
+            }
+            return;
+        }
+
+                const isCurrentlyWelding = isWelding();
+        const prevWeldingState = prevWeldingStateRef.current;
+
+        // Проверяем, изменилось ли состояние сварки
+        // Учитываем случай, когда сварка начинается впервые (prevWeldingState === null)
+        const weldingStateChanged = prevWeldingState !== isCurrentlyWelding;
+
+        // Если сварка идет, всегда проверяем, инициализирован ли график
+        if (isCurrentlyWelding) {
+            // Проверяем, нужно ли инициализировать график (изменилось состояние ИЛИ график пустой)
+            const needsInitialization = weldingStateChanged || currentChartDataRef.current.length === 0;
+            
+            if (needsInitialization) {
                 const current = parseFloat(data.Current || data['State.I'] || 0);
                 const voltage = parseFloat(data.Voltage || data['State.U'] || 0);
+                const timestamp = new Date();
 
-                // Определяем значения для графика: если сварка идет - реальные значения, иначе - 0
-                const currentValue = isCurrentlyWelding ? current : 0;
-                const voltageValue = isCurrentlyWelding ? voltage : 0;
+                // Сварка только что началась или график не инициализирован - резкий подъем
+                // График должен быть пустым, поэтому добавляем точку с 0, затем сразу точку с реальным значением
+                const timestamp0 = new Date(timestamp.getTime() - 10); // Небольшое смещение для визуализации
+                
+                setCurrentChartData(() => {
+                    // Начинаем с пустого графика, добавляем 0, затем реальное значение
+                    return [
+                        { x: timestamp0, y: 0 },
+                        { x: timestamp, y: current }
+                    ];
+                });
+                prevCurrentRef.current = current;
 
-                // Проверяем, изменилось ли состояние сварки
-                const weldingStateChanged = prevWeldingStateRef.current !== null &&
-                    prevWeldingStateRef.current !== isCurrentlyWelding;
+                setVoltageChartData(() => {
+                    // Начинаем с пустого графика, добавляем 0, затем реальное значение
+                    return [
+                        { x: timestamp0, y: 0 },
+                        { x: timestamp, y: voltage }
+                    ];
+                });
+                prevVoltageRef.current = voltage;
 
-                // Если состояние сварки изменилось (особенно переход от true к false),
-                // нужно сразу добавить точку со значением 0 для резкого падения
-                if (weldingStateChanged && !isCurrentlyWelding) {
-                    // Сварка только что закончилась - резко падаем к 0
+                lastChartUpdateTimeRef.current = timestamp.getTime();
+            }
+
+            // Останавливаем старый интервал (если был для нулей) и запускаем новый для сварки
+            if (chartUpdateIntervalRef.current) {
+                clearInterval(chartUpdateIntervalRef.current);
+            }
+            
+            // Запускаем интервал обновления графика раз в секунду
+            chartUpdateIntervalRef.current = setInterval(() => {
+                const currentDeviceData = deviceDataRef.current;
+                const currentMac = machineMacRef.current;
+                    
+                    if (Object.keys(currentDeviceData).length === 0 || !hasDataRef.current) {
+                        // Нет данных - останавливаем интервал
+                        if (chartUpdateIntervalRef.current) {
+                            clearInterval(chartUpdateIntervalRef.current);
+                            chartUpdateIntervalRef.current = null;
+                        }
+                        return;
+                    }
+                    
+                    const data = currentDeviceData[currentMac];
+                    if (!data) {
+                        return;
+                    }
+                    
+                    // Проверяем, идет ли сварка, используя актуальные данные
+                    const isCurrentlyWelding = (() => {
+                        const weldingMachineState = data['Состояние аппарата'] ||
+                            data['WeldingMachineState'] ||
+                            data.weldingMachineState ||
+                            data['State.WeldingMachineState'] ||
+                            data.properties?.['WeldingMachineState'] ||
+                            data.properties?.['Состояние аппарата'];
+                        if (weldingMachineState) {
+                            const stateLower = String(weldingMachineState).toLowerCase().trim();
+                            if (stateLower === 'сварка' || stateLower === 'welding' ||
+                                stateLower.includes('сварка') || stateLower.includes('welding') ||
+                                stateLower.includes('сварочн') || stateLower.includes('weld')) {
+                                return true;
+                            }
+                        }
+                        const status = data.status || data.Status;
+                        if (status) {
+                            const statusLower = String(status).toLowerCase().trim();
+                            if (statusLower === 'welding' || statusLower === 'сварка' ||
+                                statusLower === 'weld' ||
+                                statusLower.includes('сварка') ||
+                                statusLower.includes('welding')) {
+                                return true;
+                            }
+                        }
+                        const current = parseFloat(data.Current || data['State.I'] || 0);
+                        return current > 1;
+                    })();
+                    
+                    if (isCurrentlyWelding) {
+                        const current = parseFloat(data.Current || data['State.I'] || 0);
+                        const voltage = parseFloat(data.Voltage || data['State.U'] || 0);
                     const timestamp = new Date();
 
-                    // Добавляем точку со значением 0 для тока
                     setCurrentChartData(prev => {
-                        const newData = [...prev, { x: timestamp, y: 0 }];
+                            const newData = [...prev, { x: timestamp, y: current }];
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
-                    prevCurrentRef.current = 0;
+                        prevCurrentRef.current = current;
 
-                    // Добавляем точку со значением 0 для напряжения
                     setVoltageChartData(prev => {
-                        const newData = [...prev, { x: timestamp, y: 0 }];
+                            const newData = [...prev, { x: timestamp, y: voltage }];
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
-                    prevVoltageRef.current = 0;
+                        prevVoltageRef.current = voltage;
 
-                    // Обновляем предыдущее состояние сварки
+                        lastChartUpdateTimeRef.current = timestamp.getTime();
+                    } else {
+                        // Сварка закончилась - останавливаем интервал
+                        if (chartUpdateIntervalRef.current) {
+                            clearInterval(chartUpdateIntervalRef.current);
+                            chartUpdateIntervalRef.current = null;
+                        }
+                    }
+                }, 1000); // Обновление раз в секунду
+            
                     prevWeldingStateRef.current = isCurrentlyWelding;
-                    return;
-                }
-
-                // Проверяем, изменились ли значения перед обновлением
-                const currentChanged = prevCurrentRef.current === null || prevCurrentRef.current !== currentValue;
-                const voltageChanged = prevVoltageRef.current === null || prevVoltageRef.current !== voltageValue;
-
-                // Если состояние сварки изменилось (началась сварка), тоже обновляем
-                if (weldingStateChanged && isCurrentlyWelding) {
-                    prevWeldingStateRef.current = isCurrentlyWelding;
-                }
-
-                if (currentChanged && !isNaN(currentValue)) {
+        } else if (!isCurrentlyWelding) {
+            // Сварка не идет
+            if (weldingStateChanged) {
+                // Сварка только что закончилась - резкий спад
                     const timestamp = new Date();
-                    prevCurrentRef.current = currentValue;
+                const lastCurrent = prevCurrentRef.current !== null ? prevCurrentRef.current : 0;
+                const lastVoltage = prevVoltageRef.current !== null ? prevVoltageRef.current : 0;
 
-                    // Обновляем данные графика тока
                     setCurrentChartData(prev => {
-                        const newData = [...prev, { x: timestamp, y: currentValue }];
-                        return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
-                    });
-                }
+                    const newData = [...prev, { x: timestamp, y: lastCurrent }];
+                    // Затем сразу точку с 0
+                    return [...newData, { x: new Date(timestamp.getTime() + 1), y: 0 }];
+                });
+                prevCurrentRef.current = 0;
 
-                if (voltageChanged && !isNaN(voltageValue)) {
+                setVoltageChartData(prev => {
+                    const newData = [...prev, { x: timestamp, y: lastVoltage }];
+                    // Затем сразу точку с 0
+                    return [...newData, { x: new Date(timestamp.getTime() + 1), y: 0 }];
+                });
+                prevVoltageRef.current = 0;
+            }
+            
+            // Инициализируем график нулями, если он пустой
+            if (currentChartDataRef.current.length === 0) {
+                const timestamp = new Date();
+                setCurrentChartData([{ x: timestamp, y: 0 }]);
+                setVoltageChartData([{ x: timestamp, y: 0 }]);
+                prevCurrentRef.current = 0;
+                prevVoltageRef.current = 0;
+            }
+            
+            // Останавливаем старый интервал (если был для сварки) и запускаем новый для нулей
+            if (chartUpdateIntervalRef.current) {
+                clearInterval(chartUpdateIntervalRef.current);
+            }
+            
+            // Запускаем интервал обновления графика нулями раз в секунду
+            chartUpdateIntervalRef.current = setInterval(() => {
                     const timestamp = new Date();
-                    prevVoltageRef.current = voltageValue;
 
-                    // Обновляем данные графика напряжения
-                    setVoltageChartData(prev => {
-                        const newData = [...prev, { x: timestamp, y: voltageValue }];
+                    setCurrentChartData(prev => {
+                    const newData = [...prev, { x: timestamp, y: 0 }];
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
-                }
+                prevCurrentRef.current = 0;
 
-                // Обновляем предыдущее состояние сварки, если оно еще не было обновлено
-                if (!weldingStateChanged) {
+                    setVoltageChartData(prev => {
+                    const newData = [...prev, { x: timestamp, y: 0 }];
+                        return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
+                    });
+                prevVoltageRef.current = 0;
+            }, 1000); // Обновление раз в секунду
+
                     prevWeldingStateRef.current = isCurrentlyWelding;
                 }
-            });
-        }
-    }, [deviceData, hasData, maxDataPoints, machineMac]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [deviceData, hasData, machineMac]);
+
+    // Очистка интервала при размонтировании
+    useEffect(() => {
+        return () => {
+            if (chartUpdateIntervalRef.current) {
+                clearInterval(chartUpdateIntervalRef.current);
+            }
+        };
+    }, []);
 
     // Убираем сложную синхронизацию - теперь простое состояние
 
@@ -1345,6 +1512,30 @@ const DeviceMonitorPage = () => {
                         <span className="machine-title-main">CORE</span>
                         <span className="machine-title-accent">PRO 500</span>
                     </div>
+                    <div className="machine-info-tiles">
+                        <button 
+                            type="button" 
+                            className="machine-info-back-tile"
+                            onClick={handleBackToEquipment}
+                            title="Вернуться к списку оборудования"
+                        >
+                            <span className="machine-info-icon">←</span>
+                        </button>
+                        <div className="machine-info-row">
+                            <div className="machine-info-icon-tile">
+                                <span className="machine-info-icon">✎</span>
+                            </div>
+                            <span className="machine-info-text">{equipmentName}</span>
+                        </div>
+                        {organizationUnit && (
+                            <div className="machine-info-row">
+                                <div className="machine-info-icon-tile">
+                                    <span className="machine-info-icon">📍</span>
+                                </div>
+                                <span className="machine-info-text">{organizationUnit}</span>
+                            </div>
+                        )}
+                    </div>
                     <div className="machine-visual-container">
                         <div className="machine-visual">
                             <img
@@ -1578,7 +1769,6 @@ const DeviceMonitorPage = () => {
                             </div>
                             <div className="chart-wrapper">
                                 <div className="chart-canvas">
-                                    {currentChartData.length > 0 ? (
                                         <Line
                                             data={getCurrentChartData()}
                                             options={getChartOptions(0, 500, 'Ток (А)', 350, '350A')}
@@ -1589,11 +1779,6 @@ const DeviceMonitorPage = () => {
                                                 }
                                             }}
                                         />
-                                    ) : (
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'rgba(188, 183, 197, 0.5)' }}>
-                                            Ожидание данных...
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="chart-axis">
                                     <span>08:00</span>
@@ -1631,7 +1816,6 @@ const DeviceMonitorPage = () => {
                             </div>
                             <div className="chart-wrapper">
                                 <div className="chart-canvas">
-                                    {voltageChartData.length > 0 ? (
                                         <Line
                                             data={getVoltageChartData()}
                                             options={getChartOptions(0, 50.0, 'Напряжение (В)', 35, '35В')}
@@ -1642,11 +1826,6 @@ const DeviceMonitorPage = () => {
                                                 }
                                             }}
                                         />
-                                    ) : (
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'rgba(188, 183, 197, 0.5)' }}>
-                                            Ожидание данных...
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="chart-axis">
                                     <span>08:00</span>
