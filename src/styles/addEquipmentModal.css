@@ -221,9 +221,20 @@
     align-items: center;
 }
 
-.date-input-wrapper input {
+.date-input-wrapper input[type="text"] {
     flex: 1;
     padding-right: 32px;
+}
+
+.date-picker-hidden {
+    position: absolute;
+    right: 0;
+    width: 40px;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+    pointer-events: auto;
 }
 
 .calendar-icon {
@@ -233,6 +244,17 @@
     height: 16px;
     color: rgba(188, 183, 197, 0.6);
     pointer-events: none;
+}
+
+.calendar-icon-clickable {
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 3;
+    transition: color 0.2s ease;
+}
+
+.calendar-icon-clickable:hover {
+    color: rgba(188, 183, 197, 0.9);
 }
 
 .welders-tags {

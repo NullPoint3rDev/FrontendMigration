@@ -4,10 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import AddEquipmentModal from './AddEquipmentModal';
 import machineImage from '../images/Untitled 3 копия.png';
 // WebSocket отключен — используем только polling API
-import { 
-    createWeldingMachine, 
-    updateWeldingMachine, 
-    deleteWeldingMachine, 
+import {
+    createWeldingMachine,
+    updateWeldingMachine,
+    deleteWeldingMachine,
     getAllWeldingMachines,
     getAllOrganizationUnits,
     getAllWeldingMachineTypes
@@ -80,8 +80,9 @@ function WeldingEquipmentPage() {
     const [organizationUnits, setOrganizationUnits] = useState([]);
     const [weldingMachineTypes, setWeldingMachineTypes] = useState([]);
     const [responsibleUsers, setResponsibleUsers] = useState([]);
-    const [modelFilter, setModelFilter] = useState('');
-    const [organizationUnitFilter, setOrganizationUnitFilter] = useState('');
+    const [modelFilter, setModelFilter] = useState([]); // Массив выбранных моделей
+    const [organizationUnitFilter, setOrganizationUnitFilter] = useState([]); // Массив выбранных подразделений
+    const [statusFilter, setStatusFilter] = useState([]); // Массив выбранных статусов
     const [searchTerm, setSearchTerm] = useState('');
     const [sortField, setSortField] = useState(null);
     const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
@@ -353,7 +354,7 @@ function WeldingEquipmentPage() {
             if (id) clearInterval(id);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [equipment, modelFilter, organizationUnitFilter, searchTerm]);
+    }, [equipment, modelFilter, organizationUnitFilter, statusFilter, searchTerm]);
 
     const computeStatusFromState = (machine, stateObj) => {
         // Для CORE используем WeldingMachineState из посылки
@@ -529,14 +530,14 @@ function WeldingEquipmentPage() {
             const convertDateToISO = (dateString) => {
                 if (!dateString) return null;
                 console.log('🟡 convertDateToISO: Входная дата:', dateString);
-                
+
                 // Если дата уже в формате ISO (YYYY-MM-DD), возвращаем как есть
                 if (/^\d{4}-\d{2}-\d{2}/.test(dateString)) {
                     const result = `${dateString}T00:00:00`;
                     console.log('🟡 convertDateToISO: Дата уже в ISO формате, результат:', result);
                     return result;
                 }
-                
+
                 // Если дата в формате DD.MM.YYYY, преобразуем в YYYY-MM-DD
                 if (/^\d{2}\.\d{2}\.\d{4}/.test(dateString)) {
                     const [day, month, year] = dateString.split('.');
@@ -544,7 +545,7 @@ function WeldingEquipmentPage() {
                     console.log('🟡 convertDateToISO: Преобразовано из DD.MM.YYYY, результат:', result);
                     return result;
                 }
-                
+
                 // Пробуем распарсить как Date и преобразовать
                 try {
                     const date = new Date(dateString);
@@ -564,7 +565,7 @@ function WeldingEquipmentPage() {
 
             const commissionDateValue = convertDateToISO(dataToUse.commissionDate);
             const lastServiceValue = convertDateToISO(dataToUse.lastService);
-            
+
             console.log('🟡 handleSave: Преобразованная дата ввода в эксплуатацию:', commissionDateValue);
             console.log('🟡 handleSave: Преобразованная дата последнего ТО:', lastServiceValue);
 
@@ -582,7 +583,7 @@ function WeldingEquipmentPage() {
                     organizationUnitForApi = dataToUse.organizationUnit;
                 }
             }
-            
+
             console.log('🟡 handleSave: organizationUnit для API:', organizationUnitForApi);
             console.log('🟡 handleSave: commissionDateValue:', commissionDateValue);
             console.log('🟡 handleSave: lastServiceValue:', lastServiceValue);
@@ -735,19 +736,42 @@ function WeldingEquipmentPage() {
         let filtered = equipment;
 
         // Фильтр по модели
-        if (modelFilter) {
-            filtered = filtered.filter(item => item.deviceModel === modelFilter);
+        if (modelFilter.length > 0) {
+            // Если установлено "__NONE__", ничего не показываем
+            if (modelFilter.length === 1 && modelFilter[0] === '__NONE__') {
+                filtered = [];
+            } else {
+                filtered = filtered.filter(item => modelFilter.includes(item.deviceModel));
+            }
         }
 
         // Organization unit filter by organizationUnit.name
-        if (organizationUnitFilter) {
-            filtered = filtered.filter(item => (item.organizationUnit?.name || '') === organizationUnitFilter);
+        if (organizationUnitFilter.length > 0) {
+            // Если установлено "__NONE__", ничего не показываем
+            if (organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__') {
+                filtered = [];
+            } else {
+                filtered = filtered.filter(item => organizationUnitFilter.includes(item.organizationUnit?.name || ''));
+            }
+        }
+
+        // Фильтр по состоянию
+        if (statusFilter.length > 0) {
+            // Если установлено "__NONE__", ничего не показываем
+            if (statusFilter.length === 1 && statusFilter[0] === '__NONE__') {
+                filtered = [];
+            } else {
+                filtered = filtered.filter(item => {
+                    const status = deviceStatusesByMac[item.mac] || 'off';
+                    return statusFilter.includes(status);
+                });
+            }
         }
 
         // Фильтр по поисковому запросу
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
-            filtered = filtered.filter(item => 
+            filtered = filtered.filter(item =>
                 item.name?.toLowerCase().includes(term) ||
                 item.mac?.toLowerCase().includes(term) ||
                 item.serialNumber?.toLowerCase().includes(term) ||
@@ -811,9 +835,9 @@ function WeldingEquipmentPage() {
     const buildDepartmentTree = () => {
         const tree = [];
         const rootUnits = organizationUnits.filter(unit => !unit.parentId && !unit.parent_id);
-        
+
         rootUnits.forEach(root => {
-            const children = organizationUnits.filter(unit => 
+            const children = organizationUnits.filter(unit =>
                 (unit.parentId === root.id || unit.parent_id === root.id)
             );
             if (children.length > 0) {
@@ -855,9 +879,9 @@ function WeldingEquipmentPage() {
         <div className="welding-equipment-page">
             <div className="filters-column">
                 <div className="filter-tile search-input">
-                    <input 
-                        type="text" 
-                        className="search-input" 
+                    <input
+                        type="text"
+                        className="search-input"
                         placeholder="Поиск..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -865,138 +889,347 @@ function WeldingEquipmentPage() {
                 </div>
 
                 <div className="filter-tile">
-                    <button 
+                    <button
                         className="filter-tile-header"
                         onClick={() => toggleFilter('department')}
                     >
                         <span>Подразделение</span>
                         <span className="filter-arrow">{expandedFilters.department ? '▾' : '▸'}</span>
                     </button>
-                    {expandedFilters.department && (
-                        <div className="filter-tile-content">
-                            <label className="filter-checkbox">
-                                <input 
-                                    type="checkbox" 
-                                    checked={!organizationUnitFilter || organizationUnitFilter === ''}
-                                    onChange={(e) => {
-                                        if (e.target.checked) {
-                                            setOrganizationUnitFilter('');
-                                        }
-                                    }}
-                                />
-                                <span>Все</span>
-                            </label>
-                            {departments.map(dept => (
-                                <div key={dept.id} className="filter-option">
-                                    {dept.children ? (
-                                        <>
+                    {expandedFilters.department && (() => {
+                        // Получаем все подразделения (родительские и дочерние) для проверки "Все"
+                        const allDepartmentLabels = [];
+                        departments.forEach(dept => {
+                            allDepartmentLabels.push(dept.label);
+                            if (dept.children) {
+                                dept.children.forEach(child => {
+                                    allDepartmentLabels.push(child.label);
+                                });
+                            }
+                        });
+                        const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
+                        const allSelected = (organizationUnitFilter.length === 0 ||
+                            organizationUnitFilter.length === allDepartmentLabels.length) && !isNoneSelected;
+                        const showAllChecked = organizationUnitFilter.length === 0 && !isNoneSelected; // Если пусто - показываем все как выбранные
+
+                        return (
+                            <div className="filter-tile-content">
+                                <label className="filter-checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={allSelected}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                // Выбираем все
+                                                setOrganizationUnitFilter(allDepartmentLabels);
+                                            } else {
+                                                // При снятии галочки с активного "Все" - сбрасываем все галочки
+                                                setOrganizationUnitFilter(['__NONE__']);
+                                            }
+                                        }}
+                                    />
+                                    <span>Все</span>
+                                </label>
+                                {departments.map(dept => (
+                                    <div key={dept.id} className="filter-option">
+                                        {dept.children ? (
+                                            <>
+                                                <label className="filter-checkbox">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={showAllChecked || organizationUnitFilter.includes(dept.label)}
+                                                        onChange={(e) => {
+                                                            const willBeChecked = e.target.checked;
+                                                            const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
+
+                                                            if (isNoneSelected) {
+                                                                // Если было "__NONE__", удаляем его и добавляем выбранный элемент
+                                                                if (willBeChecked) {
+                                                                    setOrganizationUnitFilter([dept.label]);
+                                                                }
+                                                            } else if (organizationUnitFilter.length === 0) {
+                                                                // Если массив пустой (все выбрано)
+                                                                if (willBeChecked) {
+                                                                    // Ставим галочку - ничего не делаем, все уже выбрано
+                                                                    return;
+                                                                } else {
+                                                                    // Снимаем галочку - выбираем все кроме текущего
+                                                                    const allExceptCurrent = allDepartmentLabels.filter(label => label !== dept.label);
+                                                                    setOrganizationUnitFilter(allExceptCurrent);
+                                                                }
+                                                            } else {
+                                                                // Если массив не пустой
+                                                                if (willBeChecked) {
+                                                                    // Добавляем в фильтр
+                                                                    if (!organizationUnitFilter.includes(dept.label)) {
+                                                                        setOrganizationUnitFilter(prev => [...prev, dept.label]);
+                                                                    }
+                                                                } else {
+                                                                    // Убираем из фильтра
+                                                                    const newFilter = organizationUnitFilter.filter(label => label !== dept.label);
+                                                                    setOrganizationUnitFilter(newFilter);
+                                                                }
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span>{dept.label}</span>
+                                                </label>
+                                                <div className="filter-sub-options">
+                                                    {dept.children.map(child => (
+                                                        <label key={child.id} className="filter-checkbox sub">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={showAllChecked || organizationUnitFilter.includes(child.label)}
+                                                                onChange={(e) => {
+                                                                    const willBeChecked = e.target.checked;
+                                                                    const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
+
+                                                                    if (isNoneSelected) {
+                                                                        // Если было "__NONE__", удаляем его и добавляем выбранный элемент
+                                                                        if (willBeChecked) {
+                                                                            setOrganizationUnitFilter([child.label]);
+                                                                        }
+                                                                    } else if (organizationUnitFilter.length === 0) {
+                                                                        // Если массив пустой (все выбрано)
+                                                                        if (willBeChecked) {
+                                                                            // Ставим галочку - ничего не делаем, все уже выбрано
+                                                                            return;
+                                                                        } else {
+                                                                            // Снимаем галочку - выбираем все кроме текущего
+                                                                            const allExceptCurrent = allDepartmentLabels.filter(label => label !== child.label);
+                                                                            setOrganizationUnitFilter(allExceptCurrent);
+                                                                        }
+                                                                    } else {
+                                                                        // Если массив не пустой
+                                                                        if (willBeChecked) {
+                                                                            // Добавляем в фильтр
+                                                                            if (!organizationUnitFilter.includes(child.label)) {
+                                                                                setOrganizationUnitFilter(prev => [...prev, child.label]);
+                                                                            }
+                                                                        } else {
+                                                                            // Убираем из фильтра
+                                                                            const newFilter = organizationUnitFilter.filter(label => label !== child.label);
+                                                                            setOrganizationUnitFilter(newFilter);
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <span>{child.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        ) : (
                                             <label className="filter-checkbox">
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={organizationUnitFilter === dept.label}
+                                                <input
+                                                    type="checkbox"
+                                                    checked={showAllChecked || organizationUnitFilter.includes(dept.label)}
                                                     onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setOrganizationUnitFilter(dept.label);
+                                                        const willBeChecked = e.target.checked;
+                                                        const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
+
+                                                        if (isNoneSelected) {
+                                                            // Если было "__NONE__", удаляем его и добавляем выбранный элемент
+                                                            if (willBeChecked) {
+                                                                setOrganizationUnitFilter([dept.label]);
+                                                            }
+                                                        } else if (organizationUnitFilter.length === 0) {
+                                                            // Если массив пустой (все выбрано)
+                                                            if (willBeChecked) {
+                                                                // Ставим галочку - ничего не делаем, все уже выбрано
+                                                                return;
+                                                            } else {
+                                                                // Снимаем галочку - выбираем все кроме текущего
+                                                                const allExceptCurrent = allDepartmentLabels.filter(label => label !== dept.label);
+                                                                setOrganizationUnitFilter(allExceptCurrent);
+                                                            }
                                                         } else {
-                                                            setOrganizationUnitFilter('');
+                                                            // Если массив не пустой
+                                                            if (willBeChecked) {
+                                                                // Добавляем в фильтр
+                                                                if (!organizationUnitFilter.includes(dept.label)) {
+                                                                    setOrganizationUnitFilter(prev => [...prev, dept.label]);
+                                                                }
+                                                            } else {
+                                                                // Убираем из фильтра
+                                                                const newFilter = organizationUnitFilter.filter(label => label !== dept.label);
+                                                                setOrganizationUnitFilter(newFilter);
+                                                            }
                                                         }
                                                     }}
                                                 />
                                                 <span>{dept.label}</span>
                                             </label>
-                                            <div className="filter-sub-options">
-                                                {dept.children.map(child => (
-                                                    <label key={child.id} className="filter-checkbox sub">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            checked={organizationUnitFilter === child.label}
-                                                            onChange={(e) => {
-                                                                if (e.target.checked) {
-                                                                    setOrganizationUnitFilter(child.label);
-                                                                } else {
-                                                                    setOrganizationUnitFilter('');
-                                                                }
-                                                            }}
-                                                        />
-                                                        <span>{child.label}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <label className="filter-checkbox">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={organizationUnitFilter === dept.label}
-                                                onChange={(e) => {
-                                                    if (e.target.checked) {
-                                                        setOrganizationUnitFilter(dept.label);
-                                                    } else {
-                                                        setOrganizationUnitFilter('');
-                                                    }
-                                                }}
-                                            />
-                                            <span>{dept.label}</span>
-                                        </label>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 <div className="filter-tile">
-                    <button 
+                    <button
                         className="filter-tile-header"
                         onClick={() => toggleFilter('status')}
                     >
                         <span>Состояние</span>
                         <span className="filter-arrow">{expandedFilters.status ? '▾' : '▸'}</span>
                     </button>
-                    {expandedFilters.status && (
-                        <div className="filter-tile-content">
-                            {statuses.map(status => (
-                                <label key={status.id} className="filter-checkbox">
-                                    <input type="checkbox" />
-                                    <span>{status.label}</span>
+                    {expandedFilters.status && (() => {
+                        const allStatusIds = statuses.filter(s => s.id !== 'all').map(s => s.id);
+                        const isNoneSelected = statusFilter.length === 1 && statusFilter[0] === '__NONE__';
+                        const isAllSelected = (statusFilter.length === 0 || statusFilter.length === allStatusIds.length) && !isNoneSelected;
+                        const showAllChecked = statusFilter.length === 0 && !isNoneSelected; // Если пусто - показываем все как выбранные
+
+                        return (
+                            <div className="filter-tile-content">
+                                <label className="filter-checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={isAllSelected}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                // Выбираем все статусы кроме "all"
+                                                setStatusFilter(allStatusIds);
+                                            } else {
+                                                // При снятии галочки с активного "Все" - сбрасываем все галочки
+                                                setStatusFilter(['__NONE__']);
+                                            }
+                                        }}
+                                    />
+                                    <span>Все</span>
                                 </label>
-                            ))}
-                        </div>
-                    )}
+                                {statuses.filter(s => s.id !== 'all').map(status => {
+                                    const isChecked = showAllChecked || statusFilter.includes(status.id);
+                                    return (
+                                        <label key={status.id} className="filter-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={(e) => {
+                                                    const willBeChecked = e.target.checked;
+                                                    const isNoneSelected = statusFilter.length === 1 && statusFilter[0] === '__NONE__';
+
+                                                    if (isNoneSelected) {
+                                                        // Если было "__NONE__", удаляем его и добавляем выбранный элемент
+                                                        if (willBeChecked) {
+                                                            setStatusFilter([status.id]);
+                                                        }
+                                                    } else if (statusFilter.length === 0) {
+                                                        // Если массив пустой (все выбрано)
+                                                        if (willBeChecked) {
+                                                            // Ставим галочку - ничего не делаем, все уже выбрано
+                                                            return;
+                                                        } else {
+                                                            // Снимаем галочку - выбираем все кроме текущего
+                                                            const allExceptCurrent = allStatusIds.filter(id => id !== status.id);
+                                                            setStatusFilter(allExceptCurrent);
+                                                        }
+                                                    } else {
+                                                        // Если массив не пустой
+                                                        if (willBeChecked) {
+                                                            // Добавляем в фильтр
+                                                            if (!statusFilter.includes(status.id)) {
+                                                                setStatusFilter(prev => [...prev, status.id]);
+                                                            }
+                                                        } else {
+                                                            // Убираем из фильтра
+                                                            const newFilter = statusFilter.filter(id => id !== status.id);
+                                                            setStatusFilter(newFilter);
+                                                        }
+                                                    }
+                                                }}
+                                            />
+                                            <span>{status.label}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 <div className="filter-tile">
-                    <button 
+                    <button
                         className="filter-tile-header"
                         onClick={() => toggleFilter('model')}
                     >
                         <span>Модель аппарата</span>
                         <span className="filter-arrow">{expandedFilters.model ? '▾' : '▸'}</span>
                     </button>
-                    {expandedFilters.model && (
-                        <div className="filter-tile-content">
-                            {models.map(model => (
-                                <label key={model.id} className="filter-checkbox">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={modelFilter === model.id || (model.id === 'all' && !modelFilter)}
+                    {expandedFilters.model && (() => {
+                        const allModelIds = models.filter(m => m.id !== 'all').map(m => m.id);
+                        const isNoneSelected = modelFilter.length === 1 && modelFilter[0] === '__NONE__';
+                        const isAllSelected = (modelFilter.length === 0 || modelFilter.length === allModelIds.length) && !isNoneSelected;
+                        const showAllChecked = modelFilter.length === 0 && !isNoneSelected; // Если пусто - показываем все как выбранные
+
+                        return (
+                            <div className="filter-tile-content">
+                                <label className="filter-checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={isAllSelected}
                                         onChange={(e) => {
                                             if (e.target.checked) {
-                                                if (model.id === 'all') {
-                                                    setModelFilter('');
-                                                } else {
-                                                    setModelFilter(model.id);
-                                                }
+                                                // Выбираем все модели кроме "all"
+                                                setModelFilter(allModelIds);
                                             } else {
-                                                setModelFilter('');
+                                                // При снятии галочки с активного "Все" - сбрасываем все галочки
+                                                setModelFilter(['__NONE__']);
                                             }
                                         }}
                                     />
-                                    <span>{model.label}</span>
+                                    <span>Все</span>
                                 </label>
-                            ))}
-                        </div>
-                    )}
+                                {models.filter(m => m.id !== 'all').map(model => {
+                                    const isChecked = showAllChecked || modelFilter.includes(model.id);
+                                    return (
+                                        <label key={model.id} className="filter-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={(e) => {
+                                                    const willBeChecked = e.target.checked;
+                                                    const isNoneSelected = modelFilter.length === 1 && modelFilter[0] === '__NONE__';
+
+                                                    if (isNoneSelected) {
+                                                        // Если было "__NONE__", удаляем его и добавляем выбранный элемент
+                                                        if (willBeChecked) {
+                                                            setModelFilter([model.id]);
+                                                        }
+                                                    } else if (modelFilter.length === 0) {
+                                                        // Если массив пустой (все выбрано)
+                                                        if (willBeChecked) {
+                                                            // Ставим галочку - ничего не делаем, все уже выбрано
+                                                            return;
+                                                        } else {
+                                                            // Снимаем галочку - выбираем все кроме текущего
+                                                            const allExceptCurrent = allModelIds.filter(id => id !== model.id);
+                                                            setModelFilter(allExceptCurrent);
+                                                        }
+                                                    } else {
+                                                        // Если массив не пустой
+                                                        if (willBeChecked) {
+                                                            // Добавляем в фильтр
+                                                            if (!modelFilter.includes(model.id)) {
+                                                                setModelFilter(prev => [...prev, model.id]);
+                                                            }
+                                                        } else {
+                                                            // Убираем из фильтра
+                                                            const newFilter = modelFilter.filter(id => id !== model.id);
+                                                            setModelFilter(newFilter);
+                                                        }
+                                                    }
+                                                }}
+                                            />
+                                            <span>{model.label}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
                 </div>
             </div>
 
@@ -1005,11 +1238,11 @@ function WeldingEquipmentPage() {
                     <div className="add-device-tile">
                         <button className="add-device-btn" onClick={openAddModal}>
                             <span className="add-icon">+</span>
-                            <span>Добавить аппарат</span>
+                            <span>Добавить оборудование</span>
                         </button>
                     </div>
                     <div className="view-toggle">
-                        <button 
+                        <button
                             className={`view-btn ${viewMode === 'tiles' ? 'active' : ''}`}
                             onClick={() => setViewMode('tiles')}
                         >
@@ -1021,7 +1254,7 @@ function WeldingEquipmentPage() {
                             </svg>
                             <span>Таблица</span>
                         </button>
-                        <button 
+                        <button
                             className={`view-btn ${viewMode === 'table' ? 'active' : ''}`}
                             onClick={() => setViewMode('table')}
                         >
@@ -1037,85 +1270,86 @@ function WeldingEquipmentPage() {
                     <div className="equipment-table-container">
                         <table className="equipment-table">
                             <thead>
-                                <tr>
-                                    <th onClick={() => toggleSort('model')}>
-                                        <span>Модель</span>
-                                        <span className="sort-arrow">▾</span>
-                                    </th>
-                                    <th onClick={() => toggleSort('name')}>
-                                        <span>Название</span>
-                                        <span className="sort-arrow">▾</span>
-                                    </th>
-                                    <th onClick={() => toggleSort('unit')}>
-                                        <span>Подразделение</span>
-                                        <span className="sort-arrow">▾</span>
-                                    </th>
-                                    <th onClick={() => toggleSort('inventory')}>
-                                        <span>Инвентарный номер</span>
-                                        <span className="sort-arrow">▾</span>
-                                    </th>
-                                    <th onClick={() => toggleSort('welder')}>
-                                        <span>Сварщик</span>
-                                        <span className="sort-arrow">▾</span>
-                                    </th>
-                                    <th>
-                                        <span>Последнее включение</span>
-                                        <span className="sort-arrow">▾</span>
-                                    </th>
-                                    <th onClick={() => toggleSort('status')}>
-                                        <span>Статус</span>
-                                        <span className="sort-arrow">▾</span>
-                                    </th>
-                                </tr>
+                            <tr>
+                                <th onClick={() => toggleSort('model')}>
+                                    <span>Модель</span>
+                                    <span className="sort-arrow">▾</span>
+                                </th>
+                                <th onClick={() => toggleSort('name')}>
+                                    <span>Название</span>
+                                    <span className="sort-arrow">▾</span>
+                                </th>
+                                <th onClick={() => toggleSort('unit')}>
+                                    <span>Подразделение</span>
+                                    <span className="sort-arrow">▾</span>
+                                </th>
+                                <th onClick={() => toggleSort('inventory')}>
+                                    <span>Инвентарный номер</span>
+                                    <span className="sort-arrow">▾</span>
+                                </th>
+                                <th onClick={() => toggleSort('welder')}>
+                                    <span>Сварщик</span>
+                                    <span className="sort-arrow">▾</span>
+                                </th>
+                                <th>
+                                    <span>Последнее включение</span>
+                                    <span className="sort-arrow">▾</span>
+                                </th>
+                                <th onClick={() => toggleSort('status')}>
+                                    <span>Статус</span>
+                                    <span className="sort-arrow">▾</span>
+                                </th>
+                            </tr>
                             </thead>
                             <tbody>
-                                {getFilteredEquipment().map((item) => {
-                                    const status = deviceStatusesByMac[item.mac] || 'off';
-                                    const modelDisplay = getModelDisplay(item);
-                                    const modelParts = formatModel(modelDisplay);
-                                    return (
-                                        <tr 
-                                            key={item.id} 
-                                            className="table-row table-row-compact"
-                                            onClick={() => handleControl(item)}
-                                        >
-                                            <td>
-                                                <div className="model-cell-table">
-                                                    <img 
-                                                        src={machineImage} 
-                                                        alt={modelDisplay}
-                                                        className="machine-thumbnail-small"
-                                                    />
-                                                    <span className="model-text">
+                            {getFilteredEquipment().map((item) => {
+                                const status = deviceStatusesByMac[item.mac] || 'off';
+                                const modelDisplay = getModelDisplay(item);
+                                const modelParts = formatModel(modelDisplay);
+                                return (
+                                    <tr
+                                        key={item.id}
+                                        className="table-row table-row-compact"
+                                        onClick={() => handleControl(item)}
+                                    >
+                                        <td>
+                                            <div className="model-cell-table">
+                                                <span className={`equipment-status-dot ${status}`}></span>
+                                                <img
+                                                    src={machineImage}
+                                                    alt={modelDisplay}
+                                                    className="machine-thumbnail-small"
+                                                />
+                                                <span className="model-text">
                                                         <span className="model-part-first">{modelParts.first}</span>
-                                                        {modelParts.second && (
-                                                            <span className="model-part-second"> {modelParts.second}</span>
-                                                        )}
+                                                    {modelParts.second && (
+                                                        <span className="model-part-second"> {modelParts.second}</span>
+                                                    )}
                                                     </span>
-                                                </div>
-                                            </td>
-                                            <td>{item.name}</td>
-                                            <td>{item.organizationUnit?.name || 'Не указано'}</td>
-                                            <td>{item.inventoryNumber || 'Не указан'}</td>
-                                            <td>{getWelderDisplay(item)}</td>
-                                            <td>{getLastActivation(item) || 'Нет данных'}</td>
-                                            <td>
+                                            </div>
+                                        </td>
+                                        <td>{item.name}</td>
+                                        <td>{item.organizationUnit?.name || 'Не указано'}</td>
+                                        <td>{item.inventoryNumber || 'Не указан'}</td>
+                                        <td>{getWelderDisplay(item)}</td>
+                                        <td>{getLastActivation(item) || 'Нет данных'}</td>
+                                        <td>
                                                 <span className={`status-badge ${status}`}>
-                                                    {status === 'welding' ? 'Сварка' : 
-                                                     status === 'on' ? 'Вкл' :
-                                                     status === 'error' ? 'Ошибка' : 'Выкл'}
+                                                    {status === 'welding' ? 'Сварка' :
+                                                        status === 'on' ? 'Вкл' :
+                                                            status === 'error' ? 'Ошибка' : 'Выкл'}
                                                 </span>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                             </tbody>
                         </table>
                     </div>
                 )}
             </div>
 
-            <AddEquipmentModal  
+            <AddEquipmentModal
                 isOpen={modalOpen}
                 onClose={closeModal}
                 welders={welders}
@@ -1123,7 +1357,7 @@ function WeldingEquipmentPage() {
                 onSave={async (data) => {
                     try {
                         console.log('🟢 WeldingEquipmentPage: onSave вызван с данными:', data);
-                    // Преобразуем данные из AddEquipmentModal в формат для handleSave
+                        // Преобразуем данные из AddEquipmentModal в формат для handleSave
                         // Преобразуем модель: "Core" -> "CORE", "Блок мониторинга" -> "MONITORING_BLOCK"
                         let deviceModel = '';
                         if (data.model === 'Core') {
@@ -1136,28 +1370,28 @@ function WeldingEquipmentPage() {
 
                         console.log('🟢 WeldingEquipmentPage: Преобразованная модель:', deviceModel);
 
-                    const newEditData = {
-                        ...editData,
-                        name: data.name || '',
+                        const newEditData = {
+                            ...editData,
+                            name: data.name || '',
                             deviceModel: deviceModel,
-                        mac: data.macAddress || '',
-                        commissionDate: data.commissioningDate || '',
-                        serialNumber: data.serialNumber || '',
-                        inventoryNumber: data.inventoryNumber || '',
-                        organizationUnit: organizationUnits.find(unit => unit.name === data.department) || null,
-                        coreOptions: {
-                            gasControl: data.options?.gasControl || false,
-                            rfid: data.options?.rfid || false,
-                            bvo: data.options?.bvo || false
-                        },
-                        assignedWelders: data.approvedWelders || []
-                    };
+                            mac: data.macAddress || '',
+                            commissionDate: data.commissioningDate || '',
+                            serialNumber: data.serialNumber || '',
+                            inventoryNumber: data.inventoryNumber || '',
+                            organizationUnit: organizationUnits.find(unit => unit.name === data.department) || null,
+                            coreOptions: {
+                                gasControl: data.options?.gasControl || false,
+                                rfid: data.options?.rfid || false,
+                                bvo: data.options?.bvo || false
+                            },
+                            assignedWelders: data.approvedWelders || []
+                        };
                         console.log('🟢 WeldingEquipmentPage: newEditData:', newEditData);
-                    setEditData(newEditData);
-                        
+                        setEditData(newEditData);
+
                         // Вызываем handleSave с переданными данными напрямую
                         console.log('🟢 WeldingEquipmentPage: Вызываем handleSave с данными...');
-                    const fakeEvent = { preventDefault: () => {} };
+                        const fakeEvent = { preventDefault: () => {} };
                         await handleSave(fakeEvent, newEditData);
                         console.log('✅ WeldingEquipmentPage: handleSave завершен');
                     } catch (error) {

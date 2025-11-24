@@ -229,14 +229,14 @@ const DeviceMonitorPage = () => {
     // Рефы для отслеживания времени последнего обновления графика
     const lastChartUpdateTimeRef = useRef(null);
     const chartUpdateIntervalRef = useRef(null);
-    
+
     // Refs для хранения актуальных данных в интервале
     const deviceDataRef = useRef(deviceData);
     const machineMacRef = useRef(machineMac);
     const hasDataRef = useRef(hasData);
     const currentChartDataRef = useRef(currentChartData);
     const voltageChartDataRef = useRef(voltageChartData);
-    
+
     // Обновляем refs при изменении данных
     useEffect(() => {
         deviceDataRef.current = deviceData;
@@ -337,7 +337,7 @@ const DeviceMonitorPage = () => {
             return;
         }
 
-                const isCurrentlyWelding = isWelding();
+        const isCurrentlyWelding = isWelding();
         const prevWeldingState = prevWeldingStateRef.current;
 
         // Проверяем, изменилось ли состояние сварки
@@ -348,7 +348,7 @@ const DeviceMonitorPage = () => {
         if (isCurrentlyWelding) {
             // Проверяем, нужно ли инициализировать график (изменилось состояние ИЛИ график пустой)
             const needsInitialization = weldingStateChanged || currentChartDataRef.current.length === 0;
-            
+
             if (needsInitialization) {
                 const current = parseFloat(data.Current || data['State.I'] || 0);
                 const voltage = parseFloat(data.Voltage || data['State.U'] || 0);
@@ -357,7 +357,7 @@ const DeviceMonitorPage = () => {
                 // Сварка только что началась или график не инициализирован - резкий подъем
                 // График должен быть пустым, поэтому добавляем точку с 0, затем сразу точку с реальным значением
                 const timestamp0 = new Date(timestamp.getTime() - 10); // Небольшое смещение для визуализации
-                
+
                 setCurrentChartData(() => {
                     // Начинаем с пустого графика, добавляем 0, затем реальное значение
                     return [
@@ -383,93 +383,93 @@ const DeviceMonitorPage = () => {
             if (chartUpdateIntervalRef.current) {
                 clearInterval(chartUpdateIntervalRef.current);
             }
-            
+
             // Запускаем интервал обновления графика раз в секунду
             chartUpdateIntervalRef.current = setInterval(() => {
                 const currentDeviceData = deviceDataRef.current;
                 const currentMac = machineMacRef.current;
-                    
-                    if (Object.keys(currentDeviceData).length === 0 || !hasDataRef.current) {
-                        // Нет данных - останавливаем интервал
-                        if (chartUpdateIntervalRef.current) {
-                            clearInterval(chartUpdateIntervalRef.current);
-                            chartUpdateIntervalRef.current = null;
-                        }
-                        return;
+
+                if (Object.keys(currentDeviceData).length === 0 || !hasDataRef.current) {
+                    // Нет данных - останавливаем интервал
+                    if (chartUpdateIntervalRef.current) {
+                        clearInterval(chartUpdateIntervalRef.current);
+                        chartUpdateIntervalRef.current = null;
                     }
-                    
-                    const data = currentDeviceData[currentMac];
-                    if (!data) {
-                        return;
+                    return;
+                }
+
+                const data = currentDeviceData[currentMac];
+                if (!data) {
+                    return;
+                }
+
+                // Проверяем, идет ли сварка, используя актуальные данные
+                const isCurrentlyWelding = (() => {
+                    const weldingMachineState = data['Состояние аппарата'] ||
+                        data['WeldingMachineState'] ||
+                        data.weldingMachineState ||
+                        data['State.WeldingMachineState'] ||
+                        data.properties?.['WeldingMachineState'] ||
+                        data.properties?.['Состояние аппарата'];
+                    if (weldingMachineState) {
+                        const stateLower = String(weldingMachineState).toLowerCase().trim();
+                        if (stateLower === 'сварка' || stateLower === 'welding' ||
+                            stateLower.includes('сварка') || stateLower.includes('welding') ||
+                            stateLower.includes('сварочн') || stateLower.includes('weld')) {
+                            return true;
+                        }
                     }
-                    
-                    // Проверяем, идет ли сварка, используя актуальные данные
-                    const isCurrentlyWelding = (() => {
-                        const weldingMachineState = data['Состояние аппарата'] ||
-                            data['WeldingMachineState'] ||
-                            data.weldingMachineState ||
-                            data['State.WeldingMachineState'] ||
-                            data.properties?.['WeldingMachineState'] ||
-                            data.properties?.['Состояние аппарата'];
-                        if (weldingMachineState) {
-                            const stateLower = String(weldingMachineState).toLowerCase().trim();
-                            if (stateLower === 'сварка' || stateLower === 'welding' ||
-                                stateLower.includes('сварка') || stateLower.includes('welding') ||
-                                stateLower.includes('сварочн') || stateLower.includes('weld')) {
-                                return true;
-                            }
+                    const status = data.status || data.Status;
+                    if (status) {
+                        const statusLower = String(status).toLowerCase().trim();
+                        if (statusLower === 'welding' || statusLower === 'сварка' ||
+                            statusLower === 'weld' ||
+                            statusLower.includes('сварка') ||
+                            statusLower.includes('welding')) {
+                            return true;
                         }
-                        const status = data.status || data.Status;
-                        if (status) {
-                            const statusLower = String(status).toLowerCase().trim();
-                            if (statusLower === 'welding' || statusLower === 'сварка' ||
-                                statusLower === 'weld' ||
-                                statusLower.includes('сварка') ||
-                                statusLower.includes('welding')) {
-                                return true;
-                            }
-                        }
-                        const current = parseFloat(data.Current || data['State.I'] || 0);
-                        return current > 1;
-                    })();
-                    
-                    if (isCurrentlyWelding) {
-                        const current = parseFloat(data.Current || data['State.I'] || 0);
-                        const voltage = parseFloat(data.Voltage || data['State.U'] || 0);
+                    }
+                    const current = parseFloat(data.Current || data['State.I'] || 0);
+                    return current > 1;
+                })();
+
+                if (isCurrentlyWelding) {
+                    const current = parseFloat(data.Current || data['State.I'] || 0);
+                    const voltage = parseFloat(data.Voltage || data['State.U'] || 0);
                     const timestamp = new Date();
 
                     setCurrentChartData(prev => {
-                            const newData = [...prev, { x: timestamp, y: current }];
+                        const newData = [...prev, { x: timestamp, y: current }];
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
-                        prevCurrentRef.current = current;
+                    prevCurrentRef.current = current;
 
                     setVoltageChartData(prev => {
-                            const newData = [...prev, { x: timestamp, y: voltage }];
+                        const newData = [...prev, { x: timestamp, y: voltage }];
                         return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
                     });
-                        prevVoltageRef.current = voltage;
+                    prevVoltageRef.current = voltage;
 
-                        lastChartUpdateTimeRef.current = timestamp.getTime();
-                    } else {
-                        // Сварка закончилась - останавливаем интервал
-                        if (chartUpdateIntervalRef.current) {
-                            clearInterval(chartUpdateIntervalRef.current);
-                            chartUpdateIntervalRef.current = null;
-                        }
+                    lastChartUpdateTimeRef.current = timestamp.getTime();
+                } else {
+                    // Сварка закончилась - останавливаем интервал
+                    if (chartUpdateIntervalRef.current) {
+                        clearInterval(chartUpdateIntervalRef.current);
+                        chartUpdateIntervalRef.current = null;
                     }
-                }, 1000); // Обновление раз в секунду
-            
-                    prevWeldingStateRef.current = isCurrentlyWelding;
+                }
+            }, 1000); // Обновление раз в секунду
+
+            prevWeldingStateRef.current = isCurrentlyWelding;
         } else if (!isCurrentlyWelding) {
             // Сварка не идет
             if (weldingStateChanged) {
                 // Сварка только что закончилась - резкий спад
-                    const timestamp = new Date();
+                const timestamp = new Date();
                 const lastCurrent = prevCurrentRef.current !== null ? prevCurrentRef.current : 0;
                 const lastVoltage = prevVoltageRef.current !== null ? prevVoltageRef.current : 0;
 
-                    setCurrentChartData(prev => {
+                setCurrentChartData(prev => {
                     const newData = [...prev, { x: timestamp, y: lastCurrent }];
                     // Затем сразу точку с 0
                     return [...newData, { x: new Date(timestamp.getTime() + 1), y: 0 }];
@@ -483,7 +483,7 @@ const DeviceMonitorPage = () => {
                 });
                 prevVoltageRef.current = 0;
             }
-            
+
             // Инициализируем график нулями, если он пустой
             if (currentChartDataRef.current.length === 0) {
                 const timestamp = new Date();
@@ -492,31 +492,31 @@ const DeviceMonitorPage = () => {
                 prevCurrentRef.current = 0;
                 prevVoltageRef.current = 0;
             }
-            
+
             // Останавливаем старый интервал (если был для сварки) и запускаем новый для нулей
             if (chartUpdateIntervalRef.current) {
                 clearInterval(chartUpdateIntervalRef.current);
             }
-            
+
             // Запускаем интервал обновления графика нулями раз в секунду
             chartUpdateIntervalRef.current = setInterval(() => {
-                    const timestamp = new Date();
+                const timestamp = new Date();
 
-                    setCurrentChartData(prev => {
+                setCurrentChartData(prev => {
                     const newData = [...prev, { x: timestamp, y: 0 }];
-                        return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
-                    });
+                    return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
+                });
                 prevCurrentRef.current = 0;
 
-                    setVoltageChartData(prev => {
+                setVoltageChartData(prev => {
                     const newData = [...prev, { x: timestamp, y: 0 }];
-                        return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
-                    });
+                    return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
+                });
                 prevVoltageRef.current = 0;
             }, 1000); // Обновление раз в секунду
 
-                    prevWeldingStateRef.current = isCurrentlyWelding;
-                }
+            prevWeldingStateRef.current = isCurrentlyWelding;
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [deviceData, hasData, machineMac]);
 
@@ -800,6 +800,11 @@ const DeviceMonitorPage = () => {
                         } else if (key === 'Flags') {
                             // Флаги
                             params[key] = prop.value;
+                        } else if (key === 'RFID' || key === 'Rfid' || key === 'rfid' || key === 'RFIDCode' || key === 'RfidCode') {
+                            // RFID код
+                            params[key] = prop.value;
+                            // Также сохраняем как RFID для единообразия
+                            params.RFID = prop.value;
                         } else if (key === 'State.I' || key === 'State.U') {
                             // Старые параметры (для совместимости)
                             const decimalValue = parseInt(prop.value, 16);
@@ -1158,88 +1163,143 @@ const DeviceMonitorPage = () => {
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
 
+    // Функция для определения цвета состояния аппарата
+    const getStateColor = (state) => {
+        if (!state) return null;
+        const stateLower = String(state).toLowerCase().trim();
+
+        // Режим ожидания - зеленый
+        if (stateLower.includes('ожидан') || stateLower.includes('waiting') || stateLower === 'режим ожидания') {
+            return '#0cff00'; // Зеленый
+        }
+
+        // Аппарат включен - зеленый
+        if (stateLower.includes('включен') || stateLower.includes('on') || stateLower === 'аппарат включен') {
+            return '#0cff00'; // Зеленый
+        }
+
+        // Сварка - желтый
+        if (stateLower.includes('сварка') || stateLower.includes('welding') || stateLower.includes('weld')) {
+            return '#fbb56b'; // Желтый
+        }
+
+        // Авария - красный
+        if (stateLower.includes('авария') || stateLower.includes('error') || stateLower.includes('ошибка') ||
+            stateLower.includes('emergency') || stateLower.includes('failure')) {
+            return '#E42F34'; // Красный
+        }
+
+        // Дежурный режим - зеленый
+        if (stateLower.includes('дежурн') || stateLower.includes('standby') || stateLower === 'дежурный режим') {
+            return '#0cff00'; // Зеленый
+        }
+
+        // Аппарат заблокирован - серый
+        if (stateLower.includes('заблокирован') || stateLower.includes('blocked') || stateLower.includes('lock') ||
+            stateLower.includes('блокиров')) {
+            return 'rgba(188, 183, 197, 0.5)'; // Серый
+        }
+
+        // По умолчанию - обычный цвет
+        return null;
+    };
+
     const getSystemParameters = () => {
-        if (Object.keys(deviceData).length === 0 || !hasData) return [];
-        const data = deviceData[machineMac];
-        if (!data) return [];
+        const isDeviceOff = Object.keys(deviceData).length === 0 || !hasData;
+        const data = isDeviceOff ? null : deviceData[machineMac];
 
         const params = [];
 
         // 1. Состояние аппарата
-        const weldingMachineState = data['Состояние аппарата'] || data['WeldingMachineState'] || data.weldingMachineState;
-        if (weldingMachineState) {
-            params.push({ label: 'Состояние аппарата', value: weldingMachineState });
+        const weldingMachineState = data ? (data['Состояние аппарата'] || data['WeldingMachineState'] || data.weldingMachineState) : null;
+        if (weldingMachineState || isDeviceOff) {
+            const stateColor = weldingMachineState ? getStateColor(weldingMachineState) : null;
+            params.push({
+                label: 'Состояние аппарата',
+                value: isDeviceOff ? 'Не в сети' : weldingMachineState,
+                stateColor: stateColor // Добавляем цвет для состояния
+            });
         }
 
-        // 2. Сварочное задание
-        const jobNumber = data['Номер сварочного задания'] || data['JobNumber'] || data.jobNumber;
-        if (jobNumber !== undefined && jobNumber !== null) {
-            params.push({ label: 'Сварочное задание', value: String(jobNumber) });
-        }
+        // 2. Режим горелки (вместо Сварочного задания)
+        const burnerMode = data ? (data['Режим горелки'] || data.burnerMode) : null;
+        params.push({
+            label: 'Режим горелки',
+            value: isDeviceOff ? '—' : (burnerMode !== undefined && burnerMode !== null ? String(burnerMode) : '—')
+        });
 
         // 3. Индуктивность
-        const inductance = data['Inductance'] || data.inductance;
-        if (inductance !== undefined && inductance !== null) {
-            params.push({ label: 'Индуктивность', value: String(inductance) });
-        }
+        const inductance = data ? (data['Inductance'] || data.inductance) : null;
+        params.push({
+            label: 'Индуктивность',
+            value: isDeviceOff ? '—' : (inductance !== undefined && inductance !== null ? String(inductance) : '—')
+        });
 
         // 4. Напряжение фазы A
-        const voltagePhaseA = data['Напряжение фазы А'] || data['VoltagePhaseA'] || data.voltagePhaseA;
-        if (voltagePhaseA !== undefined && voltagePhaseA !== null) {
-            params.push({ label: 'Напряжение фазы А', value: `${voltagePhaseA} В` });
-        }
+        const voltagePhaseA = data ? (data['Напряжение фазы А'] || data['VoltagePhaseA'] || data.voltagePhaseA) : null;
+        params.push({
+            label: 'Напряжение фазы А',
+            value: isDeviceOff ? '—' : (voltagePhaseA !== undefined && voltagePhaseA !== null ? `${voltagePhaseA} В` : '—')
+        });
 
         // 5. Напряжение фазы В
-        const voltagePhaseB = data['Напряжение фазы В'] || data['VoltagePhaseB'] || data.voltagePhaseB;
-        if (voltagePhaseB !== undefined && voltagePhaseB !== null) {
-            params.push({ label: 'Напряжение фазы В', value: `${voltagePhaseB} В` });
-        }
+        const voltagePhaseB = data ? (data['Напряжение фазы В'] || data['VoltagePhaseB'] || data.voltagePhaseB) : null;
+        params.push({
+            label: 'Напряжение фазы В',
+            value: isDeviceOff ? '—' : (voltagePhaseB !== undefined && voltagePhaseB !== null ? `${voltagePhaseB} В` : '—')
+        });
 
         // 6. Напряжение фазы С
-        const voltagePhaseC = data['Напряжение фазы С'] || data['VoltagePhaseC'] || data.voltagePhaseC;
-        if (voltagePhaseC !== undefined && voltagePhaseC !== null) {
-            params.push({ label: 'Напряжение фазы С', value: `${voltagePhaseC} В` });
-        }
+        const voltagePhaseC = data ? (data['Напряжение фазы С'] || data['VoltagePhaseC'] || data.voltagePhaseC) : null;
+        params.push({
+            label: 'Напряжение фазы С',
+            value: isDeviceOff ? '—' : (voltagePhaseC !== undefined && voltagePhaseC !== null ? `${voltagePhaseC} В` : '—')
+        });
 
         // 7. Температура охлаждающей жидкости на входе
-        const chillerTemperature1 = data['Температура охлаждающей жидкости на входе'] ||
+        const chillerTemperature1 = data ? (data['Температура охлаждающей жидкости на входе'] ||
             data['ChillerTemperature1'] ||
-            data.chillerTemperature1;
-        if (chillerTemperature1 !== undefined && chillerTemperature1 !== null) {
-            params.push({ label: 'Входящая темп. охл. жидкости', value: `${chillerTemperature1} °C` });
-        }
+            data.chillerTemperature1) : null;
+        params.push({
+            label: 'Входящая темп. охл. жидкости',
+            value: isDeviceOff ? '—' : (chillerTemperature1 !== undefined && chillerTemperature1 !== null ? `${chillerTemperature1} °C` : '—')
+        });
 
         // 8. Температура охлаждающей жидкости на выходе
-        const chillerTemperature2 = data['Температура охлаждающей жидкости на выходе'] ||
+        const chillerTemperature2 = data ? (data['Температура охлаждающей жидкости на выходе'] ||
             data['ChillerTemperature2'] ||
-            data.chillerTemperature2;
-        if (chillerTemperature2 !== undefined && chillerTemperature2 !== null) {
-            params.push({ label: 'Исходящая темп. охл. жидкости', value: `${chillerTemperature2} °C` });
-        }
+            data.chillerTemperature2) : null;
+        params.push({
+            label: 'Исходящая темп. охл. жидкости',
+            value: isDeviceOff ? '—' : (chillerTemperature2 !== undefined && chillerTemperature2 !== null ? `${chillerTemperature2} °C` : '—')
+        });
 
         // 9. Температура первичной обмотки
-        const primaryCoilTemperature = data['Температура первичной обмотки'] ||
+        const primaryCoilTemperature = data ? (data['Температура первичной обмотки'] ||
             data['PrimaryCoilTemperature'] ||
-            data.primaryCoilTemperature;
-        if (primaryCoilTemperature !== undefined && primaryCoilTemperature !== null) {
-            params.push({ label: 'Температура первичной обмотки', value: `${primaryCoilTemperature} °C` });
-        }
+            data.primaryCoilTemperature) : null;
+        params.push({
+            label: 'Температура первичной обмотки',
+            value: isDeviceOff ? '—' : (primaryCoilTemperature !== undefined && primaryCoilTemperature !== null ? `${primaryCoilTemperature} °C` : '—')
+        });
 
         // 10. Температура вторичной обмотки
-        const secondaryCoilTemperature = data['Температура вторичной обмотки'] ||
+        const secondaryCoilTemperature = data ? (data['Температура вторичной обмотки'] ||
             data['SecondaryCoilTemperature'] ||
-            data.secondaryCoilTemperature;
-        if (secondaryCoilTemperature !== undefined && secondaryCoilTemperature !== null) {
-            params.push({ label: 'Температура вторичной обмотки', value: `${secondaryCoilTemperature} °C` });
-        }
+            data.secondaryCoilTemperature) : null;
+        params.push({
+            label: 'Температура вторичной обмотки',
+            value: isDeviceOff ? '—' : (secondaryCoilTemperature !== undefined && secondaryCoilTemperature !== null ? `${secondaryCoilTemperature} °C` : '—')
+        });
 
         // 11. Расход проволоки
-        const wireConsumption = data['Расход проволоки'] ||
+        const wireConsumption = data ? (data['Расход проволоки'] ||
             data['WireConsumption'] ||
-            data.wireConsumption;
-        if (wireConsumption !== undefined && wireConsumption !== null) {
-            params.push({ label: 'Расход проволоки', value: `${wireConsumption} м/мин` });
-        }
+            data.wireConsumption) : null;
+        params.push({
+            label: 'Расход проволоки',
+            value: isDeviceOff ? '—' : (wireConsumption !== undefined && wireConsumption !== null ? `${wireConsumption} м/мин` : '—')
+        });
 
         return params;
     };
@@ -1250,6 +1310,14 @@ const DeviceMonitorPage = () => {
         const data = deviceData[machineMac];
         if (!data) return '—';
         return data['Номер ячейки памяти'] || data.memoryCellNumber || '—';
+    };
+
+    const getJobNumberForFlag = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return '—';
+        const data = deviceData[machineMac];
+        if (!data) return '—';
+        const jobNumber = data['Номер сварочного задания'] || data['JobNumber'] || data.jobNumber;
+        return jobNumber !== undefined && jobNumber !== null ? String(jobNumber) : '—';
     };
 
     const getWeldingMaterial = () => {
@@ -1363,9 +1431,20 @@ const DeviceMonitorPage = () => {
         return errors;
     };
 
-    const getWelderName = () => {
-        // Можно получить из данных или оставить статическим
-        return 'Ильенко С.Е.';
+    const getRfidCode = () => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return null;
+        const data = deviceData[machineMac];
+        if (!data) return null;
+
+        // Пробуем разные возможные названия поля для RFID кода
+        const rfidCode = data.RFID || data.Rfid || data.rfid || data.RFIDCode || data.RfidCode ||
+            data.rfidCode || data['RFID'] || data['Rfid'] || data['RFID Code'] ||
+            data.properties?.RFID || data.properties?.Rfid || data.properties?.rfid;
+
+        if (rfidCode && rfidCode !== 'null' && String(rfidCode).trim() !== '') {
+            return String(rfidCode).trim();
+        }
+        return null;
     };
 
     const getInputPower = () => {
@@ -1495,7 +1574,8 @@ const DeviceMonitorPage = () => {
     const currentValue = getCurrentValue();
     const voltageValue = getVoltageValue();
     const weldingTimer = getWeldingTimer();
-    const welderName = getWelderName();
+    const rfidCode = getRfidCode();
+    const hasRfidCode = rfidCode !== null;
     const currentProgress = getCurrentProgress();
     const voltageProgress = getVoltageProgress();
     const isWeldingActive = isWelding();
@@ -1516,17 +1596,17 @@ const DeviceMonitorPage = () => {
             <div className="top-grid">
                 <section className="machine-section" aria-label="Сварочный аппарат">
                     <div className="machine-header">
-                        <button 
-                            type="button" 
+                        <button
+                            type="button"
                             className="machine-info-back-tile"
                             onClick={handleBackToEquipment}
                             title="Вернуться к списку оборудования"
                         >
                             <span className="machine-info-icon">←</span>
                         </button>
-                    <div className="machine-title">
-                        <span className="machine-title-main">CORE</span>
-                        <span className="machine-title-accent">PRO 500</span>
+                        <div className="machine-title">
+                            <span className="machine-title-main">CORE</span>
+                            <span className="machine-title-accent">PRO</span>
                         </div>
                     </div>
                     <div className="machine-info-tiles">
@@ -1625,9 +1705,9 @@ const DeviceMonitorPage = () => {
 
                             <div className="control-flags">
                                 <span className="flag numeric">{getMemoryCellNumber()}</span>
-                                <span className="flag numeric">{getWeldingMaterial()}</span>
+                                <span className="flag numeric">{getJobNumberForFlag()}</span>
                                 <span className="flag accent numeric">{getWeldingMode()}</span>
-                                <span className="flag negative numeric">{getBurnerMode()}</span>
+                                <span className="flag negative numeric">{getWeldingMaterial()}</span>
                                 <span className="flag numeric">{getWeldingGas()}</span>
                                 <span className="flag numeric">{getWeldingWireDiameter()}</span>
                             </div>
@@ -1641,7 +1721,10 @@ const DeviceMonitorPage = () => {
                             systemParameters.map((row) => (
                                 <div key={row.label} className="status-row">
                                     <span className="status-label">{row.label}</span>
-                                    <span className={`status-value ${row.muted ? 'muted' : ''} numeric`}>
+                                    <span
+                                        className={`status-value ${row.muted ? 'muted' : ''} numeric`}
+                                        style={row.stateColor ? { color: row.stateColor } : {}}
+                                    >
                                         {row.value}
                                     </span>
                                 </div>
@@ -1689,10 +1772,9 @@ const DeviceMonitorPage = () => {
                     <div className="card welder-header-tile">
                         <span className="welder-label">Сварщик</span>
                         <div className="welder-header-content">
-                            <span className="welder-name">{welderName}</span>
+                            {hasRfidCode && <span className="welder-name">{rfidCode}</span>}
                             <span className="welder-indicator">
-                                <span className="indicator-dot" />
-                                <span>Онлайн</span>
+                                <span className={`indicator-dot ${hasRfidCode ? 'active' : 'inactive'}`} />
                             </span>
                         </div>
                     </div>
@@ -1729,52 +1811,54 @@ const DeviceMonitorPage = () => {
             <section className="bottom-panel">
                 <div className="bottom-panel__body">
                     <div className="telemetry-controls">
+                        <div className="telemetry-header">
+                            <button
+                                type="button"
+                                className="back-button"
+                                onClick={toggleTelemetryList}
+                                title={isTelemetryListExpanded ? "Скрыть список телеметрии" : "Показать список телеметрии"}
+                            >
+                                <span className="back-arrow">{isTelemetryListExpanded ? '←' : '→'}</span>
+                            </button>
+                            {isTelemetryListExpanded && (
+                                <div className="date-box">
+                                    <span className="date-text">{formatDate()}</span>
+                                </div>
+                            )}
+                        </div>
                         {isTelemetryListExpanded && (
                             <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
                                 <div className="tabs">
                                     <button className="tab active">Графики</button>
                                     <button className="tab">Информация</button>
                                 </div>
-                                <div className="telemetry-header">
-                                    <button 
-                                        type="button" 
-                                        className="back-button" 
-                                        onClick={toggleTelemetryList}
-                                        title={isTelemetryListExpanded ? "Скрыть список телеметрии" : "Показать список телеметрии"}
+                                {telemetryChannels.map((channel) => (
+                                    <div
+                                        key={channel.label}
+                                        className={`telemetry-item ${channel.active ? 'active' : ''}`}
                                     >
-                                        <span className="back-arrow">{isTelemetryListExpanded ? '←' : '→'}</span>
-                                    </button>
-                                    <div className="date-box">
-                                        <span className="date-text">{formatDate()}</span>
+                                        <span className="telemetry-label">{channel.label}</span>
+                                        <div className="telemetry-tiles">
+                                            <button
+                                                type="button"
+                                                className={`telemetry-tile ${channel.active && channel.tile1 ? 'active' : ''}`}
+                                                style={{ color: channel.active && channel.tile1 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                            >
+                                                <span className="wave-icon">~</span>
+                                                <span className="tile-number">1</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={`telemetry-tile ${channel.active && channel.tile2 ? 'active' : ''}`}
+                                                style={{ color: channel.active && channel.tile2 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                            >
+                                                <span className="wave-icon">~</span>
+                                                <span className="tile-number">2</span>
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            {telemetryChannels.map((channel) => (
-                                <div
-                                    key={channel.label}
-                                    className={`telemetry-item ${channel.active ? 'active' : ''}`}
-                                >
-                                    <span className="telemetry-label">{channel.label}</span>
-                                    <div className="telemetry-tiles">
-                                        <button
-                                            type="button"
-                                            className={`telemetry-tile ${channel.active && channel.tile1 ? 'active' : ''}`}
-                                            style={{ color: channel.active && channel.tile1 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
-                                        >
-                                            <span className="wave-icon">~</span>
-                                            <span className="tile-number">1</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`telemetry-tile ${channel.active && channel.tile2 ? 'active' : ''}`}
-                                            style={{ color: channel.active && channel.tile2 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
-                                        >
-                                            <span className="wave-icon">~</span>
-                                            <span className="tile-number">2</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
                         )}
                     </div>
                     <div className="chart-stack">
@@ -1785,16 +1869,16 @@ const DeviceMonitorPage = () => {
                             </div>
                             <div className="chart-wrapper">
                                 <div className="chart-canvas">
-                                        <Line
-                                            data={getCurrentChartData()}
-                                            options={getChartOptions(0, 500, 'Ток (А)', 350, '350A')}
-                                            ref={(chart) => {
-                                                if (chart && chart.canvas) {
-                                                    chart.canvas.id = 'current-chart';
-                                                    currentChartInstanceRef.current = chart;
-                                                }
-                                            }}
-                                        />
+                                    <Line
+                                        data={getCurrentChartData()}
+                                        options={getChartOptions(0, 500, 'Ток (А)', 350, '350A')}
+                                        ref={(chart) => {
+                                            if (chart && chart.canvas) {
+                                                chart.canvas.id = 'current-chart';
+                                                currentChartInstanceRef.current = chart;
+                                            }
+                                        }}
+                                    />
                                 </div>
                                 <div className="chart-axis">
                                     <span>08:00</span>
@@ -1832,16 +1916,16 @@ const DeviceMonitorPage = () => {
                             </div>
                             <div className="chart-wrapper">
                                 <div className="chart-canvas">
-                                        <Line
-                                            data={getVoltageChartData()}
-                                            options={getChartOptions(0, 50.0, 'Напряжение (В)', 35, '35В')}
-                                            ref={(chart) => {
-                                                if (chart && chart.canvas) {
-                                                    chart.canvas.id = 'voltage-chart';
-                                                    voltageChartInstanceRef.current = chart;
-                                                }
-                                            }}
-                                        />
+                                    <Line
+                                        data={getVoltageChartData()}
+                                        options={getChartOptions(0, 50.0, 'Напряжение (В)', 35, '35В')}
+                                        ref={(chart) => {
+                                            if (chart && chart.canvas) {
+                                                chart.canvas.id = 'voltage-chart';
+                                                voltageChartInstanceRef.current = chart;
+                                            }
+                                        }}
+                                    />
                                 </div>
                                 <div className="chart-axis">
                                     <span>08:00</span>

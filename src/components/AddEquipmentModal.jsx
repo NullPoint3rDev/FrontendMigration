@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import '../styles/addEquipmentModal.css'
 import machineImage from '../images/2 копия.png'
 
@@ -27,6 +27,8 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
 
     const [errors, setErrors] = useState({})
     const [apiError, setApiError] = useState('')
+    const commissioningDateInputRef = useRef(null)
+    const lastMaintenanceDateInputRef = useRef(null)
 
     const models = [
         'Core',
@@ -35,6 +37,183 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
 
     if (!isOpen) return null
 
+    // Функция для форматирования даты из формата YYYY-MM-DD в DD.MM.YYYY
+    const formatDateToDDMMYYYY = (dateString) => {
+        if (!dateString) return ''
+        const date = new Date(dateString)
+        if (isNaN(date.getTime())) return ''
+        const day = String(date.getDate()).padStart(2, '0')
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const year = date.getFullYear()
+        return `${day}.${month}.${year}`
+    }
+
+    // Функция для конвертации даты из формата DD.MM.YYYY в YYYY-MM-DD
+    const convertDateToYYYYMMDD = (dateString) => {
+        if (!dateString) return ''
+        const parts = dateString.split('.')
+        if (parts.length !== 3) return ''
+        const day = parts[0]
+        const month = parts[1]
+        const year = parts[2]
+        if (day.length === 2 && month.length === 2 && year.length === 4) {
+            return `${year}-${month}-${day}`
+        }
+        return ''
+    }
+
+    // Валидация даты - проверка на будущую дату и дату старше 10 лет
+    const validateDate = (dateString) => {
+        if (!dateString) return { isValid: true, error: '' }
+
+        const dateObj = convertDateToYYYYMMDD(dateString)
+        if (!dateObj) return { isValid: true, error: '' } // Если формат неверный, не валидируем здесь
+
+        // Создаем дату в локальном времени, чтобы избежать проблем с часовыми поясами
+        const parts = dateObj.split('-')
+        if (parts.length !== 3) return { isValid: true, error: '' }
+        const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+        if (isNaN(date.getTime())) return { isValid: true, error: '' }
+        date.setHours(0, 0, 0, 0)
+
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+
+        const tenYearsAgo = new Date()
+        tenYearsAgo.setFullYear(today.getFullYear() - 10)
+        tenYearsAgo.setHours(0, 0, 0, 0)
+
+        // Разрешаем сегодняшнюю дату (date <= today, но не date > today)
+        if (date > today) {
+            return { isValid: false, error: 'Дата не может быть в будущем' }
+        }
+
+        if (date < tenYearsAgo) {
+            return { isValid: false, error: 'Дата не может быть старше 10 лет' }
+        }
+
+        return { isValid: true, error: '' }
+    }
+
+    // Валидация для поля даты - только цифры и точки
+    const handleDateInputChange = (field, value) => {
+        // Разрешаем только цифры, точки и удаление
+        const filteredValue = value.replace(/[^\d.]/g, '')
+        handleInputChange(field, filteredValue)
+
+        // Валидируем дату после ввода (только если формат полный)
+        if (filteredValue.length === 10) { // DD.MM.YYYY = 10 символов
+            const validation = validateDate(filteredValue)
+            if (!validation.isValid) {
+                setErrors(prev => ({
+                    ...prev,
+                    [field]: validation.error
+                }))
+            } else {
+                setErrors(prev => {
+                    const newErrors = { ...prev }
+                    delete newErrors[field]
+                    return newErrors
+                })
+            }
+        } else if (filteredValue.length < 10) {
+            // Если дата неполная, очищаем ошибку (пользователь еще вводит)
+            setErrors(prev => {
+                const newErrors = { ...prev }
+                delete newErrors[field]
+                return newErrors
+            })
+        }
+    }
+
+    // Валидация для полей ФИО - только буквы, пробелы, точки и запятые
+    const handleNameInputChange = (field, value) => {
+        // Разрешаем только буквы (включая кириллицу и латиницу), пробелы, точки, запятые и дефисы
+        const filteredValue = value.replace(/[^а-яА-ЯёЁa-zA-Z\s.,-]/g, '')
+        handleInputChange(field, filteredValue)
+    }
+
+    // Валидация для поля "Наработка между ТО" - только положительные действительные числа
+    const handleOperatingHoursChange = (field, value) => {
+        // Разрешаем только цифры, точку и запятую (запятую заменим на точку)
+        let filteredValue = value.replace(/[^\d.,]/g, '')
+
+        // Заменяем запятую на точку (для поддержки русской локали)
+        filteredValue = filteredValue.replace(/,/g, '.')
+
+        // Убираем все точки кроме первой
+        const parts = filteredValue.split('.')
+        if (parts.length > 2) {
+            filteredValue = parts[0] + '.' + parts.slice(1).join('')
+        }
+
+        // Не разрешаем отрицательные числа (убираем минус, если есть)
+        filteredValue = filteredValue.replace(/-/g, '')
+
+        // Не разрешаем начинать с точки (должно быть "0.5" вместо ".5")
+        // Но разрешаем пустую строку
+        if (filteredValue === '.') {
+            filteredValue = '0.'
+        }
+
+        handleInputChange(field, filteredValue)
+    }
+
+    // Обработчик выбора даты из календаря
+    const handleDatePickerChange = (field, dateString) => {
+        const formattedDate = formatDateToDDMMYYYY(dateString)
+        handleInputChange(field, formattedDate)
+
+        // Валидируем дату после выбора из календаря
+        const validation = validateDate(formattedDate)
+        if (!validation.isValid) {
+            setErrors(prev => ({
+                ...prev,
+                [field]: validation.error
+            }))
+        } else {
+            setErrors(prev => {
+                const newErrors = { ...prev }
+                delete newErrors[field]
+                return newErrors
+            })
+        }
+    }
+
+    // Получение максимальной и минимальной даты для календаря
+    const getDateLimits = () => {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        // Форматируем дату в YYYY-MM-DD без использования toISOString() для избежания проблем с часовыми поясами
+        const year = today.getFullYear()
+        const month = String(today.getMonth() + 1).padStart(2, '0')
+        const day = String(today.getDate()).padStart(2, '0')
+        const maxDate = `${year}-${month}-${day}` // Сегодня
+
+        const tenYearsAgo = new Date()
+        tenYearsAgo.setFullYear(today.getFullYear() - 10)
+        tenYearsAgo.setHours(0, 0, 0, 0)
+        const yearAgo = tenYearsAgo.getFullYear()
+        const monthAgo = String(tenYearsAgo.getMonth() + 1).padStart(2, '0')
+        const dayAgo = String(tenYearsAgo.getDate()).padStart(2, '0')
+        const minDate = `${yearAgo}-${monthAgo}-${dayAgo}` // 10 лет назад
+
+        return { minDate, maxDate }
+    }
+
+    // Обработчик клика по иконке календаря
+    const handleCalendarIconClick = (field) => {
+        const ref = field === 'commissioningDate' ? commissioningDateInputRef : lastMaintenanceDateInputRef
+        if (ref.current) {
+            // Пытаемся использовать showPicker() если доступен, иначе используем click()
+            if (ref.current.showPicker) {
+                ref.current.showPicker()
+            } else {
+                ref.current.click()
+            }
+        }
+    }
+
     const handleInputChange = (field, value) => {
         setFormData(prev => ({
             ...prev,
@@ -42,10 +221,10 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         }))
         // Очищаем ошибку для этого поля при изменении
         // Маппим поля: department -> organizationUnit, macAddress -> mac, commissioningDate -> commissionDate
-        const errorKey = field === 'department' ? 'organizationUnit' : 
-                        field === 'macAddress' ? 'mac' : 
-                        field === 'commissioningDate' ? 'commissionDate' : field;
-        
+        const errorKey = field === 'department' ? 'organizationUnit' :
+            field === 'macAddress' ? 'mac' :
+                field === 'commissioningDate' ? 'commissionDate' : field;
+
         if (errors[field] || errors[errorKey]) {
             setErrors(prev => {
                 const newErrors = { ...prev }
@@ -80,12 +259,12 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                     options: selectedOptions
                 });
                 await onSave({
-                model: selectedModel,
-                ...formData,
-                options: selectedOptions
+                    model: selectedModel,
+                    ...formData,
+                    options: selectedOptions
                 });
                 console.log('✅ AddEquipmentModal: onSave завершен успешно');
-                
+
                 // Сбрасываем форму после успешного сохранения
                 setSelectedModel('Core')
                 setFormData({
@@ -114,7 +293,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                 console.error('❌ AddEquipmentModal: Ошибка в onSave:', error);
                 console.error('❌ AddEquipmentModal: error.errors:', error.errors);
                 console.error('❌ AddEquipmentModal: typeof error.errors:', typeof error.errors);
-                
+
                 // Если ошибка содержит объект с полями ошибок
                 if (error.errors && typeof error.errors === 'object') {
                     console.log('✅ AddEquipmentModal: Обрабатываем ошибки валидации:', error.errors);
@@ -180,12 +359,12 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         <div className="modal-overlay">
             <div className="modal-content">
                 <button className="modal-close" onClick={onClose}>×</button>
-                
+
                 <div className="modal-body">
                     <div className="modal-left">
                         <div className="equipment-image-container">
-                            <img 
-                                src={machineImage} 
+                            <img
+                                src={machineImage}
                                 alt="Welding machine"
                                 className="equipment-image"
                             />
@@ -211,7 +390,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                             <div className="form-column">
                                 <div className="form-field">
                                     <label>Наименование*</label>
-                                    <input 
+                                    <input
                                         type="text"
                                         value={formData.name}
                                         onChange={(e) => handleInputChange('name', e.target.value)}
@@ -221,7 +400,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                 </div>
                                 <div className="form-field">
                                     <label>Подразделение*</label>
-                                    <select 
+                                    <select
                                         value={formData.department}
                                         onChange={(e) => handleInputChange('department', e.target.value)}
                                         className={errors.department ? 'error' : ''}
@@ -238,14 +417,30 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                 <div className="form-field">
                                     <label>Ввод в эксплуатацию*</label>
                                     <div className="date-input-wrapper">
-                                        <input 
+                                        <input
                                             type="text"
                                             value={formData.commissioningDate}
-                                            onChange={(e) => handleInputChange('commissioningDate', e.target.value)}
+                                            onChange={(e) => handleDateInputChange('commissioningDate', e.target.value)}
                                             placeholder="DD.MM.YYYY"
                                             className={errors.commissioningDate ? 'error' : ''}
                                         />
-                                        <svg className="calendar-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                        <input
+                                            ref={commissioningDateInputRef}
+                                            type="date"
+                                            className="date-picker-hidden"
+                                            value={convertDateToYYYYMMDD(formData.commissioningDate)}
+                                            onChange={(e) => handleDatePickerChange('commissioningDate', e.target.value)}
+                                            max={getDateLimits().maxDate}
+                                            min={getDateLimits().minDate}
+                                        />
+                                        <svg
+                                            className="calendar-icon calendar-icon-clickable"
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 16 16"
+                                            fill="none"
+                                            onClick={() => handleCalendarIconClick('commissioningDate')}
+                                        >
                                             <rect x="3" y="4" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
                                             <path d="M3 7H13" stroke="currentColor" strokeWidth="1.2"/>
                                             <path d="M6 2V5M10 2V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
@@ -255,7 +450,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                 </div>
                                 <div className="form-field">
                                     <label>МАС - адрес*</label>
-                                    <input 
+                                    <input
                                         type="text"
                                         value={formData.macAddress}
                                         onChange={(e) => handleInputChange('macAddress', e.target.value)}
@@ -265,7 +460,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                 </div>
                                 <div className="form-field">
                                     <label>Серийный номер</label>
-                                    <input 
+                                    <input
                                         type="text"
                                         value={formData.serialNumber}
                                         onChange={(e) => handleInputChange('serialNumber', e.target.value)}
@@ -273,7 +468,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                 </div>
                                 <div className="form-field">
                                     <label>Инвентарный номер</label>
-                                    <input 
+                                    <input
                                         type="text"
                                         value={formData.inventoryNumber}
                                         onChange={(e) => handleInputChange('inventoryNumber', e.target.value)}
@@ -284,46 +479,65 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                             <div className="form-column">
                                 <div className="form-field">
                                     <label>ФИО ответственного</label>
-                                    <input 
+                                    <input
                                         type="text"
                                         value={formData.responsiblePerson}
-                                        onChange={(e) => handleInputChange('responsiblePerson', e.target.value)}
+                                        onChange={(e) => handleNameInputChange('responsiblePerson', e.target.value)}
                                     />
                                 </div>
                                 <div className="form-field">
                                     <label>Дата последнего ТО</label>
                                     <div className="date-input-wrapper">
-                                        <input 
+                                        <input
                                             type="text"
                                             value={formData.lastMaintenanceDate}
-                                            onChange={(e) => handleInputChange('lastMaintenanceDate', e.target.value)}
+                                            onChange={(e) => handleDateInputChange('lastMaintenanceDate', e.target.value)}
+                                            placeholder="DD.MM.YYYY"
+                                            className={errors.lastMaintenanceDate ? 'error' : ''}
                                         />
-                                        <svg className="calendar-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                        <input
+                                            ref={lastMaintenanceDateInputRef}
+                                            type="date"
+                                            className="date-picker-hidden"
+                                            value={convertDateToYYYYMMDD(formData.lastMaintenanceDate)}
+                                            onChange={(e) => handleDatePickerChange('lastMaintenanceDate', e.target.value)}
+                                            max={getDateLimits().maxDate}
+                                            min={getDateLimits().minDate}
+                                        />
+                                        <svg
+                                            className="calendar-icon calendar-icon-clickable"
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 16 16"
+                                            fill="none"
+                                            onClick={() => handleCalendarIconClick('lastMaintenanceDate')}
+                                        >
                                             <rect x="3" y="4" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
                                             <path d="M3 7H13" stroke="currentColor" strokeWidth="1.2"/>
                                             <path d="M6 2V5M10 2V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                                         </svg>
                                     </div>
+                                    {errors.lastMaintenanceDate && <span className="error-message">{errors.lastMaintenanceDate}</span>}
                                 </div>
                                 <div className="form-field">
                                     <label>Наработка между ТО</label>
-                                    <input 
+                                    <input
                                         type="text"
                                         value={formData.operatingHours}
-                                        onChange={(e) => handleInputChange('operatingHours', e.target.value)}
+                                        onChange={(e) => handleOperatingHoursChange('operatingHours', e.target.value)}
                                     />
                                 </div>
                                 <div className="form-field">
                                     <label>ФИО проводившего ТО</label>
-                                    <input 
+                                    <input
                                         type="text"
                                         value={formData.maintenancePerson}
-                                        onChange={(e) => handleInputChange('maintenancePerson', e.target.value)}
+                                        onChange={(e) => handleNameInputChange('maintenancePerson', e.target.value)}
                                     />
                                 </div>
                                 <div className="form-field">
                                     <label>Пропуск проводившего ТО</label>
-                                    <input 
+                                    <input
                                         type="text"
                                         value={formData.maintenancePass}
                                         onChange={(e) => handleInputChange('maintenancePass', e.target.value)}
@@ -333,8 +547,8 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                     <label>Допущенные сварщики:</label>
                                     <div className="welders-tags">
                                         {formData.approvedWelders.map((welder, index) => (
-                                            <span 
-                                                key={index} 
+                                            <span
+                                                key={index}
                                                 className="welder-tag"
                                                 onClick={() => {
                                                     setFormData(prev => ({
@@ -346,7 +560,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                                 {welder}
                                             </span>
                                         ))}
-                                        <select 
+                                        <select
                                             className="welder-select"
                                             onChange={(e) => {
                                                 if (e.target.value && !formData.approvedWelders.includes(e.target.value)) {
@@ -373,7 +587,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                         <div className="options-section">
                             <label className="options-label">Опции:</label>
                             <div className="options-buttons">
-                                <button 
+                                <button
                                     className={`option-btn ${selectedOptions.rfid ? 'active' : ''}`}
                                     onClick={() => toggleOption('rfid')}
                                 >
@@ -384,7 +598,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                     </svg>
                                     <span>RFID</span>
                                 </button>
-                                <button 
+                                <button
                                     className={`option-btn ${selectedOptions.bvo ? 'active' : ''}`}
                                     onClick={() => toggleOption('bvo')}
                                 >
@@ -395,7 +609,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                     </svg>
                                     <span>БВО</span>
                                 </button>
-                                <button 
+                                <button
                                     className={`option-btn ${selectedOptions.gasControl ? 'active' : ''}`}
                                     onClick={() => toggleOption('gasControl')}
                                 >

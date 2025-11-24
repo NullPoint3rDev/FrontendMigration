@@ -470,6 +470,37 @@
     padding: 0 !important;
 }
 
+.welding-equipment-page .equipment-status-dot {
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50% !important;
+    flex-shrink: 0 !important;
+    display: inline-block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: 0 0 10px currentColor;
+}
+
+.welding-equipment-page .equipment-status-dot.off {
+    background: rgba(188, 183, 197, 0.5) !important;
+    box-shadow: 0 0 5px rgba(188, 183, 197, 0.3) !important;
+}
+
+.welding-equipment-page .equipment-status-dot.on {
+    background: #0cff00 !important;
+    box-shadow: 0 0 10px rgb(12, 255, 0) !important;
+}
+
+.welding-equipment-page .equipment-status-dot.welding {
+    background: #fbb56b !important;
+    box-shadow: 0 0 10px rgba(251, 181, 107, 0.8) !important;
+}
+
+.welding-equipment-page .equipment-status-dot.error {
+    background: #E42F34 !important;
+    box-shadow: 0 0 10px rgba(228, 47, 52, 0.8) !important;
+}
+
 .welding-equipment-page .machine-thumbnail-small {
     width: 44px !important;
     height: 44px !important;
