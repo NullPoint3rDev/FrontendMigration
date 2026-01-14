@@ -13,7 +13,7 @@ const Navbar = () => {
         {
             label: 'Предприятие',
             dropdown: [
-                { label: 'Подразделения', path: '/departments' },
+                { label: 'Подразделения', path: '/enterprise-map' },
                 { label: 'Сотрудники (пользователи)', path: '/employees' },
                 { label: 'Сварщики', path: '/welders' },
             ],
@@ -22,10 +22,10 @@ const Navbar = () => {
             label: 'Ресурсы',
             dropdown: [
                 { label: 'Сварочное оборудование', path: '/equipment' },
-                { label: 'Сетевое оборудование системы мониторинга', path: '/network-equipment' },
+                { label: 'Сетевое оборудование', path: '/network-equipment' },
                 { label: 'Сварочные материалы', path: '/materials' },
                 { label: 'Технологические карты сварки (WPS)', path: '/wps' },
-              //  { label: 'Тестирование плат', path: '/device-test' },
+                //  { label: 'Тестирование плат', path: '/device-test' },
             ],
         },
         {
@@ -36,7 +36,7 @@ const Navbar = () => {
                 { label: 'Перечень оборудования', path: '/equipment-list' },
             ],
         },
-        { label: 'Отчеты', path: '/my-reports' },
+        { label: 'Отчеты', path: '/reports' },
         { label: 'Уведомления', path: '/notifications' },
         { label: 'Настройки', path: '/settings' },
         { label: 'О программе', path: '/about' },

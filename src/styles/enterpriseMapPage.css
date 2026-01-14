@@ -1,0 +1,291 @@
+.enterprise-map-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+    background: #1A1420;
+    color: #f0f4ff;
+    gap: 8px;
+    padding: 8px;
+    box-sizing: border-box;
+}
+
+/* Page Title and Controls - Same line */
+.enterprise-map-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.enterprise-map-page-title {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 20px !important;
+    font-weight: 500 !important;
+    color: #F9F3FD !important;
+    white-space: nowrap !important;
+    flex-shrink: 0;
+    line-height: 1.2 !important;
+    display: block !important;
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: #F9F3FD !important;
+}
+
+.tiles-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* Tiles Section */
+.enterprise-map-tiles {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.tiles-left,
+.tiles-right {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+}
+
+.tiles-left {
+    justify-content: flex-start;
+}
+
+.tiles-right {
+    justify-content: flex-end;
+}
+
+.tiles-right .action-tile {
+    width: auto;
+    min-width: fit-content;
+}
+
+/* Action Tiles */
+.action-tile {
+    background: #122536;
+    box-shadow: none;
+    border-radius: 3px;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
+.search-tile {
+    width: 200px;
+    flex-shrink: 0;
+}
+
+.add-tile {
+    width: 300px;
+    flex-shrink: 0;
+}
+
+.action-tile .search-container {
+    position: relative;
+    width: 100%;
+}
+
+.tile-search-input {
+    width: 100%;
+    padding: 4px 3px 4px 0;
+    background: #122536;
+    border: none;
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: content-box;
+    color: #f0f4ff;
+}
+
+.tile-search-input::placeholder {
+    color: rgba(240, 244, 255, 0.5);
+}
+
+.action-tile .search-icon {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: rgba(240, 244, 255, 0.6);
+    pointer-events: none;
+    width: 14px;
+    height: 14px;
+}
+
+.tile-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding: 6px 1px !important;
+    width: 100% !important;
+    background: transparent !important;
+    border: none !important;
+    color: #d9d6df !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    white-space: nowrap !important;
+    font-family: inherit !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+}
+
+.tile-btn:hover {
+    color: #f2f1f4;
+}
+
+.tile-btn.add-btn {
+    color: #d9d6df;
+}
+
+.tile-btn.add-btn:hover {
+    color: #f2f1f4;
+}
+
+.tile-btn .btn-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+.tile-btn.delete-btn .btn-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.tile-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+}
+
+.tile-btn:disabled:hover {
+    color: inherit !important;
+}
+
+.tile-btn.add-btn .add-btn-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.control-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #f0f4ff;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.control-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.notifications-btn {
+    position: relative;
+}
+
+.notifications-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+
+.notifications-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: #ff4444;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+    line-height: 1.2;
+}
+
+/* User Profile Integration */
+.enterprise-map-header-row .tiles-controls .user-profile {
+    margin-left: 0;
+}
+
+.enterprise-map-header-row .tiles-controls .user-profile .MuiIconButton-root {
+    padding: 4px;
+}
+
+
+/* Main Content Area */
+.enterprise-map-content {
+    flex: 1;
+    background: #1A1420;
+    overflow: auto;
+    padding: 0;
+    border-radius: 5px;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .search-tile,
+    .add-tile {
+        width: 180px;
+    }
+}
+
+@media (max-width: 768px) {
+    .enterprise-map-header-row {
+        flex-wrap: wrap;
+    }
+
+    .enterprise-map-page-title {
+        width: 100%;
+    }
+
+    .tiles-controls {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .enterprise-map-tiles {
+        flex-wrap: wrap;
+    }
+
+    .tiles-left,
+    .tiles-right {
+        width: 100%;
+        flex: 1 1 100%;
+    }
+
+    .search-tile,
+    .add-tile {
+        width: 100%;
+    }
+}
+

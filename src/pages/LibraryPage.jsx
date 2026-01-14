@@ -68,7 +68,7 @@ const LibraryPage = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://192.168.10.137:8084/api'}/library-documents/${id}/download`,
+        `${process.env.REACT_APP_API_URL || 'http://89.109.8.59:8085/api'}/library-documents/${id}/download`,
         {
           headers: {
             'Authorization': token ? `Bearer ${token}` : '',

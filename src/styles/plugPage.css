@@ -1,0 +1,39 @@
+/* Plug Page Styles - Заглушки для страниц в разработке */
+.plug-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    width: 100%;
+    padding: 2rem;
+    background: var(--background, #1A1A2E);
+    margin-top: 70px; /* Account for fixed navbar */
+}
+
+.plug-image-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2rem;
+    max-width: 100%;
+}
+
+.plug-image {
+    max-width: 100%;
+    max-height: 70vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.plug-text {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--text-primary, #FFFFFF);
+    text-align: center;
+    margin-top: 1rem;
+}
+

@@ -1,0 +1,248 @@
+.unit-details-panel {
+    margin-top: 20px;
+    background: #1A1420;
+    border-radius: 3px;
+    padding: 20px;
+    transition: margin-left 0.2s ease;
+}
+
+.unit-details-content {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0;
+    align-items: stretch;
+}
+
+.unit-details-divider {
+    width: 1px;
+    background-color: #302E3C;
+    margin: 0 20px;
+    align-self: stretch;
+    flex-shrink: 0;
+}
+
+.unit-details-section {
+    background: #1A1420;
+    border-radius: 3px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    min-height: 300px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #1A1420;
+    border-radius: 3px;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #F9F3FD;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.section-icon {
+    font-size: 16px;
+    color: #F9F3FD;
+}
+
+.section-icon-img {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+}
+
+.section-selected {
+    color: #5C6D81;
+    font-size: 12px;
+}
+
+.section-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.section-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+    position: relative;
+}
+
+/* Чередование цветов для элементов списка */
+.section-list > .section-item:nth-child(odd) {
+    background: #122536;
+}
+
+.section-list > .section-item:nth-child(even) {
+    background: #1A1420;
+}
+
+.machine-item {
+    flex-direction: row;
+    align-items: center;
+}
+
+.machine-item-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.expand-btn {
+    background: none;
+    border: none;
+    color: #5C6D81;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0 4px;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.expand-btn:hover {
+    color: #F0B942;
+}
+
+.expand-spacer {
+    width: 16px;
+    display: inline-block;
+}
+
+.item-count {
+    color: #5C6D81;
+    font-size: 12px;
+    margin-left: auto;
+}
+
+.machine-welders-list {
+    width: 100%;
+    margin-top: 8px;
+    padding-left: 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.welder-sub-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+/* Чередование цветов для вложенных сварщиков */
+.machine-welders-list > .welder-sub-item:nth-child(odd) {
+    background: #122536;
+}
+
+.machine-welders-list > .welder-sub-item:nth-child(even) {
+    background: #1A1420;
+}
+
+.welder-name {
+    flex: 1;
+    color: #F9F3FD;
+    font-size: 12px;
+}
+
+.section-item:hover {
+    background: rgba(26, 20, 32, 0.8);
+}
+
+.section-item.selected {
+    background: rgba(242, 154, 46, 0.2);
+    border: 1px solid #F29A2E;
+}
+
+.item-checkbox[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #F6B243;
+    background-color: #1B1622;
+    border: 1px solid rgba(87, 77, 95, 0.6);
+    border-radius: 3px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    position: relative;
+}
+
+.item-checkbox[type="checkbox"]:checked {
+    background-color: #1B1622;
+    border-color: #F6B243;
+}
+
+.item-checkbox[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #F6B243;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.item-name {
+    flex: 1;
+    color: #F9F3FD;
+    font-size: 13px;
+}
+
+.item-edit-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #5C6D81;
+    transition: color 0.2s ease;
+}
+
+.item-edit-btn:hover {
+    color: #F0B942;
+}
+
+.edit-icon {
+    width: 14px;
+    height: 14px;
+}
+
+.loading-message,
+.empty-message {
+    color: #5C6D81;
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    .unit-details-content {
+        grid-template-columns: 1fr;
+    }
+}
+

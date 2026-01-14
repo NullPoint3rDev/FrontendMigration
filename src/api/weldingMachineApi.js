@@ -45,33 +45,93 @@ export async function searchWeldingMachines(searchTerm) {
 
 // Создать новую машину
 export async function createWeldingMachine(machine) {
+    console.log('📤 createWeldingMachine: Отправляем данные:', machine);
+    console.log('📤 createWeldingMachine: URL:', API_URL);
+
+    const headers = {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json'
+    };
+    console.log('📤 createWeldingMachine: Заголовки:', headers);
+
     const res = await fetch(API_URL, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: headers,
         body: JSON.stringify(machine),
     });
-    
+
+    console.log('📥 createWeldingMachine: Статус ответа:', res.status, res.statusText);
+
     if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: 'Ошибка создания устройства' }));
-        throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
+        let errorData;
+        try {
+            errorData = await res.json();
+            console.error('❌ createWeldingMachine: Данные ошибки:', errorData);
+        } catch (e) {
+            console.error('❌ createWeldingMachine: Не удалось распарсить JSON ошибки:', e);
+            errorData = { message: `HTTP ${res.status}: ${res.statusText}` };
+        }
+
+        // Извлекаем сообщение об ошибке из разных возможных форматов
+        const errorMessage = errorData.message ||
+            errorData.error ||
+            errorData.api ||
+            (errorData.errors && typeof errorData.errors === 'object' ?
+                (errorData.errors.message || errorData.errors.api || JSON.stringify(errorData.errors)) :
+                errorData.errors) ||
+            `HTTP ${res.status}: ${res.statusText}`;
+
+        console.error('❌ createWeldingMachine: Извлеченное сообщение об ошибке:', errorMessage);
+
+        const error = new Error(errorMessage);
+        if (errorData.errors) {
+            error.errors = errorData.errors;
+        }
+        throw error;
     }
-    
-    return res.json();
+
+    const result = await res.json();
+    console.log('✅ createWeldingMachine: Успешно создано:', result);
+    return result;
 }
 
 // Обновить машину
 export async function updateWeldingMachine(id, machine) {
+    const headers = {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json'
+    };
+
     const res = await fetch(`${API_URL}/${id}`, {
         method: 'PUT',
-        headers: getAuthHeaders(),
+        headers: headers,
         body: JSON.stringify(machine),
     });
-    
+
     if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: 'Ошибка обновления устройства' }));
-        throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
+        let errorData;
+        try {
+            errorData = await res.json();
+        } catch (e) {
+            errorData = { message: `HTTP ${res.status}: ${res.statusText}` };
+        }
+
+        // Извлекаем сообщение об ошибке из разных возможных форматов
+        const errorMessage = errorData.message ||
+            errorData.error ||
+            errorData.api ||
+            (errorData.errors && typeof errorData.errors === 'object' ?
+                (errorData.errors.message || errorData.errors.api || JSON.stringify(errorData.errors)) :
+                errorData.errors) ||
+            `HTTP ${res.status}: ${res.statusText}`;
+
+        const error = new Error(errorMessage);
+        if (errorData.errors) {
+            error.errors = errorData.errors;
+        }
+        throw error;
     }
-    
+
     return res.json();
 }
 
@@ -81,12 +141,12 @@ export async function deleteWeldingMachine(id) {
         method: 'DELETE',
         headers: getAuthHeaders()
     });
-    
+
     if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: 'Ошибка удаления устройства' }));
         throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
     }
-    
+
     return true;
 }
 

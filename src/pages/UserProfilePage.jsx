@@ -94,7 +94,7 @@ const UserProfilePage = () => {
         if (!photo) return null;
         if (typeof photo === 'string' && photo.startsWith('data:image/')) return photo;
         const token = localStorage.getItem('token');
-        return `${process.env.REACT_APP_API_URL || 'http://192.168.10.137:8084/api'}/user-accounts/photo/${photo}?token=${token}`;
+        return `${process.env.REACT_APP_API_URL || 'http://89.109.8.59:8085/api'}/user-accounts/photo/${photo}?token=${token}`;
     };
     if (loading) return <div className="profile-modern-loading">Загрузка...</div>;
     if (error) return <div className="profile-modern-error">{error}</div>;

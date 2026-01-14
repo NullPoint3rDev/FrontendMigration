@@ -1,0 +1,517 @@
+.add-welder-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+    background: #1A1420;
+    color: #f0f4ff;
+    gap: 8px;
+    padding: 8px;
+    box-sizing: border-box;
+}
+
+.add-welder-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(59, 49, 74, 0.55);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.back-btn {
+    background: transparent;
+    border: none;
+    color: #d9d6df;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+    background: rgba(45, 37, 54, 0.5);
+    color: #f2f1f4;
+}
+
+.page-title {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 20px !important;
+    font-weight: 500 !important;
+    color: #F9F3FD !important;
+    white-space: nowrap !important;
+    flex-shrink: 0;
+    line-height: 1.2 !important;
+    display: block !important;
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: #F9F3FD !important;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.control-btn {
+    background: transparent;
+    border: none;
+    color: #d9d6df;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.control-btn:hover {
+    background: rgba(45, 37, 54, 0.5);
+    color: #f2f1f4;
+}
+
+.notifications-icon {
+    font-size: 18px;
+    color: #d9d6df;
+}
+
+.notifications-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    background: #EC2B3C;
+    border-radius: 50%;
+    border: 2px solid #1A1420;
+}
+
+.add-welder-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.profile-section {
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    display: flex;
+    gap: 20px;
+    flex-shrink: 0;
+    flex: 1;
+}
+
+.profile-image-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.profile-image {
+    width: 120px;
+    height: 160px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #1A1420;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.profile-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6C7386;
+    font-size: 14px;
+}
+
+.change-photo-btn {
+    padding: 6px 12px;
+    background: #1A1420;
+    border: none;
+    border-radius: 3px;
+    color: #d9d6df;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.profile-form-columns {
+    flex: 1;
+    display: flex;
+    gap: 20px;
+}
+
+.form-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.form-group label {
+    color: #d9d6df;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.form-group input,
+.form-group select {
+    padding: 8px 12px;
+    background: #1A1420;
+    border: none;
+    border-radius: 3px;
+    color: #f0f4ff;
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.form-group input::placeholder {
+    color: #6C7386;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    border-color: rgba(178, 172, 182, 0.6);
+}
+
+.form-group input.error,
+.form-group select.error {
+    border-color: #EC2B3C;
+}
+
+.select-with-label {
+    position: relative;
+}
+
+.select-with-label option[disabled] {
+    color: #6C7386;
+}
+
+.select-with-label:invalid {
+    color: #6C7386;
+}
+
+.select-with-label:valid {
+    color: #f0f4ff;
+}
+
+.error-text {
+    color: #EC2B3C;
+    font-size: 12px;
+}
+
+.save-btn {
+    width: 100%;
+    padding: 8px 12px !important;
+    background: #1A1420 !important;
+    border: none !important;
+    border-radius: 3px !important;
+    color: #d9d6df !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    box-sizing: border-box !important;
+}
+
+.save-btn:hover {
+    background: #1A1420 !important;
+    border-color: #1A1420 !important;
+    color: #f2f1f4 !important;
+}
+
+.profile-rfid-row {
+    display: flex;
+    gap: 0;
+    flex-shrink: 0;
+    background: #122536;
+    border-radius: 3px;
+    padding: 16px;
+    box-shadow: none;
+    align-items: flex-start;
+}
+
+.profile-section {
+    flex: 1;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+}
+
+.rfid-section {
+    width: 300px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin-left: 24px;
+    padding-left: 24px;
+    border-left: 1px solid rgba(59, 49, 74, 0.55);
+}
+
+.rfid-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.rfid-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+    color: #F9F3FD;
+}
+
+.section {
+    background: #122536;
+    border-radius: 3px;
+    padding: 16px;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.certifications-section,
+.machines-section {
+    flex: 1;
+    min-height: 0;
+    background: #1A1420 !important;
+    border-radius: 3px;
+    padding: 16px;
+    box-shadow: none;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.section-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+    color: #F9F3FD;
+}
+
+.section-actions-only {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-shrink: 0;
+}
+
+.section-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.add-btn {
+    padding: 6px 32px;
+    background: #122536 !important;
+    border: none;
+    border-radius: 3px;
+    color: #d9d6df;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.naks-btn {
+    padding: 6px 32px;
+    background: #122536 !important;
+    border: none;
+    border-radius: 3px;
+    color: #d9d6df;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.delete-btn {
+    padding: 6px 50px !important;
+    background: #122536 !important;
+    border: none !important;
+    border-radius: 3px !important;
+    color: #ffffff;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.delete-btn:hover {
+    background: #122536;
+}
+
+.rfid-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    background: #1A1420;
+    border-radius: 3px;
+    padding: 67px;
+}
+
+.rfid-item {
+    background: #122536;
+    padding: 8px;
+    border-radius: 0;
+}
+
+.rfid-item:nth-child(even) {
+    background: #1A1420;
+}
+
+.scrollable-section {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.scrollable-section::-webkit-scrollbar {
+    width: 6px;
+}
+
+.scrollable-section::-webkit-scrollbar-track {
+    background: rgba(28, 22, 34, 0.3);
+    border-radius: 3px;
+}
+
+.scrollable-section::-webkit-scrollbar-thumb {
+    background: rgba(82, 69, 94, 0.6);
+    border-radius: 3px;
+}
+
+.scrollable-section::-webkit-scrollbar-thumb:hover {
+    background: rgba(94, 83, 112, 0.8);
+}
+
+/* Дубликат удален - используется стиль выше */
+
+.rfid-icon {
+    font-size: 18px;
+}
+
+.rfid-code {
+    flex: 1;
+    color: #d9d6df;
+    font-size: 13px;
+}
+
+.delete-btn-small {
+    background: transparent;
+    border: none;
+    color: #122536 !important;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+}
+
+.delete-btn-small:hover {
+    opacity: 0.8;
+}
+
+.certifications-table,
+.machines-table {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.certifications-table table,
+.machines-table table {
+    width: 100%;
+    border-collapse: collapse;
+    flex: 1;
+    min-height: 0;
+}
+
+.certifications-table th,
+.machines-table th {
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 500;
+    color: #6C7386;
+    border-bottom: 1px solid rgba(59, 49, 74, 0.55);
+    border-right: 1px solid #484B5E !important;
+    white-space: nowrap;
+}
+
+.certifications-table th:first-child,
+.machines-table th:first-child {
+    border-right: none !important;
+}
+
+.certifications-table th:last-child,
+.machines-table th:last-child {
+    border-right: none !important;
+}
+
+.certifications-table td,
+.machines-table td {
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #d9d6df;
+    border-bottom: 1px solid rgba(59, 49, 74, 0.3);
+}
+
+.certifications-table tbody tr {
+    background-color: #1A1420;
+}
+
+.certifications-table tbody tr:nth-child(even) {
+    background-color: #1A1420;
+}
+
+.empty-state {
+    text-align: center;
+    color: #6C7386;
+    font-size: 13px;
+    padding: 24px;
+}
+

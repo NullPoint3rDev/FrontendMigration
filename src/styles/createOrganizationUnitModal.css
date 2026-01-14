@@ -1,0 +1,209 @@
+.create-org-unit-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.create-org-unit-modal-content {
+    background: #122536;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 700px;
+    position: relative;
+    padding: 32px;
+    box-sizing: border-box;
+    box-shadow: 0 14px 30px rgba(6, 9, 18, 0.55);
+}
+
+.create-org-unit-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 30px;
+    height: 30px;
+    background: rgba(28, 22, 34, 0.8);
+    border: 1px solid rgba(82, 69, 94, 0.4);
+    border-radius: 4px;
+    color: rgba(188, 183, 197, 0.75);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+}
+
+.create-org-unit-modal-close:hover {
+    border-color: rgba(178, 172, 182, 0.6);
+    background: rgba(45, 37, 54, 0.9);
+    color: #f2f1f4;
+}
+
+.create-org-unit-modal-title {
+    margin: 0 0 24px 0;
+    font-size: 20px;
+    font-weight: 500;
+    text-align: center;
+    color: #FCFCFE;
+}
+
+.create-org-unit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.create-org-unit-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.create-org-unit-form-field label {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(240, 244, 255, 0.9);
+}
+
+.create-org-unit-form-field .required {
+    color: #f0f4ff;
+    margin-left: 2px;
+}
+
+.create-org-unit-form-field input,
+.create-org-unit-form-field select {
+    width: 100%;
+    padding: 10px 12px;
+    background: #1A1420;
+    border: none;
+    border-radius: 3px;
+    color: #f0f4ff;
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.create-org-unit-form-field input:focus,
+.create-org-unit-form-field select:focus {
+    border-color: rgba(175, 137, 61, 0.5);
+    background: rgba(26, 20, 32, 0.8);
+}
+
+.create-org-unit-form-field input.error,
+.create-org-unit-form-field select.error {
+    border-color: #ff4444;
+}
+
+.create-org-unit-form-field input::placeholder {
+    color: rgba(240, 244, 255, 0.4);
+}
+
+.create-org-unit-form-field select {
+    cursor: pointer;
+}
+
+.create-org-unit-form-field select option {
+    background: #1A1420;
+    color: #f0f4ff;
+}
+
+.error-message {
+    font-size: 12px;
+    color: #ff4444;
+    margin-top: 4px;
+}
+
+.create-org-unit-info-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    background: #122536;
+    border: none;
+    border-radius: 6px;
+    color: #7D8DA6;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+.create-org-unit-info-message .info-icon {
+    color: #7D8DA6;
+    font-size: 56px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.create-org-unit-error-message {
+    padding: 12px;
+    background: rgba(255, 68, 68, 0.1);
+    border: 1px solid rgba(255, 68, 68, 0.3);
+    border-radius: 6px;
+    color: #ff4444;
+    font-size: 13px;
+}
+
+.create-org-unit-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.create-org-unit-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.create-org-unit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.create-org-unit-btn.cancel {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #f0f4ff;
+}
+
+.create-org-unit-btn.cancel:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.create-org-unit-btn.create {
+    background: #F29A2E;
+    color: #ffffff;
+    border: #F29A2E;
+}
+
+.create-org-unit-btn.create:hover:not(:disabled) {
+    background: #F29A2E;
+    border-color: #F29A2E;
+}
+
+.create-org-unit-btn .btn-icon {
+    font-size: 14px;
+}
+

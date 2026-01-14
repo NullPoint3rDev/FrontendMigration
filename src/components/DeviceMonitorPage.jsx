@@ -14,6 +14,7 @@ import {
 } from 'chart.js';
 import '../styles/mainContentNew.css';
 import * as archiveDeviceApi from '../api/archiveDeviceApi';
+import { deleteWeldingMachine, getAllWeldingMachines, updateWeldingMachine, getWeldingMachineById } from '../api/weldingMachineApi';
 import machineImage from '../images/Untitled 3 копия.png';
 
 // Кастомный плагин для градиентов и пороговых линий
@@ -127,6 +128,18 @@ const DeviceMonitorPage = () => {
     // Состояние для отображения списка телеметрии
     const [isTelemetryListExpanded, setIsTelemetryListExpanded] = useState(true);
 
+    // Состояние для хранения ID аппарата (для удаления)
+    const [machineId, setMachineId] = useState(null);
+
+    // Состояние для редактирования названия аппарата
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [editedName, setEditedName] = useState(equipmentName);
+    const [displayName, setDisplayName] = useState(equipmentName);
+    const [isSavingName, setIsSavingName] = useState(false);
+
+    // Реф для предотвращения конфликта между кликом на карандаш и onBlur
+    const saveTimeoutRef = useRef(null);
+
     // Состояние для графиков
     const [currentChartData, setCurrentChartData] = useState([]);
     const [voltageChartData, setVoltageChartData] = useState([]);
@@ -197,6 +210,25 @@ const DeviceMonitorPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [machineMac]);
 
+    // Получаем ID аппарата по MAC адресу при загрузке страницы
+    useEffect(() => {
+        const fetchMachineId = async () => {
+            if (!machineMac || machineMac === 'Неизвестный MAC') return;
+            try {
+                const machines = await getAllWeldingMachines();
+                const machine = Array.isArray(machines)
+                    ? machines.find(m => m.mac === machineMac)
+                    : null;
+                if (machine && machine.id) {
+                    setMachineId(machine.id);
+                }
+            } catch (err) {
+                console.error('Ошибка получения ID аппарата:', err);
+            }
+        };
+        fetchMachineId();
+    }, [machineMac]);
+
     // Обновление текущего времени каждую секунду для таймера
     useEffect(() => {
         const interval = setInterval(() => {
@@ -213,6 +245,9 @@ const DeviceMonitorPage = () => {
             }
             if (disconnectTimeout) {
                 clearTimeout(disconnectTimeout);
+            }
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
             }
         };
     }, [disconnectTimeout]);
@@ -757,6 +792,7 @@ const DeviceMonitorPage = () => {
                 }
 
                 // Извлекаем ВСЕ параметры из структурированных данных
+                console.log('🔍 Все ключи properties:', Object.keys(data.state.properties || {}));
                 Object.entries(data.state.properties).forEach(([key, prop]) => {
                     if (prop && prop.value) {
                         // Обрабатываем все параметры Core
@@ -791,6 +827,7 @@ const DeviceMonitorPage = () => {
                         } else if (key.startsWith('VoltagePhase')) {
                             // Напряжения фаз
                             params[key] = prop.value;
+                            console.log(`🔍 Найдено напряжение фазы: ${key} = ${prop.value}`);
                         } else if (key.startsWith('Temperature') || key.includes('Temperature')) {
                             // Температуры
                             params[key] = prop.value;
@@ -816,6 +853,10 @@ const DeviceMonitorPage = () => {
                         } else {
                             // Все остальные параметры
                             params[key] = prop.value;
+                            // Логируем напряжения фаз для отладки
+                            if (key && (key.includes('Напряжение фазы') || key.includes('фазы'))) {
+                                console.log(`🔍 Сохранено напряжение фазы: key="${key}", value="${prop.value}"`);
+                            }
                         }
                     }
                 });
@@ -981,6 +1022,158 @@ const DeviceMonitorPage = () => {
     const handleBackToEquipment = () => {
         navigate('/equipment');
     };
+
+    const handleDeleteMachine = async () => {
+        if (!machineId) {
+            alert('Не удалось определить ID аппарата для удаления');
+            return;
+        }
+
+        const confirmMessage = `Вы уверены, что хотите удалить аппарат "${equipmentName}"?\n\nЭто действие нельзя отменить.`;
+        if (!window.confirm(confirmMessage)) {
+            return;
+        }
+
+        try {
+            await deleteWeldingMachine(machineId);
+            // Перенаправляем на страницу оборудования после успешного удаления
+            navigate('/equipment');
+        } catch (err) {
+            console.error('Ошибка удаления аппарата:', err);
+            alert('Ошибка удаления аппарата: ' + (err.message || 'Неизвестная ошибка'));
+        }
+    };
+
+    // Обработчик редактирования названия аппарата
+    const handleEditName = async (e) => {
+        // Предотвращаем срабатывание onBlur при клике на кнопку
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        if (isEditingName) {
+            // Сохраняем новое название
+            await handleSaveName();
+        } else {
+            // Очищаем таймаут если есть
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+                saveTimeoutRef.current = null;
+            }
+            // Включаем режим редактирования
+            setEditedName(displayName);
+            setIsEditingName(true);
+        }
+    };
+
+    // Сохранение нового названия
+    const handleSaveName = async (skipValidation = false) => {
+        // Очищаем предыдущий таймаут если есть
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = null;
+        }
+
+        if (isSavingName) {
+            return; // Уже идет сохранение
+        }
+
+        if (!machineId) {
+            alert('Не удалось определить ID аппарата для обновления');
+            setIsEditingName(false);
+            return;
+        }
+
+        const trimmedName = editedName.trim();
+        if (!trimmedName) {
+            alert('Название не может быть пустым');
+            setEditedName(displayName);
+            setIsEditingName(false);
+            return;
+        }
+
+        if (trimmedName === displayName) {
+            // Название не изменилось, просто выходим из режима редактирования
+            setIsEditingName(false);
+            return;
+        }
+
+        setIsSavingName(true);
+        try {
+            console.log('💾 Начинаем сохранение названия аппарата:', { machineId, trimmedName });
+
+            // Получаем текущие данные аппарата по ID
+            const machine = await getWeldingMachineById(machineId);
+            console.log('📦 Получены данные аппарата:', machine);
+
+            if (!machine || !machine.id) {
+                throw new Error('Аппарат не найден');
+            }
+
+            // Подготавливаем данные для обновления
+            const updateData = {
+                ...machine,
+                name: trimmedName
+            };
+            console.log('📤 Отправляем данные на обновление:', updateData);
+
+            // Обновляем только название
+            const result = await updateWeldingMachine(machineId, updateData);
+            console.log('✅ Название успешно обновлено:', result);
+
+            // Обновляем локальное состояние сразу
+            setDisplayName(trimmedName);
+
+            // Обновляем URL с новым названием
+            const newSearchParams = new URLSearchParams(searchParams);
+            newSearchParams.set('name', trimmedName);
+            navigate(`?${newSearchParams.toString()}`, { replace: true });
+
+            setIsEditingName(false);
+        } catch (err) {
+            console.error('❌ Ошибка обновления названия аппарата:', err);
+            console.error('❌ Детали ошибки:', {
+                message: err.message,
+                stack: err.stack,
+                name: err.name
+            });
+
+            let errorMessage = 'Неизвестная ошибка';
+            if (err.message) {
+                errorMessage = err.message;
+            } else if (err instanceof TypeError && err.message.includes('fetch')) {
+                errorMessage = 'Ошибка подключения к серверу. Проверьте подключение к интернету.';
+            } else if (err instanceof Error) {
+                errorMessage = err.message;
+            }
+
+            alert('Ошибка обновления названия: ' + errorMessage);
+            setEditedName(displayName);
+            setIsEditingName(false);
+        } finally {
+            setIsSavingName(false);
+        }
+    };
+
+    // Обработчик нажатия Enter для сохранения
+    const handleNameKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            handleSaveName();
+        } else if (e.key === 'Escape') {
+            setEditedName(displayName);
+            setIsEditingName(false);
+        }
+    };
+
+    // Обновляем editedName и displayName при изменении equipmentName
+    useEffect(() => {
+        setDisplayName(equipmentName);
+        if (!isEditingName) {
+            setEditedName(equipmentName);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [equipmentName]);
 
     const toggleTelemetryList = () => {
         setIsTelemetryListExpanded(prev => !prev);
@@ -1236,21 +1429,60 @@ const DeviceMonitorPage = () => {
         });
 
         // 4. Напряжение фазы A
-        const voltagePhaseA = data ? (data['Напряжение фазы А'] || data['VoltagePhaseA'] || data.voltagePhaseA) : null;
+        const voltagePhaseA = data ? (
+            data['Напряжение фазы А'] ||
+            data['VoltagePhaseA'] ||
+            data.VoltagePhaseA ||
+            data.voltagePhaseA ||
+            data['voltagePhaseA'] ||
+            data['voltage_phase_a'] ||
+            data.voltage_phase_a
+        ) : null;
         params.push({
             label: 'Напряжение фазы А',
             value: isDeviceOff ? '—' : (voltagePhaseA !== undefined && voltagePhaseA !== null ? `${voltagePhaseA} В` : '—')
         });
 
-        // 5. Напряжение фазы В
-        const voltagePhaseB = data ? (data['Напряжение фазы В'] || data['VoltagePhaseB'] || data.voltagePhaseB) : null;
+        // 5. Напряжение фазы В - проверяем все возможные варианты ключей
+        // ВАЖНО: данные приходят с ключом "Напряжение фазы B" (с английской B, не русской В!)
+        const voltagePhaseB = data ? (
+            data['Напряжение фазы B'] ||  // Приоритет: английская B (как приходит с бэка)
+            data['Напряжение фазы В'] ||  // Русская В (для совместимости)
+            data['VoltagePhaseB'] ||
+            data.VoltagePhaseB ||
+            data.voltagePhaseB ||
+            data['voltagePhaseB'] ||
+            data['voltage_phase_b'] ||
+            data.voltage_phase_b ||
+            data['Voltage_Phase_B'] ||
+            data.Voltage_Phase_B
+        ) : null;
+
+        // Логируем для отладки, если значение не найдено
+        if (data && !voltagePhaseB && voltagePhaseA) {
+            console.log('⚠️ Напряжение фазы B не найдено. Доступные ключи в data:', Object.keys(data).filter(k =>
+                k.toLowerCase().includes('voltage') ||
+                k.toLowerCase().includes('фазы') ||
+                k.toLowerCase().includes('phase')
+            ));
+            console.log('🔍 Все ключи data:', Object.keys(data));
+        }
+
         params.push({
             label: 'Напряжение фазы В',
             value: isDeviceOff ? '—' : (voltagePhaseB !== undefined && voltagePhaseB !== null ? `${voltagePhaseB} В` : '—')
         });
 
         // 6. Напряжение фазы С
-        const voltagePhaseC = data ? (data['Напряжение фазы С'] || data['VoltagePhaseC'] || data.voltagePhaseC) : null;
+        const voltagePhaseC = data ? (
+            data['Напряжение фазы С'] ||
+            data['VoltagePhaseC'] ||
+            data.VoltagePhaseC ||
+            data.voltagePhaseC ||
+            data['voltagePhaseC'] ||
+            data['voltage_phase_c'] ||
+            data.voltage_phase_c
+        ) : null;
         params.push({
             label: 'Напряжение фазы С',
             value: isDeviceOff ? '—' : (voltagePhaseC !== undefined && voltagePhaseC !== null ? `${voltagePhaseC} В` : '—')
@@ -1604,17 +1836,79 @@ const DeviceMonitorPage = () => {
                         >
                             <span className="machine-info-icon">←</span>
                         </button>
+                        {machineId && (
+                            <button
+                                type="button"
+                                className="machine-info-back-tile"
+                                onClick={handleDeleteMachine}
+                                title="Удалить аппарат"
+                                style={{ marginLeft: '8px' }}
+                            >
+                                <span className="machine-info-icon">✕</span>
+                            </button>
+                        )}
                         <div className="machine-title">
                             <span className="machine-title-main">CORE</span>
-                            <span className="machine-title-accent">PRO</span>
+                            <span className="machine-title-accent">PULSE</span>
                         </div>
                     </div>
                     <div className="machine-info-tiles">
                         <div className="machine-info-row">
-                            <div className="machine-info-icon-tile">
+                            <button
+                                type="button"
+                                className="machine-info-icon-tile"
+                                onClick={handleEditName}
+                                onMouseDown={(e) => {
+                                    // Отменяем таймаут onBlur при клике на кнопку
+                                    if (saveTimeoutRef.current) {
+                                        clearTimeout(saveTimeoutRef.current);
+                                        saveTimeoutRef.current = null;
+                                    }
+                                }}
+                                title={isEditingName ? "Сохранить название" : "Редактировать название"}
+                                style={{
+                                    cursor: 'pointer',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    padding: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
                                 <span className="machine-info-icon">✎</span>
-                            </div>
-                            <span className="machine-info-text">{equipmentName}</span>
+                            </button>
+                            {isEditingName ? (
+                                <input
+                                    type="text"
+                                    value={editedName}
+                                    onChange={(e) => setEditedName(e.target.value)}
+                                    onKeyDown={handleNameKeyDown}
+                                    onBlur={(e) => {
+                                        // Добавляем небольшую задержку, чтобы не конфликтовать с кликом на карандаш
+                                        saveTimeoutRef.current = setTimeout(() => {
+                                            handleSaveName();
+                                        }, 200);
+                                    }}
+                                    autoFocus
+                                    disabled={isSavingName}
+                                    className="machine-info-text"
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.1)',
+                                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                                        borderRadius: '4px',
+                                        padding: '4px 8px',
+                                        color: 'inherit',
+                                        font: 'inherit',
+                                        width: '100%',
+                                        outline: 'none',
+                                        opacity: isSavingName ? 0.6 : 1,
+                                        cursor: isSavingName ? 'wait' : 'text'
+                                    }}
+                                />
+                            ) : (
+                                <span className="machine-info-text">{displayName}</span>
+                            )}
                         </div>
                         {organizationUnit && (
                             <div className="machine-info-row">

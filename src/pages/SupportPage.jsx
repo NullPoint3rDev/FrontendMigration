@@ -35,7 +35,7 @@ const SupportPage = () => {
     try {
       // username можно получить из localStorage или контекста, здесь для примера:
       const username = localStorage.getItem('username') || 'anonymous';
-      const res = await fetch((process.env.REACT_APP_API_URL || 'http://192.168.10.137:8084/api') + '/support', {
+      const res = await fetch((process.env.REACT_APP_API_URL || 'http://89.109.8.59:8085/api') + '/support', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, username })

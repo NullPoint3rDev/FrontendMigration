@@ -30,31 +30,31 @@
 }
 
 .search-input {
-    width: 100%;
-    padding: 4px 0;
-    background: #122536;
-    font-size: 13px;
-    outline: none;
-    transition: all 0.2s ease;
-    box-sizing: content-box;
-    border: none;
-    color: #f0f4ff;
+    width: 100% !important;
+    padding: 4px 0 !important;
+    background: #122536 !important;
+    font-size: 13px !important;
+    outline: none !important;
+    transition: all 0.2s ease !important;
+    box-sizing: content-box !important;
+    border: none !important;
+    color: #f0f4ff !important;
 }
 
 .filter-tile-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    background: transparent;
-    border: none;
-    color: rgba(242, 241, 244, 0.9);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-align: left;
-    padding: 0;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    background: transparent !important;
+    border: none !important;
+    color: rgba(242, 241, 244, 0.9) !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-align: left !important;
+    padding: 0 !important;
 }
 
 .filter-tile-header:hover {
@@ -183,15 +183,15 @@
 }
 
 .view-toggle {
-    display: flex;
-    gap: 10px;
-    background: #122536;
-    border: 1px solid rgba(59, 49, 74, 0.55);
-    box-shadow: 0 14px 30px rgba(6, 9, 18, 0.55);
-    border-radius: 5px;
-    padding: 2px;
-    flex-shrink: 0;
-    margin-left: auto;
+    display: flex !important;
+    gap: 10px  !important;
+    background: #122536  !important;
+    border: 1px solid rgba(59, 49, 74, 0.55)  !important;
+    box-shadow: 0 14px 30px rgba(6, 9, 18, 0.55)  !important;
+    border-radius: 5px  !important;
+    padding: 2px  !important;
+    flex-shrink: 0  !important;
+    margin-left: auto  !important;
 }
 
 .view-btn {

@@ -1,0 +1,852 @@
+.welders-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+    background: #1A1420;
+    color: #f0f4ff;
+    gap: 8px;
+    padding: 8px;
+    box-sizing: border-box;
+}
+
+.welders-page .welding-equipment-page-content {
+    display: flex;
+    flex: 1;
+    gap: 8px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Filters Column */
+.filters-column {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 200px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 100%;
+    padding-right: 4px;
+}
+
+.filter-tile {
+    background: #122536;
+    box-shadow: none;
+    border-radius: 3px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.search-input {
+    width: 100% !important;
+    padding: 4px 0 !important;
+    background: #122536 !important;
+    font-size: 13px !important;
+    outline: none !important;
+    transition: all 0.2s ease !important;
+    box-sizing: content-box !important;
+    border: none !important;
+    color: #f0f4ff !important;
+}
+
+.filter-tile-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    background: transparent !important;
+    border: none !important;
+    color: rgba(242, 241, 244, 0.9) !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-align: left !important;
+    padding: 0 !important;
+}
+
+.filter-tile-header:hover {
+    color: #f2f1f4;
+}
+
+.filter-arrow {
+    font-size: 22px;
+    color: #F9FFFF;
+}
+
+.filter-tile-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.filter-option {
+    display: flex;
+    flex-direction: column;
+}
+
+.filter-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    color: rgba(217, 214, 223, 0.7);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-checkbox:hover {
+    color: rgba(242, 241, 244, 0.9);
+}
+
+.filter-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #F0B942;
+    flex-shrink: 0;
+    background-color: #1A1420;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border-radius: 2px;
+}
+
+.filter-checkbox input[type="checkbox"]:checked {
+    background-color: #1A1420;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23F0B942' d='M10 3L4.5 8.5L2 6' stroke='%23F0B942' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 10px 10px;
+}
+
+.filter-checkbox.sub {
+    padding-left: 20px;
+    font-size: 11px;
+    color: rgba(217, 214, 223, 0.6);
+}
+
+.filter-sub-options {
+    display: flex;
+    flex-direction: column;
+    padding-left: 22px;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+/* Стилизованный скроллбар для фильтров */
+.filters-column::-webkit-scrollbar {
+    width: 6px;
+}
+
+.filters-column::-webkit-scrollbar-track {
+    background: rgba(28, 22, 34, 0.3);
+    border-radius: 3px;
+}
+
+.filters-column::-webkit-scrollbar-thumb {
+    background: rgba(82, 69, 94, 0.6);
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+.filters-column::-webkit-scrollbar-thumb:hover {
+    background: rgba(94, 83, 112, 0.8);
+}
+
+/* Для Firefox */
+.filters-column {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(82, 69, 94, 0.6) rgba(28, 22, 34, 0.3);
+}
+
+/* Equipment Content Column - только для страницы сварщиков */
+.welders-page .equipment-content-column {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Welders Page Header Row - Same as Enterprise Map */
+.welders-page-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.welders-page-title-header {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 20px !important;
+    font-weight: 500 !important;
+    color: #F9F3FD !important;
+    white-space: nowrap !important;
+    flex-shrink: 0;
+    line-height: 1.2 !important;
+    display: block !important;
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: #F9F3FD !important;
+}
+
+.welders-tiles-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.control-btn {
+    background: transparent;
+    border: none;
+    color: #d9d6df;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.control-btn:hover {
+    background: rgba(45, 37, 54, 0.5);
+    color: #f2f1f4;
+}
+
+.notifications-btn {
+    position: relative;
+}
+
+.notifications-icon {
+    font-size: 18px;
+    color: #d9d6df;
+}
+
+.notifications-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    background: #EC2B3C;
+    border-radius: 50%;
+    border: 2px solid #1A1420;
+}
+
+/* NAKS Register Tile */
+.naks-register-tile {
+    background: #122536;
+    padding: 1px;
+    flex-shrink: 0;
+    border-radius: 3px;
+}
+
+.naks-register-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 12px;
+    background: #122536;
+    border: none;
+    border-radius: 3px;
+    color: #d9d6df;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.naks-register-btn:hover {
+    border-color: rgba(178, 172, 182, 0.6);
+    background: #122536;
+    color: #f2f1f4;
+}
+
+/* Welders Table */
+/* Удален глобальный стиль - используется только с префиксом .welders-page */
+
+/* Удален глобальный стиль - используется только с префиксом .welders-page */
+
+.welders-table thead {
+    background: rgba(28, 22, 34, 0.8);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.welders-table th {
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    line-height: 0.2 !important;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: #6C7386;
+    letter-spacing: 0.02em;
+    border-bottom: 1px solid rgba(59, 49, 74, 0.55) !important;
+    border-right: 1px solid #484B5E !important;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding: 2px 10px !important;
+}
+
+.welders-table th:first-child {
+    border-right: none !important;
+}
+
+.welders-table th:last-child {
+    border-right: none !important;
+}
+
+.welders-table th:hover {
+    background: rgba(45, 37, 54, 0.3);
+}
+
+.welders-table th span {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+}
+
+.welders-table .sort-arrow {
+    font-size: 19px;
+    color: rgba(188, 183, 197, 0.5);
+    transition: color 0.2s ease;
+}
+
+.welders-table th:hover .sort-arrow {
+    color: rgba(188, 183, 197, 0.8);
+}
+
+.welders-table tbody tr {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+}
+
+.welders-table tbody tr:nth-child(odd) {
+    background-color: #122536 !important;
+}
+
+.welders-table tbody tr:nth-child(even) {
+    background-color: #1A1420 !important;
+}
+
+.welders-table tbody tr.selected {
+    background: #F7A92B !important;
+}
+
+.welders-table tbody tr.selected:hover {
+    background: #F7A92B !important;
+}
+
+.welders-table td {
+    padding: 2px 10px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    line-height: 28px !important;
+    font-size: 12px !important;
+    vertical-align: middle !important;
+    white-space: nowrap !important;
+    border: none !important;
+    margin: 0 !important;
+    color: #5C6D81;
+    border-bottom: 1px solid rgba(59, 49, 74, 0.3);
+}
+
+.welders-table td:first-child {
+    padding: 2px 10px !important;
+}
+
+.welders-table td input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #F0B942;
+    flex-shrink: 0;
+    background-color: #1A1420;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border-radius: 2px;
+    border: 1px solid rgba(87, 77, 95, 0.6);
+}
+
+.welders-table td input[type="checkbox"]:checked {
+    background-color: #1A1420;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23F0B942' d='M10 3L4.5 8.5L2 6' stroke='%23F0B942' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 10px 10px;
+    border-color: #F0B942;
+}
+
+.welders-table .status-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    white-space: nowrap !important;
+}
+
+.welders-table .status-badge.online {
+    color: #0FA626 !important;
+}
+
+.welders-table .status-badge.offline {
+    color: #818EA1 !important;
+}
+
+.welders-table .status-badge.blocked {
+    color: #445569 !important;
+}
+
+/* Цвет ФИО сварщика */
+.welders-table .welder-name-cell {
+    color: #D26719 !important;
+}
+
+/* Scrollbar для таблицы сварщиков */
+.welders-table-container::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.welders-table-container::-webkit-scrollbar-track {
+    background: rgba(28, 22, 34, 0.5);
+}
+
+.welders-table-container::-webkit-scrollbar-thumb {
+    background: rgba(82, 69, 94, 0.5);
+    border-radius: 3px;
+}
+
+.welders-table-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(94, 83, 112, 0.7);
+}
+
+.content-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.welders-stats-tile {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+    margin-left: 32px;
+}
+
+.welders-stats-tile .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #d9d6df;
+    font-size: 13px;
+}
+
+.welders-stats-tile .stat-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    flex-shrink: 0;
+    transition: filter 0.2s ease;
+}
+
+.welders-stats-tile .stat-icon.stat-icon-selected {
+    filter: brightness(0) saturate(100%) invert(67%) sepia(78%) saturate(1234%) hue-rotate(3deg) brightness(96%) contrast(89%);
+}
+
+.welders-page .delete-btn,
+.welders-page .content-header .delete-btn,
+.welders-page button.delete-btn,
+.welders-page .content-header button.delete-btn {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 6px 42px !important;
+    background: #122536 !important;
+    background-color: #122536 !important;
+    border: none !important;
+    border-color: transparent !important;
+    border-radius: 3px !important;
+    color: #ffffff !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    flex-shrink: 0 !important;
+    margin-left: 32px !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.welders-page .delete-btn:hover:not(:disabled),
+.welders-page .content-header .delete-btn:hover:not(:disabled),
+.welders-page button.delete-btn:hover:not(:disabled),
+.welders-page .content-header button.delete-btn:hover:not(:disabled) {
+    background: #122536 !important;
+    background-color: #122536 !important;
+    border: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.welders-page .delete-btn:disabled {
+    background: #122536 !important;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.welders-page .delete-btn span:first-child {
+    font-size: 18px;
+    font-weight: 300;
+}
+
+.add-device-tile {
+    background: #122536;
+    padding: 0;
+    flex-shrink: 0;
+    width: 200px;
+    border-radius: 3px;
+}
+
+.add-device-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 1px;
+    background: #122536;
+    border: #122536;
+    border-radius: 3px;
+    color: #d9d6df;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.add-device-btn:hover {
+    border-color: rgba(178, 172, 182, 0.6);
+    background: #122536;
+    color: #f2f1f4;
+}
+
+.add-icon {
+    font-size: 18px;
+    font-weight: 300;
+    line-height: 1;
+}
+
+.view-toggle {
+    display: flex;
+    gap: 10px;
+    background: #122536;
+    border: 1px solid rgba(59, 49, 74, 0.55);
+    box-shadow: 0 14px 30px rgba(6, 9, 18, 0.55);
+    border-radius: 5px;
+    padding: 2px;
+    flex-shrink: 0;
+    margin-left: 16px;
+}
+
+.view-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: #122536;
+    border: none;
+    border-radius: 4px;
+    color: rgba(188, 183, 197, 0.6);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.view-btn:hover {
+    background: rgba(45, 37, 54, 0.5);
+    color: rgba(188, 183, 197, 0.9);
+}
+
+.view-btn.active {
+    background: rgba(35, 58, 92, 0.6);
+    color: #F6B243;
+}
+
+.view-btn svg {
+    flex-shrink: 0;
+}
+
+.view-btn span {
+    line-height: 1;
+}
+
+/* Удалены все стили для welding-equipment-page - они должны быть только в weldingEquipmentPageNew.css */
+
+/* Удалены все общие стили для equipment и welding-equipment-page - они должны быть только в weldingEquipmentPageNew.css */
+
+/* Modal Styles for Welders Page */
+.welders-page .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.welders-page .modal-content {
+    background: #1A1420;
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 14px 30px rgba(6, 9, 18, 0.55);
+}
+
+.welders-page .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.welders-page .modal-header h2 {
+    color: #F9F3FD;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.welders-page .modal-close {
+    background: transparent;
+    border: none;
+    color: #d9d6df;
+    font-size: 28px;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.welders-page .modal-close:hover {
+    background: rgba(45, 37, 54, 0.5);
+    color: #f2f1f4;
+}
+
+.welders-page .form-group {
+    margin-bottom: 16px;
+}
+
+.welders-page .form-group label {
+    display: block;
+    color: #d9d6df;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+
+.welders-page .form-group input,
+.welders-page .form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    background: #122536;
+    border: 1px solid rgba(59, 49, 74, 0.55);
+    border-radius: 4px;
+    color: #f0f4ff;
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.welders-page .form-group input:focus,
+.welders-page .form-group select:focus {
+    border-color: rgba(178, 172, 182, 0.6);
+}
+
+.welders-page .form-group .error {
+    color: #EC2B3C;
+    font-size: 12px;
+    margin-top: 4px;
+    display: block;
+}
+
+.welders-page .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.welders-page .modal-footer button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.welders-page .modal-footer button[type="button"] {
+    background: #122536;
+    color: #d9d6df;
+    border: 1px solid rgba(59, 49, 74, 0.55);
+}
+
+.welders-page .modal-footer button[type="button"]:hover {
+    background: rgba(45, 37, 54, 0.5);
+    border-color: rgba(178, 172, 182, 0.6);
+    color: #f2f1f4;
+}
+
+.welders-page .modal-footer button[type="submit"] {
+    background: #F29A2E;
+    color: #ffffff;
+}
+
+.welders-page .modal-footer button[type="submit"]:hover {
+    background: #e08a1f;
+}
+
+/* Переопределение старых стилей для страницы сварщиков */
+.welders-page * {
+    box-sizing: border-box;
+}
+
+.welders-page .equipment-content-column {
+    background: transparent !important;
+}
+
+/* Убеждаемся, что старые стили не перекрывают новый дизайн */
+.welders-page .welders-page-header {
+    all: initial;
+    font-family: inherit;
+}
+
+.welders-page .welders-page-header {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-shrink: 0;
+    background: #122536;
+    border-radius: 5px;
+    padding: 12px;
+    box-shadow: 0 14px 30px rgba(6, 9, 18, 0.55);
+}
+
+.welders-page .welders-table-container {
+    flex: 1 !important;
+    background: #1A1420 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.welders-page .welders-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+    min-height: 0 !important;
+    border: none !important;
+    font-family: inherit !important;
+    table-layout: auto !important;
+}
+
+.welders-page .welders-table th {
+    border-right: 1px solid #484B5E !important;
+}
+
+.welders-page .welders-table th:first-child {
+    border-right: none !important;
+}
+
+.welders-page .welders-table th:last-child {
+    border-right: none !important;
+}
+
+/* Стили для .equipment-content-column уже определены выше */
+
+.welders-stats-tile {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.welders-stats-tile .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #d9d6df;
+    font-size: 13px;
+}
+
+.welders-stats-tile .stat-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    flex-shrink: 0;
+    transition: filter 0.2s ease;
+}
+
+.welders-stats-tile .stat-icon.stat-icon-selected {
+    filter: brightness(0) saturate(100%) invert(67%) sepia(78%) saturate(1234%) hue-rotate(3deg) brightness(96%) contrast(89%);
+}
+
+/* Дубликат стилей удален - используются стили выше (строки 454-484) */

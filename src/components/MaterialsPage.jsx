@@ -1,16 +1,17 @@
 import React from 'react';
 import '../styles/plugPage.css';
-import SettingsPlug from '../images/SettingsPlug.jpg';
+import MaterialsPlug from '../images/MaterialsPlug.jpeg';
 
-const SettingsPage = () => {
+const MaterialsPage = () => {
     return (
         <div className="plug-page">
             <div className="plug-image-container">
-                <img src={SettingsPlug} alt="Настройки" className="plug-image" />
+                <img src={MaterialsPlug} alt="Сварочные материалы" className="plug-image" />
             </div>
             <div className="plug-text">Пока не доварили</div>
         </div>
     );
 };
 
-export default SettingsPage;
+export default MaterialsPage;
+

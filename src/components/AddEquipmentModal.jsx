@@ -31,8 +31,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
     const lastMaintenanceDateInputRef = useRef(null)
 
     const models = [
-        'Core',
-        'Блок мониторинга'
+        'Core Pulse'
     ]
 
     if (!isOpen) return null

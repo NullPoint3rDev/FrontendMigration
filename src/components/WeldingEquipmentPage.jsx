@@ -95,6 +95,7 @@ function WeldingEquipmentPage() {
     const currentYear = new Date().getFullYear();
     const navigate = useNavigate();
     const [deviceStatusesByMac, setDeviceStatusesByMac] = useState({}); // { [mac]: 'off' | 'on' | 'welding' }
+    const [deviceStatesByMac, setDeviceStatesByMac] = useState({}); // { [mac]: 'Дежурный режим' | 'Ожидание' | 'Заблокирован' | ... }
     const [statusIntervalId, setStatusIntervalId] = useState(null);
     const [shownErrors, setShownErrors] = useState(new Set());
 
@@ -397,9 +398,12 @@ function WeldingEquipmentPage() {
             try {
                 const state = await getArchivePanelState(machine.mac);
                 const status = computeStatusFromState(machine, state);
-                return [machine.mac, status];
+                // Получаем реальное состояние аппарата для форматирования
+                const props = state?.properties || {};
+                const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState || null;
+                return [machine.mac, status, rawState];
             } catch {
-                return [machine.mac, 'off'];
+                return [machine.mac, 'off', null];
             }
         });
         const results = await Promise.all(promises);
@@ -407,6 +411,13 @@ function WeldingEquipmentPage() {
             const next = { ...prev };
             results.forEach(([mac, status]) => {
                 next[mac] = status;
+            });
+            return next;
+        });
+        setDeviceStatesByMac(prev => {
+            const next = { ...prev };
+            results.forEach(([mac, , rawState]) => {
+                next[mac] = rawState;
             });
             return next;
         });
@@ -785,7 +796,7 @@ function WeldingEquipmentPage() {
     // Функция для получения модели аппарата для отображения
     const getModelDisplay = (item) => {
         if (item.deviceModel === 'MONITORING_BLOCK') return 'Блок Мониторинга';
-        if (item.deviceModel === 'CORE') return 'CORE PRO 500';
+        if (item.deviceModel === 'CORE') return 'CORE PULSE';
         return item.model || item.deviceModel?.name || 'Не указана';
     };
 
@@ -816,6 +827,61 @@ function WeldingEquipmentPage() {
             case 'off':
             default:
                 return '#5C6D81'; // серый
+        }
+    };
+
+    // Функция для форматирования статуса для отображения в status-badge
+    const getFormattedStatus = (status, rawState) => {
+        // Если есть реальное состояние аппарата, используем его
+        if (rawState !== null && rawState !== undefined) {
+            const stateLower = String(rawState).toLowerCase().trim();
+
+            // Дежурный режим -> Деж.Режим (зеленым #0cff00, как в DeviceMonitorPage)
+            if (stateLower.includes('дежурн') || stateLower.includes('standby')) {
+                return { text: 'Деж.Режим', className: 'on', color: '#0cff00' };
+            }
+
+            // Ожидание -> Ожидание (зеленым #0cff00, как в DeviceMonitorPage)
+            if (stateLower.includes('ожидан') || stateLower.includes('waiting')) {
+                return { text: 'Ожидание', className: 'on', color: '#0cff00' };
+            }
+
+            // Заблокирован -> Блок (серым, как в DeviceMonitorPage)
+            if (stateLower.includes('заблокирован') || stateLower.includes('blocked') ||
+                stateLower.includes('lock') || stateLower.includes('блокиров')) {
+                return { text: 'Блок', className: 'off', color: 'rgba(188, 183, 197, 0.5)' };
+            }
+
+            // Сварка -> Сварка (желтым)
+            if (stateLower.includes('сварка') || stateLower.includes('welding') ||
+                stateLower.includes('weld') || stateLower.includes('сварочн')) {
+                return { text: 'Сварка', className: 'welding' };
+            }
+
+            // Авария/Ошибка -> Ошибка (красным)
+            if (stateLower.includes('авария') || stateLower.includes('error') ||
+                stateLower.includes('ошибка') || stateLower.includes('emergency') ||
+                stateLower.includes('failure')) {
+                return { text: 'Ошибка', className: 'error' };
+            }
+
+            // Аппарат включен -> Вкл (зеленым)
+            if (stateLower.includes('включен') || stateLower.includes('on')) {
+                return { text: 'Вкл', className: 'on' };
+            }
+        }
+
+        // Если нет реального состояния, используем базовый статус
+        switch (status) {
+            case 'welding':
+                return { text: 'Сварка', className: 'welding' };
+            case 'on':
+                return { text: 'Вкл', className: 'on' };
+            case 'error':
+                return { text: 'Ошибка', className: 'error' };
+            case 'off':
+            default:
+                return { text: 'Выкл', className: 'off' };
         }
     };
 
@@ -871,7 +937,7 @@ function WeldingEquipmentPage() {
 
     const models = [
         { id: 'all', label: 'Все' },
-        { id: 'CORE', label: 'CORE PRO 500' },
+        { id: 'CORE', label: 'CORE PULSE' },
         { id: 'MONITORING_BLOCK', label: 'Блок Мониторинга' }
     ];
 
@@ -1304,6 +1370,8 @@ function WeldingEquipmentPage() {
                             <tbody>
                             {getFilteredEquipment().map((item) => {
                                 const status = deviceStatusesByMac[item.mac] || 'off';
+                                const rawState = deviceStatesByMac[item.mac] || null;
+                                const formattedStatus = getFormattedStatus(status, rawState);
                                 const modelDisplay = getModelDisplay(item);
                                 const modelParts = formatModel(modelDisplay);
                                 return (
@@ -1334,10 +1402,11 @@ function WeldingEquipmentPage() {
                                         <td>{getWelderDisplay(item)}</td>
                                         <td>{getLastActivation(item) || 'Нет данных'}</td>
                                         <td>
-                                                <span className={`status-badge ${status}`}>
-                                                    {status === 'welding' ? 'Сварка' :
-                                                        status === 'on' ? 'Вкл' :
-                                                            status === 'error' ? 'Ошибка' : 'Выкл'}
+                                                <span
+                                                    className={`status-badge ${formattedStatus.className}`}
+                                                    style={formattedStatus.color ? { color: formattedStatus.color } : {}}
+                                                >
+                                                    {formattedStatus.text}
                                                 </span>
                                         </td>
                                     </tr>
@@ -1358,16 +1427,24 @@ function WeldingEquipmentPage() {
                     try {
                         console.log('🟢 WeldingEquipmentPage: onSave вызван с данными:', data);
                         // Преобразуем данные из AddEquipmentModal в формат для handleSave
-                        // Преобразуем модель: "Core" -> "CORE", "Блок мониторинга" -> "MONITORING_BLOCK"
+                        // Преобразуем модель: "Core Pulse" или "Core" -> "CORE", "Блок мониторинга" -> "MONITORING_BLOCK"
                         let deviceModel = '';
-                        if (data.model === 'Core') {
+                        const modelLower = (data.model || '').toLowerCase().trim();
+                        if (modelLower === 'core' || modelLower === 'core pulse' || modelLower.includes('core')) {
                             deviceModel = 'CORE';
-                        } else if (data.model === 'Блок мониторинга') {
+                        } else if (modelLower === 'блок мониторинга' || modelLower === 'monitoring_block' || modelLower.includes('мониторинг')) {
                             deviceModel = 'MONITORING_BLOCK';
                         } else {
-                            deviceModel = data.model || '';
+                            // Если модель уже в правильном формате (CORE или MONITORING_BLOCK), используем как есть
+                            const upperModel = (data.model || '').toUpperCase().trim();
+                            if (upperModel === 'CORE' || upperModel === 'MONITORING_BLOCK') {
+                                deviceModel = upperModel;
+                            } else {
+                                deviceModel = data.model || '';
+                            }
                         }
 
+                        console.log('🟢 WeldingEquipmentPage: Исходная модель:', data.model);
                         console.log('🟢 WeldingEquipmentPage: Преобразованная модель:', deviceModel);
 
                         const newEditData = {
