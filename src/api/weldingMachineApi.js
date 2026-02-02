@@ -164,4 +164,20 @@ export async function getAllWeldingMachineTypes() {
         headers: getAuthHeaders()
     });
     return res.json();
+}
+
+// Получить ID аппаратов по RFID кодам
+export async function getWeldingMachineIdsByRfidCodes(rfidCodes) {
+    const res = await fetch(`${API_BASE_URL}/welding-machine-states/machines-by-rfid`, {
+        method: 'POST',
+        headers: {
+            ...getAuthHeaders(),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(rfidCodes)
+    });
+    if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    return res.json();
 } 

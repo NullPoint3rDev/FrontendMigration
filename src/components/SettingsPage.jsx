@@ -1,16 +1,8 @@
 import React from 'react';
-import '../styles/plugPage.css';
-import SettingsPlug from '../images/SettingsPlug.jpg';
+import UnderDevelopmentPage from './UnderDevelopmentPage';
 
 const SettingsPage = () => {
-    return (
-        <div className="plug-page">
-            <div className="plug-image-container">
-                <img src={SettingsPlug} alt="Настройки" className="plug-image" />
-            </div>
-            <div className="plug-text">Пока не доварили</div>
-        </div>
-    );
+    return <UnderDevelopmentPage />;
 };
 
 export default SettingsPage;

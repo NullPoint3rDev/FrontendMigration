@@ -1,640 +1,642 @@
 /* Device Monitor Page Styles */
 :root {
-  --primary: #6C63FF;
-  --secondary: #FF6584;
-  --accent: #4CAF50;
-  --background: #1A1A2E;
-  --surface: #16213E;
-  --text-primary: #FFFFFF;
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --border-color: rgba(255, 255, 255, 0.1);
-  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --primary: #6C63FF;
+    --secondary: #FF6584;
+    --accent: #4CAF50;
+    --background: #1A1A2E;
+    --surface: #16213E;
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.7);
+    --border-color: rgba(255, 255, 255, 0.1);
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .device-monitor-page {
-  padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
-  margin-top: 70px; /* Add margin to account for fixed navbar */
-  min-height: 100vh;
-  background: radial-gradient(circle at top right, #1A1A2E, #16213E);
-  color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    width: 100%;
+    padding: 2rem;
+    overflow: auto;
+    background: #1A1420;
+    color: var(--text-primary);
 }
 
 .device-monitor-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
 }
 
 .device-monitor-title {
-  font-size: 2.5rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .back-btn {
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 0.8rem 1.5rem;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .back-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
 }
 
 .device-info-card {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 16px;
-  padding: 1.5rem;
-  border: 1px solid var(--border-color);
-  margin-bottom: 2rem;
-  transition: var(--transition);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    margin-bottom: 2rem;
+    transition: var(--transition);
 }
 
 .device-info-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--card-shadow);
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow);
 }
 
 .device-name {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
 }
 
 .status-card {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 16px;
-  padding: 1.5rem;
-  border: 1px solid var(--border-color);
-  margin-bottom: 2rem;
-  transition: var(--transition);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    margin-bottom: 2rem;
+    transition: var(--transition);
 }
 
 .status-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--card-shadow);
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow);
 }
 
 .status-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
 .status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
 .status-icon {
-  font-size: 1.2rem;
+    font-size: 1.2rem;
 }
 
 .status-text {
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-primary);
 }
 
 .reconnect-btn {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .reconnect-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
 }
 
 .reconnect-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .last-update {
-  margin-top: 1rem;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  text-align: center;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    text-align: center;
 }
 
 .error-message {
-  background: rgba(255, 101, 132, 0.1);
-  border: 1px solid #FF6584;
-  color: #FF6584;
-  padding: 1rem 1.5rem;
-  border-radius: 8px;
-  margin-bottom: 2rem;
-  font-weight: 500;
+    background: rgba(255, 101, 132, 0.1);
+    border: 1px solid #FF6584;
+    color: #FF6584;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    font-weight: 500;
 }
 
 .device-data-section {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 16px;
-  padding: 2rem;
-  border: 1px solid var(--border-color);
-  transition: var(--transition);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 2rem;
+    border: 1px solid var(--border-color);
+    transition: var(--transition);
 }
 
 .device-data-section:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--card-shadow);
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow);
 }
 
 .section-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 2rem 0;
-  text-align: center;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 2rem 0;
+    text-align: center;
 }
 
 .parameters-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
 }
 
 .device-parameters {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
 }
 
 /* Основные параметры в плитках */
 .main-parameters-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
 }
 
 /* Контейнер для основной секции параметров */
 .main-parameters-container {
-  display: flex;
-  gap: 2rem;
-  margin-bottom: 2rem;
-  align-items: flex-start;
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    align-items: flex-start;
 }
 
 /* Левая колонка: Ток и Напряжение */
 .left-parameters-column {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  flex: 0 0 auto;
-  min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    flex: 0 0 auto;
+    min-width: 300px;
 }
 
 /* Правая колонка: Дополнительные параметры */
 .right-parameters-column {
-  flex: 1 1 auto;
+    flex: 1 1 auto;
 }
 
 .main-parameter-card {
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  border-radius: 16px;
-  padding: 2rem;
-  text-align: center;
-  border: none;
-  transition: var(--transition);
-  position: relative;
-  overflow: hidden;
-  min-height: 140px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  box-shadow: 0 8px 32px rgba(108, 99, 255, 0.3);
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    border: none;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-shadow: 0 8px 32px rgba(108, 99, 255, 0.3);
 }
 
 /* Увеличенные карточки для тока и напряжения */
 .main-parameter-card.small {
-  padding: 2.5rem 2rem;
-  min-height: 180px;
+    padding: 2.5rem 2rem;
+    min-height: 180px;
 }
 
 .main-parameter-card.small .main-parameter-value {
-  font-size: 3.5rem;
+    font-size: 3.5rem;
 }
 
 .main-parameter-card.small .main-parameter-icon {
-  font-size: 2.5rem;
+    font-size: 2.5rem;
 }
 
 .main-parameter-card.small .main-parameter-name {
-  font-size: 1.2rem;
+    font-size: 1.2rem;
 }
 
 .main-parameter-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(108, 99, 255, 0.4);
+    transform: translateY(-8px);
+    box-shadow: 0 12px 40px rgba(108, 99, 255, 0.4);
 }
 
 .main-parameter-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.6s;
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.6s;
 }
 
 .main-parameter-card:hover::before {
-  left: 100%;
+    left: 100%;
 }
 
 .main-parameter-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
 }
 
 .main-parameter-icon {
-  font-size: 2.5rem;
-  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+    font-size: 2.5rem;
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
 }
 
 .main-parameter-name {
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .main-parameter-value {
-  font-size: 3.5rem;
-  font-weight: bold;
-  color: white;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
-  animation: pulse 2s infinite;
+    font-size: 3.5rem;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+    animation: pulse 2s infinite;
 }
 
 /* Дополнительные параметры в списке - компактный стиль */
 .other-parameters-list {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
-  padding: 1rem;
-  border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
 }
 
 .other-parameters-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 0.75rem 0;
-  text-align: center;
-  border-bottom: 1px solid var(--primary);
-  padding-bottom: 0.4rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.75rem 0;
+    text-align: center;
+    border-bottom: 1px solid var(--primary);
+    padding-bottom: 0.4rem;
 }
 
 .other-parameter-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.35rem;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  border-left: 2px solid var(--primary);
-  transition: var(--transition);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.35rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    border-left: 2px solid var(--primary);
+    transition: var(--transition);
 }
 
 .other-parameter-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  transform: translateX(3px);
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateX(3px);
 }
 
 .other-parameter-item:last-child {
-  margin-bottom: 0;
+    margin-bottom: 0;
 }
 
 .other-parameter-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .other-parameter-icon {
-  font-size: 0.9rem;
-  opacity: 0.8;
+    font-size: 0.9rem;
+    opacity: 0.8;
 }
 
 .other-parameter-name {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
 }
 
 .other-parameter-value {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--primary);
-  text-shadow: 0 0 8px rgba(108, 99, 255, 0.3);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--primary);
+    text-shadow: 0 0 8px rgba(108, 99, 255, 0.3);
 }
 
 .parameter-card {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-  padding: 1.5rem;
-  text-align: center;
-  border: 2px solid var(--primary);
-  transition: var(--transition);
-  position: relative;
-  overflow: hidden;
-  min-height: 120px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    border: 2px solid var(--primary);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .parameter-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 30px rgba(108, 99, 255, 0.3);
-  border-color: var(--secondary);
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(108, 99, 255, 0.3);
+    border-color: var(--secondary);
 }
 
 .parameter-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-  transition: left 0.5s;
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.5s;
 }
 
 .parameter-card:hover::before {
-  left: 100%;
+    left: 100%;
 }
 
 .parameter-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
 }
 
 .parameter-icon {
-  font-size: 2rem;
+    font-size: 2rem;
 }
 
 .parameter-name {
-  font-size: 1.2rem;
-  font-weight: 500;
-  color: var(--text-secondary);
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: var(--text-secondary);
 }
 
 .parameter-value {
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: var(--primary);
-  text-shadow: 0 0 20px rgba(108, 99, 255, 0.5);
-  animation: pulse 2s infinite;
-  word-break: break-word;
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--primary);
+    text-shadow: 0 0 20px rgba(108, 99, 255, 0.5);
+    animation: pulse 2s infinite;
+    word-break: break-word;
 }
 
 @keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-  100% {
-    transform: scale(1);
-  }
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
 }
 
 .update-time {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  text-align: center;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
 }
 
 .no-data {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4rem 2rem;
-  text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
 }
 
 .no-data-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-  opacity: 0.6;
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.6;
 }
 
 .no-data-text {
-  font-size: 1.2rem;
-  color: var(--text-secondary);
-  margin: 0;
-  max-width: 400px;
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    margin: 0;
+    max-width: 400px;
 }
 
 .no-data-subtext {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  margin: 0.5rem 0 0 0;
-  opacity: 0.8;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin: 0.5rem 0 0 0;
+    opacity: 0.8;
 }
 
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .device-monitor-page {
-    padding: 1rem;
-  }
+    .device-monitor-page {
+        padding: 1rem;
+    }
 
-  .device-monitor-header {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
+    .device-monitor-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
 
-  .device-monitor-title {
-    font-size: 2rem;
-    text-align: center;
-  }
+    .device-monitor-title {
+        font-size: 2rem;
+        text-align: center;
+    }
 
-  .status-info {
-    flex-direction: column;
-    align-items: stretch;
-  }
+    .status-info {
+        flex-direction: column;
+        align-items: stretch;
+    }
 
-  .main-parameters-container {
-    flex-direction: column;
-  }
+    .main-parameters-container {
+        flex-direction: column;
+    }
 
-  .left-parameters-column {
-    min-width: 100%;
-  }
+    .left-parameters-column {
+        min-width: 100%;
+    }
 
-  .main-parameters-grid {
-    grid-template-columns: 1fr;
-  }
+    .main-parameters-grid {
+        grid-template-columns: 1fr;
+    }
 
-  .main-parameter-value {
-    font-size: 3rem;
-  }
+    .main-parameter-value {
+        font-size: 3rem;
+    }
 
-  .main-parameter-card.small .main-parameter-value {
-    font-size: 2rem;
-  }
+    .main-parameter-card.small .main-parameter-value {
+        font-size: 2rem;
+    }
 
-  .charts-container {
-    grid-template-columns: 1fr;
-  }
+    .charts-container {
+        grid-template-columns: 1fr;
+    }
 
-  .chart-box {
-    height: 250px;
-  }
+    .chart-box {
+        height: 250px;
+    }
 
-  .other-parameter-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
+    .other-parameter-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
 
-  .other-parameter-value {
-    align-self: flex-end;
-  }
+    .other-parameter-value {
+        align-self: flex-end;
+    }
 }
 
 @media (max-width: 480px) {
-  .device-monitor-title {
-    font-size: 1.8rem;
-  }
+    .device-monitor-title {
+        font-size: 1.8rem;
+    }
 
-  .main-parameter-card {
-    padding: 1.5rem;
-  }
+    .main-parameter-card {
+        padding: 1.5rem;
+    }
 
-  .main-parameter-value {
-    font-size: 2.5rem;
-  }
+    .main-parameter-value {
+        font-size: 2.5rem;
+    }
 
-  .main-parameter-name {
-    font-size: 1rem;
-  }
+    .main-parameter-name {
+        font-size: 1rem;
+    }
 
-  .other-parameters-list {
-    padding: 1rem;
-  }
+    .other-parameters-list {
+        padding: 1rem;
+    }
 
-  .other-parameter-item {
-    padding: 0.5rem 0.75rem;
-  }
+    .other-parameter-item {
+        padding: 0.5rem 0.75rem;
+    }
 }
 
 /* Device Controls Styles */
 
 .device-mac {
-  color: var(--text-secondary);
-  font-family: monospace;
-  font-size: 0.9rem;
-  margin-top: 0.5rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
 }
 
 /* Стили для графиков */
 .charts-container {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 2rem;
-  margin-top: 2rem;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+    margin-top: 2rem;
 }
 
 .chart-wrapper {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 16px;
-  padding: 1.5rem;
-  border: 1px solid var(--border-color);
-  transition: var(--transition);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    transition: var(--transition);
 }
 
 .chart-wrapper.chart-dark {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .chart-wrapper:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--card-shadow);
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow);
 }
 
 .chart-title {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 1rem;
-  text-align: center;
-  border-bottom: 2px solid var(--primary);
-  padding-bottom: 0.5rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    text-align: center;
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 0.5rem;
 }
 
 .chart-box {
-  height: 300px;
-  position: relative;
-  width: 100%;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 10px;
+    height: 300px;
+    position: relative;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px;
 }
 
 .chart-wrapper.chart-dark .chart-box {
-  background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .chart-placeholder {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  font-size: 1.1rem;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 8px;
-  border: 1px dashed var(--border-color);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    border: 1px dashed var(--border-color);
 }

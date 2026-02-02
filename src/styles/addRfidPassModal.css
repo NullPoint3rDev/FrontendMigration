@@ -1,0 +1,186 @@
+.add-rfid-pass-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.add-rfid-pass-modal-content {
+    background: #122536;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+    padding: 32px;
+    box-sizing: border-box;
+    box-shadow: 0 14px 30px rgba(6, 9, 18, 0.55);
+}
+
+.add-rfid-pass-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 30px;
+    height: 30px;
+    background: rgba(28, 22, 34, 0.8);
+    border: none;
+    border-radius: 3px;
+    color: rgba(188, 183, 197, 0.75);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+}
+
+
+.add-rfid-pass-modal-title {
+    margin: 0 0 24px 0;
+    font-size: 20px;
+    font-weight: 500;
+    text-align: center;
+    color: #FCFCFE;
+}
+
+.add-rfid-pass-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.add-rfid-pass-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.add-rfid-pass-form-field label {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(240, 244, 255, 0.9);
+}
+
+.add-rfid-pass-form-field input {
+    width: 100%;
+    padding: 10px 12px;
+    background: #1A1420;
+    border: none;
+    border-radius: 3px;
+    color: #f0f4ff;
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.add-rfid-pass-form-field input:focus {
+    border-color: rgba(175, 137, 61, 0.5);
+    box-shadow: 0 0 0 2px rgba(175, 137, 61, 0.2);
+}
+
+.add-rfid-pass-form-field input.scanning {
+    background: rgba(246, 178, 67, 0.1);
+    border: 1px solid rgba(246, 178, 67, 0.3);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.scanning-message {
+    font-size: 12px;
+    color: #F6B243;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.scanning-message::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #F6B243;
+    animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes blink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.3;
+    }
+}
+
+.add-rfid-pass-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+.add-rfid-pass-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 3px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.add-rfid-pass-btn.scan {
+    background: #1A1420;
+    color: #6C7386;
+}
+
+.add-rfid-pass-btn.scan:hover {
+    background: #1A1420;
+}
+
+.add-rfid-pass-btn.stop {
+    background: #1A1420;
+    color: #6C7386;
+}
+
+.add-rfid-pass-btn.stop:hover {
+    background: #1A1420;
+}
+
+.add-rfid-pass-btn.add {
+    background: #F29A2E;
+    color: #fff;
+}
+
+.add-rfid-pass-btn.add:hover {
+    background: #F29A2E;
+}
+
+.add-rfid-pass-btn.add:disabled {
+    background: rgba(242, 154, 46, 0.65);
+    color: rgba(255, 255, 255, 0.5);
+    cursor: not-allowed;
+}
+

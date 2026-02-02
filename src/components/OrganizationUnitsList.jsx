@@ -1,11 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { FaChevronRight, FaChevronDown, FaUser, FaEdit } from 'react-icons/fa';
 import OrganizationLogo from '../images/OrganizationLogo.png';
 import ResourcesLogo from '../images/ResourcesLogo.png';
+import WelderIcon from '../images/WelderIcon.png';
 import '../styles/organizationUnitsList.css';
 
-const OrganizationUnitsList = ({ units, onEdit, selectedUnits, onSelectionChange, onUnitClick, selectedUnitId, onExpandedUnitsChange, selectedUnitLevel }) => {
+const OrganizationUnitsList = ({ units, onEdit, selectedUnits, onSelectionChange, onUnitClick, selectedUnitId, onExpandedUnitsChange, selectedUnitLevel, unitStats }) => {
     const [expandedUnits, setExpandedUnits] = useState({});
+
+    // Компонент Tooltip для всплывающих подсказок
+    const Tooltip = ({ text, children }) => {
+        const tooltipRef = useRef(null);
+        const wrapperRef = useRef(null);
+
+        const handleMouseEnter = () => {
+            if (tooltipRef.current && wrapperRef.current) {
+                const rect = wrapperRef.current.getBoundingClientRect();
+                const tooltipWidth = 300;
+                const tooltipHeight = tooltipRef.current.offsetHeight || 100;
+                const spacing = 8;
+
+                let top = rect.top - tooltipHeight - spacing;
+                let left = rect.left + rect.width / 2;
+
+                // Проверка границ экрана
+                if (top < 0) {
+                    top = rect.bottom + spacing;
+                }
+                if (left - tooltipWidth / 2 < 0) {
+                    left = tooltipWidth / 2;
+                } else if (left + tooltipWidth / 2 > window.innerWidth) {
+                    left = window.innerWidth - tooltipWidth / 2;
+                }
+
+                tooltipRef.current.style.top = `${top}px`;
+                tooltipRef.current.style.left = `${left}px`;
+            }
+        };
+
+        return (
+            <div
+                className="tooltip-wrapper"
+                ref={wrapperRef}
+                onMouseEnter={handleMouseEnter}
+            >
+                {children}
+                <span className="tooltip-text" ref={tooltipRef}>{text}</span>
+            </div>
+        );
+    };
 
     const toggleExpand = (unitId) => {
         setExpandedUnits(prev => {
@@ -145,22 +188,36 @@ const OrganizationUnitsList = ({ units, onEdit, selectedUnits, onSelectionChange
                         </div>
                     </td>
                     <td>
-                        <div className="org-unit-stat-tile">
-                            <img src={OrganizationLogo} alt="Organization" className="stat-icon-img" />
-                            <span className="stat-number">0</span>
-                        </div>
+                        <Tooltip text="Количество пользователей в подразделении">
+                            <div className="org-unit-stat-tile">
+                                <FaUser className="stat-icon" />
+                                <span className="stat-number">{unitStats[unit.id]?.users || 0}</span>
+                            </div>
+                        </Tooltip>
                     </td>
                     <td>
-                        <div className="org-unit-stat-tile">
-                            <img src={ResourcesLogo} alt="Resources" className="stat-icon-img" />
-                            <span className="stat-number">0</span>
-                        </div>
+                        <Tooltip text="Количество подразделений">
+                            <div className="org-unit-stat-tile">
+                                <img src={OrganizationLogo} alt="Organization" className="stat-icon-img" />
+                                <span className="stat-number">{unitStats[unit.id]?.subdivisions || 0}</span>
+                            </div>
+                        </Tooltip>
                     </td>
                     <td>
-                        <div className="org-unit-stat-tile">
-                            <FaUser className="stat-icon" />
-                            <span className="stat-number">0</span>
-                        </div>
+                        <Tooltip text="Количество сварочных аппаратов в подразделении">
+                            <div className="org-unit-stat-tile">
+                                <img src={ResourcesLogo} alt="Resources" className="stat-icon-img" />
+                                <span className="stat-number">{unitStats[unit.id]?.weldingMachines || 0}</span>
+                            </div>
+                        </Tooltip>
+                    </td>
+                    <td>
+                        <Tooltip text="Количество сварщиков в подразделении">
+                            <div className="org-unit-stat-tile">
+                                <img src={WelderIcon} alt="Welder" className="stat-icon-img" />
+                                <span className="stat-number">{unitStats[unit.id]?.welders || 0}</span>
+                            </div>
+                        </Tooltip>
                     </td>
                     <td className="org-unit-edit-cell">
                         <button

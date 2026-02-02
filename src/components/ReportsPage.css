@@ -1,8 +1,9 @@
 .reports-page {
     display: flex;
     flex-direction: column;
-    height: 100vh;        /* фиксируем всю страницу */
-    width: 100vw;
+    height: 100%;
+    width: 100%;
+    flex: 1;
     overflow: hidden;     /* запрещаем внешний скролл */
     background: #1A1420;
     color: #f0f4ff;
@@ -236,7 +237,7 @@
 }
 
 .middle-subpanel-left {
-    flex: 0 0 150px;
+    flex: 1;
 }
 
 .middle-subpanel-right {
@@ -263,18 +264,22 @@
 .parameter-item-expandable {
     display: flex;
     flex-direction: column;
+    /* Убеждаемся, что marginLeft применяется правильно */
+    box-sizing: border-box;
 }
 
+/* Старые стили parameter-arrow оставлены для совместимости, но теперь используется org-unit-expand-btn */
 .parameter-arrow.expanded {
-    transform: rotate(180deg);
+    transform: rotate(180deg) !important;
 }
 
 .parameter-expanded-content {
-    padding: 4px 12px 6px 32px;
+    padding: 4px 12px 6px 0;
     background: rgba(27, 22, 34, 0.6);
     display: flex;
     flex-direction: column;
     gap: 3px;
+    margin-left: 0; /* Отступы управляются через inline стили в компоненте */
 }
 
 .parameter-sub-item {
@@ -703,9 +708,28 @@
     text-align: left;
 }
 
-.parameter-arrow {
-    font-size: 14px;
-    color: rgba(178, 172, 182, 0.6);
+/* Стили для кнопок раскрытия (как на странице Карта предприятия) */
+.org-unit-expand-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: #6C7386;
+    transition: color 0.2s ease;
+}
+
+.org-unit-expand-btn:hover {
+    color: #9CA3B8;
+}
+
+.org-unit-expand-btn .expand-icon {
+    font-size: 12px;
 }
 
 /* Right Panel Styles */
@@ -1495,6 +1519,73 @@
     padding: 8px 16px;
     background: rgb(17, 36, 54);
     border-bottom: 1px solid rgba(123, 139, 166, 0.2);
+}
+
+/* Стили для кастомного выпадающего списка типа отчета */
+.report-type-dropdown-container {
+    position: relative;
+    margin: 12px 6px 12px 6px;
+}
+
+.report-type-dropdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #112436;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    color: #f0f4ff;
+    font-size: 13px;
+}
+
+.report-type-dropdown-container.open .report-type-dropdown-header {
+    border-radius: 3px 3px 0 0;
+    border-bottom: none;
+}
+
+.report-type-dropdown-title {
+    font-weight: 500;
+    color: #f0f4ff;
+}
+
+.report-type-dropdown-title.placeholder {
+    color: #7B8BA6;
+}
+
+.report-type-dropdown-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    margin-top: 0;
+    background: #112436;
+    border: none;
+    border-top: none;
+    border-radius: 0 0 3px 3px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.report-type-dropdown-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    color: #f0f4ff;
+    font-size: 13px;
+    transition: background 0.2s;
+}
+
+.report-type-dropdown-item:hover {
+    background: rgba(123, 139, 166, 0.1);
+}
+
+.report-type-dropdown-item.selected {
+    background: rgba(246, 178, 67, 0.1);
+    color: #F6B243;
 }
 
 .report-type-label {

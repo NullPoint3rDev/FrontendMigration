@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FaChevronRight, FaChevronDown } from 'react-icons/fa';
 import '../styles/weldersPage.css';
 import { useNavigate } from 'react-router-dom';
 import { FaBell } from 'react-icons/fa';
@@ -11,6 +12,7 @@ import {
     deleteWelder
 } from '../api/welderApi';
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
+import { getCertificationsByWelderId } from '../api/certificationApi';
 
 // Данные теперь загружаются с API сервера
 
@@ -31,6 +33,8 @@ function WeldersPage() {
         department: true,
         hazardousGroups: true
     });
+    const [expandedHazardousGroups, setExpandedHazardousGroups] = useState({});
+    const [expandedOrganizationUnits, setExpandedOrganizationUnits] = useState({});
     const [selectedWelders, setSelectedWelders] = useState([]);
     const navigate = useNavigate();
 
@@ -76,7 +80,41 @@ function WeldersPage() {
         try {
             const data = await getAllWelders();
             console.log('welders from API:', data);
-            setWelders(Array.isArray(data) ? data : []);
+            const weldersArray = Array.isArray(data) ? data : [];
+
+            // Загружаем аттестации для каждого сварщика
+            const weldersWithCertifications = await Promise.all(
+                weldersArray.map(async (welder) => {
+                    try {
+                        const certifications = await getCertificationsByWelderId(welder.id);
+                        // Формируем строку "Вид допуска" на основе аттестаций
+                        let admissionType = 'Не указан';
+                        let activeTechGroups = []; // Массив активных групп опасных производств
+
+                        if (certifications && certifications.length > 0) {
+                            const activeCerts = certifications.filter(cert => cert.status === 'ACTIVE');
+                            if (activeCerts.length > 0) {
+                                // Берем способы сварки из активных аттестаций
+                                const methods = activeCerts
+                                    .flatMap(cert => cert.weldingMethods || [])
+                                    .filter((method, index, self) => self.indexOf(method) === index); // Убираем дубликаты
+                                admissionType = methods.length > 0 ? methods.join(', ') : 'Не указан';
+
+                                // Собираем все группы опасных производств из активных аттестаций
+                                activeTechGroups = activeCerts
+                                    .flatMap(cert => cert.techGroups || [])
+                                    .filter((group, index, self) => self.indexOf(group) === index); // Убираем дубликаты
+                            }
+                        }
+                        return { ...welder, admissionType, activeTechGroups };
+                    } catch (error) {
+                        console.error(`Ошибка загрузки аттестаций для сварщика ${welder.id}:`, error);
+                        return { ...welder, admissionType: 'Не указан', activeTechGroups: [] };
+                    }
+                })
+            );
+
+            setWelders(weldersWithCertifications);
         } catch (err) {
             setErrors({ api: 'Ошибка загрузки сварщиков: ' + err.message });
             setWelders([]);
@@ -98,6 +136,26 @@ function WeldersPage() {
         loadWelders();
         loadOrganizationUnits();
     }, []);
+
+    // Функция для получения названия подразделения с проверкой его существования
+    const getOrganizationUnitName = (welder) => {
+        const unitName = welder.organizationUnit?.name || welder.department;
+        if (!unitName) {
+            return 'Не указано';
+        }
+
+        // Проверяем, существует ли подразделение в текущем списке
+        const unitExists = organizationUnits.some(unit =>
+            unit.name === unitName ||
+            (welder.organizationUnit?.id && unit.id === welder.organizationUnit.id)
+        );
+
+        if (!unitExists) {
+            return 'Не указано'; // Подразделение было удалено
+        }
+
+        return unitName;
+    };
 
     // Функция для форматирования статуса сварщика
     const getWelderStatusDisplay = (welder) => {
@@ -135,7 +193,7 @@ function WeldersPage() {
                     case 'employeeId': return (item.employeeId || item.tabNumber || '').toLowerCase();
                     case 'grade': return (item.grade || '').toLowerCase();
                     case 'position': return (item.position || '').toLowerCase();
-                    case 'unit': return (item.organizationUnit?.name || item.department || '').toLowerCase();
+                    case 'unit': return getOrganizationUnitName(item).toLowerCase();
                     case 'admissionType': return (item.admissionType || '').toLowerCase();
                     case 'status': return (item.status || '').toLowerCase();
                     default: return '';
@@ -220,7 +278,7 @@ function WeldersPage() {
 
     const navigateToWelderProfile = (welderId) => {
         if (welderId) {
-            navigate(`/welders/${welderId}`);
+            navigate(`/welders/add/${welderId}`);
         }
     };
 
@@ -248,7 +306,11 @@ function WeldersPage() {
                 filtered = [];
             } else {
                 filtered = filtered.filter(item => {
-                    const unitName = item.organizationUnit?.name || item.department || '';
+                    const unitName = getOrganizationUnitName(item);
+                    // Пропускаем элементы с "Не указано" (удаленные подразделения)
+                    if (unitName === 'Не указано') {
+                        return false;
+                    }
                     return organizationUnitFilter.includes(unitName);
                 });
             }
@@ -260,10 +322,17 @@ function WeldersPage() {
                 filtered = [];
             } else {
                 filtered = filtered.filter(item => {
-                    // Здесь нужно будет адаптировать под реальную структуру данных
-                    const itemGroups = item.hazardousGroups || [];
-                    return hazardousGroupsFilter.some(filterGroup =>
-                        itemGroups.includes(filterGroup)
+                    // Получаем активные группы опасных производств из аттестаций сварщика
+                    const activeTechGroups = item.activeTechGroups || [];
+
+                    // Преобразуем ID фильтра в строки формата "ГРУППА: пп. N"
+                    const filterStrings = hazardousGroupsFilter
+                        .map(filterId => filterIdToTechGroupString(filterId))
+                        .filter(str => str !== null); // Убираем null значения
+
+                    // Проверяем, есть ли хотя бы одна выбранная группа в активных аттестациях сварщика
+                    return filterStrings.some(filterStr =>
+                        activeTechGroups.includes(filterStr)
                     );
                 });
             }
@@ -283,57 +352,325 @@ function WeldersPage() {
     };
 
 
-    // Подготовка данных для фильтров
-    const buildDepartmentTree = () => {
-        const tree = [];
-        const rootUnits = organizationUnits.filter(unit => !unit.parentId && !unit.parent_id);
+    // Построение иерархии подразделений (аналогично WeldingEquipmentPage)
+    const buildOrganizationHierarchy = () => {
+        if (!organizationUnits || organizationUnits.length === 0) return [];
 
-        rootUnits.forEach(root => {
-            const children = organizationUnits.filter(unit =>
-                (unit.parentId === root.id || unit.parent_id === root.id)
-            );
-            if (children.length > 0) {
-                tree.push({
-                    id: root.id,
-                    label: root.name,
-                    children: children.map(child => ({
-                        id: child.id,
-                        label: child.name
-                    }))
-                });
+        const unitMap = new Map();
+        const rootUnits = [];
+
+        const normalizeId = (id) => {
+            if (id == null) return null;
+            return typeof id === 'string' ? parseInt(id) : id;
+        };
+
+        // Создаем карту всех подразделений с пустыми массивами children
+        organizationUnits.forEach(unit => {
+            const normalizedId = normalizeId(unit.id);
+            unitMap.set(normalizedId, {
+                ...unit,
+                id: normalizedId,
+                name: unit.name,
+                children: []
+            });
+        });
+
+        // Строим дерево
+        organizationUnits.forEach(unit => {
+            const normalizedId = normalizeId(unit.id);
+            const unitNode = unitMap.get(normalizedId);
+
+            let parentIdValue = null;
+            if (unit.parentId != null) {
+                parentIdValue = unit.parentId;
+            } else if (unit.parent_id != null) {
+                parentIdValue = unit.parent_id;
+            } else if (unit.parentDepartment != null && unit.parentDepartment.id != null) {
+                parentIdValue = unit.parentDepartment.id;
+            }
+
+            if (parentIdValue != null) {
+                const normalizedParentId = normalizeId(parentIdValue);
+                if (unitMap.has(normalizedParentId)) {
+                    const parent = unitMap.get(normalizedParentId);
+                    parent.children.push(unitNode);
+                } else {
+                    rootUnits.push(unitNode);
+                }
             } else {
-                tree.push({
-                    id: root.id,
-                    label: root.name
-                });
+                rootUnits.push(unitNode);
             }
         });
-        return tree;
+
+        return rootUnits;
     };
 
-    const departments = buildDepartmentTree();
+    const organizationHierarchy = buildOrganizationHierarchy();
+
+    const toggleOrganizationUnitExpanded = (unitId) => {
+        setExpandedOrganizationUnits(prev => ({
+            ...prev,
+            [unitId]: !prev[unitId]
+        }));
+    };
+
+    // Рекурсивная функция для получения всех дочерних подразделений
+    const getAllChildUnits = (unit) => {
+        const all = [unit];
+        if (unit.children && unit.children.length > 0) {
+            unit.children.forEach(child => {
+                all.push(...getAllChildUnits(child));
+            });
+        }
+        return all;
+    };
+
+    // Функция для переключения подразделения
+    const toggleOrganizationUnit = (unitId) => {
+        const hierarchy = buildOrganizationHierarchy();
+        const unit = hierarchy.find(u => u.id === unitId) ||
+            hierarchy.flatMap(u => getAllChildUnits(u)).find(u => u.id === unitId);
+        if (!unit) return;
+
+        const allChildUnits = getAllChildUnits(unit);
+        const allUnitNames = allChildUnits.map(u => u.name);
+
+        setOrganizationUnitFilter(prev => {
+            const isNoneSelected = prev.length === 1 && prev[0] === '__NONE__';
+            const currentlyChecked = !isNoneSelected && allUnitNames.every(name => prev.includes(name));
+            const willBeChecked = !currentlyChecked;
+
+            if (willBeChecked) {
+                // Выбираем подразделение и все дочерние
+                if (isNoneSelected) {
+                    return allUnitNames;
+                } else {
+                    const newFilter = [...prev];
+                    allUnitNames.forEach(name => {
+                        if (!newFilter.includes(name)) {
+                            newFilter.push(name);
+                        }
+                    });
+                    return newFilter;
+                }
+            } else {
+                // Убираем подразделение и все дочерние
+                const newFilter = prev.filter(name => !allUnitNames.includes(name));
+                if (newFilter.length === 0) {
+                    return ['__NONE__'];
+                }
+                return newFilter;
+            }
+        });
+    };
+
+    // Функция для преобразования ID фильтра в строку формата "ГРУППА: пп. N"
+    const filterIdToTechGroupString = (filterId) => {
+        // Маппинг ID фильтра на название группы и номер пункта
+        const groupMapping = {
+            'PTO': 'ПТО',
+            'KO': 'КО',
+            'GO': 'ГО',
+            'NGDO': 'НГДО',
+            'MO': 'МО',
+            'OKHNVP': 'ОХВВП', // В фильтре OKHNVP, в аттестациях ОХВВП
+            'GDO': 'ГДО',
+            'OTOG': 'ОТОГ',
+            'SK': 'СК',
+            'KSM': 'КСМ'
+        };
+
+        // Парсим ID фильтра (например, "PTO1" -> группа "PTO", номер "1")
+        const match = filterId.match(/^([A-Z]+)(\d+)$/);
+        if (!match) return null;
+
+        const groupCode = match[1];
+        const groupNumber = match[2];
+        const groupName = groupMapping[groupCode];
+
+        if (!groupName) return null;
+
+        return `${groupName}: пп. ${groupNumber}`;
+    };
 
 
-    // Группы опасных произв. объектов (примерная структура, нужно будет адаптировать под реальные данные)
+    // Группы опасных произв. объектов с подгруппами
     const hazardousGroups = [
-        { id: 'all', label: 'Все' },
-        { id: 'PTO', label: 'ПТО', children: [] },
-        { id: 'KO', label: 'КО', children: [
+        {
+            id: 'PTO',
+            label: 'ПТО',
+            children: Array.from({ length: 14 }, (_, i) => ({
+                id: `PTO${i + 1}`,
+                label: `Группа ${i + 1}`
+            }))
+        },
+        {
+            id: 'KO',
+            label: 'КО',
+            children: [
                 { id: 'KO1', label: 'Группа 1' },
                 { id: 'KO2', label: 'Группа 2' },
                 { id: 'KO3', label: 'Группа 3' },
                 { id: 'KO4', label: 'Группа 4' },
                 { id: 'KO5', label: 'Группа 5' }
-            ]},
-        { id: 'GO', label: 'ГО', children: [] },
-        { id: 'NGDO', label: 'НГДО', children: [] },
-        { id: 'MO', label: 'МО', children: [] },
-        { id: 'OKHNVP', label: 'ОХНВП', children: [] },
-        { id: 'GDO', label: 'ГДО', children: [] },
-        { id: 'OTOG', label: 'ОТОГ', children: [] },
-        { id: 'SK', label: 'СК', children: [] },
-        { id: 'KSM', label: 'КСМ', children: [] }
+            ]
+        },
+        {
+            id: 'GO',
+            label: 'ГО',
+            children: Array.from({ length: 7 }, (_, i) => ({
+                id: `GO${i + 1}`,
+                label: `Группа ${i + 1}`
+            }))
+        },
+        {
+            id: 'NGDO',
+            label: 'НГДО',
+            children: Array.from({ length: 13 }, (_, i) => ({
+                id: `NGDO${i + 1}`,
+                label: `Группа ${i + 1}`
+            }))
+        },
+        {
+            id: 'MO',
+            label: 'МО',
+            children: Array.from({ length: 6 }, (_, i) => ({
+                id: `MO${i + 1}`,
+                label: `Группа ${i + 1}`
+            }))
+        },
+        {
+            id: 'OKHNVP',
+            label: 'ОХНВП',
+            children: Array.from({ length: 16 }, (_, i) => ({
+                id: `OKHNVP${i + 1}`,
+                label: `Группа ${i + 1}`
+            }))
+        },
+        {
+            id: 'GDO',
+            label: 'ГДО',
+            children: [
+                { id: 'GDO1', label: 'Группа 1' }
+            ]
+        },
+        {
+            id: 'OTOG',
+            label: 'ОТОГ',
+            children: Array.from({ length: 3 }, (_, i) => ({
+                id: `OTOG${i + 1}`,
+                label: `Группа ${i + 1}`
+            }))
+        },
+        {
+            id: 'SK',
+            label: 'СК',
+            children: Array.from({ length: 4 }, (_, i) => ({
+                id: `SK${i + 1}`,
+                label: `Группа ${i + 1}`
+            }))
+        },
+        {
+            id: 'KSM',
+            label: 'КСМ',
+            children: Array.from({ length: 2 }, (_, i) => ({
+                id: `KSM${i + 1}`,
+                label: `Группа ${i + 1}`
+            }))
+        }
     ];
+
+    const toggleHazardousGroupExpanded = (groupId) => {
+        setExpandedHazardousGroups(prev => ({
+            ...prev,
+            [groupId]: !prev[groupId]
+        }));
+    };
+
+    // Функция для получения всех дочерних групп
+    const getAllChildGroups = (group) => {
+        const all = [group.id];
+        if (group.children && group.children.length > 0) {
+            group.children.forEach(child => {
+                all.push(child.id);
+            });
+        }
+        return all;
+    };
+
+    // Функция для переключения группы или подгруппы
+    const toggleHazardousGroup = (groupId) => {
+        // Ищем группу в основном списке
+        let group = hazardousGroups.find(g => g.id === groupId);
+
+        // Если не найдена в основном списке, ищем в дочерних
+        if (!group) {
+            for (const g of hazardousGroups) {
+                if (g.children) {
+                    const child = g.children.find(c => c.id === groupId);
+                    if (child) {
+                        // Это дочерняя группа - обрабатываем её отдельно
+                        setHazardousGroupsFilter(prev => {
+                            const isNoneSelected = prev.length === 1 && prev[0] === '__NONE__';
+                            const currentlyChecked = !isNoneSelected && prev.includes(groupId);
+                            const willBeChecked = !currentlyChecked;
+
+                            if (willBeChecked) {
+                                if (isNoneSelected) {
+                                    return [groupId];
+                                } else {
+                                    const newFilter = [...prev];
+                                    if (!newFilter.includes(groupId)) {
+                                        newFilter.push(groupId);
+                                    }
+                                    return newFilter;
+                                }
+                            } else {
+                                const newFilter = prev.filter(id => id !== groupId);
+                                if (newFilter.length === 0) {
+                                    return ['__NONE__'];
+                                }
+                                return newFilter;
+                            }
+                        });
+                        return;
+                    }
+                }
+            }
+            return;
+        }
+
+        // Это родительская группа - обрабатываем её и все дочерние
+        const allChildGroups = getAllChildGroups(group);
+
+        setHazardousGroupsFilter(prev => {
+            const isNoneSelected = prev.length === 1 && prev[0] === '__NONE__';
+            const currentlyChecked = !isNoneSelected && allChildGroups.every(id => prev.includes(id));
+            const willBeChecked = !currentlyChecked;
+
+            if (willBeChecked) {
+                // Выбираем группу и все дочерние
+                if (isNoneSelected) {
+                    return allChildGroups;
+                } else {
+                    const newFilter = [...prev];
+                    allChildGroups.forEach(id => {
+                        if (!newFilter.includes(id)) {
+                            newFilter.push(id);
+                        }
+                    });
+                    return newFilter;
+                }
+            } else {
+                // Убираем группу и все дочерние
+                const newFilter = prev.filter(id => !allChildGroups.includes(id));
+                if (newFilter.length === 0) {
+                    return ['__NONE__'];
+                }
+                return newFilter;
+            }
+        });
+    };
 
     return (
         <div className="welders-page">
@@ -374,19 +711,67 @@ function WeldersPage() {
                         </button>
                         {expandedFilters.department && (() => {
                             // Получаем все подразделения (родительские и дочерние) для проверки "Все"
-                            const allDepartmentLabels = [];
-                            departments.forEach(dept => {
-                                allDepartmentLabels.push(dept.label);
-                                if (dept.children) {
-                                    dept.children.forEach(child => {
-                                        allDepartmentLabels.push(child.label);
-                                    });
-                                }
-                            });
+                            const getAllUnitNames = (units) => {
+                                const names = [];
+                                units.forEach(unit => {
+                                    names.push(unit.name);
+                                    if (unit.children && unit.children.length > 0) {
+                                        names.push(...getAllUnitNames(unit.children));
+                                    }
+                                });
+                                return names;
+                            };
+                            const allUnitNames = getAllUnitNames(organizationHierarchy);
                             const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
                             const allSelected = (organizationUnitFilter.length === 0 ||
-                                organizationUnitFilter.length === allDepartmentLabels.length) && !isNoneSelected;
-                            const showAllChecked = organizationUnitFilter.length === 0 && !isNoneSelected; // Если пусто - показываем все как выбранные
+                                organizationUnitFilter.length === allUnitNames.length) && !isNoneSelected;
+                            const showAllChecked = organizationUnitFilter.length === 0 && !isNoneSelected;
+
+                            // Рекурсивная функция для рендеринга подразделений
+                            const renderUnit = (unit, level = 0) => {
+                                const allChildUnits = getAllChildUnits(unit);
+                                const allUnitNamesForUnit = allChildUnits.map(u => u.name);
+                                const isUnitChecked = showAllChecked || (!isNoneSelected && allUnitNamesForUnit.every(name => organizationUnitFilter.includes(name)));
+                                const hasChildren = unit.children && unit.children.length > 0;
+
+                                return (
+                                    <div key={unit.id} className="filter-option-tree">
+                                        <label
+                                            className={`filter-checkbox ${level > 0 ? 'filter-checkbox-child' : ''}`}
+                                            style={{ paddingLeft: level > 0 ? `${20 + (level - 1) * 20}px` : '0' }}
+                                        >
+                                            {hasChildren && (
+                                                <button
+                                                    className="org-unit-expand-btn"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        toggleOrganizationUnitExpanded(unit.id);
+                                                    }}
+                                                >
+                                                    {expandedOrganizationUnits[unit.id] ? (
+                                                        <FaChevronDown className="expand-icon" />
+                                                    ) : (
+                                                        <FaChevronRight className="expand-icon" />
+                                                    )}
+                                                </button>
+                                            )}
+                                            {!hasChildren && <span className="org-unit-spacer" />}
+                                            <input
+                                                type="checkbox"
+                                                checked={isUnitChecked}
+                                                onChange={() => toggleOrganizationUnit(unit.id)}
+                                            />
+                                            <span>{unit.name}</span>
+                                        </label>
+                                        {hasChildren && expandedOrganizationUnits[unit.id] && (
+                                            <div className="filter-sub-options-tree">
+                                                {unit.children.map(child => renderUnit(child, level + 1))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            };
 
                             return (
                                 <div className="filter-tile-content">
@@ -397,7 +782,7 @@ function WeldersPage() {
                                             onChange={(e) => {
                                                 if (e.target.checked) {
                                                     // Выбираем все
-                                                    setOrganizationUnitFilter(allDepartmentLabels);
+                                                    setOrganizationUnitFilter(allUnitNames);
                                                 } else {
                                                     // При снятии галочки с активного "Все" - сбрасываем все галочки
                                                     setOrganizationUnitFilter(['__NONE__']);
@@ -406,139 +791,13 @@ function WeldersPage() {
                                         />
                                         <span>Все</span>
                                     </label>
-                                    {departments.map(dept => (
-                                        <div key={dept.id} className="filter-option">
-                                            {dept.children ? (
-                                                <>
-                                                    <label className="filter-checkbox">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={showAllChecked || organizationUnitFilter.includes(dept.label)}
-                                                            onChange={(e) => {
-                                                                const willBeChecked = e.target.checked;
-                                                                const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
-
-                                                                if (isNoneSelected) {
-                                                                    // Если было "__NONE__", удаляем его и добавляем выбранный элемент
-                                                                    if (willBeChecked) {
-                                                                        setOrganizationUnitFilter([dept.label]);
-                                                                    }
-                                                                } else if (organizationUnitFilter.length === 0) {
-                                                                    // Если массив пустой (все выбрано)
-                                                                    if (willBeChecked) {
-                                                                        // Ставим галочку - ничего не делаем, все уже выбрано
-                                                                        return;
-                                                                    } else {
-                                                                        // Снимаем галочку - выбираем все кроме текущего
-                                                                        const allExceptCurrent = allDepartmentLabels.filter(label => label !== dept.label);
-                                                                        setOrganizationUnitFilter(allExceptCurrent);
-                                                                    }
-                                                                } else {
-                                                                    // Если массив не пустой
-                                                                    if (willBeChecked) {
-                                                                        // Добавляем в фильтр
-                                                                        if (!organizationUnitFilter.includes(dept.label)) {
-                                                                            setOrganizationUnitFilter(prev => [...prev, dept.label]);
-                                                                        }
-                                                                    } else {
-                                                                        // Убираем из фильтра
-                                                                        const newFilter = organizationUnitFilter.filter(label => label !== dept.label);
-                                                                        setOrganizationUnitFilter(newFilter);
-                                                                    }
-                                                                }
-                                                            }}
-                                                        />
-                                                        <span>{dept.label}</span>
-                                                    </label>
-                                                    <div className="filter-sub-options">
-                                                        {dept.children.map(child => (
-                                                            <label key={child.id} className="filter-checkbox sub">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={showAllChecked || organizationUnitFilter.includes(child.label)}
-                                                                    onChange={(e) => {
-                                                                        const willBeChecked = e.target.checked;
-                                                                        const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
-
-                                                                        if (isNoneSelected) {
-                                                                            // Если было "__NONE__", удаляем его и добавляем выбранный элемент
-                                                                            if (willBeChecked) {
-                                                                                setOrganizationUnitFilter([child.label]);
-                                                                            }
-                                                                        } else if (organizationUnitFilter.length === 0) {
-                                                                            // Если массив пустой (все выбрано)
-                                                                            if (willBeChecked) {
-                                                                                // Ставим галочку - ничего не делаем, все уже выбрано
-                                                                                return;
-                                                                            } else {
-                                                                                // Снимаем галочку - выбираем все кроме текущего
-                                                                                const allExceptCurrent = allDepartmentLabels.filter(label => label !== child.label);
-                                                                                setOrganizationUnitFilter(allExceptCurrent);
-                                                                            }
-                                                                        } else {
-                                                                            // Если массив не пустой
-                                                                            if (willBeChecked) {
-                                                                                // Добавляем в фильтр
-                                                                                if (!organizationUnitFilter.includes(child.label)) {
-                                                                                    setOrganizationUnitFilter(prev => [...prev, child.label]);
-                                                                                }
-                                                                            } else {
-                                                                                // Убираем из фильтра
-                                                                                const newFilter = organizationUnitFilter.filter(label => label !== child.label);
-                                                                                setOrganizationUnitFilter(newFilter);
-                                                                            }
-                                                                        }
-                                                                    }}
-                                                                />
-                                                                <span>{child.label}</span>
-                                                            </label>
-                                                        ))}
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <label className="filter-checkbox">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={showAllChecked || organizationUnitFilter.includes(dept.label)}
-                                                        onChange={(e) => {
-                                                            const willBeChecked = e.target.checked;
-                                                            const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
-
-                                                            if (isNoneSelected) {
-                                                                // Если было "__NONE__", удаляем его и добавляем выбранный элемент
-                                                                if (willBeChecked) {
-                                                                    setOrganizationUnitFilter([dept.label]);
-                                                                }
-                                                            } else if (organizationUnitFilter.length === 0) {
-                                                                // Если массив пустой (все выбрано)
-                                                                if (willBeChecked) {
-                                                                    // Ставим галочку - ничего не делаем, все уже выбрано
-                                                                    return;
-                                                                } else {
-                                                                    // Снимаем галочку - выбираем все кроме текущего
-                                                                    const allExceptCurrent = allDepartmentLabels.filter(label => label !== dept.label);
-                                                                    setOrganizationUnitFilter(allExceptCurrent);
-                                                                }
-                                                            } else {
-                                                                // Если массив не пустой
-                                                                if (willBeChecked) {
-                                                                    // Добавляем в фильтр
-                                                                    if (!organizationUnitFilter.includes(dept.label)) {
-                                                                        setOrganizationUnitFilter(prev => [...prev, dept.label]);
-                                                                    }
-                                                                } else {
-                                                                    // Убираем из фильтра
-                                                                    const newFilter = organizationUnitFilter.filter(label => label !== dept.label);
-                                                                    setOrganizationUnitFilter(newFilter);
-                                                                }
-                                                            }
-                                                        }}
-                                                    />
-                                                    <span>{dept.label}</span>
-                                                </label>
-                                            )}
+                                    {organizationHierarchy.length > 0 ? (
+                                        organizationHierarchy.map(unit => renderUnit(unit))
+                                    ) : (
+                                        <div className="filter-checkbox" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
+                                            Нет доступных подразделений
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             );
                         })()}
@@ -553,12 +812,76 @@ function WeldersPage() {
                             <span className="filter-arrow">{expandedFilters.hazardousGroups ? '▾' : '▸'}</span>
                         </button>
                         {expandedFilters.hazardousGroups && (() => {
-                            const allGroupIds = hazardousGroups.filter(g => g.id !== 'all').flatMap(g =>
-                                g.children ? [g.id, ...g.children.map(c => c.id)] : [g.id]
-                            );
+                            // Получаем все группы (родительские и дочерние) для проверки "Все"
+                            const getAllGroupIds = (groups) => {
+                                const ids = [];
+                                groups.forEach(group => {
+                                    ids.push(group.id);
+                                    if (group.children && group.children.length > 0) {
+                                        group.children.forEach(child => {
+                                            ids.push(child.id);
+                                        });
+                                    }
+                                });
+                                return ids;
+                            };
+                            const allGroupIds = getAllGroupIds(hazardousGroups);
                             const isNoneSelected = hazardousGroupsFilter.length === 1 && hazardousGroupsFilter[0] === '__NONE__';
                             const isAllSelected = (hazardousGroupsFilter.length === 0 || hazardousGroupsFilter.length === allGroupIds.length) && !isNoneSelected;
                             const showAllChecked = hazardousGroupsFilter.length === 0 && !isNoneSelected;
+
+                            // Рекурсивная функция для рендеринга групп
+                            const renderGroup = (group, level = 0) => {
+                                const hasChildren = group.children && group.children.length > 0;
+
+                                // Для родительских групп проверяем, выбраны ли все дочерние
+                                let isGroupChecked;
+                                if (hasChildren) {
+                                    const allChildGroups = getAllChildGroups(group);
+                                    isGroupChecked = showAllChecked || (!isNoneSelected && allChildGroups.every(id => hazardousGroupsFilter.includes(id)));
+                                } else {
+                                    // Для дочерних групп проверяем только саму группу
+                                    isGroupChecked = showAllChecked || (!isNoneSelected && hazardousGroupsFilter.includes(group.id));
+                                }
+
+                                return (
+                                    <div key={group.id} className="filter-option-tree">
+                                        <label
+                                            className={`filter-checkbox ${level > 0 ? 'filter-checkbox-child' : ''}`}
+                                            style={{ paddingLeft: level > 0 ? `${20 + (level - 1) * 20}px` : '0' }}
+                                        >
+                                            {hasChildren && (
+                                                <button
+                                                    className="org-unit-expand-btn"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        toggleHazardousGroupExpanded(group.id);
+                                                    }}
+                                                >
+                                                    {expandedHazardousGroups[group.id] ? (
+                                                        <FaChevronDown className="expand-icon" />
+                                                    ) : (
+                                                        <FaChevronRight className="expand-icon" />
+                                                    )}
+                                                </button>
+                                            )}
+                                            {!hasChildren && <span className="org-unit-spacer" />}
+                                            <input
+                                                type="checkbox"
+                                                checked={isGroupChecked}
+                                                onChange={() => toggleHazardousGroup(group.id)}
+                                            />
+                                            <span>{group.label}</span>
+                                        </label>
+                                        {hasChildren && expandedHazardousGroups[group.id] && (
+                                            <div className="filter-sub-options-tree">
+                                                {group.children.map(child => renderGroup(child, level + 1))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            };
 
                             return (
                                 <div className="filter-tile-content">
@@ -568,94 +891,23 @@ function WeldersPage() {
                                             checked={isAllSelected}
                                             onChange={(e) => {
                                                 if (e.target.checked) {
+                                                    // Выбираем все
                                                     setHazardousGroupsFilter(allGroupIds);
                                                 } else {
+                                                    // При снятии галочки с активного "Все" - сбрасываем все галочки
                                                     setHazardousGroupsFilter(['__NONE__']);
                                                 }
                                             }}
                                         />
                                         <span>Все</span>
                                     </label>
-                                    {hazardousGroups.filter(g => g.id !== 'all').map(group => {
-                                        const hasChildren = group.children && group.children.length > 0;
-                                        const isGroupChecked = showAllChecked || hazardousGroupsFilter.includes(group.id);
-
-                                        return (
-                                            <div key={group.id}>
-                                                <label className="filter-checkbox">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isGroupChecked}
-                                                        onChange={(e) => {
-                                                            const willBeChecked = e.target.checked;
-                                                            const isNoneSelected = hazardousGroupsFilter.length === 1 && hazardousGroupsFilter[0] === '__NONE__';
-
-                                                            if (isNoneSelected) {
-                                                                if (willBeChecked) {
-                                                                    setHazardousGroupsFilter([group.id]);
-                                                                }
-                                                            } else if (hazardousGroupsFilter.length === 0) {
-                                                                if (!willBeChecked) {
-                                                                    const allExceptCurrent = allGroupIds.filter(id => id !== group.id);
-                                                                    setHazardousGroupsFilter(allExceptCurrent);
-                                                                }
-                                                            } else {
-                                                                if (willBeChecked) {
-                                                                    if (!hazardousGroupsFilter.includes(group.id)) {
-                                                                        setHazardousGroupsFilter(prev => [...prev, group.id]);
-                                                                    }
-                                                                } else {
-                                                                    const newFilter = hazardousGroupsFilter.filter(id => id !== group.id);
-                                                                    setHazardousGroupsFilter(newFilter);
-                                                                }
-                                                            }
-                                                        }}
-                                                    />
-                                                    <span>{group.label}</span>
-                                                </label>
-                                                {hasChildren && (
-                                                    <div className="filter-sub-options">
-                                                        {group.children.map(child => {
-                                                            const isChildChecked = showAllChecked || hazardousGroupsFilter.includes(child.id);
-                                                            return (
-                                                                <label key={child.id} className="filter-checkbox sub">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={isChildChecked}
-                                                                        onChange={(e) => {
-                                                                            const willBeChecked = e.target.checked;
-                                                                            const isNoneSelected = hazardousGroupsFilter.length === 1 && hazardousGroupsFilter[0] === '__NONE__';
-
-                                                                            if (isNoneSelected) {
-                                                                                if (willBeChecked) {
-                                                                                    setHazardousGroupsFilter([child.id]);
-                                                                                }
-                                                                            } else if (hazardousGroupsFilter.length === 0) {
-                                                                                if (!willBeChecked) {
-                                                                                    const allExceptCurrent = allGroupIds.filter(id => id !== child.id);
-                                                                                    setHazardousGroupsFilter(allExceptCurrent);
-                                                                                }
-                                                                            } else {
-                                                                                if (willBeChecked) {
-                                                                                    if (!hazardousGroupsFilter.includes(child.id)) {
-                                                                                        setHazardousGroupsFilter(prev => [...prev, child.id]);
-                                                                                    }
-                                                                                } else {
-                                                                                    const newFilter = hazardousGroupsFilter.filter(id => id !== child.id);
-                                                                                    setHazardousGroupsFilter(newFilter);
-                                                                                }
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                    <span>{child.label}</span>
-                                                                </label>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                                    {hazardousGroups.length > 0 ? (
+                                        hazardousGroups.map(group => renderGroup(group))
+                                    ) : (
+                                        <div className="filter-checkbox" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
+                                            Нет доступных групп
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })()}
@@ -671,7 +923,10 @@ function WeldersPage() {
                             </button>
                         </div>
                         <div className="naks-register-tile">
-                            <button className="naks-register-btn" onClick={() => {}}>
+                            <button
+                                className="naks-register-btn"
+                                onClick={() => window.open('https://naks.ru/registry/personal/', '_blank')}
+                            >
                                 Открыть реестр НАКС
                             </button>
                         </div>
@@ -700,33 +955,68 @@ function WeldersPage() {
                             <thead>
                             <tr>
                                 <th></th>
-                                <th onClick={() => toggleSort('name')}>
+                                <th
+                                    onClick={() => toggleSort('name')}
+                                    className={sortField === 'name' ? 'sort-active' : ''}
+                                >
                                     <span>Сварщик</span>
-                                    <span className="sort-arrow">▾</span>
+                                    <span className={`sort-arrow ${sortField === 'name' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'name' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
                                 </th>
-                                <th onClick={() => toggleSort('employeeId')}>
+                                <th
+                                    onClick={() => toggleSort('employeeId')}
+                                    className={sortField === 'employeeId' ? 'sort-active' : ''}
+                                >
                                     <span>Таб. №</span>
-                                    <span className="sort-arrow">▾</span>
+                                    <span className={`sort-arrow ${sortField === 'employeeId' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'employeeId' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
                                 </th>
-                                <th onClick={() => toggleSort('grade')}>
+                                <th
+                                    onClick={() => toggleSort('grade')}
+                                    className={sortField === 'grade' ? 'sort-active' : ''}
+                                >
                                     <span>Разряд</span>
-                                    <span className="sort-arrow">▾</span>
+                                    <span className={`sort-arrow ${sortField === 'grade' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'grade' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
                                 </th>
-                                <th onClick={() => toggleSort('position')}>
+                                <th
+                                    onClick={() => toggleSort('position')}
+                                    className={sortField === 'position' ? 'sort-active' : ''}
+                                >
                                     <span>Должность</span>
-                                    <span className="sort-arrow">▾</span>
+                                    <span className={`sort-arrow ${sortField === 'position' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'position' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
                                 </th>
-                                <th onClick={() => toggleSort('unit')}>
+                                <th
+                                    onClick={() => toggleSort('unit')}
+                                    className={sortField === 'unit' ? 'sort-active' : ''}
+                                >
                                     <span>Подразделение</span>
-                                    <span className="sort-arrow">▾</span>
+                                    <span className={`sort-arrow ${sortField === 'unit' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'unit' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
                                 </th>
-                                <th onClick={() => toggleSort('admissionType')}>
+                                <th
+                                    onClick={() => toggleSort('admissionType')}
+                                    className={`admission-type-header ${sortField === 'admissionType' ? 'sort-active' : ''}`}
+                                >
                                     <span>Вид допуска</span>
-                                    <span className="sort-arrow">▾</span>
+                                    <span className={`sort-arrow ${sortField === 'admissionType' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'admissionType' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
                                 </th>
-                                <th onClick={() => toggleSort('status')}>
+                                <th
+                                    onClick={() => toggleSort('status')}
+                                    className={sortField === 'status' ? 'sort-active' : ''}
+                                >
                                     <span>Статус</span>
-                                    <span className="sort-arrow">▾</span>
+                                    <span className={`sort-arrow ${sortField === 'status' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'status' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
                                 </th>
                             </tr>
                             </thead>
@@ -751,8 +1041,8 @@ function WeldersPage() {
                                         <td>{welder.employeeId || welder.tabNumber || 'Не указан'}</td>
                                         <td>{welder.grade || 'Не указан'}</td>
                                         <td>{welder.position || 'Не указана'}</td>
-                                        <td>{welder.organizationUnit?.name || welder.department || 'Не указано'}</td>
-                                        <td>{welder.admissionType || 'Не указан'}</td>
+                                        <td>{getOrganizationUnitName(welder)}</td>
+                                        <td className="admission-type-cell">{welder.admissionType || 'Не указан'}</td>
                                         <td>
                                                 <span
                                                     className={`status-badge ${statusDisplay.className}`}

@@ -5,9 +5,10 @@
     gap: 8px;
     padding: 10px 14px 10px 14px;
     margin: 0;
+    height: 100%;
     background: radial-gradient(circle at 18% 12%, rgba(35, 58, 92, 0.28), rgba(11, 18, 33, 0.92) 54%), #122536;
     color: #f0f4ff;
-    overflow: hidden;
+    overflow: auto;
     overflow-x: hidden;
     min-height: 0;
     box-sizing: border-box;
@@ -81,8 +82,8 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 18px;
-    font-weight: 500;
+    font-size: 22px;
+    font-weight: 700;
     letter-spacing: 0.06em;
     padding: 0;
     margin: 0;
@@ -95,9 +96,9 @@
 }
 
 .machine-title-accent {
-    color: #DC6F1C;
+    color: #fbb56b;
     font-family: 'PFDinDisplayPro', 'Rajdhani', sans-serif;
-    font-weight: 400;
+    font-weight: 700;
 }
 
 .machine-info-tiles {
@@ -969,6 +970,33 @@
 .date-text {
     text-align: center;
     text-decoration: underline;
+}
+
+.info-content {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.info-label {
+    color: #B8C2CE;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.info-value {
+    color: #f0f4ff;
+    font-size: 14px;
+    font-weight: 400;
 }
 
 .telemetry-list {

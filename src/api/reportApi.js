@@ -294,6 +294,104 @@ export const reportApi = {
             console.error('Ошибка генерации отчета:', error);
             throw error;
         }
+    },
+
+    // Генерация отчета по расходу проволоки
+    generateWireConsumptionReport: async (templateId, periodStartDate, periodEndDate, periodStartTime, periodEndTime) => {
+        try {
+            const requestBody = {
+                templateId: templateId,
+                periodStartDate: periodStartDate,
+                periodEndDate: periodEndDate,
+                periodStartTime: periodStartTime,
+                periodEndTime: periodEndTime
+            };
+
+            const response = await fetch(`${BASE_URL}/wire-consumption/generate`, {
+                method: 'POST',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'wire_consumption_report.xlsx';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
+
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Ошибка генерации отчета по расходу проволоки:', error);
+            throw error;
+        }
+    },
+
+    // Генерация отчета по работе сварщика
+    generateWelderWorkReport: async (templateId, periodStartDate, periodEndDate, periodStartTime, periodEndTime) => {
+        try {
+            const requestBody = {
+                templateId: templateId,
+                periodStartDate: periodStartDate,
+                periodEndDate: periodEndDate,
+                periodStartTime: periodStartTime,
+                periodEndTime: periodEndTime
+            };
+
+            const response = await fetch(`${BASE_URL}/welder-work/generate`, {
+                method: 'POST',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'welder_work_report.xlsx';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
+
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Ошибка генерации отчета по работе сварщика:', error);
+            throw error;
+        }
     }
 };
 

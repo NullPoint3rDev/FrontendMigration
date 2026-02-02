@@ -1,16 +1,8 @@
 import React from 'react';
-import '../styles/plugPage.css';
-import AboutPlug from '../images/AboutPlug.jpg';
+import UnderDevelopmentPage from './UnderDevelopmentPage';
 
 const AboutPage = () => {
-    return (
-        <div className="plug-page">
-            <div className="plug-image-container">
-                <img src={AboutPlug} alt="О программе" className="plug-image" />
-            </div>
-            <div className="plug-text">Пока не доварили</div>
-        </div>
-    );
+    return <UnderDevelopmentPage />;
 };
 
 export default AboutPage;

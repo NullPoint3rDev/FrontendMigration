@@ -128,6 +128,9 @@ const DeviceMonitorPage = () => {
     // Состояние для отображения списка телеметрии
     const [isTelemetryListExpanded, setIsTelemetryListExpanded] = useState(true);
 
+    // Состояние для активной вкладки (Графики/Информация)
+    const [activeTab, setActiveTab] = useState('graphs');
+
     // Состояние для хранения ID аппарата (для удаления)
     const [machineId, setMachineId] = useState(null);
 
@@ -793,6 +796,10 @@ const DeviceMonitorPage = () => {
 
                 // Извлекаем ВСЕ параметры из структурированных данных
                 console.log('🔍 Все ключи properties:', Object.keys(data.state.properties || {}));
+                // Проверяем наличие RFID.Hex в исходных данных
+                if (data.state.properties && data.state.properties['RFID.Hex']) {
+                    console.log('🔍 Найден RFID.Hex в properties:', data.state.properties['RFID.Hex']);
+                }
                 Object.entries(data.state.properties).forEach(([key, prop]) => {
                     if (prop && prop.value) {
                         // Обрабатываем все параметры Core
@@ -837,11 +844,12 @@ const DeviceMonitorPage = () => {
                         } else if (key === 'Flags') {
                             // Флаги
                             params[key] = prop.value;
-                        } else if (key === 'RFID' || key === 'Rfid' || key === 'rfid' || key === 'RFIDCode' || key === 'RfidCode') {
+                        } else if (key === 'RFID' || key === 'Rfid' || key === 'rfid' || key === 'RFIDCode' || key === 'RfidCode' || key === 'RFID.Hex') {
                             // RFID код
                             params[key] = prop.value;
                             // Также сохраняем как RFID для единообразия
                             params.RFID = prop.value;
+                            console.log(`🔍 Сохранен RFID код: key="${key}", value="${prop.value}"`);
                         } else if (key === 'State.I' || key === 'State.U') {
                             // Старые параметры (для совместимости)
                             const decimalValue = parseInt(prop.value, 16);
@@ -869,6 +877,25 @@ const DeviceMonitorPage = () => {
                 console.log('🔍 processStructuredData - finalStatus:', finalStatus);
                 console.log('🔍 processStructuredData - data.state.status:', data.state.status);
                 console.log('🔍 processStructuredData - params.status:', params.status);
+
+                // Сохраняем RFID код из предыдущих данных, если он не пришел в новом ответе
+                const existingData = deviceData[mac];
+                if (existingData && existingData.RFID && !params.RFID) {
+                    params.RFID = existingData.RFID;
+                    console.log('🔍 Сохраняем RFID из предыдущих данных:', existingData.RFID);
+                }
+                if (existingData && existingData['RFID.Hex'] && !params['RFID.Hex']) {
+                    params['RFID.Hex'] = existingData['RFID.Hex'];
+                    console.log('🔍 Сохраняем RFID.Hex из предыдущих данных:', existingData['RFID.Hex']);
+                }
+
+                // Логируем сохранение RFID перед обновлением
+                if (params.RFID) {
+                    console.log('🔍 Сохраняем RFID в deviceData:', params.RFID);
+                }
+                if (params['RFID.Hex']) {
+                    console.log('🔍 Сохраняем RFID.Hex в deviceData:', params['RFID.Hex']);
+                }
 
                 updateDeviceData({
                     [mac]: {
@@ -1666,12 +1693,32 @@ const DeviceMonitorPage = () => {
     const getRfidCode = () => {
         if (Object.keys(deviceData).length === 0 || !hasData) return null;
         const data = deviceData[machineMac];
-        if (!data) return null;
+        if (!data) {
+            console.log('🔍 getRfidCode: data is null');
+            return null;
+        }
+
+        console.log('🔍 getRfidCode: проверяем данные:', {
+            hasRFID: !!data.RFID,
+            hasRfid: !!data.Rfid,
+            hasrfid: !!data.rfid,
+            hasRFIDCode: !!data.RFIDCode,
+            hasRfidCode: !!data.RfidCode,
+            hasrfidCode: !!data.rfidCode,
+            hasRFIDHex: !!data['RFID.Hex'],
+            hasProperties: !!data.properties,
+            propertiesKeys: data.properties ? Object.keys(data.properties) : null
+        });
 
         // Пробуем разные возможные названия поля для RFID кода
         const rfidCode = data.RFID || data.Rfid || data.rfid || data.RFIDCode || data.RfidCode ||
             data.rfidCode || data['RFID'] || data['Rfid'] || data['RFID Code'] ||
+            data['RFID.Hex'] ||
+            data.properties?.RFID?.value || data.properties?.Rfid?.value || data.properties?.rfid?.value ||
+            data.properties?.['RFID.Hex']?.value || data.properties?.['RFID.Hex'] ||
             data.properties?.RFID || data.properties?.Rfid || data.properties?.rfid;
+
+        console.log('🔍 getRfidCode: найденный код:', rfidCode);
 
         if (rfidCode && rfidCode !== 'null' && String(rfidCode).trim() !== '') {
             return String(rfidCode).trim();
@@ -2123,10 +2170,20 @@ const DeviceMonitorPage = () => {
                         {isTelemetryListExpanded && (
                             <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
                                 <div className="tabs">
-                                    <button className="tab active">Графики</button>
-                                    <button className="tab">Информация</button>
+                                    <button
+                                        className={`tab ${activeTab === 'graphs' ? 'active' : ''}`}
+                                        onClick={() => setActiveTab('graphs')}
+                                    >
+                                        Графики
+                                    </button>
+                                    <button
+                                        className={`tab ${activeTab === 'info' ? 'active' : ''}`}
+                                        onClick={() => setActiveTab('info')}
+                                    >
+                                        Информация
+                                    </button>
                                 </div>
-                                {telemetryChannels.map((channel) => (
+                                {activeTab === 'graphs' && telemetryChannels.map((channel) => (
                                     <div
                                         key={channel.label}
                                         className={`telemetry-item ${channel.active ? 'active' : ''}`}
@@ -2152,102 +2209,116 @@ const DeviceMonitorPage = () => {
                                         </div>
                                     </div>
                                 ))}
+                                {activeTab === 'info' && (
+                                    <div className="info-content">
+                                        <div className="info-item">
+                                            <span className="info-label">RFID код:</span>
+                                            <span className="info-value">{getRfidCode() || 'Не указан'}</span>
+                                        </div>
+                                        <div className="info-item">
+                                            <span className="info-label">MAC адрес:</span>
+                                            <span className="info-value">{machineMac}</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
-                    <div className="chart-stack">
-                        <div className="chart-card large">
-                            <div className="chart-card__header">
-                                <div>
+                    {activeTab === 'graphs' && (
+                        <div className="chart-stack">
+                            <div className="chart-card large">
+                                <div className="chart-card__header">
+                                    <div>
+                                    </div>
+                                </div>
+                                <div className="chart-wrapper">
+                                    <div className="chart-canvas">
+                                        <Line
+                                            data={getCurrentChartData()}
+                                            options={getChartOptions(0, 500, 'Ток (А)', 350, '350A')}
+                                            ref={(chart) => {
+                                                if (chart && chart.canvas) {
+                                                    chart.canvas.id = 'current-chart';
+                                                    currentChartInstanceRef.current = chart;
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="chart-axis">
+                                        <span>08:00</span>
+                                        <span>10:00</span>
+                                        <span>12:00</span>
+                                        <span>14:00</span>
+                                        <span>16:00</span>
+                                        <span>18:00</span>
+                                        <span>20:00</span>
+                                        <span>22:00</span>
+                                    </div>
+                                </div>
+                                <div className="chart-controls">
+                                    <button type="button" className="chart-control-btn" title="Увеличить">
+                                        <span>+</span>
+                                    </button>
+                                    <button type="button" className="chart-control-btn" title="Уменьшить">
+                                        <span>−</span>
+                                    </button>
+                                    <button type="button" className="chart-control-btn" title="Обновить">
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                            <path d="M7 1V3M7 11V13M1 7H3M11 7H13M2.343 2.343L3.757 3.757M10.243 10.243L11.657 11.657M2.343 11.657L3.757 10.243M10.243 3.757L11.657 2.343" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                            <circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
-                            <div className="chart-wrapper">
-                                <div className="chart-canvas">
-                                    <Line
-                                        data={getCurrentChartData()}
-                                        options={getChartOptions(0, 500, 'Ток (А)', 350, '350A')}
-                                        ref={(chart) => {
-                                            if (chart && chart.canvas) {
-                                                chart.canvas.id = 'current-chart';
-                                                currentChartInstanceRef.current = chart;
-                                            }
-                                        }}
-                                    />
-                                </div>
-                                <div className="chart-axis">
-                                    <span>08:00</span>
-                                    <span>10:00</span>
-                                    <span>12:00</span>
-                                    <span>14:00</span>
-                                    <span>16:00</span>
-                                    <span>18:00</span>
-                                    <span>20:00</span>
-                                    <span>22:00</span>
-                                </div>
-                            </div>
-                            <div className="chart-controls">
-                                <button type="button" className="chart-control-btn" title="Увеличить">
-                                    <span>+</span>
-                                </button>
-                                <button type="button" className="chart-control-btn" title="Уменьшить">
-                                    <span>−</span>
-                                </button>
-                                <button type="button" className="chart-control-btn" title="Обновить">
-                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                        <path d="M7 1V3M7 11V13M1 7H3M11 7H13M2.343 2.343L3.757 3.757M10.243 10.243L11.657 11.657M2.343 11.657L3.757 10.243M10.243 3.757L11.657 2.343" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                                        <circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
 
-                        <div className="chart-card medium">
-                            <div className="chart-card__header">
-                                <div>
+                            <div className="chart-card medium">
+                                <div className="chart-card__header">
+                                    <div>
+                                    </div>
+                                    <div className="chart-legend">
+                                    </div>
                                 </div>
-                                <div className="chart-legend">
+                                <div className="chart-wrapper">
+                                    <div className="chart-canvas">
+                                        <Line
+                                            data={getVoltageChartData()}
+                                            options={getChartOptions(0, 50.0, 'Напряжение (В)', 35, '35В')}
+                                            ref={(chart) => {
+                                                if (chart && chart.canvas) {
+                                                    chart.canvas.id = 'voltage-chart';
+                                                    voltageChartInstanceRef.current = chart;
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="chart-axis">
+                                        <span>08:00</span>
+                                        <span>10:00</span>
+                                        <span>12:00</span>
+                                        <span>14:00</span>
+                                        <span>16:00</span>
+                                        <span>18:00</span>
+                                        <span>20:00</span>
+                                        <span>22:00</span>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="chart-wrapper">
-                                <div className="chart-canvas">
-                                    <Line
-                                        data={getVoltageChartData()}
-                                        options={getChartOptions(0, 50.0, 'Напряжение (В)', 35, '35В')}
-                                        ref={(chart) => {
-                                            if (chart && chart.canvas) {
-                                                chart.canvas.id = 'voltage-chart';
-                                                voltageChartInstanceRef.current = chart;
-                                            }
-                                        }}
-                                    />
+                                <div className="chart-controls">
+                                    <button type="button" className="chart-control-btn" title="Увеличить">
+                                        <span>+</span>
+                                    </button>
+                                    <button type="button" className="chart-control-btn" title="Уменьшить">
+                                        <span>−</span>
+                                    </button>
+                                    <button type="button" className="chart-control-btn" title="Обновить">
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                            <path d="M7 1V3M7 11V13M1 7H3M11 7H13M2.343 2.343L3.757 3.757M10.243 10.243L11.657 11.657M2.343 11.657L3.757 10.243M10.243 3.757L11.657 2.343" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                            <circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                                        </svg>
+                                    </button>
                                 </div>
-                                <div className="chart-axis">
-                                    <span>08:00</span>
-                                    <span>10:00</span>
-                                    <span>12:00</span>
-                                    <span>14:00</span>
-                                    <span>16:00</span>
-                                    <span>18:00</span>
-                                    <span>20:00</span>
-                                    <span>22:00</span>
-                                </div>
-                            </div>
-                            <div className="chart-controls">
-                                <button type="button" className="chart-control-btn" title="Увеличить">
-                                    <span>+</span>
-                                </button>
-                                <button type="button" className="chart-control-btn" title="Уменьшить">
-                                    <span>−</span>
-                                </button>
-                                <button type="button" className="chart-control-btn" title="Обновить">
-                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                        <path d="M7 1V3M7 11V13M1 7H3M11 7H13M2.343 2.343L3.757 3.757M10.243 10.243L11.657 11.657M2.343 11.657L3.757 10.243M10.243 3.757L11.657 2.343" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                                        <circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                                    </svg>
-                                </button>
                             </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </section>
         </main>

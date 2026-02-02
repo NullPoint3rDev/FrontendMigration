@@ -107,6 +107,10 @@
     overflow: hidden;
 }
 
+.add-welder-content > .certifications-section {
+    margin-top: 1px;
+}
+
 .profile-section {
     background: transparent;
     border-radius: 0;
@@ -174,13 +178,14 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 0px;
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    margin-bottom: 2px;
 }
 
 .form-group label {
@@ -236,6 +241,130 @@
     font-size: 12px;
 }
 
+/* Unit Select Dropdown Styles */
+.unit-select-container {
+    position: relative;
+    width: 100%;
+}
+
+.unit-select-dropdown {
+    position: relative;
+    width: 100%;
+    padding: 8px 12px;
+    background: #1B1622;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+    min-height: 38px;
+}
+
+.unit-select-dropdown:hover {
+    border-color: rgba(123, 139, 166, 0.8);
+}
+
+.unit-select-dropdown.error {
+    border-color: #EC2B3C;
+}
+
+.unit-select-label {
+    color: #f0f4ff;
+    font-size: 13px;
+    flex: 1;
+    text-align: left;
+}
+
+.unit-select-arrow {
+    color: #7B8BA6;
+    font-size: 10px;
+    margin-right: -9px;
+    transition: transform 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.unit-select-arrow.open {
+    transform: rotate(180deg);
+}
+
+.unit-select-options {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: #1B1622;
+    border: none;
+    border-radius: 3px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.unit-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    padding-right: 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    color: #f0f4ff;
+    font-size: 13px;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.unit-option-child {
+    /* Дочерние элементы имеют marginLeft через inline style */
+}
+
+.unit-option:hover {
+    background: #484A5D;
+}
+
+.unit-option.selected {
+    background: rgba(246, 178, 67, 0.1);
+    color: #F6B243;
+}
+
+.unit-option-name {
+    flex: 1;
+}
+
+.unit-children {
+    /* Дочерние элементы уже имеют marginLeft через renderUnitOption */
+}
+
+/* Используем стили из organizationUnitsList для кнопок раскрытия */
+.unit-select-container .org-unit-expand-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: #6C7386;
+    transition: color 0.2s ease;
+}
+
+.unit-select-container .org-unit-expand-btn:hover {
+    color: #9CA3B8;
+}
+
+.unit-select-container .org-unit-expand-btn .expand-icon {
+    font-size: 12px;
+}
+
 .save-btn {
     width: 100%;
     padding: 8px 12px !important;
@@ -262,7 +391,8 @@
     flex-shrink: 0;
     background: #122536;
     border-radius: 3px;
-    padding: 16px;
+    padding: 14px;
+    padding-bottom: 2px;
     box-shadow: none;
     align-items: flex-start;
 }
@@ -294,9 +424,14 @@
 
 .rfid-header h2 {
     margin: 0;
-    font-size: 16px;
-    font-weight: 500;
-    color: #F9F3FD;
+    font-size: 13px;
+    font-weight: 100;
+    color: #6C7386;
+}
+
+.rfid-header .add-btn {
+    background: #1A1420 !important;
+    white-space: nowrap;
 }
 
 .section {
@@ -312,10 +447,9 @@
 .certifications-section,
 .machines-section {
     flex: 1;
-    min-height: 0;
     background: #1A1420 !important;
     border-radius: 3px;
-    padding: 16px;
+    padding: 14px;
     box-shadow: none;
 }
 
@@ -340,6 +474,11 @@
     flex-shrink: 0;
 }
 
+.machines-section .section-actions-only {
+    justify-content: space-between;
+    align-items: center;
+}
+
 .section-actions {
     display: flex;
     gap: 12px;
@@ -349,7 +488,7 @@
     padding: 6px 32px;
     background: #122536 !important;
     border: none;
-    border-radius: 3px;
+    border-radius: 3px !important;
     color: #d9d6df;
     font-size: 13px;
     cursor: pointer;
@@ -357,7 +496,7 @@
 }
 
 .naks-btn {
-    padding: 6px 32px;
+    padding: 6px 32px !important;
     background: #122536 !important;
     border: none;
     border-radius: 3px;
@@ -368,40 +507,44 @@
 }
 
 .delete-btn {
-    padding: 6px 50px !important;
+    padding: 6px 12px !important;
     background: #122536 !important;
     border: none !important;
     border-radius: 3px !important;
     color: #ffffff;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    font-size: 13px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+
+.machines-section .delete-btn {
+    padding: 6px 24px !important;
+    min-width: 100px;
 }
 
 .delete-btn:hover {
-    background: #122536;
+    background: #122536 !important;
 }
 
 .rfid-list {
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: 8px;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     background: #1A1420;
     border-radius: 3px;
-    padding: 67px;
+    padding: 12px;
 }
 
 .rfid-item {
     background: #122536;
-    padding: 8px;
-    border-radius: 0;
-}
-
-.rfid-item:nth-child(even) {
-    background: #1A1420;
+    padding: 10px 12px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 .scrollable-section {
@@ -430,27 +573,68 @@
 
 /* Дубликат удален - используется стиль выше */
 
+.rfid-checkbox {
+    width: 16px !important;
+    height: 16px !important;
+    cursor: pointer !important;
+    accent-color: #F6B243 !important;
+    background-color: #1B1622 !important;
+    border: 1px solid rgba(87, 77, 95, 0.6) !important;
+    border-radius: 3px !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    position: relative !important;
+    margin: 0 !important;
+    flex-shrink: 0;
+}
+
+.rfid-checkbox:checked {
+    background-color: #1B1622 !important;
+    border-color: #F6B243 !important;
+}
+
+.rfid-checkbox:checked::after {
+    content: '✓' !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    color: #F6B243 !important;
+    font-size: 12px !important;
+    font-weight: bold !important;
+}
+
 .rfid-icon {
-    font-size: 18px;
+    font-size: 20px;
+    color: #FF8C42;
+    flex-shrink: 0;
 }
 
 .rfid-code {
     flex: 1;
-    color: #d9d6df;
+    color: #F9F3FD;
     font-size: 13px;
+    font-weight: 500;
 }
 
 .delete-btn-small {
-    background: transparent;
-    border: none;
-    color: #122536 !important;
-    cursor: pointer;
-    font-size: 16px;
+    background: transparent !important;
+    border: none !important;
+    color: #6C7386 !important;
+    cursor: pointer !important;
+    font-size: 14px;
     padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: color 0.2s ease;
 }
 
 .delete-btn-small:hover {
-    opacity: 0.8;
+    color: #d9d6df !important;
+    opacity: 1 !important;
 }
 
 .certifications-table,
@@ -502,6 +686,50 @@
 
 .certifications-table tbody tr {
     background-color: #1A1420;
+}
+
+/* Стили для чекбоксов в таблице аппаратов (как в фильтрах на странице Сварщики) */
+.machine-table-checkbox {
+    width: 16px !important;
+    height: 16px !important;
+    cursor: pointer !important;
+    accent-color: #F0B942 !important;
+    flex-shrink: 0 !important;
+    background-color: #1A1420 !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    border: 1px solid rgba(87, 77, 95, 0.6) !important;
+    border-radius: 2px !important;
+    margin: 0 !important;
+}
+
+.machine-table-checkbox:checked {
+    background-color: #1A1420 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23F0B942' d='M10 3L4.5 8.5L2 6' stroke='%23F0B942' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: 10px 10px !important;
+    border-color: #F0B942 !important;
+}
+
+/* Чередование цветов строк в таблице аппаратов (как на странице Сварочное оборудование) */
+.machines-table tbody tr.machine-table-row-odd {
+    background-color: #122536 !important;
+}
+
+.machines-table tbody tr.machine-table-row-even {
+    background-color: #1A1420 !important;
+}
+
+.machines-table tbody tr.machine-table-row-odd:hover,
+.machines-table tbody tr.machine-table-row-even:hover {
+    background-color: rgba(45, 37, 54, 0.4) !important;
+}
+
+/* Цвет для слова PULSE (как на странице Сварочное оборудование) */
+.model-part-second {
+    color: #DC6F1C !important;
 }
 
 .certifications-table tbody tr:nth-child(even) {

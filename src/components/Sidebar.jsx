@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { FaChevronDown, FaChevronRight } from 'react-icons/fa'
 import '../styles/sidebar.css'
 import WTLogo from '../images/WTLogo.png'
 import MainPageLogo from '../images/MainPageLogo.png'
@@ -13,8 +14,27 @@ import AboutLogo from '../images/AboutLogo.png'
 const Sidebar = () => {
     const navigate = useNavigate()
     const location = useLocation()
+    const [expandedGroups, setExpandedGroups] = useState({
+        enterprise: true,  // По умолчанию раскрыто
+        resources: true   // По умолчанию раскрыто
+    })
 
-    const isActive = (path) => location.pathname === path
+    const isActive = (path) => {
+        if (path === '/') {
+            return location.pathname === '/'
+        }
+        return location.pathname === path || location.pathname.startsWith(path + '/')
+    }
+
+    // Группы всегда остаются раскрытыми, но можно вручную свернуть/развернуть
+    // useEffect больше не нужен, так как по умолчанию они раскрыты
+
+    const toggleGroup = (groupName) => {
+        setExpandedGroups(prev => ({
+            ...prev,
+            [groupName]: !prev[groupName]
+        }))
+    }
 
     return (
         <aside className="sidebar">
@@ -29,84 +49,105 @@ const Sidebar = () => {
             </div>
 
             <nav className="sidebar-menu" aria-label="Основная навигация">
-                <button className="menu-link" onClick={() => navigate('/')}>
+                <button
+                    className={`menu-link ${isActive('/') ? 'active' : ''}`}
+                    onClick={() => navigate('/')}
+                >
                     <img src={MainPageLogo} alt="Главная" className="menu-icon" />
                     <span className="menu-text">Главная</span>
                 </button>
 
                 <div className={`menu-group ${isActive('/enterprise-map') || isActive('/welders') || isActive('/employees') ? 'active' : ''}`}>
-                    <button className="menu-link expanded">
+                    <button
+                        className={`menu-link ${expandedGroups.enterprise ? 'expanded' : ''}`}
+                        onClick={() => toggleGroup('enterprise')}
+                    >
                         <img src={OrganizationLogo} alt="Предприятие" className="menu-icon" />
                         <div className="menu-text-group">
                             <span className="menu-text">Предприятие</span>
                         </div>
-                        <span className="menu-arrow">▾</span>
+                        {expandedGroups.enterprise ? (
+                            <FaChevronDown className="menu-arrow expand-icon" />
+                        ) : (
+                            <FaChevronRight className="menu-arrow expand-icon" />
+                        )}
                     </button>
 
-                    <div className="submenu">
-                        <button
-                            className={`submenu-item ${isActive('/enterprise-map') ? 'active' : ''}`}
-                            onClick={() => navigate('/enterprise-map')}
-                        >
-                            <span className="submenu-marker" />
-                            <span>Карта предприятия</span>
-                        </button>
-                        <button
-                            className={`submenu-item ${isActive('/welders') ? 'active' : ''}`}
-                            onClick={() => navigate('/welders')}
-                        >
-                            <span className="submenu-marker" />
-                            <span>Сварщики</span>
-                        </button>
-                        <button
-                            className={`submenu-item ${isActive('/employees') ? 'active' : ''}`}
-                            onClick={() => navigate('/employees')}
-                        >
-                            <span className="submenu-marker" />
-                            <span>Пользователи</span>
-                        </button>
-                    </div>
+                    {expandedGroups.enterprise && (
+                        <div className="submenu">
+                            <button
+                                className={`submenu-item ${isActive('/enterprise-map') ? 'active' : ''}`}
+                                onClick={() => navigate('/enterprise-map')}
+                            >
+                                <span className="submenu-marker" />
+                                <span>Карта предприятия</span>
+                            </button>
+                            <button
+                                className={`submenu-item ${isActive('/welders') ? 'active' : ''}`}
+                                onClick={() => navigate('/welders')}
+                            >
+                                <span className="submenu-marker" />
+                                <span>Сварщики</span>
+                            </button>
+                            <button
+                                className={`submenu-item ${isActive('/employees') ? 'active' : ''}`}
+                                onClick={() => navigate('/employees')}
+                            >
+                                <span className="submenu-marker" />
+                                <span>Пользователи</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
 
-                <div className="menu-group active">
-                    <button className="menu-link expanded">
+                <div className={`menu-group ${isActive('/equipment') || isActive('/network-equipment') || isActive('/materials') || isActive('/wps') ? 'active' : ''}`}>
+                    <button
+                        className={`menu-link ${expandedGroups.resources ? 'expanded' : ''}`}
+                        onClick={() => toggleGroup('resources')}
+                    >
                         <img src={ResourcesLogo} alt="Ресурсы" className="menu-icon" />
                         <div className="menu-text-group">
                             <span className="menu-text">Ресурсы</span>
                         </div>
-                        <span className="menu-arrow">▾</span>
+                        {expandedGroups.resources ? (
+                            <FaChevronDown className="menu-arrow expand-icon" />
+                        ) : (
+                            <FaChevronRight className="menu-arrow expand-icon" />
+                        )}
                     </button>
 
-                    <div className="submenu">
-                        <button
-                            className={`submenu-item ${isActive('/equipment') ? 'active' : ''}`}
-                            onClick={() => navigate('/equipment')}
-                        >
-                            <span className="submenu-marker" />
-                            <span>Сварочное оборудование</span>
-                        </button>
-                        <button
-                            className={`submenu-item ${isActive('/network-equipment') ? 'active' : ''}`}
-                            onClick={() => navigate('/network-equipment')}
-                        >
-                            <span className="submenu-marker" />
-                            <span>Сетевое оборудование</span>
-                        </button>
-                        <button
-                            className={`submenu-item ${isActive('/materials') ? 'active' : ''}`}
-                            onClick={() => navigate('/materials')}
-                        >
-                            <span className="submenu-marker" />
-                            <span>Сварочные материалы</span>
-                        </button>
-                        <button
-                            className={`submenu-item ${isActive('/wps') ? 'active' : ''}`}
-                            onClick={() => navigate('/wps')}
-                        >
-                            <span className="submenu-marker" />
-                            <span>Технологические карты сварки (WPS)</span>
-                        </button>
-                    </div>
+                    {expandedGroups.resources && (
+                        <div className="submenu">
+                            <button
+                                className={`submenu-item ${isActive('/equipment') ? 'active' : ''}`}
+                                onClick={() => navigate('/equipment')}
+                            >
+                                <span className="submenu-marker" />
+                                <span>Сварочное оборудование</span>
+                            </button>
+                            <button
+                                className={`submenu-item ${isActive('/network-equipment') ? 'active' : ''}`}
+                                onClick={() => navigate('/network-equipment')}
+                            >
+                                <span className="submenu-marker" />
+                                <span>Сетевое оборудование</span>
+                            </button>
+                            <button
+                                className={`submenu-item ${isActive('/materials') ? 'active' : ''}`}
+                                onClick={() => navigate('/materials')}
+                            >
+                                <span className="submenu-marker" />
+                                <span>Сварочные материалы</span>
+                            </button>
+                            <button
+                                className={`submenu-item ${isActive('/wps') ? 'active' : ''}`}
+                                onClick={() => navigate('/wps')}
+                            >
+                                <span className="submenu-marker" />
+                                <span>Технологические карты сварки (WPS)</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <button
@@ -117,17 +158,26 @@ const Sidebar = () => {
                     <span className="menu-text">Отчеты</span>
                 </button>
 
-                <button className="menu-link" onClick={() => navigate('/notifications')}>
+                <button
+                    className={`menu-link ${isActive('/notifications') ? 'active' : ''}`}
+                    onClick={() => navigate('/notifications')}
+                >
                     <img src={NotificationsLogo} alt="Уведомления" className="menu-icon" />
                     <span className="menu-text">Уведомления</span>
                 </button>
 
-                <button className="menu-link" onClick={() => navigate('/settings')}>
+                <button
+                    className={`menu-link ${isActive('/settings') ? 'active' : ''}`}
+                    onClick={() => navigate('/settings')}
+                >
                     <img src={SettingsLogo} alt="Настройки" className="menu-icon" />
                     <span className="menu-text">Настройки</span>
                 </button>
 
-                <button className="menu-link" onClick={() => navigate('/about')}>
+                <button
+                    className={`menu-link ${isActive('/about') ? 'active' : ''}`}
+                    onClick={() => navigate('/about')}
+                >
                     <img src={AboutLogo} alt="О программе" className="menu-icon" />
                     <span className="menu-text">О программе</span>
                 </button>

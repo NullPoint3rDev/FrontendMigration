@@ -1,0 +1,509 @@
+.certification-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+    background: #1A1420;
+    color: #f0f4ff;
+    gap: 2px;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.certification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    padding-bottom: 1px;
+    border-bottom: none;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.back-btn {
+    background: transparent;
+    border: none;
+    color: #d9d6df;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+    background: none;
+    color: #f2f1f4;
+}
+
+.page-title {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 20px !important;
+    font-weight: 500 !important;
+    color: #F9F3FD !important;
+    white-space: nowrap !important;
+    flex-shrink: 0;
+    line-height: 1.2 !important;
+    display: block !important;
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: #F9F3FD !important;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.control-btn {
+    background: transparent;
+    border: none;
+    color: #d9d6df;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.control-btn:hover {
+    background: none;
+    color: #f2f1f4;
+}
+
+.notifications-icon {
+    font-size: 18px;
+    color: #d9d6df;
+}
+
+.notifications-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    background: #EC2B3C;
+    border-radius: 50%;
+    border: 2px solid #1A1420;
+}
+
+.certification-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 8px;
+}
+
+.certification-modal {
+    background: #122536;
+    border-radius: 3px;
+    padding: 12px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+}
+
+.header-left-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.modal-title {
+    margin: 0 !important;
+    font-size: 16px !important;
+    font-weight: 300 !important;
+    color: #F9F3FD !important;
+    line-height: 24px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.naks-btn {
+    padding: 6px 16px;
+    background: #1A1420 !important;
+    border: none;
+    border-radius: 3px;
+    color: #d9d6df;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+}
+
+.naks-btn:hover {
+    background: #1A1420;
+    opacity: 0.8;
+}
+
+.edit-btn {
+    padding: 6px 6px !important;
+    background: #1A1420 !important;
+    border: none !important;
+    border-radius: 3px !important;
+    color: #d9d6df !important;
+    font-size: 13px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    width: 100% !important;
+    margin-bottom: 8px !important;
+}
+
+.edit-btn:hover {
+    background: #1A1420 !important;
+    border-color: #1A1420 !important;
+}
+
+.certification-form {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.form-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow: hidden;
+}
+
+
+.certification-form.disabled {
+    opacity: 0.7;
+}
+
+.certification-form.disabled input,
+.certification-form.disabled select,
+.certification-form.disabled textarea {
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.certification-form.disabled .edit-btn {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.certification-form.disabled .tooltip-wrapper {
+    pointer-events: auto;
+    cursor: help;
+}
+
+.form-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1px !important;
+    margin-bottom: 2px !important;
+}
+
+.form-group label {
+    color: #d9d6df;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.form-group input[type="text"],
+.form-group input[type="date"],
+.form-group input[type="number"] {
+    padding: 4px 8px !important;
+    background: #1A1420 !important;
+    border: #1A1420 !important;
+    border-radius: 3px !important;
+    color: #f0f4ff !important;
+    font-size: 11px !important;
+    outline: none !important;
+    transition: all 0.2s ease !important;
+}
+
+.form-group input:focus {
+    border-color: #1A1420 !important;
+}
+
+.form-group input:disabled {
+    background: #1A1420 !important;
+    color: #6C7386 !important;
+    cursor: not-allowed !important;
+}
+
+.range-inputs {
+    display: flex;
+    gap: 4px;
+}
+
+.range-inputs input {
+    flex: 1;
+}
+
+.checkbox-group {
+    margin-bottom: -12px !important;
+    background: #1A1420 !important;
+    padding: 6px !important;
+    border-radius: 3px;
+}
+
+.checkbox-group-header {
+    margin-bottom: 4px;
+}
+
+.checkbox-group-label {
+    color: #d9d6df;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: help;
+}
+
+.checkbox-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.checkbox-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #F6B243;
+    background-color: #1B1622;
+    border: 1px solid rgba(87, 77, 95, 0.6);
+    border-radius: 3px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    position: relative;
+}
+
+.checkbox-item input[type="checkbox"]:checked {
+    background-color: #1B1622;
+    border-color: #F6B243;
+}
+
+.checkbox-item input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #F6B243;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.checkbox-item input[type="checkbox"]:disabled {
+    accent-color: #7B8BA6;
+    background-color: #1B1622;
+    border-color: rgba(123, 139, 166, 0.4);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.checkbox-item input[type="checkbox"]:disabled:checked {
+    border-color: #7B8BA6;
+}
+
+.checkbox-item input[type="checkbox"]:disabled:checked::after {
+    color: #7B8BA6;
+}
+
+/* Стили для radio-кнопок (способ сварки) - идентичны стилям чекбоксов */
+.checkbox-item input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #F6B243;
+    background-color: #1B1622;
+    border: 1px solid rgba(87, 77, 95, 0.6);
+    border-radius: 3px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    position: relative;
+}
+
+.checkbox-item input[type="radio"]:checked {
+    background-color: #1B1622;
+    border-color: #F6B243;
+}
+
+.checkbox-item input[type="radio"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #F6B243;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.checkbox-item input[type="radio"]:disabled {
+    accent-color: #7B8BA6;
+    background-color: #1B1622;
+    border-color: rgba(123, 139, 166, 0.4);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.checkbox-item input[type="radio"]:disabled:checked {
+    border-color: #7B8BA6;
+}
+
+.checkbox-item input[type="radio"]:disabled:checked::after {
+    color: #7B8BA6;
+}
+
+.checkbox-item span {
+    color: #d9d6df;
+    font-size: 11px;
+}
+
+.checkbox-item:hover span {
+    color: #f0f4ff;
+}
+
+.tooltip-wrapper {
+    position: relative;
+    display: inline-block;
+    overflow: visible;
+}
+
+.tooltip-text {
+    visibility: hidden;
+    width: 300px;
+    background-color: #2a3441;
+    color: #f0f4ff;
+    text-align: left;
+    border-radius: 4px;
+    padding: 8px 12px;
+    position: fixed;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 12px;
+    line-height: 1.4;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(59, 49, 74, 0.55);
+    pointer-events: none;
+    transform: translateX(-50%);
+}
+
+.tooltip-wrapper:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+.tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #2a3441 transparent transparent transparent;
+}
+
+
+.form-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: auto;
+    padding-top: 8px;
+}
+
+.save-btn {
+    padding: 8px 20px !important;
+    background: #1A1420 !important;
+    border: 1px solid rgba(59, 49, 74, 0.55) !important;
+    border-radius: 3px !important;
+    color: #d9d6df !important;
+    font-size: 12px !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.save-btn:hover:not(:disabled) {
+    background: rgba(45, 37, 54, 0.5);
+    border-color: rgba(178, 172, 182, 0.6);
+}
+
+.save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.delete-btn-cert {
+    padding: 8px 20px;
+    background: #1A1420 !important;
+    border: none;
+    border-radius: 3px;
+    color: #ffffff;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.delete-btn-cert:hover:not(:disabled) {
+    background: #d02535;
+}
+
+.delete-btn-cert:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+

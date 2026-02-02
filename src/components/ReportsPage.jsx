@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
+import { FaChevronRight, FaChevronDown } from 'react-icons/fa'
 import './ReportsPage.css'
-import { getAllWelders } from '../api/welderApi'
-import { getAllWeldingMachines } from '../api/weldingMachineApi'
+import { getAllWelders, getWelderById } from '../api/welderApi'
+import { getAllWeldingMachines, getWeldingMachineIdsByRfidCodes } from '../api/weldingMachineApi'
 import { getAllOrganizationUnits } from '../api/organizationUnitApi'
 import {
     getAllReportTemplates,
@@ -38,15 +39,12 @@ const ReportsPage = () => {
     const [templateSearchQuery, setTemplateSearchQuery] = useState('')
     const [selectedTemplateTypes, setSelectedTemplateTypes] = useState([
         'Все',
-        'По работе оборудования',
         'По работе сварщиков',
-        'По расходу материала',
-        'По сварочным швам',
-        'По ошибкам оборудования',
-        'По швам с нарушениями',
-        'По выполнению свар. задания'
+        'По расходу проволоки',
+        'По работе оборудования'
     ]) // По умолчанию все типы выбраны
     const [templateTypeDropdownOpen, setTemplateTypeDropdownOpen] = useState(false)
+    const [reportTypeDropdownOpen, setReportTypeDropdownOpen] = useState(false)
     const [selectedReportType, setSelectedReportType] = useState('')
     const [autoReportEnabled, setAutoReportEnabled] = useState(false)
     const [periodType, setPeriodType] = useState('Произвольный период')
@@ -94,6 +92,7 @@ const ReportsPage = () => {
 
     // Selected welders state
     const [selectedWelders, setSelectedWelders] = useState({})
+    const [welderSearchTerm, setWelderSearchTerm] = useState('')
 
     // Equipment models selection - динамически формируется из типов оборудования
     const [selectedEquipmentModels, setSelectedEquipmentModels] = useState({})
@@ -118,6 +117,51 @@ const ReportsPage = () => {
         }
         loadWelders()
     }, [])
+
+    // Автоматически раскрываем подразделения при поиске сварщиков (с учетом вложенных подразделений)
+    useEffect(() => {
+        if (welderSearchTerm) {
+            const searchLower = welderSearchTerm.toLowerCase()
+            const hierarchy = buildOrganizationHierarchy()
+            const unitsToExpand = {}
+
+            // Рекурсивная функция для поиска совпадений в подразделениях
+            const findMatchingUnits = (units) => {
+                units.forEach(unit => {
+                    // Проверяем название подразделения
+                    const unitNameMatch = unit.name.toLowerCase().includes(searchLower)
+
+                    // Проверяем сварщиков в подразделении
+                    const hasMatchingWelders = unit.welders.some(welder =>
+                        welder.name.toLowerCase().includes(searchLower)
+                    )
+
+                    // Рекурсивно проверяем дочерние подразделения
+                    let hasMatchingChildren = false
+                    if (unit.children && unit.children.length > 0) {
+                        findMatchingUnits(unit.children)
+                        hasMatchingChildren = unit.children.some(child =>
+                            unitsToExpand[child.id]
+                        )
+                    }
+
+                    // Раскрываем подразделение, если найдены совпадения
+                    if (unitNameMatch || hasMatchingWelders || hasMatchingChildren) {
+                        unitsToExpand[unit.id] = true
+                    }
+                })
+            }
+
+            findMatchingUnits(hierarchy)
+
+            if (Object.keys(unitsToExpand).length > 0) {
+                setExpandedOrganizationUnits(prev => ({
+                    ...prev,
+                    ...unitsToExpand
+                }))
+            }
+        }
+    }, [welderSearchTerm])
 
     // Load organization units from API
     useEffect(() => {
@@ -195,7 +239,7 @@ const ReportsPage = () => {
         return welder.id || 'Неизвестный сварщик'
     }
 
-    // Build organization hierarchy with welders
+    // Build organization hierarchy with welders - древовидная структура как на странице Карта предприятия
     const buildOrganizationHierarchy = () => {
         const hierarchy = {}
 
@@ -203,11 +247,28 @@ const ReportsPage = () => {
         organizationUnits.forEach(unit => {
             const unitId = unit.id
             const unitName = unit.name || unit.id
+
+            // Извлекаем parentId из разных возможных форматов данных
+            let parentId = null
+            if (unit.parentId) {
+                parentId = unit.parentId
+            } else if (unit.parent_id) {
+                parentId = unit.parent_id
+            } else if (unit.parentDepartment) {
+                // Если parentDepartment - это объект, берем его id
+                if (typeof unit.parentDepartment === 'object' && unit.parentDepartment !== null) {
+                    parentId = unit.parentDepartment.id
+                } else if (typeof unit.parentDepartment === 'number' || typeof unit.parentDepartment === 'string') {
+                    parentId = unit.parentDepartment
+                }
+            }
+
             hierarchy[unitId] = {
                 id: unitId,
                 name: unitName,
-                parentId: unit.parentId || unit.parent_id,
-                welders: []
+                parentId: parentId,
+                welders: [],
+                children: [] // Массив для дочерних подразделений
             }
         })
 
@@ -251,15 +312,99 @@ const ReportsPage = () => {
             }
         })
 
-        // Сортируем подразделения по имени
-        const sortedUnits = Object.values(hierarchy).sort((a, b) => {
-            return (a.name || '').localeCompare(b.name || '')
+        // Строим древовидную структуру: находим родительские подразделения и их дочерние
+        const rootUnits = []
+        const processedUnits = new Set() // Отслеживаем обработанные подразделения
+
+        // Функция для поиска родителя с учетом разных типов ID
+        const findParent = (parentId) => {
+            if (parentId == null) return null
+            // Пробуем найти родителя по разным вариантам ID (число, строка)
+            const parent = hierarchy[parentId] || hierarchy[Number(parentId)] || hierarchy[String(parentId)] || null
+            if (!parent && parentId != null) {
+                // Отладочное логирование для диагностики проблем с parentId
+                console.debug(`Не найден родитель с ID ${parentId} (тип: ${typeof parentId}). Доступные ID:`, Object.keys(hierarchy).map(k => `${k} (${typeof hierarchy[k].id})`))
+            }
+            return parent
+        }
+
+        // Сначала для каждого подразделения с parentId находим его родителя и добавляем в children
+        Object.values(hierarchy).forEach(unit => {
+            if (unit.parentId != null && unit.parentId !== undefined) {
+                const parent = findParent(unit.parentId)
+                if (parent) {
+                    // Проверяем, что подразделение еще не добавлено в children
+                    if (!parent.children.find(child => child.id === unit.id)) {
+                        parent.children.push(unit)
+                        processedUnits.add(unit.id)
+                        console.debug(`Подразделение "${unit.name}" (ID: ${unit.id}) добавлено в children родителя "${parent.name}" (ID: ${parent.id})`)
+                    }
+                } else {
+                    console.warn(`Подразделение "${unit.name}" (ID: ${unit.id}, тип ID: ${typeof unit.id}) имеет parentId ${unit.parentId} (тип: ${typeof unit.parentId}), но родитель не найден`)
+                }
+            }
         })
 
-        return sortedUnits
+        // Затем находим все корневые подразделения (без parentId или не обработанные)
+        Object.values(hierarchy).forEach(unit => {
+            // Добавляем в rootUnits только те подразделения, которые:
+            // 1. Не имеют parentId (корневые)
+            // 2. Или имеют parentId, но их родитель не найден (сироты)
+            if (!unit.parentId || unit.parentId === null || unit.parentId === undefined) {
+                if (!rootUnits.find(u => u.id === unit.id)) {
+                    rootUnits.push(unit)
+                    console.debug(`Подразделение "${unit.name}" (ID: ${unit.id}) добавлено в rootUnits (нет parentId)`)
+                }
+            } else if (!processedUnits.has(unit.id)) {
+                // Подразделение имеет parentId, но родитель не найден - добавляем в корень
+                console.warn(`Подразделение "${unit.name}" (ID: ${unit.id}) имеет parentId ${unit.parentId}, но родитель не найден. Добавляем в корень.`)
+                if (!rootUnits.find(u => u.id === unit.id)) {
+                    rootUnits.push(unit)
+                }
+            }
+        })
+
+        // Рекурсивная функция для сортировки иерархии
+        const sortHierarchy = (units) => {
+            return units.sort((a, b) => {
+                return (a.name || '').localeCompare(b.name || '')
+            }).map(unit => {
+                if (unit.children.length > 0) {
+                    unit.children = sortHierarchy(unit.children)
+                    // Отладочное логирование для проверки иерархии
+                    console.debug(`Подразделение "${unit.name}" (ID: ${unit.id}) имеет ${unit.children.length} дочерних:`, unit.children.map(c => `${c.name} (ID: ${c.id})`).join(', '))
+                }
+                // Сортируем сварщиков внутри подразделения
+                unit.welders.sort((a, b) => {
+                    return (a.name || '').localeCompare(b.name || '')
+                })
+                return unit
+            })
+        }
+
+        const sortedRootUnits = sortHierarchy(rootUnits)
+        console.debug('Итоговая иерархия корневых подразделений:', sortedRootUnits.map(u => `${u.name} (ID: ${u.id}, children: ${u.children.length})`).join(', '))
+        return sortedRootUnits
     }
 
     const organizationHierarchy = buildOrganizationHierarchy()
+
+    // Рекурсивная функция для получения всех сварщиков из иерархии (включая вложенные подразделения)
+    const getAllWeldersFromHierarchy = (units) => {
+        const welderIds = []
+        const traverse = (unitList) => {
+            unitList.forEach(unit => {
+                unit.welders.forEach(welder => {
+                    welderIds.push(welder.id)
+                })
+                if (unit.children && unit.children.length > 0) {
+                    traverse(unit.children)
+                }
+            })
+        }
+        traverse(units)
+        return welderIds
+    }
 
     // Get unique equipment models from machines
     const getUniqueEquipmentModels = () => {
@@ -284,6 +429,107 @@ const ReportsPage = () => {
     }
 
     const uniqueEquipmentModels = getUniqueEquipmentModels()
+
+    // Функция для получения аппаратов по RFID кодам
+    const getMachinesByRfidCodes = async (rfidCodes) => {
+        if (!rfidCodes || rfidCodes.length === 0) return []
+
+        try {
+            // Получаем ID аппаратов по RFID кодам через API
+            const machineIds = await getWeldingMachineIdsByRfidCodes(rfidCodes)
+            console.log('🔍 Найдены ID аппаратов по RFID кодам:', machineIds)
+
+            if (!machineIds || machineIds.length === 0) {
+                console.log('⚠️ Не найдено аппаратов по RFID кодам')
+                return []
+            }
+
+            // Получаем все аппараты и фильтруем по найденным ID
+            const allMachines = weldingMachines || []
+            const machines = allMachines.filter(machine => machineIds.includes(machine.id))
+
+            console.log('🔍 Найдены аппараты:', machines)
+            return machines
+        } catch (error) {
+            console.error('Ошибка получения аппаратов по RFID:', error)
+            return []
+        }
+    }
+
+    // Функция для автоматического выбора моделей оборудования при выборе сварщиков
+    const autoSelectEquipmentModels = async (selectedWelderIds) => {
+        if (!selectedWelderIds || selectedWelderIds.length === 0) {
+            return
+        }
+
+        try {
+            // Получаем RFID пропуски всех выбранных сварщиков
+            const rfidCodesSet = new Set()
+
+            for (const welderId of selectedWelderIds) {
+                try {
+                    const welder = await getWelderById(welderId)
+                    if (welder && welder.rfidPasses && Array.isArray(welder.rfidPasses)) {
+                        welder.rfidPasses.forEach(pass => {
+                            if (pass.code) {
+                                rfidCodesSet.add(pass.code)
+                            }
+                        })
+                    } else if (welder && welder.rfidCode) {
+                        // Обратная совместимость: если приходит один RFID код (старый формат)
+                        rfidCodesSet.add(welder.rfidCode)
+                    }
+                } catch (error) {
+                    console.error(`Ошибка получения сварщика ${welderId}:`, error)
+                }
+            }
+
+            const rfidCodes = Array.from(rfidCodesSet)
+            console.log('🔍 Найдены RFID коды выбранных сварщиков:', rfidCodes)
+
+            if (rfidCodes.length === 0) {
+                console.log('⚠️ У выбранных сварщиков нет RFID пропусков')
+                return
+            }
+
+            // Получаем аппараты по RFID кодам
+            const machines = await getMachinesByRfidCodes(rfidCodes)
+            console.log('🔍 Найдены аппараты по RFID кодам:', machines)
+
+            // Находим модели этих аппаратов и автоматически выбираем их
+            const modelsToSelect = {}
+            machines.forEach(machine => {
+                const modelName = machine.name
+                if (modelName) {
+                    modelsToSelect[modelName] = true
+                }
+            })
+
+            console.log('🔍 Автоматически выбираем модели:', Object.keys(modelsToSelect))
+
+            // Обновляем выбранные модели оборудования
+            setSelectedEquipmentModels(prev => {
+                const updated = { ...prev }
+                Object.keys(modelsToSelect).forEach(modelKey => {
+                    updated[modelKey] = true
+                })
+                return updated
+            })
+        } catch (error) {
+            console.error('Ошибка автоматического выбора моделей оборудования:', error)
+        }
+    }
+
+    // Автоматически выбираем модели оборудования при изменении выбранных сварщиков
+    useEffect(() => {
+        const selectedWelderIds = Object.keys(selectedWelders).filter(
+            key => selectedWelders[key] && key !== '__NONE__'
+        )
+
+        if (selectedWelderIds.length > 0) {
+            autoSelectEquipmentModels(selectedWelderIds)
+        }
+    }, [selectedWelders])
 
     // Handlers for range sliders to prevent min > max
     const handleSetCurrentMinChange = (value) => {
@@ -363,36 +609,60 @@ const ReportsPage = () => {
         }))
     }
 
-    // Обработчик для чекбокса "Все" - автоматически выбирает/снимает выбор со всех подразделений и сварщиков
+    // Обработчик для чекбокса "Все" - логика как в WeldersPage
     const handleToggleAll = () => {
-        const newAllValue = !parameters.all
+        const hierarchy = buildOrganizationHierarchy()
+        const allWelderIds = getAllWeldersFromHierarchy(hierarchy)
 
-        // Обновляем параметр "all"
-        setParameters(prev => ({
-            ...prev,
-            all: newAllValue
-        }))
+        // Проверяем, все ли выбрано
+        const isNoneSelected = selectedWelders.__NONE__ || (Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0)
+        const allSelected = allWelderIds.length > 0 && allWelderIds.every(id => selectedWelders[id] && !selectedWelders.__NONE__)
 
-        // Если выбираем "Все", то выбираем все подразделения и всех сварщиков
-        if (newAllValue) {
-            const allOrgUnits = {}
-            const allWeldersSelected = {}
-
-            // Выбираем все подразделения
-            organizationHierarchy.forEach(unit => {
-                allOrgUnits[unit.id] = true
-                // Выбираем всех сварщиков в каждом подразделении
-                unit.welders.forEach(welder => {
-                    allWeldersSelected[welder.id] = true
+        // Проверяем, выбраны ли все подразделения
+        const allOrgUnitsSelected = (() => {
+            if (selectedOrganizationUnits.__NONE__) return false
+            const allOrgUnitIds = []
+            const collectAllUnitIds = (units) => {
+                units.forEach(unit => {
+                    allOrgUnitIds.push(unit.id)
+                    if (unit.children && unit.children.length > 0) {
+                        collectAllUnitIds(unit.children)
+                    }
                 })
+            }
+            collectAllUnitIds(hierarchy)
+            return allOrgUnitIds.length > 0 && allOrgUnitIds.every(id => selectedOrganizationUnits[id] === true)
+        })()
+
+        if (allSelected && allOrgUnitsSelected) {
+            // Если все выбрано, снимаем все
+            setSelectedWelders({ __NONE__: true })
+            setSelectedOrganizationUnits({ __NONE__: true })
+            setParameters(prev => ({ ...prev, all: false }))
+        } else {
+            // Выбираем все
+            const allWeldersSelected = {}
+            const allOrgUnits = {}
+
+            // Собираем всех сварщиков
+            allWelderIds.forEach(id => {
+                allWeldersSelected[id] = true
             })
 
-            setSelectedOrganizationUnits(allOrgUnits)
+            // Рекурсивно собираем все ID подразделений (включая дочерние)
+            const collectAllUnitIds = (units) => {
+                units.forEach(unit => {
+                    allOrgUnits[unit.id] = true
+                    if (unit.children && unit.children.length > 0) {
+                        collectAllUnitIds(unit.children)
+                    }
+                })
+            }
+            collectAllUnitIds(hierarchy)
+
             setSelectedWelders(allWeldersSelected)
-        } else {
-            // Если снимаем выбор "Все", то снимаем выбор со всех подразделений и сварщиков
-            setSelectedOrganizationUnits({})
-            setSelectedWelders({})
+            setSelectedOrganizationUnits(allOrgUnits)
+            setParameters(prev => ({ ...prev, all: true }))
         }
     }
 
@@ -422,41 +692,312 @@ const ReportsPage = () => {
 
     const toggleWelder = (welderId) => {
         setSelectedWelders(prev => {
-            const newValue = !prev[welderId]
-            const updated = {
-                ...prev,
-                [welderId]: newValue
-            }
+            const hierarchy = buildOrganizationHierarchy()
+            const allWelderIds = getAllWeldersFromHierarchy(hierarchy)
 
-            // Если снимаем выбор со сварщика и "Все" было выбрано, снимаем "Все"
-            if (!newValue && parameters.all) {
-                setParameters(prevParams => ({
-                    ...prevParams,
-                    all: false
-                }))
-            }
+            const isNoneSelected = prev.__NONE__ || (Object.keys(prev).length === 0 && allWelderIds.length > 0)
+            // Если ничего не выбрано, то клик должен выбрать сварщика
+            // Если что-то уже выбрано, то клик должен переключить состояние
+            const willBeChecked = isNoneSelected ? true : !prev[welderId]
 
-            return updated
+            if (isNoneSelected) {
+                // Если было "__NONE__" или пусто, удаляем его и добавляем выбранный элемент
+                if (willBeChecked) {
+                    const updated = { [welderId]: true }
+                    delete updated.__NONE__
+                    // Проверяем, все ли выбрано
+                    const allSelected = allWelderIds.length === 1 || allWelderIds.every(id => updated[id])
+                    if (allSelected) {
+                        const allWeldersSelected = {}
+                        allWelderIds.forEach(id => {
+                            allWeldersSelected[id] = true
+                        })
+                        const allOrgUnits = {}
+                        hierarchy.forEach(unit => {
+                            allOrgUnits[unit.id] = true
+                        })
+                        setSelectedOrganizationUnits(allOrgUnits)
+                        setParameters(prevParams => ({ ...prevParams, all: true }))
+                        return allWeldersSelected
+                    }
+                    // При выборе сварщика из состояния __NONE__ убеждаемся, что __NONE__ удален из selectedOrganizationUnits
+                    // Родительские подразделения не нужно явно выбирать - getUnitState сам определит их состояние
+                    setSelectedOrganizationUnits(prevUnits => {
+                        const updatedUnits = { ...prevUnits }
+                        delete updatedUnits.__NONE__
+                        return updatedUnits
+                    })
+                    setParameters(prevParams => ({ ...prevParams, all: false }))
+                    return updated
+                }
+                return prev
+            } else {
+                // Если объект не пустой
+                if (willBeChecked) {
+                    // Добавляем в выбор
+                    const updated = { ...prev, [welderId]: true }
+                    delete updated.__NONE__
+                    // Проверяем, все ли выбрано
+                    const allSelected = allWelderIds.every(id => updated[id])
+                    if (allSelected) {
+                        const allOrgUnits = {}
+                        hierarchy.forEach(unit => {
+                            allOrgUnits[unit.id] = true
+                        })
+                        setSelectedOrganizationUnits(allOrgUnits)
+                        setParameters(prevParams => ({ ...prevParams, all: true }))
+                    } else {
+                        // При выборе сварщика не нужно явно выбирать родительские подразделения
+                        // Они должны оставаться в состоянии, которое позволит getUnitState определить indeterminate
+                        // Просто убеждаемся, что __NONE__ удален
+                        setSelectedOrganizationUnits(prevUnits => {
+                            const updatedUnits = { ...prevUnits }
+                            delete updatedUnits.__NONE__
+                            // Не удаляем родительские подразделения - они должны остаться для правильного определения состояния
+                            // getUnitState сам определит, что они в indeterminate состоянии на основе выбранных сварщиков
+                            return updatedUnits
+                        })
+                        setParameters(prevParams => ({ ...prevParams, all: false }))
+                    }
+                    return updated
+                } else {
+                    // Убираем из выбора
+                    const updated = { ...prev }
+                    delete updated[welderId]
+                    delete updated.__NONE__
+
+                    // Находим родительские подразделения и снимаем с них галочки
+                    const hierarchy = buildOrganizationHierarchy()
+                    const parentUnitIds = findParentUnitsForWelder(hierarchy, welderId)
+                    if (parentUnitIds && parentUnitIds.length > 0) {
+                        setSelectedOrganizationUnits(prevUnits => {
+                            const updatedUnits = { ...prevUnits }
+                            delete updatedUnits.__NONE__
+                            // Снимаем галочки с родительских подразделений
+                            parentUnitIds.forEach(parentId => {
+                                delete updatedUnits[parentId]
+                            })
+                            // Если ничего не выбрано, устанавливаем "__NONE__"
+                            if (Object.keys(updatedUnits).length === 0) {
+                                return { __NONE__: true }
+                            }
+                            return updatedUnits
+                        })
+                    }
+
+                    // Если ничего не выбрано, устанавливаем "__NONE__"
+                    if (Object.keys(updated).length === 0) {
+                        setSelectedOrganizationUnits({ __NONE__: true })
+                        setParameters(prevParams => ({ ...prevParams, all: false }))
+                        return { __NONE__: true }
+                    }
+                    setParameters(prevParams => ({ ...prevParams, all: false }))
+                    return updated
+                }
+            }
         })
     }
 
+    // Рекурсивная функция для поиска подразделения в иерархии
+    const findUnitInHierarchy = (units, unitId) => {
+        for (const unit of units) {
+            if (unit.id === unitId) {
+                return unit
+            }
+            if (unit.children && unit.children.length > 0) {
+                const found = findUnitInHierarchy(unit.children, unitId)
+                if (found) return found
+            }
+        }
+        return null
+    }
+
+    // Рекурсивная функция для получения всех сварщиков из подразделения и его дочерних
+    const getWeldersFromUnit = (unit) => {
+        const welders = [...unit.welders]
+        if (unit.children && unit.children.length > 0) {
+            unit.children.forEach(child => {
+                welders.push(...getWeldersFromUnit(child))
+            })
+        }
+        return welders
+    }
+
+    // Рекурсивная функция для получения всех ID дочерних подразделений
+    const getAllChildUnitIds = (unit) => {
+        const ids = []
+        if (unit.children && unit.children.length > 0) {
+            unit.children.forEach(child => {
+                ids.push(child.id)
+                ids.push(...getAllChildUnitIds(child))
+            })
+        }
+        return ids
+    }
+
+    // Рекурсивная функция для поиска родительских подразделений сварщика
+    const findParentUnitsForWelder = (units, welderId, parentPath = []) => {
+        for (const unit of units) {
+            // Проверяем, есть ли сварщик в этом подразделении
+            if (unit.welders && unit.welders.some(w => w.id === welderId)) {
+                return parentPath
+            }
+            // Проверяем в дочерних подразделениях
+            if (unit.children && unit.children.length > 0) {
+                const found = findParentUnitsForWelder(unit.children, welderId, [...parentPath, unit.id])
+                if (found !== null) {
+                    return found
+                }
+            }
+        }
+        return null
+    }
+
+    // Рекурсивная функция для поиска родительских подразделений подразделения
+    const findParentUnitsForUnit = (units, unitId, parentPath = []) => {
+        for (const unit of units) {
+            if (unit.id === unitId) {
+                return parentPath
+            }
+            if (unit.children && unit.children.length > 0) {
+                const found = findParentUnitsForUnit(unit.children, unitId, [...parentPath, unit.id])
+                if (found !== null) {
+                    return found
+                }
+            }
+        }
+        return null
+    }
+
     const toggleOrganizationUnit = (unitId) => {
+        const hierarchy = buildOrganizationHierarchy()
+        const unit = findUnitInHierarchy(hierarchy, unitId)
+        if (!unit) return
+
+        // Определяем фактическое состояние подразделения через getUnitState
+        // Это нужно, чтобы правильно определить, выбрано ли подразделение
+        // (даже если оно выбрано только через дочерние элементы)
+        const getUnitStateForToggle = (unit) => {
+            if (selectedOrganizationUnits.__NONE__) return { checked: false, indeterminate: false }
+
+            const explicitlySelected = selectedOrganizationUnits[unit.id] === true
+            const unitWelders = unit.welders || []
+            const selectedWeldersCount = unitWelders.filter(w => selectedWelders[w.id] && !selectedWelders.__NONE__).length
+            const allWeldersSelected = unitWelders.length > 0 && selectedWeldersCount === unitWelders.length
+            const someWeldersSelected = selectedWeldersCount > 0
+
+            if (unit.children && unit.children.length > 0) {
+                const childrenStates = unit.children.map(child => getUnitStateForToggle(child))
+                const allChildrenChecked = childrenStates.every(state => state.checked)
+                const someChildrenChecked = childrenStates.some(state => state.checked || state.indeterminate)
+
+                if (allChildrenChecked) {
+                    if (unitWelders.length > 0) {
+                        if (allWeldersSelected) {
+                            return { checked: true, indeterminate: false }
+                        } else {
+                            return { checked: false, indeterminate: true }
+                        }
+                    } else {
+                        return { checked: true, indeterminate: false }
+                    }
+                }
+                if (someChildrenChecked || someWeldersSelected) {
+                    return { checked: false, indeterminate: true }
+                }
+                if (explicitlySelected) {
+                    return { checked: false, indeterminate: true }
+                }
+                return { checked: false, indeterminate: false }
+            }
+
+            if (unitWelders.length > 0) {
+                if (allWeldersSelected) {
+                    return { checked: true, indeterminate: false }
+                } else if (someWeldersSelected) {
+                    return { checked: false, indeterminate: true }
+                }
+            }
+
+            return { checked: explicitlySelected, indeterminate: false }
+        }
+
+        const currentState = getUnitStateForToggle(unit)
+        const currentlyChecked = currentState.checked
+        const willBeChecked = !currentlyChecked
+
         setSelectedOrganizationUnits(prev => {
-            const newValue = !prev[unitId]
-            const updated = {
-                ...prev,
-                [unitId]: newValue
-            }
+            const isNoneSelected = prev.__NONE__ || (Object.keys(prev).length === 0)
 
-            // Если снимаем выбор с подразделения и "Все" было выбрано, снимаем "Все"
-            if (!newValue && parameters.all) {
-                setParameters(prevParams => ({
-                    ...prevParams,
-                    all: false
-                }))
-            }
+            if (willBeChecked) {
+                // Выбираем подразделение и всех его сварщиков (включая дочерние подразделения)
+                const updatedUnits = isNoneSelected ? { [unitId]: true } : { ...prev, [unitId]: true }
+                delete updatedUnits.__NONE__
 
-            return updated
+                // Также выбираем все дочерние подразделения
+                const allChildUnitIds = getAllChildUnitIds(unit)
+                allChildUnitIds.forEach(childId => {
+                    updatedUnits[childId] = true
+                })
+
+                const updatedWelders = { ...selectedWelders }
+                // Автоматически выбираем всех сварщиков в подразделении и его дочерних
+                const allWeldersInUnit = getWeldersFromUnit(unit)
+                allWeldersInUnit.forEach(welder => {
+                    updatedWelders[welder.id] = true
+                })
+                delete updatedWelders.__NONE__
+
+                // Обновляем состояние сварщиков сразу
+                setSelectedWelders(updatedWelders)
+
+                // НЕ проверяем автоматически, все ли выбрано - это должно происходить только при клике на "Все"
+                // Просто обновляем параметр all на false, так как мы выбрали только одно подразделение
+                setParameters(prevParams => ({ ...prevParams, all: false }))
+                return updatedUnits
+            } else {
+                // Снимаем выбор с подразделения и всех его дочерних подразделений
+                const updatedUnits = { ...prev }
+                delete updatedUnits[unitId]
+                delete updatedUnits.__NONE__
+
+                // Также снимаем выбор со всех дочерних подразделений
+                const allChildUnitIds = getAllChildUnitIds(unit)
+                allChildUnitIds.forEach(childId => {
+                    delete updatedUnits[childId]
+                })
+
+                // НЕ удаляем родительские подразделения - их состояние будет определяться автоматически
+                // на основе состояния дочерних элементов через getUnitState
+                // Это позволит родительским подразделениям получить indeterminate состояние
+                // если часть дочерних элементов выбрана
+
+                // Обновляем состояние сварщиков с использованием функционального обновления
+                setSelectedWelders(prevWelders => {
+                    const updatedWelders = { ...prevWelders }
+                    delete updatedWelders.__NONE__
+
+                    // Автоматически снимаем выбор со всех сварщиков в подразделении и его дочерних
+                    const allWeldersInUnit = getWeldersFromUnit(unit)
+                    allWeldersInUnit.forEach(welder => {
+                        delete updatedWelders[welder.id]
+                    })
+
+                    // Если ничего не выбрано, устанавливаем "__NONE__"
+                    if (Object.keys(updatedWelders).length === 0) {
+                        return { __NONE__: true }
+                    }
+                    return updatedWelders
+                })
+
+                // Если ничего не выбрано, устанавливаем "__NONE__"
+                if (Object.keys(updatedUnits).length === 0) {
+                    setParameters(prevParams => ({ ...prevParams, all: false }))
+                    return { __NONE__: true }
+                }
+                setParameters(prevParams => ({ ...prevParams, all: false }))
+                return updatedUnits
+            }
         })
     }
 
@@ -565,22 +1106,14 @@ const ReportsPage = () => {
         'Все',
         'По работе оборудования',
         'По работе сварщиков',
-        'По расходу материала',
-        'По сварочным швам',
-        'По ошибкам оборудования',
-        'По швам с нарушениями',
-        'По выполнению свар. задания'
+        'По расходу проволоки',
     ]
 
     // Типы отчетов для выбора
     const reportTypes = [
-        'По работе оборудования',
-        'По работе сварщиков',
-        'По расходу материала',
-        'По сварочным швам',
-        'По ошибкам оборудования',
-        'По швам с нарушениями',
-        'По выполнению свар. задания'
+        'По расходу проволоки',
+        'По работе сварщика',
+        'По работе оборудования'
     ]
 
     // Типы периода
@@ -606,6 +1139,23 @@ const ReportsPage = () => {
             document.removeEventListener('mousedown', handleClickOutside)
         }
     }, [templateTypeDropdownOpen])
+
+    // Закрытие выпадающего списка типа отчета при клике вне его области
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (reportTypeDropdownOpen && !event.target.closest('.report-type-dropdown-container')) {
+                setReportTypeDropdownOpen(false)
+            }
+        }
+
+        if (reportTypeDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside)
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [reportTypeDropdownOpen])
 
     // Обработка выбора типа шаблона
     const handleTemplateTypeToggle = (type) => {
@@ -674,6 +1224,35 @@ const ReportsPage = () => {
             'По выполнению свар. задания'
         ])
         // Reset all parameters to defaults
+        setParameters({
+            welder: true,
+            all: false,
+            wire: true,
+            consumption: true,
+            equipmentModel: false,
+            workOutsideSetCurrent: false,
+            workOutsideActualCurrent: false,
+            tableNumber: true,
+            profession: false,
+            department: true,
+            equipmentName: false,
+            timeOnline: true,
+            arcBurningTime: true,
+            efficiency: false,
+            energyConsumed: false
+        })
+        setSelectedOrganizationUnits({})
+        setSelectedWelders({})
+        setSelectedEquipmentModels({})
+        setEmailDuplicate(false)
+        setEmailAddress('')
+        setTimeRange({ start: '08:00', end: '17:00' })
+        setTimeRangeEnabled(false)
+        setStartDate(null)
+        setEndDate(null)
+        setSelectedDays([])
+        setSelectedPeriod('day')
+        setWelderSearchTerm('')
     }
 
     const handleSaveTemplate = async () => {
@@ -698,7 +1277,9 @@ const ReportsPage = () => {
         try {
             // Подготовка данных для сохранения
             // Гарантируем, что обязательные параметры всегда true
-            const reportParams = { ...parameters }
+            // ВАЖНО: backend ReportTemplateDTO не имеет отдельного поля reportType,
+            // поэтому сохраняем тип отчёта внутри reportParameters (как часть JSON).
+            const reportParams = { ...parameters, reportType: selectedReportType || null }
             reportParams.welder = true
             reportParams.tableNumber = true
             reportParams.department = true
@@ -772,11 +1353,21 @@ const ReportsPage = () => {
         setCurrentTemplateId(template.id)
         setTemplateName(template.name || '')
         setTemplateEmail(template.email || '')
+        // reportType хранится внутри reportParameters (см. confirmSaveTemplate)
+        const loadedReportType =
+            template?.reportParameters?.reportType ||
+            template?.reportType || // на случай старых/локальных объектов
+            ''
+        setSelectedReportType(loadedReportType)
 
         // Загружаем параметры отчета
         if (template.reportParameters) {
             setParameters(prev => {
-                const updated = { ...prev, ...template.reportParameters }
+                // Не мержим служебное поле reportType в параметры колонок
+                // (оно нужно только для отображения выбора типа отчёта).
+                // eslint-disable-next-line no-unused-vars
+                const { reportType, ...restParams } = template.reportParameters || {}
+                const updated = { ...prev, ...restParams }
                 // Гарантируем, что обязательные параметры всегда true
                 updated.welder = true
                 updated.tableNumber = true
@@ -972,6 +1563,12 @@ const ReportsPage = () => {
             return
         }
 
+        // Проверяем, выбран ли тип отчета
+        if (!selectedReportType) {
+            alert('Выберите тип шаблона отчета')
+            return
+        }
+
         try {
             // Получаем даты периода
             let periodStartDate = startDate
@@ -999,14 +1596,29 @@ const ReportsPage = () => {
             let periodStartTime = timeRangeEnabled ? timeRange.start : null
             let periodEndTime = timeRangeEnabled ? timeRange.end : null
 
-            // Вызываем API для генерации отчета
-            await reportApi.generateReportFromTemplate(
-                currentTemplateId,
-                formatDate(periodStartDate),
-                formatDate(periodEndDate),
-                periodStartTime,
-                periodEndTime
-            )
+            // Вызываем соответствующий API в зависимости от типа отчета
+            if (selectedReportType === 'По расходу проволоки') {
+                await reportApi.generateWireConsumptionReport(
+                    currentTemplateId,
+                    formatDate(periodStartDate),
+                    formatDate(periodEndDate),
+                    periodStartTime,
+                    periodEndTime
+                )
+            } else if (selectedReportType === 'По работе сварщика') {
+                await reportApi.generateWelderWorkReport(
+                    currentTemplateId,
+                    formatDate(periodStartDate),
+                    formatDate(periodEndDate),
+                    periodStartTime,
+                    periodEndTime
+                )
+            } else if (selectedReportType === 'По работе оборудования') {
+                // TODO: Реализовать когда будет готово
+                alert('Отчет по работе оборудования пока не реализован')
+            } else {
+                alert('Неизвестный тип отчета: ' + selectedReportType)
+            }
         } catch (error) {
             console.error('Ошибка генерации отчета:', error)
             alert('Ошибка генерации отчета: ' + (error.message || 'Неизвестная ошибка'))
@@ -1050,7 +1662,19 @@ const ReportsPage = () => {
                                 onClick={() => setTemplateTypeDropdownOpen(!templateTypeDropdownOpen)}
                             >
                                 <span className="template-type-dropdown-title">Тип шаблона</span>
-                                <span className={`template-type-dropdown-arrow ${templateTypeDropdownOpen ? 'open' : ''}`}>▾</span>
+                                <button
+                                    className="org-unit-expand-btn"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setTemplateTypeDropdownOpen(!templateTypeDropdownOpen);
+                                    }}
+                                >
+                                    {templateTypeDropdownOpen ? (
+                                        <FaChevronDown className="expand-icon" />
+                                    ) : (
+                                        <FaChevronRight className="expand-icon" />
+                                    )}
+                                </button>
                             </div>
                             {templateTypeDropdownOpen && (
                                 <div className="template-type-dropdown-list">
@@ -1173,29 +1797,101 @@ const ReportsPage = () => {
                     </div>
 
                     {/* Выпадающий список "Выберите тип отчета" */}
-                    <div className="report-type-selector">
-                        <div className="report-type-select-wrapper">
-                            <select
-                                className="report-type-select"
-                                value={selectedReportType}
-                                onChange={(e) => setSelectedReportType(e.target.value)}
+                    <div className={`report-type-dropdown-container ${reportTypeDropdownOpen ? 'open' : ''}`}>
+                        <div
+                            className="report-type-dropdown-header"
+                            onClick={() => setReportTypeDropdownOpen(!reportTypeDropdownOpen)}
+                        >
+                            <span className={`report-type-dropdown-title ${!selectedReportType ? 'placeholder' : ''}`}>
+                                {selectedReportType || 'Выберите тип шаблона*'}
+                            </span>
+                            <button
+                                className="org-unit-expand-btn"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReportTypeDropdownOpen(!reportTypeDropdownOpen);
+                                }}
                             >
-                                <option value="">Выберите тип шаблона*</option>
-                                {reportTypes.map(type => (
-                                    <option key={type} value={type}>{type}</option>
-                                ))}
-                            </select>
+                                {reportTypeDropdownOpen ? (
+                                    <FaChevronDown className="expand-icon" />
+                                ) : (
+                                    <FaChevronRight className="expand-icon" />
+                                )}
+                            </button>
                         </div>
+                        {reportTypeDropdownOpen && (
+                            <div className="report-type-dropdown-list">
+                                {reportTypes.map(type => (
+                                    <div
+                                        key={type}
+                                        className={`report-type-dropdown-item ${selectedReportType === type ? 'selected' : ''}`}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedReportType(type);
+                                            setReportTypeDropdownOpen(false);
+                                        }}
+                                    >
+                                        <span>{type}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div className="panel-body middle-panel-content">
                         {/* Left sub-panel - Welders selection */}
                         <div className="middle-subpanel middle-subpanel-left">
                             <div className="parameters-list">
                                 <div className="subpanel-title">Сварщик*</div>
+                                <input
+                                    type="text"
+                                    className="welder-search-input"
+                                    placeholder="Поиск"
+                                    value={welderSearchTerm}
+                                    onChange={(e) => setWelderSearchTerm(e.target.value)}
+                                    style={{
+                                        backgroundColor: '#122536',
+                                        padding: '4px 8px',
+                                        marginBottom: '8px',
+                                        borderRadius: '3px',
+                                        fontSize: '11px',
+                                        color: '#fff',
+                                        border: 'none',
+                                        outline: 'none',
+                                        width: '100%',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
                                 <label className="parameter-item">
                                     <input
                                         type="checkbox"
-                                        checked={parameters.all}
+                                        checked={(() => {
+                                            const hierarchy = buildOrganizationHierarchy()
+                                            const allWelderIds = getAllWeldersFromHierarchy(hierarchy)
+
+                                            // Проверяем, выбраны ли все сварщики
+                                            const isNoneSelected = selectedWelders.__NONE__ || (Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0)
+                                            const showAllChecked = !isNoneSelected && Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0
+                                            const allWeldersSelected = allWelderIds.length > 0 && allWelderIds.every(id => selectedWelders[id] && !selectedWelders.__NONE__)
+
+                                            // Проверяем, выбраны ли все подразделения (включая дочерние)
+                                            const allOrgUnitIds = []
+                                            const collectAllUnitIds = (units) => {
+                                                units.forEach(unit => {
+                                                    allOrgUnitIds.push(unit.id)
+                                                    if (unit.children && unit.children.length > 0) {
+                                                        collectAllUnitIds(unit.children)
+                                                    }
+                                                })
+                                            }
+                                            collectAllUnitIds(hierarchy)
+
+                                            const allOrgUnitsSelected = allOrgUnitIds.length > 0 &&
+                                                !selectedOrganizationUnits.__NONE__ &&
+                                                allOrgUnitIds.every(id => selectedOrganizationUnits[id] === true)
+
+                                            // "Все" выбрано только если выбраны И все сварщики, И все подразделения
+                                            return (showAllChecked || allWeldersSelected) && allOrgUnitsSelected
+                                        })()}
                                         onChange={handleToggleAll}
                                     />
                                     <span className="parameter-label">Все</span>
@@ -1205,44 +1901,241 @@ const ReportsPage = () => {
                                     <div className="parameter-item" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
                                         Загрузка сварщиков...
                                     </div>
-                                ) : organizationHierarchy.length > 0 ? (
-                                    organizationHierarchy.map(unit => (
-                                        <div key={unit.id} className="parameter-item-expandable">
-                                            <label
-                                                className="parameter-item"
-                                                onClick={(e) => {
-                                                    if (e.target.type !== 'checkbox') {
-                                                        toggleOrganizationUnitExpanded(unit.id)
+                                ) : organizationHierarchy.length > 0 ? (() => {
+                                    const hierarchy = buildOrganizationHierarchy()
+                                    const allWelderIds = getAllWeldersFromHierarchy(hierarchy)
+                                    const isNoneSelected = selectedWelders.__NONE__ || (Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0)
+                                    const showAllChecked = !isNoneSelected && Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0
+
+                                    // Рекурсивная функция для получения всех сварщиков из подразделения и его дочерних
+                                    const getAllWeldersInUnit = (unit) => {
+                                        const welders = [...(unit.welders || [])]
+                                        if (unit.children && unit.children.length > 0) {
+                                            unit.children.forEach(child => {
+                                                welders.push(...getAllWeldersInUnit(child))
+                                            })
+                                        }
+                                        return welders
+                                    }
+
+                                    // Рекурсивная функция для определения состояния подразделения
+                                    // Возвращает объект: { checked: boolean, indeterminate: boolean }
+                                    const getUnitState = (unit) => {
+                                        if (showAllChecked) return { checked: true, indeterminate: false }
+                                        if (selectedOrganizationUnits.__NONE__) return { checked: false, indeterminate: false }
+
+                                        // Проверяем, явно ли выбрано это подразделение
+                                        const explicitlySelected = selectedOrganizationUnits[unit.id] === true
+
+                                        // Проверяем состояние сварщиков в этом подразделении
+                                        const unitWelders = unit.welders || []
+                                        const selectedWeldersCount = unitWelders.filter(w => selectedWelders[w.id] && !selectedWelders.__NONE__).length
+                                        const allWeldersSelected = unitWelders.length > 0 && selectedWeldersCount === unitWelders.length
+                                        const someWeldersSelected = selectedWeldersCount > 0
+
+                                        // Проверяем состояние дочерних подразделений
+                                        let allChildrenChecked = false
+                                        let someChildrenChecked = false
+
+                                        // Проверяем, есть ли выбранные сварщики в дочерних подразделениях
+                                        let someWeldersInChildrenSelected = false
+
+                                        if (unit.children && unit.children.length > 0) {
+                                            const childrenStates = unit.children.map(child => {
+                                                const state = getUnitState(child)
+                                                return state
+                                            })
+                                            allChildrenChecked = childrenStates.every(state => state.checked)
+                                            // Проверяем, есть ли хотя бы один выбранный или частично выбранный дочерний элемент
+                                            someChildrenChecked = childrenStates.some(state => state.checked || state.indeterminate)
+
+                                            // Проверяем, есть ли выбранные сварщики в дочерних подразделениях
+                                            unit.children.forEach(child => {
+                                                const childWelders = getAllWeldersInUnit(child)
+                                                const hasSelectedWelders = childWelders.some(w => selectedWelders[w.id] && !selectedWelders.__NONE__)
+                                                if (hasSelectedWelders) {
+                                                    someWeldersInChildrenSelected = true
+                                                }
+                                            })
+                                        }
+
+                                        // Если есть дочерние подразделения, учитываем их состояние
+                                        if (unit.children && unit.children.length > 0) {
+                                            // Если все дочерние подразделения выбраны
+                                            // Для родительских подразделений проверяем только дочерние, сварщики не обязательны
+                                            if (allChildrenChecked) {
+                                                // Если есть сварщики в этом подразделении, они тоже должны быть выбраны
+                                                if (unitWelders.length > 0) {
+                                                    if (allWeldersSelected) {
+                                                        return { checked: true, indeterminate: false }
+                                                    } else {
+                                                        return { checked: false, indeterminate: true }
                                                     }
-                                                }}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedOrganizationUnits[unit.id] || false}
-                                                    onChange={() => toggleOrganizationUnit(unit.id)}
-                                                />
-                                                <span className="parameter-label">{unit.name}</span>
-                                                {unit.welders.length > 0 && (
-                                                    <span className={`parameter-arrow ${expandedOrganizationUnits[unit.id] ? 'expanded' : ''}`}>▾</span>
-                                                )}
-                                            </label>
-                                            {expandedOrganizationUnits[unit.id] && unit.welders.length > 0 && (
-                                                <div className="parameter-expanded-content">
-                                                    {unit.welders.map(welder => (
-                                                        <label key={welder.id} className="parameter-sub-item">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedWelders[welder.id] || false}
-                                                                onChange={() => toggleWelder(welder.id)}
-                                                            />
-                                                            <span>{welder.name}</span>
-                                                        </label>
-                                                    ))}
+                                                } else {
+                                                    // Если нет сварщиков в этом подразделении, достаточно что все дочерние выбраны
+                                                    return { checked: true, indeterminate: false }
+                                                }
+                                            }
+                                            // Если хотя бы что-то выбрано (дочерние или сварщики в этом подразделении или в дочерних)
+                                            if (someChildrenChecked || someWeldersSelected || someWeldersInChildrenSelected) {
+                                                return { checked: false, indeterminate: true }
+                                            }
+                                            // Если явно выбрано, но дочерние не все выбраны - indeterminate
+                                            if (explicitlySelected) {
+                                                return { checked: false, indeterminate: true }
+                                            }
+                                            return { checked: false, indeterminate: false }
+                                        }
+
+                                        // Для подразделений без дочерних элементов проверяем сварщиков и явный выбор
+                                        if (unitWelders.length > 0) {
+                                            if (allWeldersSelected) {
+                                                return { checked: true, indeterminate: false }
+                                            } else if (someWeldersSelected) {
+                                                return { checked: false, indeterminate: true }
+                                            }
+                                        }
+
+                                        // Если нет сварщиков и нет дочерних, проверяем только явный выбор
+                                        // Подразделение считается выбранным, если оно явно выбрано
+                                        return { checked: explicitlySelected, indeterminate: false }
+                                    }
+
+                                    // Для обратной совместимости
+                                    const isUnitSelected = (unit) => {
+                                        const state = getUnitState(unit)
+                                        return state.checked
+                                    }
+
+                                    // Рекурсивная функция для рендеринга подразделения с дочерними
+                                    const renderOrganizationUnit = (unit, level = 0) => {
+                                        const unitState = getUnitState(unit)
+                                        const isUnitChecked = Boolean(unitState?.checked ?? false)
+                                        const isUnitIndeterminate = Boolean(unitState?.indeterminate ?? false)
+
+                                        // Фильтрация сварщиков по поисковому запросу
+                                        const searchLower = welderSearchTerm ? welderSearchTerm.toLowerCase() : ''
+                                        const filteredWelders = unit.welders.filter(welder => {
+                                            if (!searchLower) return true
+                                            return welder.name.toLowerCase().includes(searchLower)
+                                        })
+
+                                        // Проверяем, нужно ли показывать это подразделение (если есть поиск)
+                                        const unitNameMatch = !searchLower || unit.name.toLowerCase().includes(searchLower)
+                                        const hasMatchingWelders = filteredWelders.length > 0
+                                        const hasMatchingChildren = unit.children && unit.children.some(child => {
+                                            const childNameMatch = !searchLower || child.name.toLowerCase().includes(searchLower)
+                                            const childHasWelders = child.welders.some(w => {
+                                                if (!searchLower) return true
+                                                return w.name.toLowerCase().includes(searchLower)
+                                            })
+                                            return childNameMatch || childHasWelders
+                                        })
+
+                                        // Показываем подразделение, если оно соответствует поиску или имеет соответствующих сварщиков/дочерние
+                                        if (searchLower && !unitNameMatch && !hasMatchingWelders && !hasMatchingChildren) {
+                                            return null
+                                        }
+
+                                        const hasContent = filteredWelders.length > 0 || (unit.children && unit.children.length > 0)
+
+                                        // Отступ для видимости иерархии
+                                        const indentSize = 12 // пикселей на уровень
+                                        const paddingLeft = level * indentSize
+
+                                        return (
+                                            <div key={unit.id} className="parameter-item-expandable" style={{ marginLeft: `${paddingLeft}px` }}>
+                                                <div className="parameter-item" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isUnitChecked}
+                                                        ref={(input) => {
+                                                            if (input) {
+                                                                input.indeterminate = false // Убираем indeterminate с чекбокса
+                                                            }
+                                                        }}
+                                                        onChange={() => toggleOrganizationUnit(unit.id)}
+                                                    />
+                                                    <span
+                                                        className="parameter-label"
+                                                        style={{
+                                                            flex: 1,
+                                                            cursor: 'pointer',
+                                                            color: isUnitIndeterminate ? '#F6B243' : undefined // Желтый цвет для частичного выбора
+                                                        }}
+                                                        onClick={() => toggleOrganizationUnitExpanded(unit.id)}
+                                                    >
+                                                    {unit.name}
+                                                </span>
+                                                    {hasContent && (
+                                                        <button
+                                                            className="org-unit-expand-btn"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleOrganizationUnitExpanded(unit.id);
+                                                            }}
+                                                        >
+                                                            {expandedOrganizationUnits[unit.id] ? (
+                                                                <FaChevronDown className="expand-icon" />
+                                                            ) : (
+                                                                <FaChevronRight className="expand-icon" />
+                                                            )}
+                                                        </button>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
-                                    ))
-                                ) : (
+                                                {expandedOrganizationUnits[unit.id] && (
+                                                    <div className="parameter-expanded-content" style={{ marginLeft: '0', paddingLeft: '0' }}>
+                                                        {/* Рендерим дочерние подразделения ПЕРЕД сварщиками */}
+                                                        {/* Важно: дочерние подразделения рендерятся с level + 1, что даст им правильный отступ */}
+                                                        {/* Отступ применяется через marginLeft в renderOrganizationUnit, поэтому дочерние подразделения будут иметь отступ 24px относительно родителя */}
+                                                        {unit.children && unit.children.length > 0 && (
+                                                            <>
+                                                                {unit.children.map(child => {
+                                                                    // Рекурсивно рендерим дочернее подразделение с увеличенным уровнем
+                                                                    // level + 1 даст отступ (level + 1) * 24px = например, для ОГК внутри Alloy: 1 * 24 = 24px
+                                                                    return renderOrganizationUnit(child, level + 1)
+                                                                }).filter(Boolean)}
+                                                            </>
+                                                        )}
+                                                        {/* Рендерим сварщиков ПОСЛЕ дочерних подразделений */}
+                                                        {filteredWelders.length > 0 && filteredWelders.map(welder => {
+                                                            const isWelderChecked = Boolean(showAllChecked || (selectedWelders[welder.id] && !selectedWelders.__NONE__))
+                                                            return (
+                                                                <label key={welder.id} className="parameter-sub-item" style={{ marginLeft: `${indentSize}px`, paddingLeft: '0' }}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isWelderChecked}
+                                                                        onChange={() => toggleWelder(welder.id)}
+                                                                    />
+                                                                    <span>{welder.name}</span>
+                                                                </label>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    }
+
+                                    // Фильтрация корневых подразделений по поисковому запросу
+                                    const searchLower = welderSearchTerm ? welderSearchTerm.toLowerCase() : ''
+                                    const filteredRootUnits = hierarchy.filter(unit => {
+                                        if (!searchLower) return true
+                                        const unitNameMatch = unit.name.toLowerCase().includes(searchLower)
+                                        const hasMatchingWelders = unit.welders.some(welder =>
+                                            welder.name.toLowerCase().includes(searchLower)
+                                        )
+                                        // Проверяем дочерние подразделения рекурсивно
+                                        const hasMatchingChildren = unit.children && unit.children.some(child => {
+                                            const childNameMatch = child.name.toLowerCase().includes(searchLower)
+                                            const childHasWelders = child.welders.some(w => w.name.toLowerCase().includes(searchLower))
+                                            return childNameMatch || childHasWelders
+                                        })
+                                        return unitNameMatch || hasMatchingWelders || hasMatchingChildren
+                                    })
+
+                                    return filteredRootUnits.map(unit => renderOrganizationUnit(unit, 0)).filter(Boolean)
+                                })() : (
                                     <div className="parameter-item" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
                                         Нет доступных подразделений
                                     </div>
@@ -1253,50 +2146,14 @@ const ReportsPage = () => {
                         {/* Right sub-panel - Report columns selection */}
                         <div className="middle-subpanel middle-subpanel-right">
                             <div className="parameters-list">
-                                <div className="parameter-item-expandable">
-                                    <label
-                                        className="parameter-item"
-                                        onClick={(e) => {
-                                            if (e.target.type !== 'checkbox') {
-                                                toggleExpanded('equipmentModel')
-                                            }
-                                        }}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={parameters.equipmentModel}
-                                            onChange={() => toggleParameter('equipmentModel')}
-                                        />
-                                        <span className="parameter-label">Модель оборудования</span>
-                                        <span className={`parameter-arrow ${expandedEquipmentModel ? 'expanded' : ''}`}>▾</span>
-                                    </label>
-                                    {expandedEquipmentModel && (
-                                        <div className="parameter-expanded-content">
-                                            {loadingEquipment ? (
-                                                <div className="parameter-sub-item" style={{ color: '#7B8BA6', fontSize: '11px' }}>
-                                                    Загрузка...
-                                                </div>
-                                            ) : uniqueEquipmentModels.length > 0 ? (
-                                                uniqueEquipmentModels.map(model => {
-                                                    return (
-                                                        <label key={model.id || model.key} className="parameter-sub-item">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedEquipmentModels[model.key] || false}
-                                                                onChange={() => toggleEquipmentModel(model.key)}
-                                                            />
-                                                            <span>{model.name}</span>
-                                                        </label>
-                                                    )
-                                                })
-                                            ) : (
-                                                <div className="parameter-sub-item" style={{ color: '#7B8BA6', fontSize: '11px' }}>
-                                                    Нет доступных моделей
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+                                <label className="parameter-item">
+                                    <input
+                                        type="checkbox"
+                                        checked={parameters.equipmentModel}
+                                        onChange={() => toggleParameter('equipmentModel')}
+                                    />
+                                    <span className="parameter-label">Модель оборудования</span>
+                                </label>
 
                                 <label className="parameter-item">
                                     <input
@@ -1333,7 +2190,19 @@ const ReportsPage = () => {
                                             onChange={() => toggleParameter('workOutsideSetCurrent')}
                                         />
                                         <span className="parameter-label">Пределы разрешенного уст. тока</span>
-                                        <span className={`parameter-arrow ${expandedWorkOutsideSetCurrent ? 'expanded' : ''}`}>▾</span>
+                                        <button
+                                            className="org-unit-expand-btn"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleExpanded('workOutsideSetCurrent');
+                                            }}
+                                        >
+                                            {expandedWorkOutsideSetCurrent ? (
+                                                <FaChevronDown className="expand-icon" />
+                                            ) : (
+                                                <FaChevronRight className="expand-icon" />
+                                            )}
+                                        </button>
                                     </label>
                                     {expandedWorkOutsideSetCurrent && (
                                         <div className="parameter-expanded-content">
@@ -1407,7 +2276,19 @@ const ReportsPage = () => {
                                             onChange={() => toggleParameter('workOutsideActualCurrent')}
                                         />
                                         <span className="parameter-label">Пределы разрешенного факт.тока</span>
-                                        <span className={`parameter-arrow ${expandedWorkOutsideActualCurrent ? 'expanded' : ''}`}>▾</span>
+                                        <button
+                                            className="org-unit-expand-btn"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleExpanded('workOutsideActualCurrent');
+                                            }}
+                                        >
+                                            {expandedWorkOutsideActualCurrent ? (
+                                                <FaChevronDown className="expand-icon" />
+                                            ) : (
+                                                <FaChevronRight className="expand-icon" />
+                                            )}
+                                        </button>
                                     </label>
                                     {expandedWorkOutsideActualCurrent && (
                                         <div className="parameter-expanded-content">
