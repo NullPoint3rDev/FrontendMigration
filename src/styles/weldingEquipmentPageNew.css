@@ -140,6 +140,15 @@
     color: #f2f1f4;
 }
 
+.filter-tile-header-label--partial {
+    color: rgb(246, 178, 67);
+}
+
+/* Подсветка родительских подразделений при выборе дочерних (как на странице Отчёты) */
+.filter-unit-name--highlight {
+    color: rgb(246, 178, 67);
+}
+
 .filter-arrow {
     font-size: 22px;
     color: #F9FFFF;

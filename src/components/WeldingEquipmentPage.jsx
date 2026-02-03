@@ -86,7 +86,7 @@ function WeldingEquipmentPage() {
     const [organizationUnitFilter, setOrganizationUnitFilter] = useState([]); // Массив выбранных подразделений
     const [statusFilter, setStatusFilter] = useState(['on', 'welding', 'error', 'off']); // Массив выбранных статусов (по умолчанию все выбраны)
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortField, setSortField] = useState(null);
+    const [sortField, setSortField] = useState('unit'); // по умолчанию сортировка по подразделению
     const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
     const [viewMode, setViewMode] = useState('table'); // 'tiles' or 'table'
     const [expandedFilters, setExpandedFilters] = useState({
@@ -1080,6 +1080,27 @@ function WeldingEquipmentPage() {
         { id: 'MONITORING_BLOCK', label: 'Блок Мониторинга' }
     ];
 
+    // Подсветка заголовка «Подразделение» при частичном выборе (как на странице Отчёты)
+    const getAllUnitNamesFromHierarchy = (units) => {
+        const names = [];
+        units.forEach(unit => {
+            names.push(unit.name);
+            if (unit.children && unit.children.length > 0) {
+                names.push(...getAllUnitNamesFromHierarchy(unit.children));
+            }
+        });
+        return names;
+    };
+    const allDepartmentNames = organizationHierarchy.length ? getAllUnitNamesFromHierarchy(organizationHierarchy) : [];
+    // «Ни одного»: только __NONE__ или пустой массив (все галочки сняты)
+    const isDepartmentNoneSelected =
+        (organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__') ||
+        organizationUnitFilter.length === 0;
+    const isDepartmentAllSelected = (organizationUnitFilter.length === 0 || organizationUnitFilter.length === allDepartmentNames.length) && !isDepartmentNoneSelected && allDepartmentNames.length > 0;
+    // Подсветка только при частичном выборе: есть хотя бы одно выбранное подразделение и не все
+    const hasAtLeastOneDepartment = organizationUnitFilter.length > 0 && organizationUnitFilter.some(name => name !== '__NONE__');
+    const isDepartmentFilterPartial = !isDepartmentNoneSelected && !isDepartmentAllSelected && allDepartmentNames.length > 0 && hasAtLeastOneDepartment;
+
     return (
         <div className="welding-equipment-page">
             <div className="equipment-page-header-row">
@@ -1112,7 +1133,7 @@ function WeldingEquipmentPage() {
                             className="filter-tile-header"
                             onClick={() => toggleFilter('department')}
                         >
-                            <span>Подразделение</span>
+                            <span className={isDepartmentFilterPartial ? 'filter-tile-header-label filter-tile-header-label--partial' : 'filter-tile-header-label'}>Подразделение</span>
                             <span className="filter-arrow">{expandedFilters.department ? '▾' : '▸'}</span>
                         </button>
                         {expandedFilters.department && (() => {
@@ -1133,11 +1154,29 @@ function WeldingEquipmentPage() {
                                 organizationUnitFilter.length === allUnitNames.length) && !isNoneSelected;
                             const showAllChecked = organizationUnitFilter.length === 0 && !isNoneSelected;
 
+                            // Состояние подразделения рекурсивно (как на странице Отчёты): по unit.name в фильтре и по состоянию дочерних
+                            const getUnitState = (unit) => {
+                                if (showAllChecked) return { checked: true, indeterminate: false };
+                                if (isNoneSelected) return { checked: false, indeterminate: false };
+                                const unitInFilter = organizationUnitFilter.includes(unit.name);
+                                const hasChildren = unit.children && unit.children.length > 0;
+                                if (!hasChildren) {
+                                    return { checked: unitInFilter, indeterminate: false };
+                                }
+                                const childStates = unit.children.map(child => getUnitState(child));
+                                const allChildrenChecked = childStates.every(s => s.checked);
+                                const someChildrenCheckedOrIndeterminate = childStates.some(s => s.checked || s.indeterminate);
+                                if (allChildrenChecked) return { checked: true, indeterminate: false };
+                                if (someChildrenCheckedOrIndeterminate) return { checked: false, indeterminate: true };
+                                if (unitInFilter) return { checked: false, indeterminate: true };
+                                return { checked: false, indeterminate: false };
+                            };
+
                             // Рекурсивная функция для рендеринга подразделений
                             const renderUnit = (unit, level = 0) => {
-                                const allChildUnits = getAllChildUnits(unit);
-                                const allUnitNamesForUnit = allChildUnits.map(u => u.name);
-                                const isUnitChecked = showAllChecked || (!isNoneSelected && allUnitNamesForUnit.every(name => organizationUnitFilter.includes(name)));
+                                const unitState = getUnitState(unit);
+                                const isUnitChecked = Boolean(unitState.checked);
+                                const isUnitIndeterminate = Boolean(unitState.indeterminate);
                                 const hasChildren = unit.children && unit.children.length > 0;
 
                                 return (
@@ -1168,7 +1207,7 @@ function WeldingEquipmentPage() {
                                                 checked={isUnitChecked}
                                                 onChange={() => toggleOrganizationUnit(unit.id)}
                                             />
-                                            <span>{unit.name}</span>
+                                            <span className={isUnitIndeterminate ? 'filter-unit-name filter-unit-name--highlight' : 'filter-unit-name'}>{unit.name}</span>
                                         </label>
                                         {hasChildren && expandedOrganizationUnits[unit.id] && (
                                             <div className="filter-sub-options-tree">
