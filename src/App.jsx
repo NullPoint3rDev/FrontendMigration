@@ -21,7 +21,7 @@ import AddWelderPage from './pages/AddWelderPage';
 import CertificationPage from './pages/CertificationPage';
 import AboutPage from './components/AboutPage';
 import AuthPage from './components/AuthPage';
-import UserProfilePage from './pages/UserProfilePage';
+import UserProfilePage from './components/UserProfilePage';
 import ReportsPage from './components/ReportsPage';
 import NotificationsPage from './components/NotificationsPage';
 import EmployeesPage from './components/EmployeesPage';
@@ -160,6 +160,7 @@ function App() {
 
                                     {/* Профиль пользователя */}
                                     <Route path="/profile" element={<UserProfilePage />} />
+
                                 </Routes>
                             </Layout>
                         </PrivateRoute>

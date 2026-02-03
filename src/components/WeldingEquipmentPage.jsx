@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { FaChevronRight, FaChevronDown } from 'react-icons/fa';
+import { FaChevronRight, FaChevronDown, FaBell } from 'react-icons/fa';
 import '../styles/weldingEquipmentPageNew.css';
 import { useNavigate } from 'react-router-dom';
 import AddEquipmentModal from './AddEquipmentModal';
+import UserProfile from './UserProfile';
 import machineImage from '../images/Untitled 3 копия.png';
 // WebSocket отключен — используем только polling API
 import {
@@ -1081,432 +1082,447 @@ function WeldingEquipmentPage() {
 
     return (
         <div className="welding-equipment-page">
-            <div className="filters-column">
-                <div className="filter-tile search-input">
-                    <input
-                        type="text"
-                        className="search-input"
-                        placeholder="Поиск..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-
-                <div className="filter-tile">
+            <div className="equipment-page-header-row">
+                <h1 className="equipment-page-title-header">Сварочное оборудование</h1>
+                <div className="equipment-page-controls">
                     <button
-                        className="filter-tile-header"
-                        onClick={() => toggleFilter('department')}
+                        className="control-btn notifications-btn"
+                        onClick={() => navigate('/notifications')}
                     >
-                        <span>Подразделение</span>
-                        <span className="filter-arrow">{expandedFilters.department ? '▾' : '▸'}</span>
+                        <FaBell className="notifications-icon" />
+                        <span className="notifications-badge"></span>
                     </button>
-                    {expandedFilters.department && (() => {
-                        // Получаем все подразделения (родительские и дочерние) для проверки "Все"
-                        const getAllUnitNames = (units) => {
-                            const names = [];
-                            units.forEach(unit => {
-                                names.push(unit.name);
-                                if (unit.children && unit.children.length > 0) {
-                                    names.push(...getAllUnitNames(unit.children));
-                                }
-                            });
-                            return names;
-                        };
-                        const allUnitNames = getAllUnitNames(organizationHierarchy);
-                        const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
-                        const allSelected = (organizationUnitFilter.length === 0 ||
-                            organizationUnitFilter.length === allUnitNames.length) && !isNoneSelected;
-                        const showAllChecked = organizationUnitFilter.length === 0 && !isNoneSelected;
+                    <UserProfile />
+                </div>
+            </div>
+            <div className="welding-equipment-page-content">
+                <div className="filters-column">
+                    <div className="filter-tile search-input">
+                        <input
+                            type="text"
+                            className="search-input"
+                            placeholder="Поиск..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
 
-                        // Рекурсивная функция для рендеринга подразделений
-                        const renderUnit = (unit, level = 0) => {
-                            const allChildUnits = getAllChildUnits(unit);
-                            const allUnitNamesForUnit = allChildUnits.map(u => u.name);
-                            const isUnitChecked = showAllChecked || (!isNoneSelected && allUnitNamesForUnit.every(name => organizationUnitFilter.includes(name)));
-                            const hasChildren = unit.children && unit.children.length > 0;
+                    <div className="filter-tile">
+                        <button
+                            className="filter-tile-header"
+                            onClick={() => toggleFilter('department')}
+                        >
+                            <span>Подразделение</span>
+                            <span className="filter-arrow">{expandedFilters.department ? '▾' : '▸'}</span>
+                        </button>
+                        {expandedFilters.department && (() => {
+                            // Получаем все подразделения (родительские и дочерние) для проверки "Все"
+                            const getAllUnitNames = (units) => {
+                                const names = [];
+                                units.forEach(unit => {
+                                    names.push(unit.name);
+                                    if (unit.children && unit.children.length > 0) {
+                                        names.push(...getAllUnitNames(unit.children));
+                                    }
+                                });
+                                return names;
+                            };
+                            const allUnitNames = getAllUnitNames(organizationHierarchy);
+                            const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
+                            const allSelected = (organizationUnitFilter.length === 0 ||
+                                organizationUnitFilter.length === allUnitNames.length) && !isNoneSelected;
+                            const showAllChecked = organizationUnitFilter.length === 0 && !isNoneSelected;
+
+                            // Рекурсивная функция для рендеринга подразделений
+                            const renderUnit = (unit, level = 0) => {
+                                const allChildUnits = getAllChildUnits(unit);
+                                const allUnitNamesForUnit = allChildUnits.map(u => u.name);
+                                const isUnitChecked = showAllChecked || (!isNoneSelected && allUnitNamesForUnit.every(name => organizationUnitFilter.includes(name)));
+                                const hasChildren = unit.children && unit.children.length > 0;
+
+                                return (
+                                    <div key={unit.id} className="filter-option-tree">
+                                        <label
+                                            className={`filter-checkbox ${level > 0 ? 'filter-checkbox-child' : ''}`}
+                                            style={{ paddingLeft: level > 0 ? `${20 + (level - 1) * 20}px` : '0' }}
+                                        >
+                                            {hasChildren && (
+                                                <button
+                                                    className="org-unit-expand-btn"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        toggleOrganizationUnitExpanded(unit.id);
+                                                    }}
+                                                >
+                                                    {expandedOrganizationUnits[unit.id] ? (
+                                                        <FaChevronDown className="expand-icon" />
+                                                    ) : (
+                                                        <FaChevronRight className="expand-icon" />
+                                                    )}
+                                                </button>
+                                            )}
+                                            {!hasChildren && <span className="org-unit-spacer" />}
+                                            <input
+                                                type="checkbox"
+                                                checked={isUnitChecked}
+                                                onChange={() => toggleOrganizationUnit(unit.id)}
+                                            />
+                                            <span>{unit.name}</span>
+                                        </label>
+                                        {hasChildren && expandedOrganizationUnits[unit.id] && (
+                                            <div className="filter-sub-options-tree">
+                                                {unit.children.map(child => renderUnit(child, level + 1))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            };
 
                             return (
-                                <div key={unit.id} className="filter-option-tree">
-                                    <label
-                                        className={`filter-checkbox ${level > 0 ? 'filter-checkbox-child' : ''}`}
-                                        style={{ paddingLeft: level > 0 ? `${20 + (level - 1) * 20}px` : '0' }}
-                                    >
-                                        {hasChildren && (
-                                            <button
-                                                className="org-unit-expand-btn"
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    toggleOrganizationUnitExpanded(unit.id);
-                                                }}
-                                            >
-                                                {expandedOrganizationUnits[unit.id] ? (
-                                                    <FaChevronDown className="expand-icon" />
-                                                ) : (
-                                                    <FaChevronRight className="expand-icon" />
-                                                )}
-                                            </button>
-                                        )}
-                                        {!hasChildren && <span className="org-unit-spacer" />}
+                                <div className="filter-tile-content">
+                                    <label className="filter-checkbox">
                                         <input
                                             type="checkbox"
-                                            checked={isUnitChecked}
-                                            onChange={() => toggleOrganizationUnit(unit.id)}
+                                            checked={allSelected}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    // Выбираем все
+                                                    setOrganizationUnitFilter(allUnitNames);
+                                                } else {
+                                                    // При снятии галочки с активного "Все" - сбрасываем все галочки
+                                                    setOrganizationUnitFilter(['__NONE__']);
+                                                }
+                                            }}
                                         />
-                                        <span>{unit.name}</span>
+                                        <span>Все</span>
                                     </label>
-                                    {hasChildren && expandedOrganizationUnits[unit.id] && (
-                                        <div className="filter-sub-options-tree">
-                                            {unit.children.map(child => renderUnit(child, level + 1))}
+                                    {organizationHierarchy.length > 0 ? (
+                                        organizationHierarchy.map(unit => renderUnit(unit))
+                                    ) : (
+                                        <div className="parameter-item" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
+                                            Нет доступных подразделений
                                         </div>
                                     )}
                                 </div>
                             );
-                        };
-
-                        return (
-                            <div className="filter-tile-content">
-                                <label className="filter-checkbox">
-                                    <input
-                                        type="checkbox"
-                                        checked={allSelected}
-                                        onChange={(e) => {
-                                            if (e.target.checked) {
-                                                // Выбираем все
-                                                setOrganizationUnitFilter(allUnitNames);
-                                            } else {
-                                                // При снятии галочки с активного "Все" - сбрасываем все галочки
-                                                setOrganizationUnitFilter(['__NONE__']);
-                                            }
-                                        }}
-                                    />
-                                    <span>Все</span>
-                                </label>
-                                {organizationHierarchy.length > 0 ? (
-                                    organizationHierarchy.map(unit => renderUnit(unit))
-                                ) : (
-                                    <div className="parameter-item" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
-                                        Нет доступных подразделений
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })()}
-                </div>
-
-                <div className="filter-tile">
-                    <button
-                        className="filter-tile-header"
-                        onClick={() => toggleFilter('status')}
-                    >
-                        <span>Статус</span>
-                        <span className="filter-arrow">{expandedFilters.status ? '▾' : '▸'}</span>
-                    </button>
-                    {expandedFilters.status && (() => {
-                        const allStatusIds = statuses.filter(s => s.id !== 'all').map(s => s.id);
-                        const isNoneSelected = statusFilter.length === 1 && statusFilter[0] === '__NONE__';
-                        const isAllSelected = statusFilter.length === allStatusIds.length && !isNoneSelected;
-                        const showAllChecked = false; // Не показываем все как выбранные когда массив пустой
-
-                        return (
-                            <div className="filter-tile-content">
-                                <label className="filter-checkbox">
-                                    <input
-                                        type="checkbox"
-                                        checked={isAllSelected}
-                                        onChange={(e) => {
-                                            if (e.target.checked) {
-                                                // Выбираем все статусы кроме "all"
-                                                setStatusFilter(allStatusIds);
-                                            } else {
-                                                // При снятии галочки с активного "Все" - очищаем все галочки (пустой массив)
-                                                setStatusFilter([]);
-                                            }
-                                        }}
-                                    />
-                                    <span>Все</span>
-                                </label>
-                                {statuses.filter(s => s.id !== 'all').map(status => {
-                                    const isChecked = showAllChecked || statusFilter.includes(status.id);
-                                    return (
-                                        <label key={status.id} className="filter-checkbox">
-                                            <input
-                                                type="checkbox"
-                                                checked={isChecked}
-                                                onChange={(e) => {
-                                                    const willBeChecked = e.target.checked;
-                                                    const isNoneSelected = statusFilter.length === 1 && statusFilter[0] === '__NONE__';
-
-                                                    if (isNoneSelected) {
-                                                        // Если было "__NONE__", удаляем его и добавляем выбранный элемент
-                                                        if (willBeChecked) {
-                                                            setStatusFilter([status.id]);
-                                                        }
-                                                    } else if (statusFilter.length === 0) {
-                                                        // Если массив пустой (ничего не выбрано)
-                                                        if (willBeChecked) {
-                                                            // Ставим галочку - добавляем только этот элемент
-                                                            setStatusFilter([status.id]);
-                                                        } else {
-                                                            // Снимаем галочку - ничего не делаем, уже ничего не выбрано
-                                                            return;
-                                                        }
-                                                    } else {
-                                                        // Если массив не пустой
-                                                        if (willBeChecked) {
-                                                            // Добавляем в фильтр
-                                                            if (!statusFilter.includes(status.id)) {
-                                                                setStatusFilter(prev => [...prev, status.id]);
-                                                            }
-                                                        } else {
-                                                            // Убираем из фильтра
-                                                            const newFilter = statusFilter.filter(id => id !== status.id);
-                                                            setStatusFilter(newFilter);
-                                                        }
-                                                    }
-                                                }}
-                                            />
-                                            <span>{status.label}</span>
-                                        </label>
-                                    );
-                                })}
-                            </div>
-                        );
-                    })()}
-                </div>
-
-                <div className="filter-tile">
-                    <button
-                        className="filter-tile-header"
-                        onClick={() => toggleFilter('model')}
-                    >
-                        <span>Модель аппарата</span>
-                        <span className="filter-arrow">{expandedFilters.model ? '▾' : '▸'}</span>
-                    </button>
-                    {expandedFilters.model && (() => {
-                        const allModelIds = models.filter(m => m.id !== 'all').map(m => m.id);
-                        const isNoneSelected = modelFilter.length === 1 && modelFilter[0] === '__NONE__';
-                        const isAllSelected = (modelFilter.length === 0 || modelFilter.length === allModelIds.length) && !isNoneSelected;
-                        const showAllChecked = modelFilter.length === 0 && !isNoneSelected; // Если пусто - показываем все как выбранные
-
-                        return (
-                            <div className="filter-tile-content">
-                                <label className="filter-checkbox">
-                                    <input
-                                        type="checkbox"
-                                        checked={isAllSelected}
-                                        onChange={(e) => {
-                                            if (e.target.checked) {
-                                                // Выбираем все модели кроме "all"
-                                                setModelFilter(allModelIds);
-                                            } else {
-                                                // При снятии галочки с активного "Все" - сбрасываем все галочки
-                                                setModelFilter(['__NONE__']);
-                                            }
-                                        }}
-                                    />
-                                    <span>Все</span>
-                                </label>
-                                {models.filter(m => m.id !== 'all').map(model => {
-                                    const isChecked = showAllChecked || modelFilter.includes(model.id);
-                                    return (
-                                        <label key={model.id} className="filter-checkbox">
-                                            <input
-                                                type="checkbox"
-                                                checked={isChecked}
-                                                onChange={(e) => {
-                                                    const willBeChecked = e.target.checked;
-                                                    const isNoneSelected = modelFilter.length === 1 && modelFilter[0] === '__NONE__';
-
-                                                    if (isNoneSelected) {
-                                                        // Если было "__NONE__", удаляем его и добавляем выбранный элемент
-                                                        if (willBeChecked) {
-                                                            setModelFilter([model.id]);
-                                                        }
-                                                    } else if (modelFilter.length === 0) {
-                                                        // Если массив пустой (все выбрано)
-                                                        if (willBeChecked) {
-                                                            // Ставим галочку - ничего не делаем, все уже выбрано
-                                                            return;
-                                                        } else {
-                                                            // Снимаем галочку - выбираем все кроме текущего
-                                                            const allExceptCurrent = allModelIds.filter(id => id !== model.id);
-                                                            setModelFilter(allExceptCurrent);
-                                                        }
-                                                    } else {
-                                                        // Если массив не пустой
-                                                        if (willBeChecked) {
-                                                            // Добавляем в фильтр
-                                                            if (!modelFilter.includes(model.id)) {
-                                                                setModelFilter(prev => [...prev, model.id]);
-                                                            }
-                                                        } else {
-                                                            // Убираем из фильтра
-                                                            const newFilter = modelFilter.filter(id => id !== model.id);
-                                                            setModelFilter(newFilter);
-                                                        }
-                                                    }
-                                                }}
-                                            />
-                                            <span>{model.label}</span>
-                                        </label>
-                                    );
-                                })}
-                            </div>
-                        );
-                    })()}
-                </div>
-            </div>
-
-            <div className="equipment-content-column">
-                <div className="content-header">
-                    <div className="add-device-tile">
-                        <button className="add-device-btn" onClick={openAddModal}>
-                            <span className="add-icon">+</span>
-                            <span>Добавить оборудование</span>
-                        </button>
+                        })()}
                     </div>
-                    <div className="view-toggle">
+
+                    <div className="filter-tile">
                         <button
-                            className={`view-btn ${viewMode === 'tiles' ? 'active' : ''}`}
-                            onClick={() => setViewMode('tiles')}
+                            className="filter-tile-header"
+                            onClick={() => toggleFilter('status')}
                         >
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                                <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                                <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                                <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                                <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                            </svg>
-                            <span>Таблица</span>
+                            <span>Статус</span>
+                            <span className="filter-arrow">{expandedFilters.status ? '▾' : '▸'}</span>
                         </button>
+                        {expandedFilters.status && (() => {
+                            const allStatusIds = statuses.filter(s => s.id !== 'all').map(s => s.id);
+                            const isNoneSelected = statusFilter.length === 1 && statusFilter[0] === '__NONE__';
+                            const isAllSelected = statusFilter.length === allStatusIds.length && !isNoneSelected;
+                            const showAllChecked = false; // Не показываем все как выбранные когда массив пустой
+
+                            return (
+                                <div className="filter-tile-content">
+                                    <label className="filter-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={isAllSelected}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    // Выбираем все статусы кроме "all"
+                                                    setStatusFilter(allStatusIds);
+                                                } else {
+                                                    // При снятии галочки с активного "Все" - очищаем все галочки (пустой массив)
+                                                    setStatusFilter([]);
+                                                }
+                                            }}
+                                        />
+                                        <span>Все</span>
+                                    </label>
+                                    {statuses.filter(s => s.id !== 'all').map(status => {
+                                        const isChecked = showAllChecked || statusFilter.includes(status.id);
+                                        return (
+                                            <label key={status.id} className="filter-checkbox">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={(e) => {
+                                                        const willBeChecked = e.target.checked;
+                                                        const isNoneSelected = statusFilter.length === 1 && statusFilter[0] === '__NONE__';
+
+                                                        if (isNoneSelected) {
+                                                            // Если было "__NONE__", удаляем его и добавляем выбранный элемент
+                                                            if (willBeChecked) {
+                                                                setStatusFilter([status.id]);
+                                                            }
+                                                        } else if (statusFilter.length === 0) {
+                                                            // Если массив пустой (ничего не выбрано)
+                                                            if (willBeChecked) {
+                                                                // Ставим галочку - добавляем только этот элемент
+                                                                setStatusFilter([status.id]);
+                                                            } else {
+                                                                // Снимаем галочку - ничего не делаем, уже ничего не выбрано
+                                                                return;
+                                                            }
+                                                        } else {
+                                                            // Если массив не пустой
+                                                            if (willBeChecked) {
+                                                                // Добавляем в фильтр
+                                                                if (!statusFilter.includes(status.id)) {
+                                                                    setStatusFilter(prev => [...prev, status.id]);
+                                                                }
+                                                            } else {
+                                                                // Убираем из фильтра
+                                                                const newFilter = statusFilter.filter(id => id !== status.id);
+                                                                setStatusFilter(newFilter);
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                                <span>{status.label}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
+                    </div>
+
+                    <div className="filter-tile">
                         <button
-                            className={`view-btn ${viewMode === 'table' ? 'active' : ''}`}
-                            onClick={() => setViewMode('table')}
+                            className="filter-tile-header"
+                            onClick={() => toggleFilter('model')}
                         >
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                                <path d="M2 4H14M2 8H14M2 12H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                            </svg>
-                            <span>Плитки</span>
+                            <span>Модель аппарата</span>
+                            <span className="filter-arrow">{expandedFilters.model ? '▾' : '▸'}</span>
                         </button>
+                        {expandedFilters.model && (() => {
+                            const allModelIds = models.filter(m => m.id !== 'all').map(m => m.id);
+                            const isNoneSelected = modelFilter.length === 1 && modelFilter[0] === '__NONE__';
+                            const isAllSelected = (modelFilter.length === 0 || modelFilter.length === allModelIds.length) && !isNoneSelected;
+                            const showAllChecked = modelFilter.length === 0 && !isNoneSelected; // Если пусто - показываем все как выбранные
+
+                            return (
+                                <div className="filter-tile-content">
+                                    <label className="filter-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={isAllSelected}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    // Выбираем все модели кроме "all"
+                                                    setModelFilter(allModelIds);
+                                                } else {
+                                                    // При снятии галочки с активного "Все" - сбрасываем все галочки
+                                                    setModelFilter(['__NONE__']);
+                                                }
+                                            }}
+                                        />
+                                        <span>Все</span>
+                                    </label>
+                                    {models.filter(m => m.id !== 'all').map(model => {
+                                        const isChecked = showAllChecked || modelFilter.includes(model.id);
+                                        return (
+                                            <label key={model.id} className="filter-checkbox">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={(e) => {
+                                                        const willBeChecked = e.target.checked;
+                                                        const isNoneSelected = modelFilter.length === 1 && modelFilter[0] === '__NONE__';
+
+                                                        if (isNoneSelected) {
+                                                            // Если было "__NONE__", удаляем его и добавляем выбранный элемент
+                                                            if (willBeChecked) {
+                                                                setModelFilter([model.id]);
+                                                            }
+                                                        } else if (modelFilter.length === 0) {
+                                                            // Если массив пустой (все выбрано)
+                                                            if (willBeChecked) {
+                                                                // Ставим галочку - ничего не делаем, все уже выбрано
+                                                                return;
+                                                            } else {
+                                                                // Снимаем галочку - выбираем все кроме текущего
+                                                                const allExceptCurrent = allModelIds.filter(id => id !== model.id);
+                                                                setModelFilter(allExceptCurrent);
+                                                            }
+                                                        } else {
+                                                            // Если массив не пустой
+                                                            if (willBeChecked) {
+                                                                // Добавляем в фильтр
+                                                                if (!modelFilter.includes(model.id)) {
+                                                                    setModelFilter(prev => [...prev, model.id]);
+                                                                }
+                                                            } else {
+                                                                // Убираем из фильтра
+                                                                const newFilter = modelFilter.filter(id => id !== model.id);
+                                                                setModelFilter(newFilter);
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                                <span>{model.label}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
 
-                {viewMode === 'table' && (
-                    <div className="equipment-table-container">
-                        <table className="equipment-table">
-                            <thead>
-                            <tr>
-                                <th
-                                    onClick={() => toggleSort('model')}
-                                    className={sortField === 'model' ? 'sort-active' : ''}
-                                >
-                                    <span>Модель</span>
-                                    <span className={`sort-arrow ${sortField === 'model' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                <div className="equipment-content-column">
+                    <div className="content-header">
+                        <div className="add-device-tile">
+                            <button className="add-device-btn" onClick={openAddModal}>
+                                <span className="add-icon">+</span>
+                                <span>Добавить оборудование</span>
+                            </button>
+                        </div>
+                        <div className="view-toggle">
+                            <button
+                                className={`view-btn ${viewMode === 'tiles' ? 'active' : ''}`}
+                                onClick={() => setViewMode('tiles')}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                    <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                                    <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                                    <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                                    <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                                </svg>
+                                <span>Таблица</span>
+                            </button>
+                            <button
+                                className={`view-btn ${viewMode === 'table' ? 'active' : ''}`}
+                                onClick={() => setViewMode('table')}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                    <path d="M2 4H14M2 8H14M2 12H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                </svg>
+                                <span>Плитки</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {viewMode === 'table' && (
+                        <div className="equipment-table-container">
+                            <table className="equipment-table">
+                                <thead>
+                                <tr>
+                                    <th
+                                        onClick={() => toggleSort('model')}
+                                        className={sortField === 'model' ? 'sort-active' : ''}
+                                    >
+                                        <span>Модель</span>
+                                        <span className={`sort-arrow ${sortField === 'model' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
                                             {sortField === 'model' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
                                         </span>
-                                </th>
-                                <th
-                                    onClick={() => toggleSort('name')}
-                                    className={sortField === 'name' ? 'sort-active' : ''}
-                                >
-                                    <span>Название</span>
-                                    <span className={`sort-arrow ${sortField === 'name' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                    </th>
+                                    <th
+                                        onClick={() => toggleSort('name')}
+                                        className={sortField === 'name' ? 'sort-active' : ''}
+                                    >
+                                        <span>Название</span>
+                                        <span className={`sort-arrow ${sortField === 'name' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
                                             {sortField === 'name' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
                                         </span>
-                                </th>
-                                <th
-                                    onClick={() => toggleSort('unit')}
-                                    className={sortField === 'unit' ? 'sort-active' : ''}
-                                >
-                                    <span>Подразделение</span>
-                                    <span className={`sort-arrow ${sortField === 'unit' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                    </th>
+                                    <th
+                                        onClick={() => toggleSort('unit')}
+                                        className={sortField === 'unit' ? 'sort-active' : ''}
+                                    >
+                                        <span>Подразделение</span>
+                                        <span className={`sort-arrow ${sortField === 'unit' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
                                             {sortField === 'unit' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
                                         </span>
-                                </th>
-                                <th
-                                    onClick={() => toggleSort('inventory')}
-                                    className={sortField === 'inventory' ? 'sort-active' : ''}
-                                >
-                                    <span>Инвентарный номер</span>
-                                    <span className={`sort-arrow ${sortField === 'inventory' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                    </th>
+                                    <th
+                                        onClick={() => toggleSort('inventory')}
+                                        className={sortField === 'inventory' ? 'sort-active' : ''}
+                                    >
+                                        <span>Инвентарный номер</span>
+                                        <span className={`sort-arrow ${sortField === 'inventory' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
                                             {sortField === 'inventory' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
                                         </span>
-                                </th>
-                                <th
-                                    onClick={() => toggleSort('welder')}
-                                    className={sortField === 'welder' ? 'sort-active' : ''}
-                                >
-                                    <span>Сварщик</span>
-                                    <span className={`sort-arrow ${sortField === 'welder' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                    </th>
+                                    <th
+                                        onClick={() => toggleSort('welder')}
+                                        className={sortField === 'welder' ? 'sort-active' : ''}
+                                    >
+                                        <span>Сварщик</span>
+                                        <span className={`sort-arrow ${sortField === 'welder' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
                                             {sortField === 'welder' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
                                         </span>
-                                </th>
-                                <th>
-                                    <span>Последнее включение</span>
-                                    <span className="sort-arrow">▾</span>
-                                </th>
-                                <th
-                                    onClick={() => toggleSort('status')}
-                                    className={sortField === 'status' ? 'sort-active' : ''}
-                                >
-                                    <span>Статус</span>
-                                    <span className={`sort-arrow ${sortField === 'status' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                    </th>
+                                    <th>
+                                        <span>Последнее включение</span>
+                                        <span className="sort-arrow">▾</span>
+                                    </th>
+                                    <th
+                                        onClick={() => toggleSort('status')}
+                                        className={sortField === 'status' ? 'sort-active' : ''}
+                                    >
+                                        <span>Статус</span>
+                                        <span className={`sort-arrow ${sortField === 'status' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
                                             {sortField === 'status' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
                                         </span>
-                                </th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {filteredEquipment.map((item, index) => {
-                                const status = deviceStatusesByMac[item.mac] || 'off';
-                                const rawState = deviceStatesByMac[item.mac] || null;
-                                const formattedStatus = getFormattedStatus(status, rawState);
-                                const modelDisplay = getModelDisplay(item);
-                                const modelParts = formatModel(modelDisplay);
-                                // Используем комбинацию id и индекса для гарантии уникальности ключа
-                                const uniqueKey = item.id ? `${item.id}-${index}` : `item-${index}-${item.mac || Date.now()}`;
-                                return (
-                                    <tr
-                                        key={uniqueKey}
-                                        className="table-row table-row-compact"
-                                        onClick={() => handleControl(item)}
-                                    >
-                                        <td>
-                                            <div className="model-cell-table">
-                                                <span className={`equipment-status-dot ${status}`}></span>
-                                                <img
-                                                    src={machineImage}
-                                                    alt={modelDisplay}
-                                                    className="machine-thumbnail-small"
-                                                />
-                                                <span className="model-text">
+                                    </th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {filteredEquipment.map((item, index) => {
+                                    const status = deviceStatusesByMac[item.mac] || 'off';
+                                    const rawState = deviceStatesByMac[item.mac] || null;
+                                    const formattedStatus = getFormattedStatus(status, rawState);
+                                    const modelDisplay = getModelDisplay(item);
+                                    const modelParts = formatModel(modelDisplay);
+                                    // Используем комбинацию id и индекса для гарантии уникальности ключа
+                                    const uniqueKey = item.id ? `${item.id}-${index}` : `item-${index}-${item.mac || Date.now()}`;
+                                    return (
+                                        <tr
+                                            key={uniqueKey}
+                                            className="table-row table-row-compact"
+                                            onClick={() => handleControl(item)}
+                                        >
+                                            <td>
+                                                <div className="model-cell-table">
+                                                    <span className={`equipment-status-dot ${status}`}></span>
+                                                    <img
+                                                        src={machineImage}
+                                                        alt={modelDisplay}
+                                                        className="machine-thumbnail-small"
+                                                    />
+                                                    <span className="model-text">
                                                         <span className="model-part-first">{modelParts.first}</span>
-                                                    {modelParts.second && (
-                                                        <span className="model-part-second"> {modelParts.second}</span>
-                                                    )}
+                                                        {modelParts.second && (
+                                                            <span className="model-part-second"> {modelParts.second}</span>
+                                                        )}
                                                     </span>
-                                            </div>
-                                        </td>
-                                        <td>{item.name}</td>
-                                        <td>{item.organizationUnit?.name || 'Не указано'}</td>
-                                        <td>{item.inventoryNumber || 'Не указан'}</td>
-                                        <td>{getWelderDisplay(item)}</td>
-                                        <td>{getLastActivation(item) || 'Нет данных'}</td>
-                                        <td>
+                                                </div>
+                                            </td>
+                                            <td>{item.name}</td>
+                                            <td>{item.organizationUnit?.name || 'Не указано'}</td>
+                                            <td>{item.inventoryNumber || 'Не указан'}</td>
+                                            <td>{getWelderDisplay(item)}</td>
+                                            <td>{getLastActivation(item) || 'Нет данных'}</td>
+                                            <td>
                                                 <span
                                                     className={`status-badge ${formattedStatus.className}`}
                                                     style={formattedStatus.color ? { color: formattedStatus.color } : {}}
                                                 >
                                                     {formattedStatus.text}
                                                 </span>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <AddEquipmentModal
