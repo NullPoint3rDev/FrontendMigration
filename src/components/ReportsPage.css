@@ -81,15 +81,59 @@
 }
 
 .panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    background: #112436;
-    gap: 12px;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 12px 16px !important;
+    background: #112436 !important;
+    gap: 12px !important;
+}
+
+.report-name {
+    display: flex !important;
+    align-items: center !important;
+    flex: 1 !important;
+    gap: 10px !important;
+    padding: 2px 8px !important;
+    background: #1B1622 !important;
+    border-radius: 3px !important;
+    flex-shrink: 0 !important;
+}
+
+.report-name-label {
+    font-size: 12px !important;
+    color: #ECECEF !important;
+    white-space: nowrap !important;
+}
+
+.report-name-input {
+    flex: 1 !important;
+    background: transparent !important;
+    border: none !important;
+    color: #f0f4ff !important;
+    font-size: 13px !important;
+    outline: none !important;
+    transition: all 0.2s !important;
+    padding: 0 !important;
+    text-align: right !important;
+}
+
+.report-name-input:focus {
+    outline: none;
+}
+
+.report-name-input::placeholder {
+    color: #7B8BA6;
 }
 
 .template-report-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #f0f4ff;
+    white-space: nowrap;
+}
+
+.template-report-label-below {
     font-size: 14px;
     font-weight: 500;
     color: #f0f4ff;
@@ -919,6 +963,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    padding: 1px 132px;
 }
 
 .right-panel-time-inputs input[type="time"] {
@@ -1320,11 +1365,90 @@
     flex-shrink: 0;
 }
 
+/* Строка только с полем "Имя" (без кнопки Сохранить) */
+.right-panel-template-name-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    background: #1B1622;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.right-panel-template-name-row .right-panel-template-name-label {
+    font-size: 12px;
+    color: #ECECEF;
+    white-space: nowrap;
+}
+
+.right-panel-template-name-row .right-panel-template-name-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #f0f4ff;
+    font-size: 13px;
+    outline: none;
+    padding: 0;
+    text-align: right;
+}
+
+.right-panel-template-name-row .right-panel-template-name-input:focus {
+    outline: none;
+}
+
+.right-panel-template-name-row .right-panel-template-name-input::placeholder {
+    color: #7B8BA6;
+}
+
 .right-panel-save-name-row {
     display: flex;
     align-items: center;
     gap: 12px;
     margin-bottom: 16px;
+}
+
+/* Нижняя строка: Сформировать, Сохранить, Удалить на одной линии */
+.right-panel-bottom-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(79, 70, 90, 0.4);
+    flex-shrink: 0;
+}
+
+.right-panel-generate-btn {
+    padding: 6px 12px;
+    background: #F6B243;
+    border: none;
+    border-radius: 6px;
+    color: #1B1622;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.right-panel-generate-btn:hover {
+    background: #E7A933;
+}
+
+.right-panel-delete-inline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.right-panel-bottom-actions .right-panel-delete-template-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.right-panel-bottom-actions .right-panel-delete-template-btn:disabled:hover {
+    background: #1B1622;
 }
 
 .right-panel-save-template-btn {
@@ -1548,16 +1672,22 @@
 
 /* Стили для кастомного выпадающего списка типа отчета */
 .report-type-dropdown-container {
+    display: flex !important;
     position: relative;
-    margin: 12px 6px 12px 6px;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 6px 16px !important;
+    background: #112436 !important;
+    gap: 8px !important;
 }
 
 .report-type-dropdown-header {
     display: flex;
+    flex: 1;
     justify-content: space-between;
     align-items: center;
     padding: 8px 12px;
-    background: #112436;
+    background-color: #1B1622;
     border: 1px solid transparent;
     border-radius: 3px;
     cursor: pointer;
@@ -1603,7 +1733,7 @@
 .report-type-dropdown-item {
     display: flex;
     align-items: center;
-    padding: 8px 12px;
+    padding: 8px 28px;
     cursor: pointer;
     color: #f0f4ff;
     font-size: 13px;
@@ -1611,7 +1741,7 @@
 }
 
 .report-type-dropdown-item:hover {
-    background: rgba(123, 139, 166, 0.1);
+    background: #1B1622 !important;
 }
 
 .report-type-dropdown-item.selected {

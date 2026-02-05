@@ -1102,7 +1102,7 @@ const ReportsPage = () => {
     const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
     const monthDays = Array.from({ length: 31 }, (_, i) => i + 1)
 
-    // При создании нового шаблона настройки (чекбоксы, даты) недоступны, пока не выбран тип шаблона
+    // При создании нового шаблона настройки (чекбоксы, даты) недоступны, пока не выбран тип отчета
     const configDisabled = isCreatingTemplate && !selectedReportType
 
     const handleConfigAreaClick = () => {
@@ -1577,7 +1577,7 @@ const ReportsPage = () => {
 
         // Проверяем, выбран ли тип отчета
         if (!selectedReportType) {
-            alert('Выберите тип шаблона отчета')
+            alert('Выберите тип отчета')
             return
         }
 
@@ -1667,13 +1667,13 @@ const ReportsPage = () => {
                             </div>
                         </div>
 
-                        {/* Выпадающий список "Тип шаблона" */}
+                        {/* Выпадающий список "Тип отчета" */}
                         <div className={`template-type-dropdown-container ${templateTypeDropdownOpen ? 'open' : ''}`}>
                             <div
                                 className="template-type-dropdown-header"
                                 onClick={() => setTemplateTypeDropdownOpen(!templateTypeDropdownOpen)}
                             >
-                                <span className={`template-type-dropdown-title ${selectedTemplateTypes.length > 0 && !selectedTemplateTypes.includes('Все') ? 'template-type-dropdown-title--partial' : ''}`}>Тип шаблона</span>
+                                <span className={`template-type-dropdown-title ${selectedTemplateTypes.length > 0 && !selectedTemplateTypes.includes('Все') ? 'template-type-dropdown-title--partial' : ''}`}>Тип отчета</span>
                                 <button
                                     className="org-unit-expand-btn"
                                     onClick={(e) => {
@@ -1720,22 +1720,22 @@ const ReportsPage = () => {
                                         if (templateSearchQuery && !template.name.toLowerCase().includes(templateSearchQuery.toLowerCase())) {
                                             return false
                                         }
-                                        // Фильтр по типу шаблона
+                                        // Фильтр по типу отчета
                                         if (selectedTemplateTypes.length === 0 || selectedTemplateTypes.includes('Все')) {
                                             return true
                                         }
-                                        // Здесь можно добавить логику фильтрации по типу, если в шаблоне есть поле типа
+                                        // Здесь можно добавить логику фильтрации по типу, если в отчета есть поле типа
                                         return true
                                     })
                                     .map((template, index) => {
-                                        // Проверяем, есть ли у шаблона автоматическое формирование
+                                        // Проверяем, есть ли у отчета автоматическое формирование
                                         // АВТО показывается только если:
-                                        // 1. isActive === true (шаблон активен)
+                                        // 1. isActive === true (отчет активен)
                                         // 2. есть autoReportSettings и они не пустые
                                         // 3. есть хотя бы одно значимое поле (время + дни недели/месяца)
                                         let hasAutoReport = false
 
-                                        // Сначала проверяем isActive - если шаблон не активен, бейдж не показываем
+                                        // Сначала проверяем isActive - если отчет не активен, бейдж не показываем
                                         if (template.isActive === true) {
                                             // Проверяем, что autoReportSettings существует и не null
                                             if (template.autoReportSettings != null) {
@@ -1790,7 +1790,7 @@ const ReportsPage = () => {
                             onClick={handleNewTemplate}
                         >
                             <span className="new-template-icon">+</span>
-                            <span>Новый шаблон</span>
+                            <span>Новый отчет</span>
                         </button>
                     </div>
                 </div>
@@ -1798,14 +1798,16 @@ const ReportsPage = () => {
                 {/* Middle Panel - Report Parameters */}
                 <div className="reports-panel reports-panel-middle">
                     <div className="panel-header">
-                        <span className="template-report-label">Шаблон отчёта:</span>
-                        <button
-                            className={`generate-now-btn ${(isCreatingTemplate || currentTemplateId) ? 'active' : ''}`}
-                            type="button"
-                            onClick={handleGenerateNow}
-                        >
-                            <span>Сформировать сейчас</span>
-                        </button>
+                        <div className="report-name">
+                            <span className="template-report-label">Имя:*</span>
+                            <input
+                                type="text"
+                                className="report-name-input"
+                                placeholder="Введите название"
+                                value={templateName}
+                                onChange={(e) => setTemplateName(e.target.value)}
+                            />
+                        </div>
                     </div>
 
                     {/* Выпадающий список "Выберите тип отчета" */}
@@ -1818,7 +1820,7 @@ const ReportsPage = () => {
                             }}
                         >
                             <span className={`report-type-dropdown-title ${!selectedReportType ? 'placeholder' : ''}`}>
-                                {selectedReportType || 'Выберите тип шаблона*'}
+                                {selectedReportType || 'Выберите тип отчета*'}
                             </span>
                             <button
                                 className="org-unit-expand-btn"
@@ -1861,7 +1863,7 @@ const ReportsPage = () => {
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleConfigAreaClick(); } }}
                                 role="button"
                                 tabIndex={0}
-                                aria-label="Сначала выберите тип шаблона"
+                                aria-label="Сначала выберите тип отчета"
                             />
                         )}
                         <div className={`middle-panel-content-inner ${configDisabled ? 'report-config-content-disabled' : ''}`}>
@@ -2465,136 +2467,11 @@ const ReportsPage = () => {
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleConfigAreaClick(); } }}
                                 role="button"
                                 tabIndex={0}
-                                aria-label="Сначала выберите тип шаблона"
+                                aria-label="Сначала выберите тип отчета"
                             />
                         )}
                         <div className={`right-panel-content ${configDisabled ? 'report-config-content-disabled' : ''}`}>
-                            {(isCreatingTemplate || currentTemplateId) ? (
-                                <>
-                                    {/* Кнопка "Сохранить шаблон" и поле "Имя" на одной линии */}
-                                    <div className="right-panel-save-name-row">
-                                        <button
-                                            className="right-panel-save-template-btn"
-                                            type="button"
-                                            onClick={handleSaveTemplate}
-                                        >
-                                            Сохранить шаблон
-                                        </button>
-                                        <div className="right-panel-template-name-tile">
-                                            <span className="right-panel-template-name-label">Имя:*</span>
-                                            <input
-                                                type="text"
-                                                className="right-panel-template-name-input"
-                                                placeholder="Введите название"
-                                                value={templateName}
-                                                onChange={(e) => setTemplateName(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="right-panel-email-tile">
-                                        <span className="right-panel-email-label">Эл. почта для отправки отчёта*</span>
-                                        <input
-                                            type="email"
-                                            className="right-panel-email-input"
-                                            placeholder="email@example.com"
-                                            value={templateEmail}
-                                            onChange={(e) => setTemplateEmail(e.target.value)}
-                                        />
-                                    </div>
-
-                                    {/* Чекбокс "Автоматическое формирование отчета" */}
-                                    <label className="right-panel-auto-report-checkbox-simple">
-                                        <input
-                                            type="checkbox"
-                                            checked={autoReportEnabled}
-                                            onChange={(e) => {
-                                                setAutoReportEnabled(e.target.checked)
-                                                if (e.target.checked) {
-                                                    setTemplateActive(true)
-                                                }
-                                            }}
-                                        />
-                                        <span>Автоматическое формирование отчёта</span>
-                                        {autoReportEnabled && <span className="auto-badge">АВТО</span>}
-                                    </label>
-
-                                    {/* Поля автоматического формирования (показываются только если чекбокс активен) */}
-                                    {autoReportEnabled && (
-                                        <div className="right-panel-auto-report-section">
-                                            <h3 className="right-panel-auto-report-title">Когда сформировать отчёт?</h3>
-
-                                            <div className="right-panel-auto-report-time-monthdays-row">
-                                                <div className="right-panel-auto-report-time">
-                                                    <label className="right-panel-auto-report-time-label">К какому времени?*</label>
-                                                    <input
-                                                        type="time"
-                                                        className="right-panel-auto-report-time-input"
-                                                        value={autoReportTime}
-                                                        onChange={(e) => setAutoReportTime(e.target.value)}
-                                                    />
-                                                </div>
-
-                                                <div className="right-panel-auto-report-monthdays">
-                                                    <label className="right-panel-auto-report-monthdays-label">По каким числам месяца?</label>
-                                                    <div className="right-panel-date-picker right-panel-auto-report-monthdays-calendar">
-                                                        <div className="right-panel-calendar-grid">
-                                                            <div className="right-panel-calendar-weekdays">
-                                                                {weekDays.map(day => (
-                                                                    <div key={day} className="right-panel-calendar-weekday">{day}</div>
-                                                                ))}
-                                                            </div>
-                                                            <div className="right-panel-calendar-days">
-                                                                {monthDays.map(day => (
-                                                                    <button
-                                                                        key={day}
-                                                                        type="button"
-                                                                        className={`right-panel-calendar-day ${autoReportMonthDays.includes(day) ? 'selected' : ''}`}
-                                                                        onClick={(e) => toggleAutoReportMonthDay(day, e)}
-                                                                    >
-                                                                        {day}
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="right-panel-auto-report-weekdays">
-                                                <label className="right-panel-auto-report-weekdays-label">По каким дням недели?</label>
-                                                <div className="right-panel-auto-report-weekdays-buttons">
-                                                    {weekDays.map(day => (
-                                                        <button
-                                                            key={day}
-                                                            type="button"
-                                                            className={`right-panel-auto-report-weekday-btn ${autoReportWeekDays.includes(day) ? 'selected' : ''}`}
-                                                            onClick={() => toggleAutoReportWeekDay(day)}
-                                                        >
-                                                            {day}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <>
-                                    {/* Форма когда шаблон не выбран */}
-                                    <div className="right-panel-email-tile">
-                                        <span className="right-panel-email-label">Продублировать отчёт на эл. почту:</span>
-                                        <input
-                                            type="email"
-                                            className="right-panel-email-input"
-                                            placeholder="email@example.com"
-                                            value={emailAddress}
-                                            onChange={(e) => setEmailAddress(e.target.value)}
-                                        />
-                                    </div>
-                                </>
-                            )}
-
+                            {/* Сверху только период для формирования отчёта */}
                             <div className="right-panel-period-section">
                                 <div className="right-panel-period-header">
                                     <h3 className="right-panel-period-question">Период для формирования отчёта:</h3>
@@ -2611,60 +2488,58 @@ const ReportsPage = () => {
 
                                 <div className="right-panel-time-range-row">
                                     <label className="right-panel-time-range-checkbox">
-                                        <input
-                                            type="checkbox"
-                                            checked={timeRangeEnabled}
-                                            onChange={(e) => setTimeRangeEnabled(e.target.checked)}
-                                        />
+
                                         <div className="right-panel-time-inputs">
                                             <input
                                                 type="time"
                                                 value={timeRange.start}
                                                 onChange={(e) => setTimeRange(prev => ({ ...prev, start: e.target.value }))}
-                                                disabled={!timeRangeEnabled}
+
                                             />
                                             <span>—</span>
                                             <input
                                                 type="time"
                                                 value={timeRange.end}
                                                 onChange={(e) => setTimeRange(prev => ({ ...prev, end: e.target.value }))}
-                                                disabled={!timeRangeEnabled}
+
                                             />
                                         </div>
                                     </label>
                                 </div>
 
-                                <div className="right-panel-working-days-row">
-                                    <label className="right-panel-working-days-checkbox">
-                                        <input
-                                            type="checkbox"
-                                            checked={workingDaysEnabled}
-                                            onChange={(e) => setWorkingDaysEnabled(e.target.checked)}
-                                        />
-                                        <span>по рабочим дням</span>
-                                    </label>
+                                {periodType !== 'Произвольный период' && (
+                                    <div className="right-panel-working-days-row">
+                                        <label className="right-panel-working-days-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                checked={workingDaysEnabled}
+                                                onChange={(e) => setWorkingDaysEnabled(e.target.checked)}
+                                            />
+                                            <span>по рабочим дням</span>
+                                        </label>
 
-                                    {workingDaysEnabled && (
-                                        <div className="right-panel-working-days-buttons">
-                                            {weekDays.map(day => (
-                                                <button
-                                                    key={day}
-                                                    type="button"
-                                                    className={`right-panel-week-day-btn ${selectedWorkingDays.includes(day) ? 'selected' : ''}`}
-                                                    onClick={() => {
-                                                        if (selectedWorkingDays.includes(day)) {
-                                                            setSelectedWorkingDays(selectedWorkingDays.filter(d => d !== day))
-                                                        } else {
-                                                            setSelectedWorkingDays([...selectedWorkingDays, day])
-                                                        }
-                                                    }}
-                                                >
-                                                    {day}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                                        {workingDaysEnabled && (
+                                            <div className="right-panel-working-days-buttons">
+                                                {weekDays.map(day => (
+                                                    <button
+                                                        key={day}
+                                                        type="button"
+                                                        className={`right-panel-week-day-btn ${selectedWorkingDays.includes(day) ? 'selected' : ''}`}
+                                                        onClick={() => {
+                                                            if (selectedWorkingDays.includes(day)) {
+                                                                setSelectedWorkingDays(selectedWorkingDays.filter(d => d !== day))
+                                                            } else {
+                                                                setSelectedWorkingDays([...selectedWorkingDays, day])
+                                                            }
+                                                        }}
+                                                    >
+                                                        {day}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 {periodType === 'Произвольный период' && (
                                     <div className="right-panel-date-range-section">
@@ -2795,20 +2670,130 @@ const ReportsPage = () => {
                                 )}
                             </div>
 
+                            {/* Под периодом: настройки автоматического отчёта (чекбокс, затем почта, затем детали) */}
+                            {(isCreatingTemplate || currentTemplateId) ? (
+                                <>
+                                    <label className="right-panel-auto-report-checkbox-simple">
+                                        <input
+                                            type="checkbox"
+                                            checked={autoReportEnabled}
+                                            onChange={(e) => {
+                                                setAutoReportEnabled(e.target.checked)
+                                                if (e.target.checked) {
+                                                    setTemplateActive(true)
+                                                }
+                                            }}
+                                        />
+                                        <span>Автоматическое формирование отчёта</span>
+                                        {autoReportEnabled && <span className="auto-badge">АВТО</span>}
+                                    </label>
 
-                            {(isCreatingTemplate || currentTemplateId) && currentTemplateId && (
-                                <div className="right-panel-template-actions">
-                                    <div className="right-panel-delete-template">
-                                        <span className="right-panel-delete-template-label">Удалить текущий шаблон?</span>
-                                        <button
-                                            className="right-panel-delete-template-btn"
-                                            type="button"
-                                            onClick={() => handleDeleteTemplate(currentTemplateId)}
-                                        >
-                                            <span className="delete-icon">×</span>
-                                            <span>Удалить</span>
-                                        </button>
+                                    <div className="right-panel-email-tile">
+                                        <span className="right-panel-email-label">Эл. почта для отправки отчёта*</span>
+                                        <input
+                                            type="email"
+                                            className="right-panel-email-input"
+                                            placeholder="email@example.com"
+                                            value={templateEmail}
+                                            onChange={(e) => setTemplateEmail(e.target.value)}
+                                        />
                                     </div>
+
+                                    {autoReportEnabled && (
+                                        <div className="right-panel-auto-report-section">
+                                            <h3 className="right-panel-auto-report-title">Когда сформировать отчёт?</h3>
+                                            <div className="right-panel-auto-report-time-monthdays-row">
+                                                <div className="right-panel-auto-report-time">
+                                                    <label className="right-panel-auto-report-time-label">К какому времени?*</label>
+                                                    <input
+                                                        type="time"
+                                                        className="right-panel-auto-report-time-input"
+                                                        value={autoReportTime}
+                                                        onChange={(e) => setAutoReportTime(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="right-panel-auto-report-monthdays">
+                                                    <label className="right-panel-auto-report-monthdays-label">По каким числам месяца?</label>
+                                                    <div className="right-panel-date-picker right-panel-auto-report-monthdays-calendar">
+                                                        <div className="right-panel-calendar-grid">
+                                                            <div className="right-panel-calendar-weekdays">
+                                                                {weekDays.map(day => (
+                                                                    <div key={day} className="right-panel-calendar-weekday">{day}</div>
+                                                                ))}
+                                                            </div>
+                                                            <div className="right-panel-calendar-days">
+                                                                {monthDays.map(day => (
+                                                                    <button
+                                                                        key={day}
+                                                                        type="button"
+                                                                        className={`right-panel-calendar-day ${autoReportMonthDays.includes(day) ? 'selected' : ''}`}
+                                                                        onClick={(e) => toggleAutoReportMonthDay(day, e)}
+                                                                    >
+                                                                        {day}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="right-panel-auto-report-weekdays">
+                                                <label className="right-panel-auto-report-weekdays-label">По каким дням недели?</label>
+                                                <div className="right-panel-auto-report-weekdays-buttons">
+                                                    {weekDays.map(day => (
+                                                        <button
+                                                            key={day}
+                                                            type="button"
+                                                            className={`right-panel-auto-report-weekday-btn ${autoReportWeekDays.includes(day) ? 'selected' : ''}`}
+                                                            onClick={() => toggleAutoReportWeekDay(day)}
+                                                        >
+                                                            {day}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="right-panel-email-tile">
+                                    <span className="right-panel-email-label">Продублировать отчёт на эл. почту:</span>
+                                    <input
+                                        type="email"
+                                        className="right-panel-email-input"
+                                        placeholder="email@example.com"
+                                        value={emailAddress}
+                                        onChange={(e) => setEmailAddress(e.target.value)}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Внизу три кнопки на одной линии: Сформировать, Сохранить, Удалить */}
+                            {(isCreatingTemplate || currentTemplateId) && (
+                                <div className="right-panel-bottom-actions">
+                                    <button
+                                        className="right-panel-generate-btn"
+                                        type="button"
+                                        onClick={handleGenerateNow}
+                                    >
+                                        Сформировать
+                                    </button>
+                                    <button
+                                        className="right-panel-save-template-btn"
+                                        type="button"
+                                        onClick={handleSaveTemplate}
+                                    >
+                                        Сохранить
+                                    </button>
+                                    <button
+                                        className="right-panel-delete-template-btn"
+                                        type="button"
+                                        onClick={() => currentTemplateId && handleDeleteTemplate(currentTemplateId)}
+                                        disabled={!currentTemplateId}
+                                    >
+                                        <span className="delete-icon">×</span>
+                                        <span>Удалить</span>
+                                    </button>
                                 </div>
                             )}
                         </div>
