@@ -566,7 +566,7 @@
     gap: 12px;
     width: 100%;
     box-sizing: border-box;
-    padding: 16px !important; /* Сохраняем padding от panel-body, но явно указываем */
+    padding: 0 !important; /* Сохраняем padding от panel-body, но явно указываем */
     overflow-y: auto; /* Переносим скролл на уровень left-panel-body */
     overflow-x: hidden;
 }

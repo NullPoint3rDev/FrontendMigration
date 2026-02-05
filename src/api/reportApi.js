@@ -346,7 +346,8 @@ export const reportApi = {
     },
 
     // Генерация отчета по работе сварщика
-    generateWelderWorkReport: async (templateId, periodStartDate, periodEndDate, periodStartTime, periodEndTime) => {
+    // selectedColumns — массив ключей выбранных опциональных колонок: equipmentModel, equipmentName, wireFeedSpeed, consumption, energyConsumed, gasConsumption
+    generateWelderWorkReport: async (templateId, periodStartDate, periodEndDate, periodStartTime, periodEndTime, selectedColumns = null) => {
         try {
             const requestBody = {
                 templateId: templateId,
@@ -355,6 +356,9 @@ export const reportApi = {
                 periodStartTime: periodStartTime,
                 periodEndTime: periodEndTime
             };
+            if (selectedColumns != null && Array.isArray(selectedColumns)) {
+                requestBody.selectedColumns = selectedColumns;
+            }
 
             const response = await fetch(`${BASE_URL}/welder-work/generate`, {
                 method: 'POST',

@@ -54,12 +54,13 @@ const ReportsPage = () => {
     const [showResaveConfirm, setShowResaveConfirm] = useState(false)
 
     // Report parameters state - динамические параметры для подразделений
-    // Параметры welder, tableNumber, department, timeOnline, arcBurningTime, wire, consumption всегда обязательны
+    // Для "По расходу проволоки": welder, tableNumber, department, timeOnline, arcBurningTime, wire, consumption обязательны
+    // Для "По работе сварщика": обязательные колонки фиксированы (№ п/п, Дата, Время начала шва, Режим, Ток, Напряжение, Время шва); остальные опциональны
     const [parameters, setParameters] = useState({
         welder: true, // Обязательный
         all: false, // По умолчанию "Все" не выбрано
-        wire: true, // Обязательный
-        consumption: true, // Обязательный
+        wire: true, // Обязательный (расход проволоки)
+        consumption: true, // Обязательный (расход проволоки) / опционально (сварщик)
         equipmentModel: false,
         workOutsideSetCurrent: false,
         workOutsideActualCurrent: false,
@@ -70,8 +71,17 @@ const ReportsPage = () => {
         timeOnline: true, // Обязательный
         arcBurningTime: true, // Обязательный
         efficiency: false,
-        energyConsumed: false
+        energyConsumed: false,
+        // Опциональные колонки отчёта по работе сварщика (швы)
+        wireFeedSpeed: false,   // Скорость подачи проволоки, м/мин
+        gasConsumption: false  // Расход газа, л
     })
+
+    // Настройки отчёта по работе сварщика (швы): мин. интервал между швами (с), мин. учитываемый шов (с)
+    const [minSeamInterval, setMinSeamInterval] = useState(2)
+    const [minSeamDuration, setMinSeamDuration] = useState(2)
+    const [minSeamIntervalEnabled, setMinSeamIntervalEnabled] = useState(true)
+    const [minSeamDurationEnabled, setMinSeamDurationEnabled] = useState(true)
 
     // Динамические параметры для подразделений и сварщиков
     const [selectedOrganizationUnits, setSelectedOrganizationUnits] = useState({})
@@ -598,10 +608,12 @@ const ReportsPage = () => {
     }
 
     const toggleParameter = (key) => {
-        // Запрещаем изменение обязательных параметров
-        const requiredParams = ['welder', 'tableNumber', 'department', 'timeOnline', 'arcBurningTime', 'wire', 'consumption']
+        // Обязательные параметры зависят от типа отчёта: для "По расходу проволоки" — wire, consumption тоже обязательны
+        const requiredForWire = ['welder', 'tableNumber', 'department', 'timeOnline', 'arcBurningTime', 'wire', 'consumption']
+        const requiredForWelder = ['welder', 'tableNumber', 'department', 'timeOnline', 'arcBurningTime']
+        const requiredParams = selectedReportType === 'По работе сварщика' ? requiredForWelder : requiredForWire
         if (requiredParams.includes(key)) {
-            return // Не позволяем изменять обязательные параметры
+            return
         }
 
         setParameters(prev => ({
@@ -1251,8 +1263,14 @@ const ReportsPage = () => {
             timeOnline: true,
             arcBurningTime: true,
             efficiency: false,
-            energyConsumed: false
+            energyConsumed: false,
+            wireFeedSpeed: false,
+            gasConsumption: false
         })
+        setMinSeamInterval(2)
+        setMinSeamDuration(2)
+        setMinSeamIntervalEnabled(true)
+        setMinSeamDurationEnabled(true)
         setSelectedOrganizationUnits({})
         setSelectedWelders({})
         setSelectedEquipmentModels({})
@@ -1297,8 +1315,17 @@ const ReportsPage = () => {
             reportParams.department = true
             reportParams.timeOnline = true
             reportParams.arcBurningTime = true
-            reportParams.wire = true
-            reportParams.consumption = true
+            // Для "По работе сварщика" колонки wire и consumption опциональны — сохраняем текущие галочки
+            if (selectedReportType !== 'По работе сварщика') {
+                reportParams.wire = true
+                reportParams.consumption = true
+            }
+            if (selectedReportType === 'По работе сварщика') {
+                reportParams.minSeamInterval = minSeamInterval
+                reportParams.minSeamDuration = minSeamDuration
+                reportParams.minSeamIntervalEnabled = minSeamIntervalEnabled
+                reportParams.minSeamDurationEnabled = minSeamDurationEnabled
+            }
 
             const templateData = {
                 id: currentTemplateId || undefined,
@@ -1374,22 +1401,25 @@ const ReportsPage = () => {
 
         // Загружаем параметры отчета
         if (template.reportParameters) {
+            const loadedType = template.reportParameters.reportType || template.reportType || ''
+            const { reportType, minSeamInterval: loadedMinSeamInterval, minSeamDuration: loadedMinSeamDuration, minSeamIntervalEnabled: loadedMinSeamIntervalEnabled, minSeamDurationEnabled: loadedMinSeamDurationEnabled, ...restParams } = template.reportParameters || {}
             setParameters(prev => {
-                // Не мержим служебное поле reportType в параметры колонок
-                // (оно нужно только для отображения выбора типа отчёта).
-                // eslint-disable-next-line no-unused-vars
-                const { reportType, ...restParams } = template.reportParameters || {}
                 const updated = { ...prev, ...restParams }
-                // Гарантируем, что обязательные параметры всегда true
                 updated.welder = true
                 updated.tableNumber = true
                 updated.department = true
                 updated.timeOnline = true
                 updated.arcBurningTime = true
-                updated.wire = true
-                updated.consumption = true
+                if (loadedType !== 'По работе сварщика') {
+                    updated.wire = true
+                    updated.consumption = true
+                }
                 return updated
             })
+            if (loadedMinSeamInterval != null) setMinSeamInterval(Math.max(0, Math.min(10, Number(loadedMinSeamInterval) || 0)))
+            if (loadedMinSeamDuration != null) setMinSeamDuration(Math.max(0, Math.min(10, Number(loadedMinSeamDuration) || 0)))
+            if (loadedMinSeamIntervalEnabled != null) setMinSeamIntervalEnabled(Boolean(loadedMinSeamIntervalEnabled))
+            if (loadedMinSeamDurationEnabled != null) setMinSeamDurationEnabled(Boolean(loadedMinSeamDurationEnabled))
         }
 
         // Загружаем настройки периода
@@ -1618,12 +1648,23 @@ const ReportsPage = () => {
                     periodEndTime
                 )
             } else if (selectedReportType === 'По работе сварщика') {
+                // Собираем выбранные опциональные колонки из текущих галочек (parameters)
+                const welderWorkOptionalKeys = [
+                    'equipmentModel',
+                    'equipmentName',
+                    'wireFeedSpeed',
+                    'consumption',
+                    'energyConsumed',
+                    'gasConsumption'
+                ]
+                const selectedColumns = welderWorkOptionalKeys.filter((key) => parameters[key] === true)
                 await reportApi.generateWelderWorkReport(
                     currentTemplateId,
                     formatDate(periodStartDate),
                     formatDate(periodEndDate),
                     periodStartTime,
-                    periodEndTime
+                    periodEndTime,
+                    selectedColumns
                 )
             } else if (selectedReportType === 'По работе оборудования') {
                 // TODO: Реализовать когда будет готово
@@ -2172,285 +2213,466 @@ const ReportsPage = () => {
                                 </div>
                             </div>
 
-                            {/* Right sub-panel - Report columns selection */}
+                            {/* Right sub-panel - Report columns selection (зависит от типа отчёта) */}
                             <div className="middle-subpanel middle-subpanel-right">
                                 <div className="parameters-list">
-                                    <label className="parameter-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={parameters.equipmentModel}
-                                            onChange={() => toggleParameter('equipmentModel')}
-                                        />
-                                        <span className="parameter-label">Модель оборудования</span>
-                                    </label>
-
-                                    <label className="parameter-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={parameters.wire}
-                                            onChange={() => toggleParameter('wire')}
-                                            disabled={true}
-                                        />
-                                        <span className="parameter-label">Проволока</span>
-                                    </label>
-
-                                    <label className="parameter-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={parameters.consumption}
-                                            onChange={() => toggleParameter('consumption')}
-                                            disabled={true}
-                                        />
-                                        <span className="parameter-label">Расход, кг</span>
-                                    </label>
-
-                                    <div className="parameter-item-expandable">
-                                        <label
-                                            className="parameter-item"
-                                            onClick={(e) => {
-                                                if (e.target.type !== 'checkbox') {
-                                                    toggleExpanded('workOutsideSetCurrent')
-                                                }
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={parameters.workOutsideSetCurrent}
-                                                onChange={() => toggleParameter('workOutsideSetCurrent')}
-                                            />
-                                            <span className="parameter-label">Пределы разрешенного уст. тока</span>
-                                            <button
-                                                className="org-unit-expand-btn"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toggleExpanded('workOutsideSetCurrent');
-                                                }}
-                                            >
-                                                {expandedWorkOutsideSetCurrent ? (
-                                                    <FaChevronDown className="expand-icon" />
-                                                ) : (
-                                                    <FaChevronRight className="expand-icon" />
-                                                )}
-                                            </button>
-                                        </label>
-                                        {expandedWorkOutsideSetCurrent && (
-                                            <div className="parameter-expanded-content">
-                                                <div className="current-range-controls">
-                                                    <div className="current-range-inputs">
-                                                        <input
-                                                            type="number"
-                                                            min="5"
-                                                            max={workOutsideSetCurrentRange.max}
-                                                            value={workOutsideSetCurrentRange.min}
-                                                            onChange={(e) => handleSetCurrentMinChange(e.target.value)}
-                                                            className="current-range-input"
-                                                        />
-                                                        <span className="current-range-separator">—</span>
-                                                        <input
-                                                            type="number"
-                                                            min={workOutsideSetCurrentRange.min}
-                                                            max="500"
-                                                            value={workOutsideSetCurrentRange.max}
-                                                            onChange={(e) => handleSetCurrentMaxChange(e.target.value)}
-                                                            className="current-range-input"
-                                                        />
-                                                    </div>
-                                                    <div className="current-range-slider-wrapper">
-                                                        <div className="current-range-slider">
-                                                            <div className="current-range-slider-track-bg"></div>
-                                                            <div
-                                                                className="current-range-slider-track"
-                                                                style={{
-                                                                    left: `${((workOutsideSetCurrentRange.min - 5) / (500 - 5)) * 100}%`,
-                                                                    width: `${((workOutsideSetCurrentRange.max - workOutsideSetCurrentRange.min) / (500 - 5)) * 100}%`
-                                                                }}
-                                                            />
-                                                            <input
-                                                                type="range"
-                                                                min="5"
-                                                                max="500"
-                                                                value={workOutsideSetCurrentRange.min}
-                                                                onInput={(e) => handleSetCurrentMinChange(e.target.value)}
-                                                                onChange={(e) => handleSetCurrentMinChange(e.target.value)}
-                                                                className="current-range-slider-input current-range-slider-input-min"
-                                                            />
-                                                            <input
-                                                                type="range"
-                                                                min="5"
-                                                                max="500"
-                                                                value={workOutsideSetCurrentRange.max}
-                                                                onInput={(e) => handleSetCurrentMaxChange(e.target.value)}
-                                                                onChange={(e) => handleSetCurrentMaxChange(e.target.value)}
-                                                                className="current-range-slider-input current-range-slider-input-max"
-                                                            />
+                                    {selectedReportType === 'По работе сварщика' ? (
+                                        /* Параметры отчёта по работе сварщика (швы): обязательные колонки всегда включены (серые галочки), остальные — опционально */
+                                        <>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">№ п/п</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">Дата</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">Время начала шва</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">Режим работы оборудования</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">Рабочий ток, А</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">Рабочее напряжение, В</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">Время шва, с</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.equipmentModel}
+                                                    onChange={() => toggleParameter('equipmentModel')}
+                                                />
+                                                <span className="parameter-label">Модель оборудования</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.equipmentName}
+                                                    onChange={() => toggleParameter('equipmentName')}
+                                                />
+                                                <span className="parameter-label">Наименование оборудования</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.wireFeedSpeed}
+                                                    onChange={() => toggleParameter('wireFeedSpeed')}
+                                                />
+                                                <span className="parameter-label">Скорость подачи проволоки, м/мин</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.consumption}
+                                                    onChange={() => toggleParameter('consumption')}
+                                                />
+                                                <span className="parameter-label">Расход проволоки, кг</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.energyConsumed}
+                                                    onChange={() => toggleParameter('energyConsumed')}
+                                                />
+                                                <span className="parameter-label">Затраченная энергия на шов, кВт*ч</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.gasConsumption}
+                                                    onChange={() => toggleParameter('gasConsumption')}
+                                                />
+                                                <span className="parameter-label">Расход газа, л</span>
+                                            </label>
+                                            <div className="parameter-item-expandable">
+                                                <label
+                                                    className="parameter-item"
+                                                    onClick={(e) => {
+                                                        if (e.target.type !== 'checkbox') toggleExpanded('workOutsideActualCurrent')
+                                                    }}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.workOutsideActualCurrent}
+                                                        onChange={() => toggleParameter('workOutsideActualCurrent')}
+                                                    />
+                                                    <span className="parameter-label">Пределы разрешенного факт.тока, А (min — max)</span>
+                                                    <button
+                                                        className="org-unit-expand-btn"
+                                                        onClick={(e) => { e.stopPropagation(); toggleExpanded('workOutsideActualCurrent'); }}
+                                                    >
+                                                        {expandedWorkOutsideActualCurrent ? <FaChevronDown className="expand-icon" /> : <FaChevronRight className="expand-icon" />}
+                                                    </button>
+                                                </label>
+                                                {expandedWorkOutsideActualCurrent && (
+                                                    <div className="parameter-expanded-content">
+                                                        <div className="current-range-controls">
+                                                            <div className="current-range-inputs">
+                                                                <input
+                                                                    type="number"
+                                                                    min="5"
+                                                                    max={workOutsideActualCurrentRange.max}
+                                                                    value={workOutsideActualCurrentRange.min}
+                                                                    onChange={(e) => handleActualCurrentMinChange(e.target.value)}
+                                                                    className="current-range-input"
+                                                                />
+                                                                <span className="current-range-separator">—</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min={workOutsideActualCurrentRange.min}
+                                                                    max="500"
+                                                                    value={workOutsideActualCurrentRange.max}
+                                                                    onChange={(e) => handleActualCurrentMaxChange(e.target.value)}
+                                                                    className="current-range-input"
+                                                                />
+                                                            </div>
+                                                            <div className="current-range-slider-wrapper">
+                                                                <div className="current-range-slider">
+                                                                    <div className="current-range-slider-track-bg"></div>
+                                                                    <div
+                                                                        className="current-range-slider-track"
+                                                                        style={{
+                                                                            left: `${((workOutsideActualCurrentRange.min - 5) / (500 - 5)) * 100}%`,
+                                                                            width: `${((workOutsideActualCurrentRange.max - workOutsideActualCurrentRange.min) / (500 - 5)) * 100}%`
+                                                                        }}
+                                                                    />
+                                                                    <input type="range" min="5" max="500" value={workOutsideActualCurrentRange.min} onInput={(e) => handleActualCurrentMinChange(e.target.value)} onChange={(e) => handleActualCurrentMinChange(e.target.value)} className="current-range-slider-input current-range-slider-input-min" />
+                                                                    <input type="range" min="5" max="500" value={workOutsideActualCurrentRange.max} onInput={(e) => handleActualCurrentMaxChange(e.target.value)} onChange={(e) => handleActualCurrentMaxChange(e.target.value)} className="current-range-slider-input current-range-slider-input-max" />
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="parameter-item-expandable">
-                                        <label
-                                            className="parameter-item"
-                                            onClick={(e) => {
-                                                if (e.target.type !== 'checkbox') {
-                                                    toggleExpanded('workOutsideActualCurrent')
-                                                }
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={parameters.workOutsideActualCurrent}
-                                                onChange={() => toggleParameter('workOutsideActualCurrent')}
-                                            />
-                                            <span className="parameter-label">Пределы разрешенного факт.тока</span>
-                                            <button
-                                                className="org-unit-expand-btn"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    toggleExpanded('workOutsideActualCurrent');
-                                                }}
-                                            >
-                                                {expandedWorkOutsideActualCurrent ? (
-                                                    <FaChevronDown className="expand-icon" />
-                                                ) : (
-                                                    <FaChevronRight className="expand-icon" />
                                                 )}
-                                            </button>
-                                        </label>
-                                        {expandedWorkOutsideActualCurrent && (
-                                            <div className="parameter-expanded-content">
-                                                <div className="current-range-controls">
-                                                    <div className="current-range-inputs">
-                                                        <input
-                                                            type="number"
-                                                            min="5"
-                                                            max={workOutsideActualCurrentRange.max}
-                                                            value={workOutsideActualCurrentRange.min}
-                                                            onChange={(e) => handleActualCurrentMinChange(e.target.value)}
-                                                            className="current-range-input"
-                                                        />
-                                                        <span className="current-range-separator">—</span>
-                                                        <input
-                                                            type="number"
-                                                            min={workOutsideActualCurrentRange.min}
-                                                            max="500"
-                                                            value={workOutsideActualCurrentRange.max}
-                                                            onChange={(e) => handleActualCurrentMaxChange(e.target.value)}
-                                                            className="current-range-input"
-                                                        />
-                                                    </div>
-                                                    <div className="current-range-slider-wrapper">
-                                                        <div className="current-range-slider">
-                                                            <div className="current-range-slider-track-bg"></div>
-                                                            <div
-                                                                className="current-range-slider-track"
-                                                                style={{
-                                                                    left: `${((workOutsideActualCurrentRange.min - 5) / (500 - 5)) * 100}%`,
-                                                                    width: `${((workOutsideActualCurrentRange.max - workOutsideActualCurrentRange.min) / (500 - 5)) * 100}%`
-                                                                }}
-                                                            />
-                                                            <input
-                                                                type="range"
-                                                                min="5"
-                                                                max="500"
-                                                                value={workOutsideActualCurrentRange.min}
-                                                                onInput={(e) => handleActualCurrentMinChange(e.target.value)}
-                                                                onChange={(e) => handleActualCurrentMinChange(e.target.value)}
-                                                                className="current-range-slider-input current-range-slider-input-min"
-                                                            />
-                                                            <input
-                                                                type="range"
-                                                                min="5"
-                                                                max="500"
-                                                                value={workOutsideActualCurrentRange.max}
-                                                                onInput={(e) => handleActualCurrentMaxChange(e.target.value)}
-                                                                onChange={(e) => handleActualCurrentMaxChange(e.target.value)}
-                                                                className="current-range-slider-input current-range-slider-input-max"
-                                                            />
+                                            </div>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={minSeamIntervalEnabled}
+                                                    onChange={(e) => setMinSeamIntervalEnabled(e.target.checked)}
+                                                />
+                                                <span className="parameter-label">Мин. интервал между швами, с (0–10)</span>
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    max={10}
+                                                    value={minSeamInterval}
+                                                    onChange={(e) => setMinSeamInterval(Math.max(0, Math.min(10, Number(e.target.value) || 0)))}
+                                                    className="current-range-input"
+                                                    style={{ width: '50px', marginLeft: '8px' }}
+                                                    disabled={!minSeamIntervalEnabled}
+                                                />
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={minSeamDurationEnabled}
+                                                    onChange={(e) => setMinSeamDurationEnabled(e.target.checked)}
+                                                />
+                                                <span className="parameter-label">Мин. учитываемый шов, с (0–10)</span>
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    max={10}
+                                                    value={minSeamDuration}
+                                                    onChange={(e) => setMinSeamDuration(Math.max(0, Math.min(10, Number(e.target.value) || 0)))}
+                                                    className="current-range-input"
+                                                    style={{ width: '50px', marginLeft: '8px' }}
+                                                    disabled={!minSeamDurationEnabled}
+                                                />
+                                            </label>
+                                        </>
+                                    ) : (
+                                        /* Параметры отчёта по расходу проволоки (текущий набор) */
+                                        <>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.equipmentModel}
+                                                    onChange={() => toggleParameter('equipmentModel')}
+                                                />
+                                                <span className="parameter-label">Модель оборудования</span>
+                                            </label>
+
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.wire}
+                                                    onChange={() => toggleParameter('wire')}
+                                                    disabled={true}
+                                                />
+                                                <span className="parameter-label">Проволока</span>
+                                            </label>
+
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.consumption}
+                                                    onChange={() => toggleParameter('consumption')}
+                                                    disabled={true}
+                                                />
+                                                <span className="parameter-label">Расход, кг</span>
+                                            </label>
+
+                                            <div className="parameter-item-expandable">
+                                                <label
+                                                    className="parameter-item"
+                                                    onClick={(e) => {
+                                                        if (e.target.type !== 'checkbox') {
+                                                            toggleExpanded('workOutsideSetCurrent')
+                                                        }
+                                                    }}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.workOutsideSetCurrent}
+                                                        onChange={() => toggleParameter('workOutsideSetCurrent')}
+                                                    />
+                                                    <span className="parameter-label">Пределы разрешенного уст. тока</span>
+                                                    <button
+                                                        className="org-unit-expand-btn"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleExpanded('workOutsideSetCurrent');
+                                                        }}
+                                                    >
+                                                        {expandedWorkOutsideSetCurrent ? (
+                                                            <FaChevronDown className="expand-icon" />
+                                                        ) : (
+                                                            <FaChevronRight className="expand-icon" />
+                                                        )}
+                                                    </button>
+                                                </label>
+                                                {expandedWorkOutsideSetCurrent && (
+                                                    <div className="parameter-expanded-content">
+                                                        <div className="current-range-controls">
+                                                            <div className="current-range-inputs">
+                                                                <input
+                                                                    type="number"
+                                                                    min="5"
+                                                                    max={workOutsideSetCurrentRange.max}
+                                                                    value={workOutsideSetCurrentRange.min}
+                                                                    onChange={(e) => handleSetCurrentMinChange(e.target.value)}
+                                                                    className="current-range-input"
+                                                                />
+                                                                <span className="current-range-separator">—</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min={workOutsideSetCurrentRange.min}
+                                                                    max="500"
+                                                                    value={workOutsideSetCurrentRange.max}
+                                                                    onChange={(e) => handleSetCurrentMaxChange(e.target.value)}
+                                                                    className="current-range-input"
+                                                                />
+                                                            </div>
+                                                            <div className="current-range-slider-wrapper">
+                                                                <div className="current-range-slider">
+                                                                    <div className="current-range-slider-track-bg"></div>
+                                                                    <div
+                                                                        className="current-range-slider-track"
+                                                                        style={{
+                                                                            left: `${((workOutsideSetCurrentRange.min - 5) / (500 - 5)) * 100}%`,
+                                                                            width: `${((workOutsideSetCurrentRange.max - workOutsideSetCurrentRange.min) / (500 - 5)) * 100}%`
+                                                                        }}
+                                                                    />
+                                                                    <input
+                                                                        type="range"
+                                                                        min="5"
+                                                                        max="500"
+                                                                        value={workOutsideSetCurrentRange.min}
+                                                                        onInput={(e) => handleSetCurrentMinChange(e.target.value)}
+                                                                        onChange={(e) => handleSetCurrentMinChange(e.target.value)}
+                                                                        className="current-range-slider-input current-range-slider-input-min"
+                                                                    />
+                                                                    <input
+                                                                        type="range"
+                                                                        min="5"
+                                                                        max="500"
+                                                                        value={workOutsideSetCurrentRange.max}
+                                                                        onInput={(e) => handleSetCurrentMaxChange(e.target.value)}
+                                                                        onChange={(e) => handleSetCurrentMaxChange(e.target.value)}
+                                                                        className="current-range-slider-input current-range-slider-input-max"
+                                                                    />
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
 
-                                    <label className="parameter-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={parameters.tableNumber}
-                                            onChange={() => toggleParameter('tableNumber')}
-                                            disabled={true}
-                                        />
-                                        <span className="parameter-label">Таб. №</span>
-                                    </label>
+                                            <div className="parameter-item-expandable">
+                                                <label
+                                                    className="parameter-item"
+                                                    onClick={(e) => {
+                                                        if (e.target.type !== 'checkbox') {
+                                                            toggleExpanded('workOutsideActualCurrent')
+                                                        }
+                                                    }}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.workOutsideActualCurrent}
+                                                        onChange={() => toggleParameter('workOutsideActualCurrent')}
+                                                    />
+                                                    <span className="parameter-label">Пределы разрешенного факт.тока</span>
+                                                    <button
+                                                        className="org-unit-expand-btn"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleExpanded('workOutsideActualCurrent');
+                                                        }}
+                                                    >
+                                                        {expandedWorkOutsideActualCurrent ? (
+                                                            <FaChevronDown className="expand-icon" />
+                                                        ) : (
+                                                            <FaChevronRight className="expand-icon" />
+                                                        )}
+                                                    </button>
+                                                </label>
+                                                {expandedWorkOutsideActualCurrent && (
+                                                    <div className="parameter-expanded-content">
+                                                        <div className="current-range-controls">
+                                                            <div className="current-range-inputs">
+                                                                <input
+                                                                    type="number"
+                                                                    min="5"
+                                                                    max={workOutsideActualCurrentRange.max}
+                                                                    value={workOutsideActualCurrentRange.min}
+                                                                    onChange={(e) => handleActualCurrentMinChange(e.target.value)}
+                                                                    className="current-range-input"
+                                                                />
+                                                                <span className="current-range-separator">—</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min={workOutsideActualCurrentRange.min}
+                                                                    max="500"
+                                                                    value={workOutsideActualCurrentRange.max}
+                                                                    onChange={(e) => handleActualCurrentMaxChange(e.target.value)}
+                                                                    className="current-range-input"
+                                                                />
+                                                            </div>
+                                                            <div className="current-range-slider-wrapper">
+                                                                <div className="current-range-slider">
+                                                                    <div className="current-range-slider-track-bg"></div>
+                                                                    <div
+                                                                        className="current-range-slider-track"
+                                                                        style={{
+                                                                            left: `${((workOutsideActualCurrentRange.min - 5) / (500 - 5)) * 100}%`,
+                                                                            width: `${((workOutsideActualCurrentRange.max - workOutsideActualCurrentRange.min) / (500 - 5)) * 100}%`
+                                                                        }}
+                                                                    />
+                                                                    <input
+                                                                        type="range"
+                                                                        min="5"
+                                                                        max="500"
+                                                                        value={workOutsideActualCurrentRange.min}
+                                                                        onInput={(e) => handleActualCurrentMinChange(e.target.value)}
+                                                                        onChange={(e) => handleActualCurrentMinChange(e.target.value)}
+                                                                        className="current-range-slider-input current-range-slider-input-min"
+                                                                    />
+                                                                    <input
+                                                                        type="range"
+                                                                        min="5"
+                                                                        max="500"
+                                                                        value={workOutsideActualCurrentRange.max}
+                                                                        onInput={(e) => handleActualCurrentMaxChange(e.target.value)}
+                                                                        onChange={(e) => handleActualCurrentMaxChange(e.target.value)}
+                                                                        className="current-range-slider-input current-range-slider-input-max"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                    <label className="parameter-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={parameters.profession}
-                                            onChange={() => toggleParameter('profession')}
-                                        />
-                                        <span className="parameter-label">Профессия</span>
-                                    </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.tableNumber}
+                                                    onChange={() => toggleParameter('tableNumber')}
+                                                    disabled={true}
+                                                />
+                                                <span className="parameter-label">Таб. №</span>
+                                            </label>
 
-                                    <label className="parameter-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={parameters.department}
-                                            onChange={() => toggleParameter('department')}
-                                            disabled={true}
-                                        />
-                                        <span className="parameter-label">Подразделение</span>
-                                    </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.profession}
+                                                    onChange={() => toggleParameter('profession')}
+                                                />
+                                                <span className="parameter-label">Профессия</span>
+                                            </label>
 
-                                    <label className="parameter-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={parameters.equipmentName}
-                                            onChange={() => toggleParameter('equipmentName')}
-                                        />
-                                        <span className="parameter-label">Наименование оборудования</span>
-                                    </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.department}
+                                                    onChange={() => toggleParameter('department')}
+                                                    disabled={true}
+                                                />
+                                                <span className="parameter-label">Подразделение</span>
+                                            </label>
 
-                                    <label className="parameter-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={parameters.timeOnline}
-                                            onChange={() => toggleParameter('timeOnline')}
-                                            disabled={true}
-                                        />
-                                        <span className="parameter-label">Время в сети</span>
-                                    </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.equipmentName}
+                                                    onChange={() => toggleParameter('equipmentName')}
+                                                />
+                                                <span className="parameter-label">Наименование оборудования</span>
+                                            </label>
 
-                                    <label className="parameter-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={parameters.arcBurningTime}
-                                            onChange={() => toggleParameter('arcBurningTime')}
-                                            disabled={true}
-                                        />
-                                        <span className="parameter-label">Время горения дуги</span>
-                                    </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.timeOnline}
+                                                    onChange={() => toggleParameter('timeOnline')}
+                                                    disabled={true}
+                                                />
+                                                <span className="parameter-label">Время в сети</span>
+                                            </label>
 
-                                    <label className="parameter-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={parameters.efficiency}
-                                            onChange={() => toggleParameter('efficiency')}
-                                        />
-                                        <span className="parameter-label">Эффективность, %</span>
-                                    </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.arcBurningTime}
+                                                    onChange={() => toggleParameter('arcBurningTime')}
+                                                    disabled={true}
+                                                />
+                                                <span className="parameter-label">Время горения дуги</span>
+                                            </label>
 
-                                    <label className="parameter-item">
-                                        <input
-                                            type="checkbox"
-                                            checked={parameters.energyConsumed}
-                                            onChange={() => toggleParameter('energyConsumed')}
-                                        />
-                                        <span className="parameter-label">Затраченная энергия, кВт*ч</span>
-                                    </label>
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.efficiency}
+                                                    onChange={() => toggleParameter('efficiency')}
+                                                />
+                                                <span className="parameter-label">Эффективность, %</span>
+                                            </label>
+
+                                            <label className="parameter-item">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={parameters.energyConsumed}
+                                                    onChange={() => toggleParameter('energyConsumed')}
+                                                />
+                                                <span className="parameter-label">Затраченная энергия, кВт*ч</span>
+                                            </label>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
