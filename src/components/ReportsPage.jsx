@@ -40,8 +40,7 @@ const ReportsPage = () => {
     const [selectedTemplateTypes, setSelectedTemplateTypes] = useState([
         'Все',
         'По работе сварщиков',
-        'По расходу проволоки',
-        'По работе оборудования'
+        'По расходу проволоки'
     ]) // По умолчанию все типы выбраны
     const [templateTypeDropdownOpen, setTemplateTypeDropdownOpen] = useState(false)
     const [reportTypeDropdownOpen, setReportTypeDropdownOpen] = useState(false)
@@ -1127,7 +1126,6 @@ const ReportsPage = () => {
     // Типы шаблонов для фильтра
     const templateTypes = [
         'Все',
-        'По работе оборудования',
         'По работе сварщиков',
         'По расходу проволоки',
     ]
@@ -1135,8 +1133,7 @@ const ReportsPage = () => {
     // Типы отчетов для выбора
     const reportTypes = [
         'По расходу проволоки',
-        'По работе сварщика',
-        'По работе оборудования'
+        'По работе сварщика'
     ]
 
     // Типы периода
@@ -1239,7 +1236,6 @@ const ReportsPage = () => {
         setReportTypeDropdownHighlight(false)
         setSelectedTemplateTypes([
             'Все',
-            'По работе оборудования',
             'По работе сварщиков',
             'По расходу материала',
             'По сварочным швам',
