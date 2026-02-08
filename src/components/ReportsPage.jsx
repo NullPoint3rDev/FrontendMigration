@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { FaChevronRight, FaChevronDown } from 'react-icons/fa'
+import { useReportsUnsaved } from '../contexts/ReportsUnsavedContext'
 import './ReportsPage.css'
 import { getAllWelders, getWelderById } from '../api/welderApi'
 import { getAllWeldingMachines, getWeldingMachineIdsByRfidCodes } from '../api/weldingMachineApi'
@@ -13,6 +15,8 @@ import {
 import { reportApi } from '../api/reportApi'
 
 const ReportsPage = () => {
+    const navigate = useNavigate()
+    const reportsUnsaved = useReportsUnsaved()
     const [templates, setTemplates] = useState([])
     const [currentTemplateId, setCurrentTemplateId] = useState(null)
     const [isCreatingTemplate, setIsCreatingTemplate] = useState(false)
@@ -52,6 +56,11 @@ const ReportsPage = () => {
     const [workingDaysEnabled, setWorkingDaysEnabled] = useState(false)
     const [selectedWorkingDays, setSelectedWorkingDays] = useState([])
     const [showResaveConfirm, setShowResaveConfirm] = useState(false)
+    const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false)
+    const [lastSavedSnapshot, setLastSavedSnapshot] = useState(null)
+    const pendingActionRef = useRef(null)
+    const isFormDirtyRef = useRef(null)
+    const needSyncSnapshotRef = useRef(false)
 
     // Report parameters state - динамические параметры для подразделений
     // Для "По расходу проволоки": welder, tableNumber, department, timeOnline, arcBurningTime, wire, consumption обязательны
@@ -248,6 +257,176 @@ const ReportsPage = () => {
             return `${welder.lastName} ${welder.firstName.charAt(0)}.${middleName}`
         }
         return welder.id || 'Неизвестный сварщик'
+    }
+
+    // Каноническая строка для сравнения снимков (порядок ключей не влияет)
+    const canonicalJson = (val) => {
+        if (val === null || typeof val !== 'object') return JSON.stringify(val)
+        if (Array.isArray(val)) return '[' + val.map(canonicalJson).join(',') + ']'
+        const keys = Object.keys(val).sort()
+        return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalJson(val[k])).join(',') + '}'
+    }
+
+    // Нормализация выбора сварщиков/подразделений для сравнения (без __NONE__, ключи — строки)
+    const normalizeSelection = (obj) => {
+        if (!obj || typeof obj !== 'object') return {}
+        const out = {}
+        for (const [k, v] of Object.entries(obj)) {
+            if (k === '__NONE__') continue
+            if (v) out[String(k)] = true
+        }
+        return out
+    }
+
+    // Снимок формы для проверки несохранённых изменений (нормализованный объект для JSON-сравнения)
+    const getFormSnapshot = () => {
+        return {
+            templateName: (templateName || '').trim(),
+            templateEmail: (templateEmail || '').trim(),
+            selectedReportType: selectedReportType || '',
+            parameters: parameters ? { ...parameters } : {},
+            selectedOrganizationUnits: normalizeSelection(selectedOrganizationUnits),
+            selectedWelders: normalizeSelection(selectedWelders),
+            selectedEquipmentModels: selectedEquipmentModels ? { ...selectedEquipmentModels } : {},
+            workOutsideSetCurrentRange: workOutsideSetCurrentRange ? { ...workOutsideSetCurrentRange } : {},
+            workOutsideActualCurrentRange: workOutsideActualCurrentRange ? { ...workOutsideActualCurrentRange } : {},
+            selectedPeriod: selectedPeriod || 'day',
+            selectedDays: [...(selectedDays || [])].sort((a, b) => a - b),
+            startDate: startDate && startDate instanceof Date ? startDate.toISOString() : null,
+            endDate: endDate && endDate instanceof Date ? endDate.toISOString() : null,
+            timeRange: timeRange ? { ...timeRange } : {},
+            timeRangeEnabled: timeRangeEnabled || false,
+            periodType: periodType || '',
+            workingDaysEnabled: workingDaysEnabled || false,
+            selectedWorkingDays: [...(selectedWorkingDays || [])].sort((a, b) => a - b),
+            autoReportEnabled: autoReportEnabled || false,
+            autoReportTime: autoReportTime || '08:00',
+            autoReportWeekDays: [...(autoReportWeekDays || [])].sort((a, b) => a - b),
+            autoReportMonthDays: [...(autoReportMonthDays || [])].sort((a, b) => a - b),
+            minSeamInterval: minSeamInterval ?? 2,
+            minSeamDuration: minSeamDuration ?? 2,
+            minSeamIntervalEnabled: minSeamIntervalEnabled ?? true,
+            minSeamDurationEnabled: minSeamDurationEnabled ?? true,
+            emailAddress: (emailAddress || '').trim()
+        }
+    }
+
+    const getEmptySnapshot = () => {
+        return {
+            templateName: '',
+            templateEmail: '',
+            selectedReportType: '',
+            parameters: {
+                welder: true, all: false, wire: true, consumption: true, equipmentModel: false,
+                workOutsideSetCurrent: false, workOutsideActualCurrent: false, tableNumber: true, profession: false,
+                department: true, equipmentName: false, timeOnline: true, arcBurningTime: true, efficiency: false,
+                energyConsumed: false, wireFeedSpeed: false, gasConsumption: false
+            },
+            selectedOrganizationUnits: {},
+            selectedWelders: {},
+            selectedEquipmentModels: {},
+            workOutsideSetCurrentRange: { min: 300, max: 450 },
+            workOutsideActualCurrentRange: { min: 300, max: 450 },
+            selectedPeriod: 'day',
+            selectedDays: [],
+            startDate: null,
+            endDate: null,
+            timeRange: { start: '08:00', end: '17:00' },
+            timeRangeEnabled: false,
+            periodType: 'Произвольный период',
+            workingDaysEnabled: false,
+            selectedWorkingDays: [],
+            autoReportEnabled: false,
+            autoReportTime: '08:00',
+            autoReportWeekDays: [],
+            autoReportMonthDays: [],
+            minSeamInterval: 2,
+            minSeamDuration: 2,
+            minSeamIntervalEnabled: true,
+            minSeamDurationEnabled: true,
+            emailAddress: ''
+        }
+    }
+
+    const buildSnapshotFromTemplate = (template) => {
+        if (!template) return getEmptySnapshot()
+        const ps = template.periodSettings || {}
+        const ars = template.autoReportSettings || {}
+        const rp = template.reportParameters || {}
+        const orgUnits = {}
+        ;(template.selectedOrganizationUnitIds || []).forEach(id => { orgUnits[String(id)] = true })
+        const welders = {}
+        ;(template.selectedWelderIds || []).forEach(id => { welders[String(id)] = true })
+        const models = {}
+        ;(template.selectedEquipmentModels || []).forEach(key => { models[String(key)] = true })
+        let hasAutoReport = false
+        if (template.isActive === true && ars && typeof ars === 'object' && !Array.isArray(ars) && Object.keys(ars).length > 0) {
+            const hasTime = ars.autoReportTime && typeof ars.autoReportTime === 'string' && ars.autoReportTime.trim().length > 0
+            const hasWeekDays = Array.isArray(ars.autoReportWeekDays) && ars.autoReportWeekDays.length > 0
+            const hasMonthDays = Array.isArray(ars.autoReportMonthDays) && ars.autoReportMonthDays.length > 0
+            hasAutoReport = hasTime && (hasWeekDays || hasMonthDays)
+        }
+        const { reportType: _rp, ...paramsRest } = rp || {}
+        const defaultParams = getEmptySnapshot().parameters
+        return {
+            templateName: (template.name || '').trim(),
+            templateEmail: (template.email || '').trim(),
+            selectedReportType: (rp?.reportType || template.reportType || '').trim(),
+            parameters: rp ? { ...defaultParams, ...paramsRest } : defaultParams,
+            selectedOrganizationUnits: orgUnits,
+            selectedWelders: welders,
+            selectedEquipmentModels: models,
+            workOutsideSetCurrentRange: template.currentRanges?.workOutsideSetCurrent ? { ...template.currentRanges.workOutsideSetCurrent } : { min: 300, max: 450 },
+            workOutsideActualCurrentRange: template.currentRanges?.workOutsideActualCurrent ? { ...template.currentRanges.workOutsideActualCurrent } : { min: 300, max: 450 },
+            selectedPeriod: ps.selectedPeriod || 'day',
+            selectedDays: [...(ps.selectedDays || [])].sort((a, b) => a - b),
+            startDate: ps.startDate || null,
+            endDate: ps.endDate || null,
+            timeRange: ps.timeRange ? { ...ps.timeRange } : { start: '08:00', end: '17:00' },
+            timeRangeEnabled: ps.timeRangeEnabled || false,
+            periodType: ps.periodType || 'Произвольный период',
+            workingDaysEnabled: ps.workingDaysEnabled || false,
+            selectedWorkingDays: [...(ps.selectedWorkingDays || [])].sort((a, b) => a - b),
+            autoReportEnabled: hasAutoReport,
+            autoReportTime: ars.autoReportTime || '08:00',
+            autoReportWeekDays: [...(ars.autoReportWeekDays || [])].sort((a, b) => a - b),
+            autoReportMonthDays: [...(ars.autoReportMonthDays || [])].sort((a, b) => a - b),
+            minSeamInterval: rp.minSeamInterval ?? 2,
+            minSeamDuration: rp.minSeamDuration ?? 2,
+            minSeamIntervalEnabled: rp.minSeamIntervalEnabled ?? true,
+            minSeamDurationEnabled: rp.minSeamDurationEnabled ?? true,
+            emailAddress: (template.email || '').trim()
+        }
+    }
+
+    const isFormDirty = () => {
+        if (!currentTemplateId && !isCreatingTemplate) return false
+        const saved = lastSavedSnapshot
+        if (saved == null) return false
+        const current = getFormSnapshot()
+        try {
+            return canonicalJson(current) !== canonicalJson(saved)
+        } catch {
+            return false
+        }
+    }
+    isFormDirtyRef.current = isFormDirty
+    if (reportsUnsaved?.isDirtyRef) reportsUnsaved.isDirtyRef.current = isFormDirty
+
+    const executePendingAction = () => {
+        const action = pendingActionRef.current
+        pendingActionRef.current = null
+        if (!action) return
+        if (action.type === 'load' && action.template) {
+            handleLoadTemplate(action.template, true)
+        } else if (action.type === 'new') {
+            handleNewTemplate(true)
+        } else if (action.type === 'generate') {
+            handleGenerateNow(true)
+        } else if (action.type === 'leave' && action.path) {
+            reportsUnsaved?.setPendingLeavePath(null)
+            navigate(action.path)
+        }
     }
 
     // Build organization hierarchy with welders - древовидная структура как на странице Карта предприятия
@@ -1180,6 +1359,36 @@ const ReportsPage = () => {
         }
     }, [reportTypeDropdownOpen])
 
+    // Снимок «сохранённого» — только сразу после load/new (флаг ставим в handleLoadTemplate/handleNewTemplate)
+    useLayoutEffect(() => {
+        if (needSyncSnapshotRef.current && (currentTemplateId != null || isCreatingTemplate)) {
+            needSyncSnapshotRef.current = false
+            setLastSavedSnapshot(getFormSnapshot())
+        }
+    }, [currentTemplateId, isCreatingTemplate])
+
+    // Показ модалки несохранённых изменений при попытке уйти со страницы через сайдбар
+    useEffect(() => {
+        if (reportsUnsaved?.pendingLeavePath && isFormDirty()) {
+            const path = reportsUnsaved.pendingLeavePath
+            reportsUnsaved.setPendingLeavePath(null)
+            pendingActionRef.current = { type: 'leave', path }
+            setShowUnsavedConfirm(true)
+        }
+    }, [reportsUnsaved?.pendingLeavePath])
+
+    // Предупреждение при уходе со страницы или обновлении с несохранёнными изменениями (ref — всегда актуальная проверка)
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if (isFormDirtyRef.current && isFormDirtyRef.current()) {
+                e.preventDefault()
+                e.returnValue = ''
+            }
+        }
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    }, [])
+
     // Обработка выбора типа шаблона
     const handleTemplateTypeToggle = (type) => {
         setSelectedTemplateTypes(prev => {
@@ -1225,7 +1434,12 @@ const ReportsPage = () => {
         })
     }
 
-    const handleNewTemplate = () => {
+    const handleNewTemplate = (forceNew = false) => {
+        if (!forceNew && isFormDirty()) {
+            pendingActionRef.current = { type: 'new' }
+            setShowUnsavedConfirm(true)
+            return
+        }
         setIsCreatingTemplate(true)
         setCurrentTemplateId(null)
         setTemplateName('')
@@ -1283,6 +1497,7 @@ const ReportsPage = () => {
         setSelectedDays([])
         setSelectedPeriod('day')
         setWelderSearchTerm('')
+        needSyncSnapshotRef.current = true
     }
 
     const handleSaveTemplate = async () => {
@@ -1382,13 +1597,20 @@ const ReportsPage = () => {
 
             setCurrentTemplateId(savedTemplate.id)
             setIsCreatingTemplate(false)
+            setLastSavedSnapshot(getFormSnapshot())
         } catch (error) {
             console.error('Ошибка сохранения шаблона:', error)
             alert('Ошибка сохранения шаблона: ' + (error.message || 'Неизвестная ошибка'))
+            throw error
         }
     }
 
-    const handleLoadTemplate = (template) => {
+    const handleLoadTemplate = (template, forceLoad = false) => {
+        if (!forceLoad && isFormDirty() && (currentTemplateId !== template.id || isCreatingTemplate)) {
+            pendingActionRef.current = { type: 'load', template }
+            setShowUnsavedConfirm(true)
+            return
+        }
         setCurrentTemplateId(template.id)
         setTemplateName(template.name || '')
         setTemplateEmail(template.email || '')
@@ -1488,31 +1710,19 @@ const ReportsPage = () => {
             setLastSelectedMonthDay(null)
         }
 
-        // Загружаем выбранные подразделения и сварщиков
-        if (template.selectedOrganizationUnitIds) {
-            const orgUnits = {}
-            template.selectedOrganizationUnitIds.forEach(id => {
-                orgUnits[id] = true
-            })
-            setSelectedOrganizationUnits(orgUnits)
-        }
+        // Загружаем выбранные подразделения и сварщиков (всегда задаём состояние, чтобы снимок совпадал с формой)
+        const orgUnits = {}
+        ;(template.selectedOrganizationUnitIds || []).forEach(id => { orgUnits[String(id)] = true })
+        setSelectedOrganizationUnits(orgUnits)
 
-        if (template.selectedWelderIds) {
-            const welders = {}
-            template.selectedWelderIds.forEach(id => {
-                welders[id] = true
-            })
-            setSelectedWelders(welders)
-        }
+        const welders = {}
+        ;(template.selectedWelderIds || []).forEach(id => { welders[String(id)] = true })
+        setSelectedWelders(welders)
 
-        // Загружаем выбранные модели оборудования
-        if (template.selectedEquipmentModels) {
-            const models = {}
-            template.selectedEquipmentModels.forEach(key => {
-                models[key] = true
-            })
-            setSelectedEquipmentModels(prev => ({ ...prev, ...models }))
-        }
+        // Загружаем выбранные модели оборудования (полная замена, не слияние)
+        const models = {}
+        ;(template.selectedEquipmentModels || []).forEach(key => { models[String(key)] = true })
+        setSelectedEquipmentModels(models)
 
         // Загружаем диапазоны токов
         if (template.currentRanges) {
@@ -1526,6 +1736,7 @@ const ReportsPage = () => {
 
         setTemplateActive(template.isActive || false)
         setIsCreatingTemplate(false)
+        needSyncSnapshotRef.current = true
     }
 
     const handleDeleteTemplate = async (templateId) => {
@@ -1598,7 +1809,12 @@ const ReportsPage = () => {
         return time || '8:00 Пн Вт Ср Чт Пт'
     }
 
-    const handleGenerateNow = async () => {
+    const handleGenerateNow = async (forceGenerate = false) => {
+        if (!forceGenerate && isFormDirty()) {
+            pendingActionRef.current = { type: 'generate' }
+            setShowUnsavedConfirm(true)
+            return
+        }
         // Проверяем, выбран ли шаблон
         if (!currentTemplateId) {
             alert('Выберите шаблон отчета или создайте новый')
@@ -3052,6 +3268,36 @@ const ReportsPage = () => {
                             <button
                                 className="resave-confirm-btn resave-confirm-btn-yes"
                                 onClick={confirmSaveTemplate}
+                            >
+                                <span className="resave-confirm-icon-check">✓</span>
+                                <span>Да</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Модальное окно: несохранённые изменения при смене действия */}
+            {showUnsavedConfirm && (
+                <div className="modal-overlay" onClick={() => { setShowUnsavedConfirm(false); pendingActionRef.current = null }}>
+                    <div className="resave-confirm-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="resave-confirm-icon">⚠</div>
+                        <div className="resave-confirm-question">Вы внесли изменения в отчет. Сохранить их?</div>
+                        <div className="resave-confirm-buttons">
+                            <button
+                                className="resave-confirm-btn resave-confirm-btn-no"
+                                onClick={() => { setShowUnsavedConfirm(false); executePendingAction(); }}
+                            >
+                                <span className="resave-confirm-icon-x">×</span>
+                                <span>Нет</span>
+                            </button>
+                            <button
+                                className="resave-confirm-btn resave-confirm-btn-yes"
+                                onClick={() => {
+                                    confirmSaveTemplate()
+                                        .then(() => { setShowUnsavedConfirm(false); executePendingAction(); })
+                                        .catch(() => {})
+                                }}
                             >
                                 <span className="resave-confirm-icon-check">✓</span>
                                 <span>Да</span>

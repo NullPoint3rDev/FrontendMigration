@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useReportsUnsaved } from '../contexts/ReportsUnsavedContext'
 import { FaChevronDown, FaChevronRight } from 'react-icons/fa'
 import '../styles/sidebar.css'
 import WTLogo from '../images/WTLogo.png'
@@ -14,6 +15,7 @@ import AboutLogo from '../images/AboutLogo.png'
 const Sidebar = () => {
     const navigate = useNavigate()
     const location = useLocation()
+    const reportsUnsaved = useReportsUnsaved()
     const [expandedGroups, setExpandedGroups] = useState({
         enterprise: true,  // По умолчанию раскрыто
         resources: true   // По умолчанию раскрыто
@@ -24,6 +26,14 @@ const Sidebar = () => {
             return location.pathname === '/'
         }
         return location.pathname === path || location.pathname.startsWith(path + '/')
+    }
+
+    const handleNavigate = (path) => {
+        if (location.pathname === '/reports' && reportsUnsaved?.isDirtyRef?.current?.()) {
+            reportsUnsaved.requestLeave(path)
+        } else {
+            navigate(path)
+        }
     }
 
     // Группы всегда остаются раскрытыми, но можно вручную свернуть/развернуть
@@ -51,7 +61,7 @@ const Sidebar = () => {
             <nav className="sidebar-menu" aria-label="Основная навигация">
                 <button
                     className={`menu-link ${isActive('/') ? 'active' : ''}`}
-                    onClick={() => navigate('/')}
+                    onClick={() => handleNavigate('/')}
                 >
                     <img src={MainPageLogo} alt="Главная" className="menu-icon" />
                     <span className="menu-text">Главная</span>
@@ -77,21 +87,21 @@ const Sidebar = () => {
                         <div className="submenu">
                             <button
                                 className={`submenu-item ${isActive('/enterprise-map') ? 'active' : ''}`}
-                                onClick={() => navigate('/enterprise-map')}
+                                onClick={() => handleNavigate('/enterprise-map')}
                             >
                                 <span className="submenu-marker" />
                                 <span>Карта предприятия</span>
                             </button>
                             <button
                                 className={`submenu-item ${isActive('/welders') ? 'active' : ''}`}
-                                onClick={() => navigate('/welders')}
+                                onClick={() => handleNavigate('/welders')}
                             >
                                 <span className="submenu-marker" />
                                 <span>Сварщики</span>
                             </button>
                             <button
                                 className={`submenu-item ${isActive('/employees') ? 'active' : ''}`}
-                                onClick={() => navigate('/employees')}
+                                onClick={() => handleNavigate('/employees')}
                             >
                                 <span className="submenu-marker" />
                                 <span>Пользователи</span>
@@ -120,28 +130,28 @@ const Sidebar = () => {
                         <div className="submenu">
                             <button
                                 className={`submenu-item ${isActive('/equipment') ? 'active' : ''}`}
-                                onClick={() => navigate('/equipment')}
+                                onClick={() => handleNavigate('/equipment')}
                             >
                                 <span className="submenu-marker" />
                                 <span>Сварочное оборудование</span>
                             </button>
                             <button
                                 className={`submenu-item ${isActive('/network-equipment') ? 'active' : ''}`}
-                                onClick={() => navigate('/network-equipment')}
+                                onClick={() => handleNavigate('/network-equipment')}
                             >
                                 <span className="submenu-marker" />
                                 <span>Сетевое оборудование</span>
                             </button>
                             <button
                                 className={`submenu-item ${isActive('/materials') ? 'active' : ''}`}
-                                onClick={() => navigate('/materials')}
+                                onClick={() => handleNavigate('/materials')}
                             >
                                 <span className="submenu-marker" />
                                 <span>Сварочные материалы</span>
                             </button>
                             <button
                                 className={`submenu-item ${isActive('/wps') ? 'active' : ''}`}
-                                onClick={() => navigate('/wps')}
+                                onClick={() => handleNavigate('/wps')}
                             >
                                 <span className="submenu-marker" />
                                 <span>Технологические карты сварки (WPS)</span>
@@ -152,7 +162,7 @@ const Sidebar = () => {
 
                 <button
                     className={`menu-link ${isActive('/reports') ? 'active' : ''}`}
-                    onClick={() => navigate('/reports')}
+                    onClick={() => handleNavigate('/reports')}
                 >
                     <img src={ReportsLogo} alt="Отчеты" className="menu-icon" />
                     <span className="menu-text">Отчеты</span>
@@ -160,7 +170,7 @@ const Sidebar = () => {
 
                 <button
                     className={`menu-link ${isActive('/notifications') ? 'active' : ''}`}
-                    onClick={() => navigate('/notifications')}
+                    onClick={() => handleNavigate('/notifications')}
                 >
                     <img src={NotificationsLogo} alt="Уведомления" className="menu-icon" />
                     <span className="menu-text">Уведомления</span>
@@ -168,7 +178,7 @@ const Sidebar = () => {
 
                 <button
                     className={`menu-link ${isActive('/settings') ? 'active' : ''}`}
-                    onClick={() => navigate('/settings')}
+                    onClick={() => handleNavigate('/settings')}
                 >
                     <img src={SettingsLogo} alt="Настройки" className="menu-icon" />
                     <span className="menu-text">Настройки</span>
@@ -176,7 +186,7 @@ const Sidebar = () => {
 
                 <button
                     className={`menu-link ${isActive('/about') ? 'active' : ''}`}
-                    onClick={() => navigate('/about')}
+                    onClick={() => handleNavigate('/about')}
                 >
                     <img src={AboutLogo} alt="О программе" className="menu-icon" />
                     <span className="menu-text">О программе</span>

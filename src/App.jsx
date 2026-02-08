@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { ReportsUnsavedProvider } from './contexts/ReportsUnsavedContext';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import ScopedCssBaseline from '@mui/material/ScopedCssBaseline';
@@ -117,52 +118,53 @@ function App() {
                     <Route path="/login" element={<AuthPage />} />
                     <Route path="/*" element={
                         <PrivateRoute>
-                            <Layout>
-                                <Routes>
-                                    <Route path="/" element={<HomePage />} />
-                                    <Route path="/about" element={<AboutPage />} />
+                            <ReportsUnsavedProvider>
+                                <Layout>
+                                    <Routes>
+                                        <Route path="/" element={<HomePage />} />
+                                        <Route path="/about" element={<AboutPage />} />
 
-                                    {/* 1. Предприятие */}
-                                    <Route path="/departments" element={<DepartmentsPage />} />
-                                    <Route path="/employees" element={<EmployeesPage />} />
-                                    <Route path="/welders" element={<WeldersPage />} />
-                                    <Route path="/welders/add" element={<AddWelderPage />} />
-                                    <Route path="/welders/add/:id" element={<AddWelderPage />} />
-                                    <Route path="/welders/:id" element={<WelderProfilePage />} />
-                                    <Route path="/welders/:id/certification/:certId" element={<CertificationPage />} />
-                                    <Route path="/welders/:id/certification" element={<CertificationPage />} />
-                                    <Route path="/welders/add/certification" element={<CertificationPage />} />
+                                        {/* 1. Предприятие */}
+                                        <Route path="/departments" element={<DepartmentsPage />} />
+                                        <Route path="/employees" element={<EmployeesPage />} />
+                                        <Route path="/welders" element={<WeldersPage />} />
+                                        <Route path="/welders/add" element={<AddWelderPage />} />
+                                        <Route path="/welders/add/:id" element={<AddWelderPage />} />
+                                        <Route path="/welders/:id" element={<WelderProfilePage />} />
+                                        <Route path="/welders/:id/certification/:certId" element={<CertificationPage />} />
+                                        <Route path="/welders/:id/certification" element={<CertificationPage />} />
+                                        <Route path="/welders/add/certification" element={<CertificationPage />} />
 
-                                    {/* 2. Ресурсы */}
-                                    <Route path="/equipment" element={<WeldingEquipmentPage />} />
-                                    <Route path="/network-equipment" element={<NetworkEquipmentPage />} />
-                                    <Route path="/materials" element={<MaterialsPage />} />
-                                    <Route path="/wps" element={<WPSPage />} />
-                                    <Route path="/device-monitor" element={<DeviceMonitorPage />} />
-                                    <Route path="/device-test" element={<DeviceTestPage />} />
+                                        {/* 2. Ресурсы */}
+                                        <Route path="/equipment" element={<WeldingEquipmentPage />} />
+                                        <Route path="/network-equipment" element={<NetworkEquipmentPage />} />
+                                        <Route path="/materials" element={<MaterialsPage />} />
+                                        <Route path="/wps" element={<WPSPage />} />
+                                        <Route path="/device-monitor" element={<DeviceMonitorPage />} />
+                                        <Route path="/device-test" element={<DeviceTestPage />} />
 
-                                    {/* 3. Мониторинг */}
-                                    <Route path="/enterprise-map" element={<EnterpriseMapPageSimple />} />
-                                    <Route path="/interactive-map" element={<InteractiveMapPage />} />
-                                    <Route path="/equipment-list" element={<div className="main-content"><h2>Перечень оборудования</h2></div>} />
+                                        {/* 3. Мониторинг */}
+                                        <Route path="/enterprise-map" element={<EnterpriseMapPageSimple />} />
+                                        <Route path="/interactive-map" element={<InteractiveMapPage />} />
+                                        <Route path="/equipment-list" element={<div className="main-content"><h2>Перечень оборудования</h2></div>} />
 
-                                    {/* 4. Отчеты */}
-                                    <Route path="/reports" element={<ReportsPage />} />
-                                    <Route path="/my-reports" element={<Navigate to="/reports" replace />} />
+                                        {/* 4. Отчеты */}
+                                        <Route path="/reports" element={<ReportsPage />} />
+                                        <Route path="/my-reports" element={<Navigate to="/reports" replace />} />
 
-                                    {/* 5. Уведомления */}
-                                    <Route path="/notifications" element={<NotificationsPage />} />
+                                        {/* 5. Уведомления */}
+                                        <Route path="/notifications" element={<NotificationsPage />} />
 
-                                    {/* 6. Настройки */}
-                                    <Route path="/settings" element={<SettingsPage />} />
-                                    <Route path="/settings/storage" element={<SettingsPage />} />
-                                    <Route path="/settings/inactivity" element={<SettingsPage />} />
+                                        {/* 6. Настройки */}
+                                        <Route path="/settings" element={<SettingsPage />} />
+                                        <Route path="/settings/storage" element={<SettingsPage />} />
+                                        <Route path="/settings/inactivity" element={<SettingsPage />} />
 
-                                    {/* Профиль пользователя */}
-                                    <Route path="/profile" element={<UserProfilePage />} />
-
-                                </Routes>
-                            </Layout>
+                                        {/* Профиль пользователя */}
+                                        <Route path="/profile" element={<UserProfilePage />} />
+                                    </Routes>
+                                </Layout>
+                            </ReportsUnsavedProvider>
                         </PrivateRoute>
                     } />
                 </Routes>
