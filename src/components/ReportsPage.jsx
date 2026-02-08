@@ -40,7 +40,8 @@ const ReportsPage = () => {
     const [selectedTemplateTypes, setSelectedTemplateTypes] = useState([
         'Все',
         'По работе сварщиков',
-        'По расходу проволоки'
+        'По расходу проволоки',
+        'По работе оборудования'
     ]) // По умолчанию все типы выбраны
     const [templateTypeDropdownOpen, setTemplateTypeDropdownOpen] = useState(false)
     const [reportTypeDropdownOpen, setReportTypeDropdownOpen] = useState(false)
@@ -1126,6 +1127,7 @@ const ReportsPage = () => {
     // Типы шаблонов для фильтра
     const templateTypes = [
         'Все',
+        'По работе оборудования',
         'По работе сварщиков',
         'По расходу проволоки',
     ]
@@ -1133,7 +1135,8 @@ const ReportsPage = () => {
     // Типы отчетов для выбора
     const reportTypes = [
         'По расходу проволоки',
-        'По работе сварщика'
+        'По работе сварщика',
+        'По работе оборудования'
     ]
 
     // Типы периода
@@ -1236,6 +1239,7 @@ const ReportsPage = () => {
         setReportTypeDropdownHighlight(false)
         setSelectedTemplateTypes([
             'Все',
+            'По работе оборудования',
             'По работе сварщиков',
             'По расходу материала',
             'По сварочным швам',
@@ -1749,7 +1753,7 @@ const ReportsPage = () => {
                             )}
                         </div>
 
-                        {templates.length > 0 && (
+                        {(templates.length > 0 || isCreatingTemplate) && (
                             <div className="templates-list">
                                 {templates
                                     .filter(template => {
@@ -1819,6 +1823,18 @@ const ReportsPage = () => {
                                             </div>
                                         )
                                     })}
+                                {isCreatingTemplate && (
+                                    <div
+                                        className="template-item active"
+                                        aria-label="Новый отчет"
+                                    >
+                                        <div className="template-number">{String(templates.length + 1).padStart(2, '0')}</div>
+                                        <div className="template-info">
+                                            <div className="template-name">{templateName.trim() || 'Без названия'}</div>
+                                            <div className="template-schedule">—</div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                         <button
