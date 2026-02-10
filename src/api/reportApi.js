@@ -396,6 +396,61 @@ export const reportApi = {
             console.error('Ошибка генерации отчета по работе сварщика:', error);
             throw error;
         }
+    },
+
+    // Генерация отчета по работе оборудования
+    generateEquipmentWorkReport: async (templateId, periodStartDate, periodEndDate, periodStartTime, periodEndTime, selectedColumns = null, selectedEquipmentIds = null) => {
+        try {
+            const requestBody = {
+                templateId: templateId,
+                periodStartDate: periodStartDate,
+                periodEndDate: periodEndDate,
+                periodStartTime: periodStartTime,
+                periodEndTime: periodEndTime
+            };
+            if (selectedColumns != null && Array.isArray(selectedColumns)) {
+                requestBody.selectedColumns = selectedColumns;
+            }
+            if (selectedEquipmentIds != null && Array.isArray(selectedEquipmentIds)) {
+                requestBody.selectedEquipmentIds = selectedEquipmentIds;
+            }
+
+            const response = await fetch(`${BASE_URL}/equipment-work/generate`, {
+                method: 'POST',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'equipment_work_report.xlsx';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
+
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Ошибка генерации отчета по работе оборудования:', error);
+            throw error;
+        }
     }
 };
 

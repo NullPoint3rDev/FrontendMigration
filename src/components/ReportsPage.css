@@ -1421,10 +1421,10 @@
 
 .right-panel-generate-btn {
     padding: 6px 12px;
-    background: #F6B243;
+    background: #1B1622;
     border: none;
-    border-radius: 6px;
-    color: #1B1622;
+    border-radius: 3px;
+    color: #ffffff;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
@@ -1433,7 +1433,7 @@
 }
 
 .right-panel-generate-btn:hover {
-    background: #E7A933;
+    background: rgba(62, 52, 69, 0.95)
 }
 
 .right-panel-delete-inline {
@@ -1455,8 +1455,8 @@
     padding: 6px 12px;
     background: #191420;
     border: none;
-    border-radius: 6px;
-    color: #7B8BA6;
+    border-radius: 3px;
+    color: #ffffff;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
@@ -1473,7 +1473,7 @@
 }
 
 .right-panel-save-template-btn:hover {
-    background: rgba(62, 52, 69, 0.95);
+    background: rgb(246, 178, 67);
 }
 
 .right-panel-delete-template {
@@ -1492,13 +1492,13 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 16px;
+    padding: 6px 12px;
     background: #1B1622;
     border: none;
-    border-radius: 6px;
+    border-radius: 3px;
     color: #ffffff;
-    font-size: 13px;
-    font-weight: 500;
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -1953,6 +1953,19 @@
     color: #FFC107;
 }
 
+/* Подсветка кнопки «Сохранить» при несохранённых изменениях */
+.right-panel-save-template-btn-unsaved {
+    background: rgba(255, 193, 7, 0.25) !important;
+    border-color: #FFC107 !important;
+    box-shadow: 0 0 0 1px rgba(255, 193, 7, 0.4);
+    animation: save-btn-pulse 2s ease-in-out infinite;
+}
+
+@keyframes save-btn-pulse {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(255, 193, 7, 0.4); }
+    50% { box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.6), 0 0 12px rgba(255, 193, 7, 0.2); }
+}
+
 /* Модальное окно подтверждения пересохранения */
 .modal-overlay {
     position: fixed;
@@ -1967,15 +1980,46 @@
     z-index: 10000;
 }
 
+.modal-overlay-no-close-on-backdrop {
+    /* Клик по фону не закрывает модалку — обработчик не вешается в JS */
+}
+
 .resave-confirm-modal {
+    position: relative;
     background: #1A1420;
     border-radius: 8px;
     padding: 24px;
+    padding-top: 40px;
     min-width: 320px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 16px;
+}
+
+.resave-confirm-close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: rgba(123, 139, 166, 0.2);
+    color: #f0f4ff;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s;
+}
+
+.resave-confirm-close-btn:hover {
+    background: rgba(123, 139, 166, 0.35);
+    color: #fff;
 }
 
 .resave-confirm-icon {
