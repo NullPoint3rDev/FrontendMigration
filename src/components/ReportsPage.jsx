@@ -2011,6 +2011,12 @@ const ReportsPage = () => {
         return time || '8:00 Пн Вт Ср Чт Пт'
     }
 
+    /** Тип отчёта шаблона для отображения в левой панели (вместо расписания) */
+    const getTemplateReportType = (template) => {
+        const type = template?.reportParameters?.reportType || template?.reportType
+        return (type && String(type).trim()) ? String(type).trim() : '—'
+    }
+
     const handleGenerateNow = async (forceGenerate = false) => {
         if (!forceGenerate && isFormDirty()) {
             pendingActionRef.current = { type: 'generate' }
@@ -2199,7 +2205,15 @@ const ReportsPage = () => {
 
                         {(templates.length > 0 || isCreatingTemplate) && (
                             <div className="templates-list">
-                                {templates
+                                {[...templates]
+                                    .sort((a, b) => {
+                                        const idA = a.id != null ? Number(a.id) : 0
+                                        const idB = b.id != null ? Number(b.id) : 0
+                                        if (idA !== idB) return idA - idB
+                                        const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+                                        const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+                                        return createdA - createdB
+                                    })
                                     .filter(template => {
                                         // Фильтр по поисковому запросу
                                         if (templateSearchQuery && !template.name.toLowerCase().includes(templateSearchQuery.toLowerCase())) {
@@ -2259,7 +2273,7 @@ const ReportsPage = () => {
                                                 <div className="template-number">{String(index + 1).padStart(2, '0')}</div>
                                                 <div className="template-info">
                                                     <div className="template-name">{template.name}</div>
-                                                    <div className="template-schedule">{formatTemplateSchedule(template)}</div>
+                                                    <div className="template-schedule">{getTemplateReportType(template)}</div>
                                                 </div>
                                                 {hasAutoReport && (
                                                     <div className="template-auto-badge">АВТО</div>
@@ -2275,7 +2289,7 @@ const ReportsPage = () => {
                                         <div className="template-number">{String(templates.length + 1).padStart(2, '0')}</div>
                                         <div className="template-info">
                                             <div className="template-name">{templateName.trim() || 'Без названия'}</div>
-                                            <div className="template-schedule">—</div>
+                                            <div className="template-schedule">{selectedReportType || '—'}</div>
                                         </div>
                                     </div>
                                 )}
@@ -3644,11 +3658,12 @@ const ReportsPage = () => {
             {showResaveConfirm && (
                 <div className="modal-overlay modal-overlay-no-close-on-backdrop">
                     <div className="resave-confirm-modal">
+                        {/* Крестик = отмена нажатия кнопки «Сохранить», закрыть без действия (не «Нет») */}
                         <button
                             type="button"
                             className="resave-confirm-close-btn"
                             onClick={() => setShowResaveConfirm(false)}
-                            aria-label="Закрыть"
+                            aria-label="Отмена"
                         >
                             ×
                         </button>
@@ -3678,11 +3693,16 @@ const ReportsPage = () => {
             {showUnsavedConfirm && (
                 <div className="modal-overlay modal-overlay-no-close-on-backdrop">
                     <div className="resave-confirm-modal">
+                        {/* Крестик = отмена: закрыть модалку, остаться в текущем отчёте, изменения остаются (не сохраняем и не выполняем отложенное действие) */}
                         <button
                             type="button"
                             className="resave-confirm-close-btn"
-                            onClick={() => { setShowUnsavedConfirm(false); executePendingAction(); }}
-                            aria-label="Закрыть"
+                            onClick={() => {
+                                pendingActionRef.current = null
+                                reportsUnsaved?.setPendingLeavePath(null)
+                                setShowUnsavedConfirm(false)
+                            }}
+                            aria-label="Отмена"
                         >
                             ×
                         </button>
