@@ -128,7 +128,16 @@ export const reportApi = {
             'tasks': `${BASE_URL}/tasks`
         };
 
-        const endpoint = endpoints[reportType];
+        // Маппинг русских названий типов (с бэкенда/UI) на ключи эндпоинтов
+        const reportTypeNorm = (typeof reportType === 'string' && reportType.trim()) ? reportType.trim() : '';
+        const keyByRussian = {
+            'По расходу проволоки': 'WIRE_CONSUMPTION',
+            'По работе сварщика (швы)': 'WELDER_REPORT',
+            'По работе оборудования (швы)': 'equipment',
+            'По работе оборудования': 'equipment'
+        };
+        const endpointKey = keyByRussian[reportTypeNorm] || reportTypeNorm;
+        const endpoint = endpoints[endpointKey];
         if (!endpoint) {
             throw new Error(`Неизвестный тип отчета: ${reportType}`);
         }
@@ -399,7 +408,7 @@ export const reportApi = {
     },
 
     // Генерация отчета по работе оборудования
-    generateEquipmentWorkReport: async (templateId, periodStartDate, periodEndDate, periodStartTime, periodEndTime, selectedColumns = null, selectedEquipmentIds = null) => {
+    generateEquipmentWorkReport: async (templateId, periodStartDate, periodEndDate, periodStartTime, periodEndTime, selectedColumns = null, selectedEquipmentIds = null, minSeamInterval = null, minSeamDuration = null) => {
         try {
             const requestBody = {
                 templateId: templateId,
@@ -414,6 +423,8 @@ export const reportApi = {
             if (selectedEquipmentIds != null && Array.isArray(selectedEquipmentIds)) {
                 requestBody.selectedEquipmentIds = selectedEquipmentIds;
             }
+            if (minSeamInterval != null) requestBody.minSeamInterval = minSeamInterval;
+            if (minSeamDuration != null) requestBody.minSeamDuration = minSeamDuration;
 
             const response = await fetch(`${BASE_URL}/equipment-work/generate`, {
                 method: 'POST',

@@ -1411,12 +1411,30 @@
 /* Нижняя строка: Сформировать, Сохранить, Удалить на одной линии */
 .right-panel-bottom-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px;
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid rgba(79, 70, 90, 0.4);
     flex-shrink: 0;
+}
+
+.right-panel-generate-error {
+    width: 100%;
+    order: -1;
+    font-size: 12px;
+    color: #e57373;
+    margin-bottom: 2px;
+}
+
+.right-panel-save-before-generate-hint {
+    width: 100%;
+    font-size: 11px;
+    color: #FFC107;
+    margin-top: 6px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 193, 7, 0.25);
 }
 
 .right-panel-generate-btn {
@@ -1434,6 +1452,19 @@
 
 .right-panel-generate-btn:hover {
     background: rgba(62, 52, 69, 0.95)
+}
+
+/* Подсветка кнопки «Сформировать» во время формирования (как у «Сохранить») */
+.right-panel-generate-btn-generating {
+    background: rgba(255, 193, 7, 0.25) !important;
+    border: 1px solid #FFC107 !important;
+    box-shadow: 0 0 0 1px rgba(255, 193, 7, 0.4);
+    animation: save-btn-pulse 2s ease-in-out infinite;
+    cursor: wait;
+}
+
+.right-panel-generate-btn-generating:hover {
+    background: rgba(255, 193, 7, 0.25) !important;
 }
 
 .right-panel-delete-inline {
@@ -1964,6 +1995,19 @@
 @keyframes save-btn-pulse {
     0%, 100% { box-shadow: 0 0 0 1px rgba(255, 193, 7, 0.4); }
     50% { box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.6), 0 0 12px rgba(255, 193, 7, 0.2); }
+}
+
+/* Помигивание кнопки «Сохранить» при нажатии «Сформировать» с несохранёнными изменениями */
+.right-panel-save-template-btn-blink {
+    background: rgba(255, 193, 7, 0.35) !important;
+    border: 1px solid #FFC107 !important;
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.6), 0 0 14px rgba(255, 193, 7, 0.3);
+    animation: save-btn-blink 0.55s ease-in-out 4;
+}
+
+@keyframes save-btn-blink {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(255, 193, 7, 0.5), 0 0 8px rgba(255, 193, 7, 0.2); }
+    50% { box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.7), 0 0 18px rgba(255, 193, 7, 0.35); }
 }
 
 /* Модальное окно подтверждения пересохранения */

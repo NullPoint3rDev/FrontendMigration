@@ -43,9 +43,9 @@ const ReportsPage = () => {
     const [templateSearchQuery, setTemplateSearchQuery] = useState('')
     const [selectedTemplateTypes, setSelectedTemplateTypes] = useState([
         'Все',
-        'По работе сварщиков',
+        'По работе сварщика (швы)',
         'По расходу проволоки',
-        'По работе оборудования'
+        'По работе оборудования (швы)'
     ]) // По умолчанию все типы выбраны
     const [templateTypeDropdownOpen, setTemplateTypeDropdownOpen] = useState(false)
     const [reportTypeDropdownOpen, setReportTypeDropdownOpen] = useState(false)
@@ -55,9 +55,12 @@ const ReportsPage = () => {
     const [periodType, setPeriodType] = useState('Произвольный период')
     const [workingDaysEnabled, setWorkingDaysEnabled] = useState(false)
     const [selectedWorkingDays, setSelectedWorkingDays] = useState([])
-    const [showResaveConfirm, setShowResaveConfirm] = useState(false)
     const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false)
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [generateError, setGenerateError] = useState('')
+    const [isGenerating, setIsGenerating] = useState(false)
+    const [saveButtonBlink, setSaveButtonBlink] = useState(false)
+    const saveButtonBlinkTimeoutRef = useRef(null)
     const [lastSavedSnapshot, setLastSavedSnapshot] = useState(null)
     const pendingActionRef = useRef(null)
     const isFormDirtyRef = useRef(null)
@@ -268,6 +271,13 @@ const ReportsPage = () => {
         loadEquipment()
     }, [])
 
+    // Очистка таймера мигания кнопки «Сохранить» при размонтировании
+    useEffect(() => {
+        return () => {
+            if (saveButtonBlinkTimeoutRef.current) clearTimeout(saveButtonBlinkTimeoutRef.current)
+        }
+    }, [])
+
     // Load report templates from API
     useEffect(() => {
         const loadTemplates = async () => {
@@ -384,6 +394,26 @@ const ReportsPage = () => {
         }
     }
 
+    // Канонические типы отчётов и нормализация с бэкенда (нужны для buildSnapshotFromTemplate и панели параметров)
+    const REPORT_TYPE_WIRE = 'По расходу проволоки'
+    const REPORT_TYPE_WELDER = 'По работе сварщика (швы)'
+    const REPORT_TYPE_EQUIPMENT = 'По работе оборудования (швы)'
+    const normalizeReportType = (raw) => {
+        if (raw == null || typeof raw !== 'string') return ''
+        const t = String(raw).trim()
+        if (!t) return ''
+        if (t === REPORT_TYPE_WIRE || t === REPORT_TYPE_WELDER || t === REPORT_TYPE_EQUIPMENT) return t
+        if (t.toLowerCase().includes('сварщика') || t === 'WELDER_WORK' || t === 'welder') return REPORT_TYPE_WELDER
+        if (t.toLowerCase().includes('оборудован') || t === 'EQUIPMENT_WORK' || t === 'equipment') return REPORT_TYPE_EQUIPMENT
+        if (t.toLowerCase().includes('проволок') || t === 'WIRE_CONSUMPTION' || t === 'wire') return REPORT_TYPE_WIRE
+        return t
+    }
+    const isWelderOrEquipmentReportType = (type) => {
+        if (!type || typeof type !== 'string') return false
+        const t = type.trim()
+        return t === REPORT_TYPE_WELDER || t === REPORT_TYPE_EQUIPMENT || t.includes('сварщика') || t.includes('оборудован')
+    }
+
     const buildSnapshotFromTemplate = (template) => {
         if (!template) return getEmptySnapshot()
         const ps = template.periodSettings || {}
@@ -409,7 +439,7 @@ const ReportsPage = () => {
         return {
             templateName: (template.name || '').trim(),
             templateEmail: (template.email || '').trim(),
-            selectedReportType: (rp?.reportType || template.reportType || '').trim(),
+            selectedReportType: normalizeReportType(rp?.reportType || template.reportType || ''),
             parameters: rp ? { ...defaultParams, ...paramsRest } : defaultParams,
             selectedOrganizationUnits: orgUnits,
             selectedWelders: welders,
@@ -893,7 +923,7 @@ const ReportsPage = () => {
         // Обязательные параметры зависят от типа отчёта: для "По расходу проволоки" — wire, consumption тоже обязательны
         const requiredForWire = ['welder', 'tableNumber', 'department', 'timeOnline', 'arcBurningTime', 'wire', 'consumption']
         const requiredForWelder = ['welder', 'tableNumber', 'department', 'timeOnline', 'arcBurningTime']
-        const requiredParams = selectedReportType === 'По работе сварщика' ? requiredForWelder : requiredForWire
+        const requiredParams = selectedReportType === REPORT_TYPE_WELDER ? requiredForWelder : requiredForWire
         if (requiredParams.includes(key)) {
             return
         }
@@ -1498,17 +1528,13 @@ const ReportsPage = () => {
     // Типы шаблонов для фильтра
     const templateTypes = [
         'Все',
-        'По работе оборудования',
-        'По работе сварщиков',
+        'По работе оборудования (швы)',
+        'По работе сварщика (швы)',
         'По расходу проволоки',
     ]
 
-    // Типы отчетов для выбора
-    const reportTypes = [
-        'По расходу проволоки',
-        'По работе сварщика',
-        'По работе оборудования'
-    ]
+    // Типы отчетов для выбора (константы REPORT_TYPE_* и normalizeReportType объявлены выше)
+    const reportTypes = [REPORT_TYPE_WIRE, REPORT_TYPE_WELDER, REPORT_TYPE_EQUIPMENT]
 
     // Типы периода
     const periodTypes = [
@@ -1572,6 +1598,14 @@ const ReportsPage = () => {
         window.addEventListener('beforeunload', handleBeforeUnload)
         return () => window.removeEventListener('beforeunload', handleBeforeUnload)
     }, [])
+
+    // Сбрасываем сообщение «Выберите сварщика», когда пользователь выбрал хотя бы одного
+    useEffect(() => {
+        const hasWelders = Object.keys(selectedWelders).some(
+            (key) => key !== '__NONE__' && selectedWelders[key]
+        )
+        if (hasWelders && generateError) setGenerateError('')
+    }, [selectedWelders, generateError])
 
     // Обработка выбора типа шаблона
     const handleTemplateTypeToggle = (type) => {
@@ -1637,8 +1671,8 @@ const ReportsPage = () => {
         setReportTypeDropdownHighlight(false)
         setSelectedTemplateTypes([
             'Все',
-            'По работе оборудования',
-            'По работе сварщиков',
+            'По работе оборудования (швы)',
+            'По работе сварщиков (швы)',
             'По расходу материала',
             'По сварочным швам',
             'По ошибкам оборудования',
@@ -1690,23 +1724,37 @@ const ReportsPage = () => {
     }
 
     const handleSaveTemplate = async () => {
+        setSaveButtonBlink(false)
+        if (saveButtonBlinkTimeoutRef.current) {
+            clearTimeout(saveButtonBlinkTimeoutRef.current)
+            saveButtonBlinkTimeoutRef.current = null
+        }
         if (!templateName.trim()) {
             alert('Введите название шаблона')
             return
         }
 
-        // Если редактируем существующий шаблон, показываем модальное окно подтверждения
-        if (currentTemplateId) {
-            setShowResaveConfirm(true)
+        // Для нового шаблона тип отчёта обязателен — подсвечиваем и раскрываем выпадающий список
+        if (!currentTemplateId && !(selectedReportType && selectedReportType.trim())) {
+            setReportTypeDropdownHighlight(true)
+            setReportTypeDropdownOpen(true)
             return
         }
 
-        // Если создаем новый шаблон, сохраняем сразу
+        // Если редактируем существующий шаблон или создаём новый — сохраняем сразу
         await confirmSaveTemplate()
     }
 
     const confirmSaveTemplate = async () => {
-        setShowResaveConfirm(false)
+        // Для нового шаблона тип отчёта обязателен (в т.ч. при нажатии «Да» в модалке несохранённых изменений)
+        if (!currentTemplateId && !(selectedReportType && selectedReportType.trim())) {
+            setShowUnsavedConfirm(false)
+            pendingActionRef.current = null
+            reportsUnsaved?.setPendingLeavePath(null)
+            setReportTypeDropdownHighlight(true)
+            setReportTypeDropdownOpen(true)
+            throw new Error('REPORT_TYPE_REQUIRED')
+        }
 
         try {
             // Подготовка данных для сохранения
@@ -1714,7 +1762,7 @@ const ReportsPage = () => {
             // ВАЖНО: backend ReportTemplateDTO не имеет отдельного поля reportType,
             // поэтому сохраняем тип отчёта внутри reportParameters (как часть JSON).
             const reportParams = { ...parameters, reportType: selectedReportType || null }
-            if (selectedReportType === 'По работе оборудования') {
+            if (selectedReportType === REPORT_TYPE_EQUIPMENT) {
                 reportParams.selectedEquipmentIds = Object.keys(selectedEquipment)
                     .filter(key => selectedEquipment[key])
                     .map(key => parseInt(key, 10))
@@ -1726,11 +1774,11 @@ const ReportsPage = () => {
             reportParams.timeOnline = true
             reportParams.arcBurningTime = true
             // Для "По работе сварщика" колонки wire и consumption опциональны — сохраняем текущие галочки
-            if (selectedReportType !== 'По работе сварщика') {
+            if (selectedReportType !== REPORT_TYPE_WELDER) {
                 reportParams.wire = true
                 reportParams.consumption = true
             }
-            if (selectedReportType === 'По работе сварщика') {
+            if (selectedReportType === REPORT_TYPE_WELDER || selectedReportType === REPORT_TYPE_EQUIPMENT) {
                 reportParams.minSeamInterval = minSeamInterval
                 reportParams.minSeamDuration = minSeamDuration
                 reportParams.minSeamIntervalEnabled = minSeamIntervalEnabled
@@ -1827,7 +1875,7 @@ const ReportsPage = () => {
                 updated.department = true
                 updated.timeOnline = true
                 updated.arcBurningTime = true
-                if (loadedType !== 'По работе сварщика') {
+                if (loadedType !== 'По работе сварщика (швы)') {
                     updated.wire = true
                     updated.consumption = true
                 }
@@ -1843,9 +1891,15 @@ const ReportsPage = () => {
         if (template.periodSettings) {
             setSelectedPeriod(template.periodSettings.selectedPeriod || 'day')
             setSelectedDays(template.periodSettings.selectedDays || [])
-            setPeriodType(template.periodSettings.periodType || 'Произвольный период')
+            const loadedPeriodType = template.periodSettings.periodType || 'Произвольный период'
+            setPeriodType(loadedPeriodType)
             setWorkingDaysEnabled(template.periodSettings.workingDaysEnabled || false)
-            setSelectedWorkingDays(template.periodSettings.selectedWorkingDays || [])
+            const loadedWorkingDays = template.periodSettings.selectedWorkingDays || []
+            setSelectedWorkingDays(
+                loadedPeriodType === 'За 7 дней' && loadedWorkingDays.length === 0
+                    ? ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+                    : loadedWorkingDays
+            )
             if (template.periodSettings.startDate) {
                 const startDateObj = new Date(template.periodSettings.startDate)
                 setStartDate(startDateObj)
@@ -2013,14 +2067,19 @@ const ReportsPage = () => {
 
     /** Тип отчёта шаблона для отображения в левой панели (вместо расписания) */
     const getTemplateReportType = (template) => {
-        const type = template?.reportParameters?.reportType || template?.reportType
-        return (type && String(type).trim()) ? String(type).trim() : '—'
+        const raw = template?.reportParameters?.reportType || template?.reportType
+        const normalized = normalizeReportType(raw)
+        return normalized || '—'
     }
 
     const handleGenerateNow = async (forceGenerate = false) => {
         if (!forceGenerate && isFormDirty()) {
-            pendingActionRef.current = { type: 'generate' }
-            setShowUnsavedConfirm(true)
+            setSaveButtonBlink(true)
+            if (saveButtonBlinkTimeoutRef.current) clearTimeout(saveButtonBlinkTimeoutRef.current)
+            saveButtonBlinkTimeoutRef.current = setTimeout(() => {
+                setSaveButtonBlink(false)
+                saveButtonBlinkTimeoutRef.current = null
+            }, 2200)
             return
         }
         // Проверяем, выбран ли шаблон
@@ -2031,23 +2090,26 @@ const ReportsPage = () => {
 
         // Проверяем, выбран ли тип отчета
         if (!selectedReportType) {
-            alert('Выберите тип отчета')
+            setReportTypeDropdownHighlight(true)
+            setReportTypeDropdownOpen(true)
             return
         }
 
+        // Для отчётов по сварщикам нужен выбор хотя бы одного сварщика
+        const welderRequiredTypes = [REPORT_TYPE_WIRE, REPORT_TYPE_WELDER]
+        if (welderRequiredTypes.includes(selectedReportType)) {
+            const selectedWelderIds = Object.keys(selectedWelders).filter(
+                (key) => key !== '__NONE__' && selectedWelders[key]
+            )
+            if (selectedWelderIds.length === 0) {
+                setGenerateError('Выберите хотя бы одного сварщика')
+                return
+            }
+        }
+        setGenerateError('') // сбрасываем при успешной проверке
+        setIsGenerating(true)
+
         try {
-            // Получаем даты периода
-            let periodStartDate = startDate
-            let periodEndDate = endDate
-
-            // Если даты не выбраны, используем текущую дату
-            if (!periodStartDate) {
-                periodStartDate = new Date()
-            }
-            if (!periodEndDate) {
-                periodEndDate = new Date()
-            }
-
             // Форматируем даты для API (YYYY-MM-DD)
             const formatDate = (date) => {
                 if (!date) return null
@@ -2058,12 +2120,44 @@ const ReportsPage = () => {
                 return `${year}-${month}-${day}`
             }
 
-            // Получаем время из timeRange или используем значения по умолчанию
-            let periodStartTime = timeRangeEnabled ? timeRange.start : null
-            let periodEndTime = timeRangeEnabled ? timeRange.end : null
+            // Вычисляем даты и время периода по текущему выбору (periodType), а не по сохранённым в шаблоне
+            let periodStartDate
+            let periodEndDate
+            let periodStartTime
+            let periodEndTime
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
 
+            if (periodType === 'За 24 часа') {
+                // Суточный отчёт: с (сегодня − 1 сутки) в выбранное время по сегодня в то же время (ровно 24 ч)
+                const startTime = timeRange?.start || '00:00'
+                const endTime = startTime // одно и то же время = 24 часа
+                periodStartDate = new Date(today)
+                periodStartDate.setDate(periodStartDate.getDate() - 1)
+                periodEndDate = new Date(today)
+                periodStartTime = startTime
+                periodEndTime = endTime
+            } else if (periodType === 'За 7 дней') {
+                // 7 дней: с (сегодня − 7 дней) по сегодня
+                periodStartDate = new Date(today)
+                periodStartDate.setDate(periodStartDate.getDate() - 7)
+                periodEndDate = new Date(today)
+                periodStartTime = timeRange?.start || '00:00'
+                periodEndTime = timeRange?.end || '23:59'
+            } else {
+                // Произвольный период — берём выбранные даты
+                periodStartDate = startDate ? new Date(startDate) : new Date(today)
+                periodEndDate = endDate ? new Date(endDate) : new Date(today)
+                if (!startDate) periodStartDate.setHours(0, 0, 0, 0)
+                if (!endDate) periodEndDate.setHours(0, 0, 0, 0)
+                periodStartTime = timeRangeEnabled ? (timeRange?.start || null) : null
+                periodEndTime = timeRangeEnabled ? (timeRange?.end || null) : null
+            }
+
+            // Нормализуем тип отчёта (на случай короткой формы с бэкенда, например "По работе оборудования")
+            const normalizedReportType = normalizeReportType(selectedReportType) || selectedReportType
             // Вызываем соответствующий API в зависимости от типа отчета
-            if (selectedReportType === 'По расходу проволоки') {
+            if (normalizedReportType === REPORT_TYPE_WIRE) {
                 await reportApi.generateWireConsumptionReport(
                     currentTemplateId,
                     formatDate(periodStartDate),
@@ -2071,7 +2165,7 @@ const ReportsPage = () => {
                     periodStartTime,
                     periodEndTime
                 )
-            } else if (selectedReportType === 'По работе сварщика') {
+            } else if (normalizedReportType === REPORT_TYPE_WELDER) {
                 // Собираем выбранные опциональные колонки из текущих галочек (parameters)
                 const welderWorkOptionalKeys = [
                     'equipmentModel',
@@ -2090,7 +2184,7 @@ const ReportsPage = () => {
                     periodEndTime,
                     selectedColumns
                 )
-            } else if (selectedReportType === 'По работе оборудования') {
+            } else if (normalizedReportType === REPORT_TYPE_EQUIPMENT) {
                 const equipmentWorkOptionalKeys = [
                     'welderFullName',
                     'welderTabNumber',
@@ -2117,14 +2211,18 @@ const ReportsPage = () => {
                     periodStartTime,
                     periodEndTime,
                     selectedColumns,
-                    selectedEquipmentIds
+                    selectedEquipmentIds,
+                    minSeamIntervalEnabled ? minSeamInterval : null,
+                    minSeamDurationEnabled ? minSeamDuration : null
                 )
             } else {
-                alert('Неизвестный тип отчета: ' + selectedReportType)
+                alert('Неизвестный тип отчета: ' + (normalizedReportType || selectedReportType))
             }
         } catch (error) {
             console.error('Ошибка генерации отчета:', error)
             alert('Ошибка генерации отчета: ' + (error.message || 'Неизвестная ошибка'))
+        } finally {
+            setIsGenerating(false)
         }
     }
 
@@ -2381,7 +2479,7 @@ const ReportsPage = () => {
                             {/* Left sub-panel - Welders or Equipment selection */}
                             <div className="middle-subpanel middle-subpanel-left">
                                 <div className="parameters-list">
-                                    {selectedReportType === 'По работе оборудования' ? (
+                                    {selectedReportType === REPORT_TYPE_EQUIPMENT ? (
                                         (() => {
                                             const equipmentHierarchy = buildEquipmentHierarchy()
                                             const allEquipmentIds = getAllEquipmentFromHierarchy(equipmentHierarchy)
@@ -2831,7 +2929,7 @@ const ReportsPage = () => {
                             {/* Right sub-panel - Report columns selection (зависит от типа отчёта) */}
                             <div className="middle-subpanel middle-subpanel-right">
                                 <div className="parameters-list">
-                                    {(selectedReportType === 'По работе сварщика' || selectedReportType === 'По работе оборудования') ? (
+                                    {isWelderOrEquipmentReportType(selectedReportType) ? (
                                         /* Параметры отчёта по работе сварщика / по работе оборудования: одинаковый набор */
                                         <>
                                             <label className="parameter-item">
@@ -2862,7 +2960,7 @@ const ReportsPage = () => {
                                                 <input type="checkbox" checked={true} disabled={true} />
                                                 <span className="parameter-label">Время шва, с</span>
                                             </label>
-                                            {selectedReportType === 'По работе оборудования' && (
+                                            {selectedReportType === REPORT_TYPE_EQUIPMENT && (
                                                 <>
                                                     <label className="parameter-item">
                                                         <input type="checkbox" checked={parameters.welderFullName} onChange={() => toggleParameter('welderFullName')} />
@@ -3331,7 +3429,13 @@ const ReportsPage = () => {
                                     <select
                                         className="period-type-select"
                                         value={periodType}
-                                        onChange={(e) => setPeriodType(e.target.value)}
+                                        onChange={(e) => {
+                                            const newType = e.target.value
+                                            setPeriodType(newType)
+                                            if (newType === 'За 7 дней') {
+                                                setSelectedWorkingDays([...weekDays])
+                                            }
+                                        }}
                                     >
                                         {periodTypes.map(type => (
                                             <option key={type} value={type}>{type}</option>
@@ -3360,37 +3464,26 @@ const ReportsPage = () => {
                                     </label>
                                 </div>
 
-                                {periodType !== 'Произвольный период' && (
+                                {periodType === 'За 7 дней' && (
                                     <div className="right-panel-working-days-row">
-                                        <label className="right-panel-working-days-checkbox">
-                                            <input
-                                                type="checkbox"
-                                                checked={workingDaysEnabled}
-                                                onChange={(e) => setWorkingDaysEnabled(e.target.checked)}
-                                            />
-                                            <span>по рабочим дням</span>
-                                        </label>
-
-                                        {workingDaysEnabled && (
-                                            <div className="right-panel-working-days-buttons">
-                                                {weekDays.map(day => (
-                                                    <button
-                                                        key={day}
-                                                        type="button"
-                                                        className={`right-panel-week-day-btn ${selectedWorkingDays.includes(day) ? 'selected' : ''}`}
-                                                        onClick={() => {
-                                                            if (selectedWorkingDays.includes(day)) {
-                                                                setSelectedWorkingDays(selectedWorkingDays.filter(d => d !== day))
-                                                            } else {
-                                                                setSelectedWorkingDays([...selectedWorkingDays, day])
-                                                            }
-                                                        }}
-                                                    >
-                                                        {day}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
+                                        <div className="right-panel-working-days-buttons">
+                                            {weekDays.map(day => (
+                                                <button
+                                                    key={day}
+                                                    type="button"
+                                                    className={`right-panel-week-day-btn ${selectedWorkingDays.includes(day) ? 'selected' : ''}`}
+                                                    onClick={() => {
+                                                        if (selectedWorkingDays.includes(day)) {
+                                                            setSelectedWorkingDays(selectedWorkingDays.filter(d => d !== day))
+                                                        } else {
+                                                            setSelectedWorkingDays([...selectedWorkingDays, day])
+                                                        }
+                                                    }}
+                                                >
+                                                    {day}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
 
@@ -3624,15 +3717,21 @@ const ReportsPage = () => {
                             {/* Внизу три кнопки на одной линии: Сформировать, Сохранить, Удалить */}
                             {(isCreatingTemplate || currentTemplateId) && (
                                 <div className="right-panel-bottom-actions">
+                                    {generateError && (
+                                        <div className="right-panel-generate-error" role="alert">
+                                            {generateError}
+                                        </div>
+                                    )}
                                     <button
-                                        className="right-panel-generate-btn"
+                                        className={`right-panel-generate-btn${isGenerating ? ' right-panel-generate-btn-generating' : ''}`}
                                         type="button"
                                         onClick={handleGenerateNow}
+                                        disabled={isGenerating || isFormDirty()}
                                     >
-                                        Сформировать
+                                        {isGenerating ? 'Формируется' : 'Сформировать'}
                                     </button>
                                     <button
-                                        className={`right-panel-save-template-btn${isFormDirty() ? ' right-panel-save-template-btn-unsaved' : ''}`}
+                                        className={`right-panel-save-template-btn${isFormDirty() ? ' right-panel-save-template-btn-unsaved' : ''}${saveButtonBlink ? ' right-panel-save-template-btn-blink' : ''}`}
                                         type="button"
                                         onClick={handleSaveTemplate}
                                     >
@@ -3647,47 +3746,17 @@ const ReportsPage = () => {
                                         <span className="delete-icon">×</span>
                                         <span>Удалить</span>
                                     </button>
+                                    {isFormDirty() && (
+                                        <div className="right-panel-save-before-generate-hint">
+                                            Сохраните изменения перед формированием отчета
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
             </div>
-
-            {/* Модальное окно подтверждения пересохранения */}
-            {showResaveConfirm && (
-                <div className="modal-overlay modal-overlay-no-close-on-backdrop">
-                    <div className="resave-confirm-modal">
-                        {/* Крестик = отмена нажатия кнопки «Сохранить», закрыть без действия (не «Нет») */}
-                        <button
-                            type="button"
-                            className="resave-confirm-close-btn"
-                            onClick={() => setShowResaveConfirm(false)}
-                            aria-label="Отмена"
-                        >
-                            ×
-                        </button>
-                        <div className="resave-confirm-icon">⚠</div>
-                        <div className="resave-confirm-question">Пересохранить шаблон?</div>
-                        <div className="resave-confirm-buttons">
-                            <button
-                                className="resave-confirm-btn resave-confirm-btn-no"
-                                onClick={() => setShowResaveConfirm(false)}
-                            >
-                                <span className="resave-confirm-icon-x">×</span>
-                                <span>Нет</span>
-                            </button>
-                            <button
-                                className="resave-confirm-btn resave-confirm-btn-yes"
-                                onClick={confirmSaveTemplate}
-                            >
-                                <span className="resave-confirm-icon-check">✓</span>
-                                <span>Да</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Модальное окно: несохранённые изменения при смене действия */}
             {showUnsavedConfirm && (
