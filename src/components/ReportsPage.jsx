@@ -2048,6 +2048,16 @@ const ReportsPage = () => {
         }
     }
 
+    /** Изменение времени HH:mm на step минут по колёсику мыши (deltaY > 0 — минус, deltaY < 0 — плюс) */
+    const adjustTimeByWheel = (currentValue, deltaY, stepMinutes = 1) => {
+        const [h = 0, m = 0] = (currentValue || '00:00').split(':').map(Number)
+        let total = h * 60 + m + (deltaY > 0 ? -stepMinutes : stepMinutes)
+        total = Math.max(0, Math.min(24 * 60 - 1, total))
+        const nh = Math.floor(total / 60)
+        const nm = total % 60
+        return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`
+    }
+
     const formatTemplateSchedule = (template) => {
         const autoSettings = template.autoReportSettings || {}
         const time = autoSettings.autoReportTime || template.autoReportTime
@@ -2182,7 +2192,11 @@ const ReportsPage = () => {
                     formatDate(periodEndDate),
                     periodStartTime,
                     periodEndTime,
-                    selectedColumns
+                    selectedColumns,
+                    minSeamIntervalEnabled ? minSeamInterval : null,
+                    minSeamDurationEnabled ? minSeamDuration : null,
+                    minSeamIntervalEnabled,
+                    minSeamDurationEnabled
                 )
             } else if (normalizedReportType === REPORT_TYPE_EQUIPMENT) {
                 const equipmentWorkOptionalKeys = [
@@ -2213,7 +2227,9 @@ const ReportsPage = () => {
                     selectedColumns,
                     selectedEquipmentIds,
                     minSeamIntervalEnabled ? minSeamInterval : null,
-                    minSeamDurationEnabled ? minSeamDuration : null
+                    minSeamDurationEnabled ? minSeamDuration : null,
+                    minSeamIntervalEnabled,
+                    minSeamDurationEnabled
                 )
             } else {
                 alert('Неизвестный тип отчета: ' + (normalizedReportType || selectedReportType))
@@ -3451,14 +3467,22 @@ const ReportsPage = () => {
                                                 type="time"
                                                 value={timeRange.start}
                                                 onChange={(e) => setTimeRange(prev => ({ ...prev, start: e.target.value }))}
-
+                                                onWheel={(e) => {
+                                                    e.preventDefault()
+                                                    const step = e.shiftKey ? 60 : 1
+                                                    setTimeRange(prev => ({ ...prev, start: adjustTimeByWheel(prev.start, e.deltaY, step) }))
+                                                }}
                                             />
                                             <span>—</span>
                                             <input
                                                 type="time"
                                                 value={timeRange.end}
                                                 onChange={(e) => setTimeRange(prev => ({ ...prev, end: e.target.value }))}
-
+                                                onWheel={(e) => {
+                                                    e.preventDefault()
+                                                    const step = e.shiftKey ? 60 : 1
+                                                    setTimeRange(prev => ({ ...prev, end: adjustTimeByWheel(prev.end, e.deltaY, step) }))
+                                                }}
                                             />
                                         </div>
                                     </label>

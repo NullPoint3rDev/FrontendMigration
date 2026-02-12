@@ -356,7 +356,8 @@ export const reportApi = {
 
     // Генерация отчета по работе сварщика
     // selectedColumns — массив ключей выбранных опциональных колонок: equipmentModel, equipmentName, wireFeedSpeed, consumption, energyConsumed, gasConsumption
-    generateWelderWorkReport: async (templateId, periodStartDate, periodEndDate, periodStartTime, periodEndTime, selectedColumns = null) => {
+    // minSeamIntervalEnabled / minSeamDurationEnabled — галочки; при false бэкенд сбрасывает значение в шаблоне
+    generateWelderWorkReport: async (templateId, periodStartDate, periodEndDate, periodStartTime, periodEndTime, selectedColumns = null, minSeamInterval = null, minSeamDuration = null, minSeamIntervalEnabled = null, minSeamDurationEnabled = null) => {
         try {
             const requestBody = {
                 templateId: templateId,
@@ -368,6 +369,10 @@ export const reportApi = {
             if (selectedColumns != null && Array.isArray(selectedColumns)) {
                 requestBody.selectedColumns = selectedColumns;
             }
+            if (minSeamInterval != null) requestBody.minSeamInterval = minSeamInterval;
+            if (minSeamDuration != null) requestBody.minSeamDuration = minSeamDuration;
+            if (minSeamIntervalEnabled !== undefined && minSeamIntervalEnabled !== null) requestBody.minSeamIntervalEnabled = !!minSeamIntervalEnabled;
+            if (minSeamDurationEnabled !== undefined && minSeamDurationEnabled !== null) requestBody.minSeamDurationEnabled = !!minSeamDurationEnabled;
 
             const response = await fetch(`${BASE_URL}/welder-work/generate`, {
                 method: 'POST',
@@ -408,7 +413,8 @@ export const reportApi = {
     },
 
     // Генерация отчета по работе оборудования
-    generateEquipmentWorkReport: async (templateId, periodStartDate, periodEndDate, periodStartTime, periodEndTime, selectedColumns = null, selectedEquipmentIds = null, minSeamInterval = null, minSeamDuration = null) => {
+    // minSeamIntervalEnabled / minSeamDurationEnabled — галочки; при false бэкенд сбрасывает значение в шаблоне
+    generateEquipmentWorkReport: async (templateId, periodStartDate, periodEndDate, periodStartTime, periodEndTime, selectedColumns = null, selectedEquipmentIds = null, minSeamInterval = null, minSeamDuration = null, minSeamIntervalEnabled = null, minSeamDurationEnabled = null) => {
         try {
             const requestBody = {
                 templateId: templateId,
@@ -425,6 +431,8 @@ export const reportApi = {
             }
             if (minSeamInterval != null) requestBody.minSeamInterval = minSeamInterval;
             if (minSeamDuration != null) requestBody.minSeamDuration = minSeamDuration;
+            if (minSeamIntervalEnabled !== undefined && minSeamIntervalEnabled !== null) requestBody.minSeamIntervalEnabled = !!minSeamIntervalEnabled;
+            if (minSeamDurationEnabled !== undefined && minSeamDurationEnabled !== null) requestBody.minSeamDurationEnabled = !!minSeamDurationEnabled;
 
             const response = await fetch(`${BASE_URL}/equipment-work/generate`, {
                 method: 'POST',
