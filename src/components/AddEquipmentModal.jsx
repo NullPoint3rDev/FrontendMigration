@@ -1,23 +1,25 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import '../styles/addEquipmentModal.css'
 import machineImage from '../images/2 копия.png'
 
-const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organizationUnits = [] }) => {
+const defaultFormData = () => ({
+    name: '',
+    department: '',
+    commissioningDate: '',
+    macAddress: '',
+    serialNumber: '',
+    inventoryNumber: '',
+    responsiblePerson: '',
+    lastMaintenanceDate: '',
+    operatingHours: '',
+    maintenancePerson: '',
+    maintenancePass: '',
+    approvedWelders: []
+})
+
+const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organizationUnits = [], editMode = false, initialData = null }) => {
     const [selectedModel, setSelectedModel] = useState('Core')
-    const [formData, setFormData] = useState({
-        name: '',
-        department: '',
-        commissioningDate: '',
-        macAddress: '',
-        serialNumber: '',
-        inventoryNumber: '',
-        responsiblePerson: '',
-        lastMaintenanceDate: '',
-        operatingHours: '',
-        maintenancePerson: '',
-        maintenancePass: '',
-        approvedWelders: []
-    })
+    const [formData, setFormData] = useState(defaultFormData())
 
     const [selectedOptions, setSelectedOptions] = useState({
         rfid: false,
@@ -31,8 +33,19 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
     const lastMaintenanceDateInputRef = useRef(null)
 
     const models = [
-        'Core Pulse'
+        'Core Pulse'            // TODO: RENAME MODEL TO Core Pulse
     ]
+
+    // При открытии в режиме редактирования подставляем initialData
+    useEffect(() => {
+        if (isOpen && editMode && initialData) {
+            setFormData(prev => ({
+                ...prev,
+                name: initialData.name ?? '',
+                department: initialData.department ?? ''
+            }))
+        }
+    }, [isOpen, editMode, initialData?.name, initialData?.department])
 
     if (!isOpen) return null
 
@@ -246,40 +259,47 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
     }
 
     const handleSave = async () => {
-        // Очищаем предыдущие ошибки
         setErrors({})
         setApiError('')
 
+        if (editMode && initialData) {
+            const name = formData.name?.trim() ?? ''
+            const department = formData.department ?? ''
+            const editErrors = {}
+            if (!name) editErrors.name = 'Это поле обязательно'
+            if (!department) editErrors.department = 'Выберите подразделение'
+            if (Object.keys(editErrors).length > 0) {
+                setErrors(editErrors)
+                return
+            }
+        }
+
         if (onSave) {
             try {
-                console.log('🔵 AddEquipmentModal: Вызываем onSave с данными:', {
-                    model: selectedModel,
-                    ...formData,
-                    options: selectedOptions
-                });
-                await onSave({
-                    model: selectedModel,
-                    ...formData,
-                    options: selectedOptions
-                });
+                if (editMode && initialData) {
+                    await onSave({
+                        editMode: true,
+                        machineId: initialData.machineId,
+                        name: formData.name?.trim() ?? '',
+                        department: formData.department ?? ''
+                    });
+                } else {
+                    console.log('🔵 AddEquipmentModal: Вызываем onSave с данными:', {
+                        model: selectedModel,
+                        ...formData,
+                        options: selectedOptions
+                    });
+                    await onSave({
+                        model: selectedModel,
+                        ...formData,
+                        options: selectedOptions
+                    });
+                }
                 console.log('✅ AddEquipmentModal: onSave завершен успешно');
 
                 // Сбрасываем форму после успешного сохранения
                 setSelectedModel('Core')
-                setFormData({
-                    name: '',
-                    department: '',
-                    commissioningDate: '',
-                    macAddress: '',
-                    serialNumber: '',
-                    inventoryNumber: '',
-                    responsiblePerson: '',
-                    lastMaintenanceDate: '',
-                    operatingHours: '',
-                    maintenancePerson: '',
-                    maintenancePass: '',
-                    approvedWelders: []
-                })
+                setFormData(defaultFormData())
                 setSelectedOptions({
                     rfid: false,
                     bvo: false,
@@ -328,22 +348,8 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
     }
 
     const handleClose = () => {
-        // Сбрасываем форму при закрытии
         setSelectedModel('Core')
-        setFormData({
-            name: '',
-            department: '',
-            commissioningDate: '',
-            macAddress: '',
-            serialNumber: '',
-            inventoryNumber: '',
-            responsiblePerson: '',
-            lastMaintenanceDate: '',
-            operatingHours: '',
-            maintenancePerson: '',
-            maintenancePass: '',
-            approvedWelders: []
-        })
+        setFormData(defaultFormData())
         setSelectedOptions({
             rfid: false,
             bvo: false,
@@ -368,20 +374,22 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                 className="equipment-image"
                             />
                         </div>
-                        <div className="model-selection">
-                            <label className="model-label">Модель*</label>
-                            <div className="model-list">
-                                {models.map(model => (
-                                    <button
-                                        key={model}
-                                        className={`model-item ${selectedModel === model ? 'active' : ''}`}
-                                        onClick={() => setSelectedModel(model)}
-                                    >
-                                        {model}
-                                    </button>
-                                ))}
+                        {!editMode && (
+                            <div className="model-selection">
+                                <label className="model-label">Модель*</label>
+                                <div className="model-list">
+                                    {models.map(model => (
+                                        <button
+                                            key={model}
+                                            className={`model-item ${selectedModel === model ? 'active' : ''}`}
+                                            onClick={() => setSelectedModel(model)}
+                                        >
+                                            {model}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
 
                     <div className="modal-right">
@@ -413,213 +421,221 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                     </select>
                                     {errors.department && <span className="error-message">{errors.department}</span>}
                                 </div>
-                                <div className="form-field">
-                                    <label>Ввод в эксплуатацию*</label>
-                                    <div className="date-input-wrapper">
-                                        <input
-                                            type="text"
-                                            value={formData.commissioningDate}
-                                            onChange={(e) => handleDateInputChange('commissioningDate', e.target.value)}
-                                            placeholder="DD.MM.YYYY"
-                                            className={errors.commissioningDate ? 'error' : ''}
-                                        />
-                                        <input
-                                            ref={commissioningDateInputRef}
-                                            type="date"
-                                            className="date-picker-hidden"
-                                            value={convertDateToYYYYMMDD(formData.commissioningDate)}
-                                            onChange={(e) => handleDatePickerChange('commissioningDate', e.target.value)}
-                                            max={getDateLimits().maxDate}
-                                            min={getDateLimits().minDate}
-                                        />
-                                        <svg
-                                            className="calendar-icon calendar-icon-clickable"
-                                            width="16"
-                                            height="16"
-                                            viewBox="0 0 16 16"
-                                            fill="none"
-                                            onClick={() => handleCalendarIconClick('commissioningDate')}
-                                        >
-                                            <rect x="3" y="4" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-                                            <path d="M3 7H13" stroke="currentColor" strokeWidth="1.2"/>
-                                            <path d="M6 2V5M10 2V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                                        </svg>
-                                    </div>
-                                    {errors.commissioningDate && <span className="error-message">{errors.commissioningDate}</span>}
-                                </div>
-                                <div className="form-field">
-                                    <label>МАС - адрес*</label>
-                                    <input
-                                        type="text"
-                                        value={formData.macAddress}
-                                        onChange={(e) => handleInputChange('macAddress', e.target.value)}
-                                        className={errors.macAddress ? 'error' : ''}
-                                    />
-                                    {errors.macAddress && <span className="error-message">{errors.macAddress}</span>}
-                                </div>
-                                <div className="form-field">
-                                    <label>Серийный номер</label>
-                                    <input
-                                        type="text"
-                                        value={formData.serialNumber}
-                                        onChange={(e) => handleInputChange('serialNumber', e.target.value)}
-                                    />
-                                </div>
-                                <div className="form-field">
-                                    <label>Инвентарный номер</label>
-                                    <input
-                                        type="text"
-                                        value={formData.inventoryNumber}
-                                        onChange={(e) => handleInputChange('inventoryNumber', e.target.value)}
-                                    />
-                                </div>
+                                {!editMode && (
+                                    <>
+                                        <div className="form-field">
+                                            <label>Ввод в эксплуатацию*</label>
+                                            <div className="date-input-wrapper">
+                                                <input
+                                                    type="text"
+                                                    value={formData.commissioningDate}
+                                                    onChange={(e) => handleDateInputChange('commissioningDate', e.target.value)}
+                                                    placeholder="DD.MM.YYYY"
+                                                    className={errors.commissioningDate ? 'error' : ''}
+                                                />
+                                                <input
+                                                    ref={commissioningDateInputRef}
+                                                    type="date"
+                                                    className="date-picker-hidden"
+                                                    value={convertDateToYYYYMMDD(formData.commissioningDate)}
+                                                    onChange={(e) => handleDatePickerChange('commissioningDate', e.target.value)}
+                                                    max={getDateLimits().maxDate}
+                                                    min={getDateLimits().minDate}
+                                                />
+                                                <svg
+                                                    className="calendar-icon calendar-icon-clickable"
+                                                    width="16"
+                                                    height="16"
+                                                    viewBox="0 0 16 16"
+                                                    fill="none"
+                                                    onClick={() => handleCalendarIconClick('commissioningDate')}
+                                                >
+                                                    <rect x="3" y="4" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                                                    <path d="M3 7H13" stroke="currentColor" strokeWidth="1.2"/>
+                                                    <path d="M6 2V5M10 2V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                                                </svg>
+                                            </div>
+                                            {errors.commissioningDate && <span className="error-message">{errors.commissioningDate}</span>}
+                                        </div>
+                                        <div className="form-field">
+                                            <label>МАС - адрес*</label>
+                                            <input
+                                                type="text"
+                                                value={formData.macAddress}
+                                                onChange={(e) => handleInputChange('macAddress', e.target.value)}
+                                                className={errors.macAddress ? 'error' : ''}
+                                            />
+                                            {errors.macAddress && <span className="error-message">{errors.macAddress}</span>}
+                                        </div>
+                                        <div className="form-field">
+                                            <label>Серийный номер</label>
+                                            <input
+                                                type="text"
+                                                value={formData.serialNumber}
+                                                onChange={(e) => handleInputChange('serialNumber', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="form-field">
+                                            <label>Инвентарный номер</label>
+                                            <input
+                                                type="text"
+                                                value={formData.inventoryNumber}
+                                                onChange={(e) => handleInputChange('inventoryNumber', e.target.value)}
+                                            />
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
-                            <div className="form-column">
-                                <div className="form-field">
-                                    <label>ФИО ответственного</label>
-                                    <input
-                                        type="text"
-                                        value={formData.responsiblePerson}
-                                        onChange={(e) => handleNameInputChange('responsiblePerson', e.target.value)}
-                                    />
-                                </div>
-                                <div className="form-field">
-                                    <label>Дата последнего ТО</label>
-                                    <div className="date-input-wrapper">
+                            {!editMode && (
+                                <div className="form-column">
+                                    <div className="form-field">
+                                        <label>ФИО ответственного</label>
                                         <input
                                             type="text"
-                                            value={formData.lastMaintenanceDate}
-                                            onChange={(e) => handleDateInputChange('lastMaintenanceDate', e.target.value)}
-                                            placeholder="DD.MM.YYYY"
-                                            className={errors.lastMaintenanceDate ? 'error' : ''}
+                                            value={formData.responsiblePerson}
+                                            onChange={(e) => handleNameInputChange('responsiblePerson', e.target.value)}
                                         />
-                                        <input
-                                            ref={lastMaintenanceDateInputRef}
-                                            type="date"
-                                            className="date-picker-hidden"
-                                            value={convertDateToYYYYMMDD(formData.lastMaintenanceDate)}
-                                            onChange={(e) => handleDatePickerChange('lastMaintenanceDate', e.target.value)}
-                                            max={getDateLimits().maxDate}
-                                            min={getDateLimits().minDate}
-                                        />
-                                        <svg
-                                            className="calendar-icon calendar-icon-clickable"
-                                            width="16"
-                                            height="16"
-                                            viewBox="0 0 16 16"
-                                            fill="none"
-                                            onClick={() => handleCalendarIconClick('lastMaintenanceDate')}
-                                        >
-                                            <rect x="3" y="4" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-                                            <path d="M3 7H13" stroke="currentColor" strokeWidth="1.2"/>
-                                            <path d="M6 2V5M10 2V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                                        </svg>
                                     </div>
-                                    {errors.lastMaintenanceDate && <span className="error-message">{errors.lastMaintenanceDate}</span>}
-                                </div>
-                                <div className="form-field">
-                                    <label>Наработка между ТО</label>
-                                    <input
-                                        type="text"
-                                        value={formData.operatingHours}
-                                        onChange={(e) => handleOperatingHoursChange('operatingHours', e.target.value)}
-                                    />
-                                </div>
-                                <div className="form-field">
-                                    <label>ФИО проводившего ТО</label>
-                                    <input
-                                        type="text"
-                                        value={formData.maintenancePerson}
-                                        onChange={(e) => handleNameInputChange('maintenancePerson', e.target.value)}
-                                    />
-                                </div>
-                                <div className="form-field">
-                                    <label>Пропуск проводившего ТО</label>
-                                    <input
-                                        type="text"
-                                        value={formData.maintenancePass}
-                                        onChange={(e) => handleInputChange('maintenancePass', e.target.value)}
-                                    />
-                                </div>
-                                <div className="form-field">
-                                    <label>Допущенные сварщики:</label>
-                                    <div className="welders-tags">
-                                        {formData.approvedWelders.map((welder, index) => (
-                                            <span
-                                                key={index}
-                                                className="welder-tag"
-                                                onClick={() => {
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        approvedWelders: prev.approvedWelders.filter((_, i) => i !== index)
-                                                    }))
-                                                }}
+                                    <div className="form-field">
+                                        <label>Дата последнего ТО</label>
+                                        <div className="date-input-wrapper">
+                                            <input
+                                                type="text"
+                                                value={formData.lastMaintenanceDate}
+                                                onChange={(e) => handleDateInputChange('lastMaintenanceDate', e.target.value)}
+                                                placeholder="DD.MM.YYYY"
+                                                className={errors.lastMaintenanceDate ? 'error' : ''}
+                                            />
+                                            <input
+                                                ref={lastMaintenanceDateInputRef}
+                                                type="date"
+                                                className="date-picker-hidden"
+                                                value={convertDateToYYYYMMDD(formData.lastMaintenanceDate)}
+                                                onChange={(e) => handleDatePickerChange('lastMaintenanceDate', e.target.value)}
+                                                max={getDateLimits().maxDate}
+                                                min={getDateLimits().minDate}
+                                            />
+                                            <svg
+                                                className="calendar-icon calendar-icon-clickable"
+                                                width="16"
+                                                height="16"
+                                                viewBox="0 0 16 16"
+                                                fill="none"
+                                                onClick={() => handleCalendarIconClick('lastMaintenanceDate')}
                                             >
+                                                <rect x="3" y="4" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                                                <path d="M3 7H13" stroke="currentColor" strokeWidth="1.2"/>
+                                                <path d="M6 2V5M10 2V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                                            </svg>
+                                        </div>
+                                        {errors.lastMaintenanceDate && <span className="error-message">{errors.lastMaintenanceDate}</span>}
+                                    </div>
+                                    <div className="form-field">
+                                        <label>Наработка между ТО</label>
+                                        <input
+                                            type="text"
+                                            value={formData.operatingHours}
+                                            onChange={(e) => handleOperatingHoursChange('operatingHours', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="form-field">
+                                        <label>ФИО проводившего ТО</label>
+                                        <input
+                                            type="text"
+                                            value={formData.maintenancePerson}
+                                            onChange={(e) => handleNameInputChange('maintenancePerson', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="form-field">
+                                        <label>Пропуск проводившего ТО</label>
+                                        <input
+                                            type="text"
+                                            value={formData.maintenancePass}
+                                            onChange={(e) => handleInputChange('maintenancePass', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="form-field">
+                                        <label>Допущенные сварщики:</label>
+                                        <div className="welders-tags">
+                                            {formData.approvedWelders.map((welder, index) => (
+                                                <span
+                                                    key={index}
+                                                    className="welder-tag"
+                                                    onClick={() => {
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            approvedWelders: prev.approvedWelders.filter((_, i) => i !== index)
+                                                        }))
+                                                    }}
+                                                >
                                                 {welder}
                                             </span>
-                                        ))}
-                                        <select
-                                            className="welder-select"
-                                            onChange={(e) => {
-                                                if (e.target.value && !formData.approvedWelders.includes(e.target.value)) {
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        approvedWelders: [...prev.approvedWelders, e.target.value]
-                                                    }))
-                                                }
-                                                e.target.value = ''
-                                            }}
-                                        >
-                                            <option value="">+</option>
-                                            {welders.map(welder => (
-                                                <option key={welder.id} value={welder.name}>
-                                                    {welder.name}
-                                                </option>
                                             ))}
-                                        </select>
+                                            <select
+                                                className="welder-select"
+                                                onChange={(e) => {
+                                                    if (e.target.value && !formData.approvedWelders.includes(e.target.value)) {
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            approvedWelders: [...prev.approvedWelders, e.target.value]
+                                                        }))
+                                                    }
+                                                    e.target.value = ''
+                                                }}
+                                            >
+                                                <option value="">+</option>
+                                                {welders.map(welder => (
+                                                    <option key={welder.id} value={welder.name}>
+                                                        {welder.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
-                        <div className="options-section">
-                            <label className="options-label">Опции:</label>
-                            <div className="options-buttons">
-                                <button
-                                    className={`option-btn ${selectedOptions.rfid ? 'active' : ''}`}
-                                    onClick={() => toggleOption('rfid')}
-                                >
-                                    <svg className="option-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                        <rect x="4" y="6" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                                        <path d="M6 10H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                                        <path d="M8 4V6M12 4V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                                    </svg>
-                                    <span>RFID</span>
-                                </button>
-                                <button
-                                    className={`option-btn ${selectedOptions.bvo ? 'active' : ''}`}
-                                    onClick={() => toggleOption('bvo')}
-                                >
-                                    <svg className="option-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                        <ellipse cx="10" cy="12" rx="6" ry="6" stroke="currentColor" strokeWidth="1.5"/>
-                                        <path d="M10 4V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                                        <path d="M6 6L8 8M14 6L12 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                                    </svg>
-                                    <span>БВО</span>
-                                </button>
-                                <button
-                                    className={`option-btn ${selectedOptions.gasControl ? 'active' : ''}`}
-                                    onClick={() => toggleOption('gasControl')}
-                                >
-                                    <svg className="option-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                        <path d="M10 4C10 4 6 8 6 12C6 14.5 7.5 16.5 10 16.5C12.5 16.5 14 14.5 14 12C14 8 10 4 10 4Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                                        <path d="M10 8V12M8 10H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                                    </svg>
-                                    <span>СИСТЕМА контроля газа</span>
-                                </button>
+                        {!editMode && (
+                            <div className="options-section">
+                                <label className="options-label">Опции:</label>
+                                <div className="options-buttons">
+                                    <button
+                                        className={`option-btn ${selectedOptions.rfid ? 'active' : ''}`}
+                                        onClick={() => toggleOption('rfid')}
+                                    >
+                                        <svg className="option-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                            <rect x="4" y="6" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                                            <path d="M6 10H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                            <path d="M8 4V6M12 4V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                        </svg>
+                                        <span>RFID</span>
+                                    </button>
+                                    <button
+                                        className={`option-btn ${selectedOptions.bvo ? 'active' : ''}`}
+                                        onClick={() => toggleOption('bvo')}
+                                    >
+                                        <svg className="option-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                            <ellipse cx="10" cy="12" rx="6" ry="6" stroke="currentColor" strokeWidth="1.5"/>
+                                            <path d="M10 4V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                            <path d="M6 6L8 8M14 6L12 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                        </svg>
+                                        <span>БВО</span>
+                                    </button>
+                                    <button
+                                        className={`option-btn ${selectedOptions.gasControl ? 'active' : ''}`}
+                                        onClick={() => toggleOption('gasControl')}
+                                    >
+                                        <svg className="option-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                            <path d="M10 4C10 4 6 8 6 12C6 14.5 7.5 16.5 10 16.5C12.5 16.5 14 14.5 14 12C14 8 10 4 10 4Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                                            <path d="M10 8V12M8 10H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                        </svg>
+                                        <span>СИСТЕМА контроля газа</span>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {apiError && (
                             <div className="api-error-message">
@@ -634,7 +650,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                         )}
 
                         <button className="save-button" onClick={handleSave}>
-                            Добавить оборудование
+                            {editMode ? 'Сохранить изменения' : 'Добавить оборудование'}
                         </button>
                     </div>
                 </div>

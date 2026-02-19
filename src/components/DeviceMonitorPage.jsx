@@ -14,8 +14,9 @@ import {
 } from 'chart.js';
 import '../styles/mainContentNew.css';
 import * as archiveDeviceApi from '../api/archiveDeviceApi';
-import { deleteWeldingMachine, getAllWeldingMachines, updateWeldingMachine, getWeldingMachineById } from '../api/weldingMachineApi';
+import { deleteWeldingMachine, getAllWeldingMachines, updateWeldingMachine, getWeldingMachineById, getAllOrganizationUnits } from '../api/weldingMachineApi';
 import machineImage from '../images/Untitled 3 копия.png';
+import AddEquipmentModal from './AddEquipmentModal';
 
 // Кастомный плагин для градиентов и пороговых линий
 const gradientPlugin = {
@@ -134,11 +135,15 @@ const DeviceMonitorPage = () => {
     // Состояние для хранения ID аппарата (для удаления)
     const [machineId, setMachineId] = useState(null);
 
-    // Состояние для редактирования названия аппарата
+    // Состояние для редактирования названия аппарата (инлайн — оставлено для совместимости, но карандаш открывает модалку)
     const [isEditingName, setIsEditingName] = useState(false);
     const [editedName, setEditedName] = useState(equipmentName);
     const [displayName, setDisplayName] = useState(equipmentName);
     const [isSavingName, setIsSavingName] = useState(false);
+
+    // Модальное окно редактирования аппарата (наименование и подразделение)
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [organizationUnits, setOrganizationUnits] = useState([]);
 
     // Реф для предотвращения конфликта между кликом на карандаш и onBlur
     const saveTimeoutRef = useRef(null);
@@ -1202,6 +1207,67 @@ const DeviceMonitorPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [equipmentName]);
 
+    // Загрузка подразделений при открытии модалки редактирования
+    useEffect(() => {
+        if (editModalOpen && organizationUnits.length === 0) {
+            getAllOrganizationUnits()
+                .then((data) => setOrganizationUnits(Array.isArray(data) ? data : []))
+                .catch(() => setOrganizationUnits([]));
+        }
+    }, [editModalOpen, organizationUnits.length]);
+
+    // Открыть модалку редактирования (наименование и подразделение)
+    const handleOpenEditModal = (e) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = null;
+        }
+        setEditModalOpen(true);
+    };
+
+    // Сохранение из модалки: обновить наименование и подразделение аппарата
+    const handleSaveEquipmentEdit = async (payload) => {
+        if (!payload.editMode || !payload.machineId) {
+            const err = new Error('Не удалось определить аппарат для сохранения.');
+            err.errors = { api: err.message };
+            throw err;
+        }
+        const { machineId: id, name, department } = payload;
+        const trimmedName = (name || '').trim();
+        if (!trimmedName) {
+            return;
+        }
+        try {
+            const machine = await getWeldingMachineById(id);
+            if (!machine || !machine.id) {
+                throw new Error('Аппарат не найден');
+            }
+            const unit = organizationUnits.find((u) => (u.name || '') === (department || ''));
+            const organizationUnitForApi = unit
+                ? { id: unit.id, name: unit.name || '' }
+                : (machine.organizationUnit || null);
+            const updateData = {
+                ...machine,
+                name: trimmedName,
+                organizationUnit: organizationUnitForApi,
+            };
+            await updateWeldingMachine(id, updateData);
+            setDisplayName(trimmedName);
+            const newParams = new URLSearchParams(searchParams);
+            newParams.set('name', trimmedName);
+            newParams.set('organizationUnit', department || '');
+            navigate(`?${newParams.toString()}`, { replace: true });
+            setEditModalOpen(false);
+        } catch (err) {
+            console.error('Ошибка сохранения аппарата:', err);
+            throw err;
+        }
+    };
+
     const toggleTelemetryList = () => {
         setIsTelemetryListExpanded(prev => !prev);
     };
@@ -1557,7 +1623,7 @@ const DeviceMonitorPage = () => {
             data.wireConsumption) : null;
         params.push({
             label: 'Расход проволоки',
-            value: isDeviceOff ? '—' : (wireConsumption !== undefined && wireConsumption !== null ? `${wireConsumption} м/мин` : '—')
+            value: isDeviceOff ? '—' : (wireConsumption !== undefined && wireConsumption !== null ? `${wireConsumption} м` : '—')
         });
 
         return params;
@@ -1904,15 +1970,8 @@ const DeviceMonitorPage = () => {
                             <button
                                 type="button"
                                 className="machine-info-icon-tile"
-                                onClick={handleEditName}
-                                onMouseDown={(e) => {
-                                    // Отменяем таймаут onBlur при клике на кнопку
-                                    if (saveTimeoutRef.current) {
-                                        clearTimeout(saveTimeoutRef.current);
-                                        saveTimeoutRef.current = null;
-                                    }
-                                }}
-                                title={isEditingName ? "Сохранить название" : "Редактировать название"}
+                                onClick={handleOpenEditModal}
+                                title="Редактировать наименование и подразделение"
                                 style={{
                                     cursor: 'pointer',
                                     border: 'none',
@@ -1925,37 +1984,7 @@ const DeviceMonitorPage = () => {
                             >
                                 <span className="machine-info-icon">✎</span>
                             </button>
-                            {isEditingName ? (
-                                <input
-                                    type="text"
-                                    value={editedName}
-                                    onChange={(e) => setEditedName(e.target.value)}
-                                    onKeyDown={handleNameKeyDown}
-                                    onBlur={(e) => {
-                                        // Добавляем небольшую задержку, чтобы не конфликтовать с кликом на карандаш
-                                        saveTimeoutRef.current = setTimeout(() => {
-                                            handleSaveName();
-                                        }, 200);
-                                    }}
-                                    autoFocus
-                                    disabled={isSavingName}
-                                    className="machine-info-text"
-                                    style={{
-                                        background: 'rgba(255, 255, 255, 0.1)',
-                                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                                        borderRadius: '4px',
-                                        padding: '4px 8px',
-                                        color: 'inherit',
-                                        font: 'inherit',
-                                        width: '100%',
-                                        outline: 'none',
-                                        opacity: isSavingName ? 0.6 : 1,
-                                        cursor: isSavingName ? 'wait' : 'text'
-                                    }}
-                                />
-                            ) : (
-                                <span className="machine-info-text">{displayName}</span>
-                            )}
+                            <span className="machine-info-text">{displayName}</span>
                         </div>
                         {organizationUnit && (
                             <div className="machine-info-row">
@@ -2321,6 +2350,16 @@ const DeviceMonitorPage = () => {
                     )}
                 </div>
             </section>
+
+            <AddEquipmentModal
+                isOpen={editModalOpen}
+                onClose={() => setEditModalOpen(false)}
+                onSave={handleSaveEquipmentEdit}
+                welders={[]}
+                organizationUnits={organizationUnits}
+                editMode={true}
+                initialData={editModalOpen ? { machineId, name: displayName, department: organizationUnit } : null}
+            />
         </main>
     );
 };

@@ -25,6 +25,24 @@ const defaultCoreOptions = {
     bvo: false,
 };
 
+const EQUIPMENT_FILTERS_STORAGE_KEY = 'weldingEquipmentFilters';
+
+function loadFiltersFromStorage() {
+    try {
+        const raw = sessionStorage.getItem(EQUIPMENT_FILTERS_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+    } catch (_) {}
+    return null;
+}
+
+function saveFiltersToStorage(data) {
+    try {
+        sessionStorage.setItem(EQUIPMENT_FILTERS_STORAGE_KEY, JSON.stringify(data));
+    } catch (_) {}
+}
+
 const navMenu = [
     { label: 'Главная', path: '/' },
     {
@@ -72,7 +90,21 @@ const navMenu = [
     { label: 'О программе', path: '/about' },
 ];
 
+function getInitialFilterState() {
+    const s = loadFiltersFromStorage();
+    return {
+        modelFilter: Array.isArray(s?.modelFilter) ? s.modelFilter : [],
+        organizationUnitFilter: Array.isArray(s?.organizationUnitFilter) ? s.organizationUnitFilter : [],
+        statusFilter: Array.isArray(s?.statusFilter) && s.statusFilter.length > 0 ? s.statusFilter : ['on', 'welding', 'error', 'off'],
+        searchTerm: typeof s?.searchTerm === 'string' ? s.searchTerm : '',
+        sortField: typeof s?.sortField === 'string' ? s.sortField : 'unit',
+        sortDirection: s?.sortDirection === 'desc' ? 'desc' : 'asc',
+        viewMode: s?.viewMode === 'tiles' ? 'tiles' : 'table',
+    };
+}
+
 function WeldingEquipmentPage() {
+    const initialFilters = useMemo(() => getInitialFilterState(), []);
     const [equipment, setEquipment] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
     const [editData, setEditData] = useState({});
@@ -82,13 +114,13 @@ function WeldingEquipmentPage() {
     const [organizationUnits, setOrganizationUnits] = useState([]);
     const [weldingMachineTypes, setWeldingMachineTypes] = useState([]);
     const [responsibleUsers, setResponsibleUsers] = useState([]);
-    const [modelFilter, setModelFilter] = useState([]); // Массив выбранных моделей
-    const [organizationUnitFilter, setOrganizationUnitFilter] = useState([]); // Массив выбранных подразделений
-    const [statusFilter, setStatusFilter] = useState(['on', 'welding', 'error', 'off']); // Массив выбранных статусов (по умолчанию все выбраны)
-    const [searchTerm, setSearchTerm] = useState('');
-    const [sortField, setSortField] = useState('unit'); // по умолчанию сортировка по подразделению
-    const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
-    const [viewMode, setViewMode] = useState('table'); // 'tiles' or 'table'
+    const [modelFilter, setModelFilter] = useState(initialFilters.modelFilter); // Массив выбранных моделей
+    const [organizationUnitFilter, setOrganizationUnitFilter] = useState(initialFilters.organizationUnitFilter); // Массив выбранных подразделений
+    const [statusFilter, setStatusFilter] = useState(initialFilters.statusFilter); // Массив выбранных статусов (по умолчанию все выбраны)
+    const [searchTerm, setSearchTerm] = useState(initialFilters.searchTerm);
+    const [sortField, setSortField] = useState(initialFilters.sortField); // по умолчанию сортировка по подразделению
+    const [sortDirection, setSortDirection] = useState(initialFilters.sortDirection); // 'asc' | 'desc'
+    const [viewMode, setViewMode] = useState(initialFilters.viewMode); // 'tiles' or 'table'
     const [expandedFilters, setExpandedFilters] = useState({
         department: true,
         status: true,
@@ -350,6 +382,19 @@ function WeldingEquipmentPage() {
         loadWeldingMachineTypes();
         loadResponsibleUsers();
     }, []);
+
+    // Сохраняем фильтры в sessionStorage при изменении, чтобы при возврате со страницы мониторинга они не сбрасывались
+    useEffect(() => {
+        saveFiltersToStorage({
+            modelFilter,
+            organizationUnitFilter,
+            statusFilter,
+            searchTerm,
+            sortField,
+            sortDirection,
+            viewMode,
+        });
+    }, [modelFilter, organizationUnitFilter, statusFilter, searchTerm, sortField, sortDirection, viewMode]);
 
     // Poll device statuses every 4s
     useEffect(() => {

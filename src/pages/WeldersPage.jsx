@@ -933,7 +933,7 @@ function WeldersPage() {
                         <div className="welders-stats-tile">
                             <div className="stat-item">
                                 <img src={WelderIcon} alt="Welder" className="stat-icon" />
-                                <span>Всего: {welders.length}</span>
+                                <span>Всего: {getFilteredWelders().length}</span>
                             </div>
                             <div className="stat-item">
                                 <img
