@@ -2197,8 +2197,8 @@ const DeviceMonitorPage = () => {
                             )}
                         </div>
                         {isTelemetryListExpanded && (
-                            <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
-                                <div className="tabs">
+                            <>
+                                <div className="tabs tabs-fixed">
                                     <button
                                         className={`tab ${activeTab === 'graphs' ? 'active' : ''}`}
                                         onClick={() => setActiveTab('graphs')}
@@ -2212,47 +2212,159 @@ const DeviceMonitorPage = () => {
                                         Информация
                                     </button>
                                 </div>
-                                {activeTab === 'graphs' && telemetryChannels.map((channel) => (
-                                    <div
-                                        key={channel.label}
-                                        className={`telemetry-item ${channel.active ? 'active' : ''}`}
-                                    >
-                                        <span className="telemetry-label">{channel.label}</span>
-                                        <div className="telemetry-tiles">
-                                            <button
-                                                type="button"
-                                                className={`telemetry-tile ${channel.active && channel.tile1 ? 'active' : ''}`}
-                                                style={{ color: channel.active && channel.tile1 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
-                                            >
-                                                <span className="wave-icon">~</span>
-                                                <span className="tile-number">1</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className={`telemetry-tile ${channel.active && channel.tile2 ? 'active' : ''}`}
-                                                style={{ color: channel.active && channel.tile2 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
-                                            >
-                                                <span className="wave-icon">~</span>
-                                                <span className="tile-number">2</span>
-                                            </button>
+                                <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
+                                    {activeTab === 'graphs' && telemetryChannels.map((channel) => (
+                                        <div
+                                            key={channel.label}
+                                            className={`telemetry-item ${channel.active ? 'active' : ''}`}
+                                        >
+                                            <span className="telemetry-label">{channel.label}</span>
+                                            <div className="telemetry-tiles">
+                                                <button
+                                                    type="button"
+                                                    className={`telemetry-tile ${channel.active && channel.tile1 ? 'active' : ''}`}
+                                                    style={{ color: channel.active && channel.tile1 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                                >
+                                                    <span className="wave-icon">~</span>
+                                                    <span className="tile-number">1</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={`telemetry-tile ${channel.active && channel.tile2 ? 'active' : ''}`}
+                                                    style={{ color: channel.active && channel.tile2 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                                >
+                                                    <span className="wave-icon">~</span>
+                                                    <span className="tile-number">2</span>
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                                {activeTab === 'info' && (
-                                    <div className="info-content">
-                                        <div className="info-item">
-                                            <span className="info-label">RFID код:</span>
-                                            <span className="info-value">{getRfidCode() || 'Не указан'}</span>
+                                    ))}
+                                    {activeTab === 'info' && (
+                                        <div className="info-content info-content-placeholder">
                                         </div>
-                                        <div className="info-item">
-                                            <span className="info-label">MAC адрес:</span>
-                                            <span className="info-value">{machineMac}</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                                    )}
+                                </div>
+                            </>
                         )}
                     </div>
+                    {activeTab === 'info' && (
+                        <div className="info-tiles-container">
+                            <div className="info-tile">
+                                <div className="info-tile-row info-tile-row-editable">
+                                    <span className="info-tile-label">Ответственное лицо</span>
+                                    <span className="info-tile-value"></span>
+                                    <span className="info-tile-edit" aria-hidden>✎</span>
+                                </div>
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">Серийный номер ИП</span>
+                                    <span className="info-tile-value"></span>
+                                </div>
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">Инвентарный номер</span>
+                                    <span className="info-tile-value"></span>
+                                </div>
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">Дата ввода в эксплуатацию</span>
+                                    <span className="info-tile-value"></span>
+                                </div>
+                                <button type="button" className="info-tile-btn">Обновление ПО ИП</button>
+                            </div>
+                            <div className="info-tile">
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">МАС адрес модуля WT</span>
+                                    <span className="info-tile-value">{machineMac || '1223 2323 2356 12'}</span>
+                                </div>
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">Дата выпуска WT</span>
+                                    <span className="info-tile-value"></span>
+                                </div>
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">Серийный номер</span>
+                                    <span className="info-tile-value"></span>
+                                </div>
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">Версия ПО модуля WT</span>
+                                    <span className="info-tile-value"></span>
+                                </div>
+                                <button type="button" className="info-tile-btn">Обновление ПО WT</button>
+                            </div>
+                            <div className="info-tile">
+                                <div className="info-tile-status-row">
+                                    <span className="info-tile-label">Система контроля газа</span>
+                                    <span className="info-tile-badge info-tile-badge-active">Неактивно</span>
+                                </div>
+                                <div className="info-tile-status-row">
+                                    <span className="info-tile-label">RFID</span>
+                                    <span className="info-tile-badge info-tile-badge-inactive">Активно</span>
+                                </div>
+                                <div className="info-tile-status-row">
+                                    <span className="info-tile-label">БВО</span>
+                                    <span className="info-tile-badge info-tile-badge-active">Активно</span>
+                                </div>
+                                <div className="info-tile-row info-tile-row-editable">
+                                    <span className="info-tile-value"></span>
+                                    <span className="info-tile-edit" aria-hidden>✎</span>
+                                </div>
+                            </div>
+                            <div className="info-tile info-tile-software">
+                                <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
+                                <div className="info-tile-row"><span className="info-tile-label">Версия ПО Лицовой платы</span><span className="info-tile-value"></span></div>
+                                <div className="info-tile-row"><span className="info-tile-label">Версия ПО БВО</span><span className="info-tile-value"></span></div>
+                                <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
+                                <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
+                                <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
+                            </div>
+                            <div className="info-tile">
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">Дата последнего ТО</span>
+                                    <span className="info-tile-value"></span>
+                                </div>
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">ФИО проводившего ТО</span>
+                                    <span className="info-tile-value"></span>
+                                </div>
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">Пропуск проводившего ТО</span>
+                                    <span className="info-tile-value"></span>
+                                </div>
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">Время до планового ремонта</span>
+                                    <span className="info-tile-value"></span>
+                                </div>
+                            </div>
+                            <div className="info-tile">
+                                <div className="info-tile-row info-tile-row-editable">
+                                    <span className="info-tile-label">Наработка между ТО</span>
+                                    <span className="info-tile-value"></span>
+                                    <span className="info-tile-edit" aria-hidden>✎</span>
+                                </div>
+                                <div className="info-tile-row info-tile-row-editable">
+                                    <span className="info-tile-label">Время между ТО</span>
+                                    <span className="info-tile-value"></span>
+                                    <span className="info-tile-edit" aria-hidden>✎</span>
+                                </div>
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">Наработка до ТО</span>
+                                    <span className="info-tile-value"></span>
+                                </div>
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">Время до ТО</span>
+                                    <span className="info-tile-value"></span>
+                                </div>
+                                <button type="button" className="info-tile-btn">История ТО ИП</button>
+                            </div>
+                            <div className="info-tile">
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">RFID код</span>
+                                    <span className="info-tile-value">{getRfidCode() || '—'}</span>
+                                </div>
+                                <div className="info-tile-row">
+                                    <span className="info-tile-label">MAC адрес</span>
+                                    <span className="info-tile-value">{machineMac}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {activeTab === 'graphs' && (
                         <div className="chart-stack">
                             <div className="chart-card large">
