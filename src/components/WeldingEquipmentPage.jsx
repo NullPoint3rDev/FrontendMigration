@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import AddEquipmentModal from './AddEquipmentModal';
 import UserProfile from './UserProfile';
 import machineImage from '../images/Untitled 3 копия.png';
+import ResourcesLogo from '../images/ResourcesLogo.png';
 // WebSocket отключен — используем только polling API
 import {
     createWeldingMachine,
@@ -1464,6 +1465,16 @@ function WeldingEquipmentPage() {
                                 <span className="add-icon">+</span>
                                 <span>Добавить оборудование</span>
                             </button>
+                        </div>
+                        <div className="welders-stats-tile">
+                            <div className="stat-item">
+                                <img src={ResourcesLogo} alt="" className="stat-icon" />
+                                <span>Всего: {equipment.length}</span>
+                            </div>
+                            <div className="stat-item">
+                                <img src={ResourcesLogo} alt="" className="stat-icon" />
+                                <span>Выбрано: {filteredEquipment.length}</span>
+                            </div>
                         </div>
                         <div className="view-toggle">
                             <button

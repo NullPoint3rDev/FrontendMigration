@@ -270,6 +270,29 @@
     line-height: 1;
 }
 
+.welding-equipment-page .welders-stats-tile {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+    margin-left: 550px;
+}
+
+.welding-equipment-page .welders-stats-tile .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #d9d6df;
+    font-size: 13px;
+}
+
+.welding-equipment-page .welders-stats-tile .stat-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
 .view-toggle {
     display: flex;
     gap: 10px;

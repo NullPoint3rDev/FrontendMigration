@@ -18,70 +18,10 @@ import { deleteWeldingMachine, getAllWeldingMachines, updateWeldingMachine, getW
 import machineImage from '../images/Untitled 3 копия.png';
 import AddEquipmentModal from './AddEquipmentModal';
 
-// Кастомный плагин для градиентов и пороговых линий
-const gradientPlugin = {
-    id: 'gradientPlugin',
-    beforeDatasetsDraw: (chart) => {
-        const ctx = chart.ctx;
-        const chartArea = chart.chartArea;
-        const scales = chart.scales;
-
-        if (!chartArea || !scales.y) return;
-
-        // Идентифицируем график по данным или другим способом
-        const isCurrentChart = chart.canvas.id === 'current-chart' ||
-            (chart.data.datasets[0] && chart.data.datasets[0].label === 'Ток (А)');
-
-        // Для осциллограммы градиенты не нужны, но оставляем для совместимости
-        // Графики теперь без заливки (fill: false)
-    },
-    afterDatasetsDraw: (chart) => {
-        const ctx = chart.ctx;
-        const chartArea = chart.chartArea;
-        const scales = chart.scales;
-
-        if (!chartArea || !scales.y) return;
-
-        // Идентифицируем график
-        const isCurrentChart = chart.canvas.id === 'current-chart' ||
-            (chart.data.datasets[0] && chart.data.datasets[0].label === 'Ток (А)');
-
-        // // Пороговая линия для тока (350A)
-        // if (isCurrentChart) {
-        //     const thresholdValue = 350;
-        //     const yPos = scales.y.getPixelForValue(thresholdValue);
-        //
-        //     ctx.save();
-        //     ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-        //     ctx.lineWidth = 1.5;
-        //     ctx.setLineDash([5, 5]);
-        //     ctx.beginPath();
-        //     ctx.moveTo(chartArea.left, yPos);
-        //     ctx.lineTo(chartArea.right, yPos);
-        //     ctx.stroke();
-        //     ctx.restore();
-        // }
-
-        // Идентифицируем график напряжения
-        const isVoltageChart = chart.canvas.id === 'voltage-chart' ||
-            (chart.data.datasets[0] && chart.data.datasets[0].label === 'Напряжение (В)');
-
-        // // Пороговая линия для напряжения (35V)
-        // if (isVoltageChart) {
-        //     const thresholdValue = 35;
-        //     const yPos = scales.y.getPixelForValue(thresholdValue);
-        //
-        //     ctx.save();
-        //     ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-        //     ctx.lineWidth = 1.5;
-        //     ctx.setLineDash([5, 5]);
-        //     ctx.beginPath();
-        //     ctx.moveTo(chartArea.left, yPos);
-        //     ctx.lineTo(chartArea.right, yPos);
-        //     ctx.stroke();
-        //     ctx.restore();
-        // }
-    }
+// Плагин пороговой линии отключён (белую линию на графике убрали по запросу)
+const thresholdLinePlugin = {
+    id: 'thresholdLinePlugin',
+    afterDatasetsDraw: () => {}
 };
 
 // Регистрация компонентов Chart.js
@@ -94,7 +34,7 @@ ChartJS.register(
     Tooltip,
     Legend,
     Filler,
-    gradientPlugin
+    thresholdLinePlugin
 );
 
 const DeviceMonitorPage = () => {
@@ -1280,124 +1220,278 @@ const DeviceMonitorPage = () => {
         return gradient;
     };
 
-    // Конфигурация графиков в стиле скриншота
-    const getChartOptions = (min, max, label, threshold, thresholdLabel, chartRef) => ({
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: false
-            },
-            tooltip: {
-                mode: 'index',
-                intersect: false,
-                backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                titleColor: '#FFFFFF',
-                bodyColor: '#FFFFFF',
-                borderColor: 'rgba(255, 255, 255, 0.2)',
-                borderWidth: 1,
-                padding: 12,
-                cornerRadius: 8,
-                displayColors: true,
-                callbacks: {
-                    label: function(context) {
-                        return `${label}: ${context.parsed.y.toFixed(1)}`;
+    // Равномерные деления осей (одинаковый gap между подписями)
+    const LEFT_Y_TICKS = [0, 100, 200, 300, 400, 500];
+    const RIGHT_Y_TICKS = [0, 10, 20, 30, 40, 50];
+
+    // Конфигурация верхнего графика (ток): левая ось 0–500, правая 0–50, ось X 6:00–22:00
+    const getCurrentChartOptions = (dataLength) => {
+        const n = Math.max(dataLength, 1);
+        const xMax = Math.max(0, n - 1);
+        const xStep = n <= 1 ? 1 : xMax / 8;
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#FFFFFF',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
+                    displayColors: true,
+                    callbacks: {
+                        label: (ctx) => `Ток (А): ${ctx.parsed.y.toFixed(1)}`
                     }
                 }
-            }
-        },
-        scales: {
-            x: {
-                display: false,
-                grid: {
-                    display: false
-                }
             },
-            y: {
-                min: min,
-                max: max,
-                grid: {
-                    color: 'rgba(255, 255, 255, 0.1)',
-                    lineWidth: 1,
-                    drawBorder: false
-                },
-                ticks: {
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    font: {
-                        size: 11
+            scales: {
+                x: {
+                    type: 'linear',
+                    min: 0,
+                    max: xMax,
+                    display: true,
+                    grid: {
+                        display: true,
+                        color: 'rgba(255, 255, 255, 0.15)',
+                        lineWidth: 1,
+                        borderDash: [4, 4]
                     },
-                    padding: 8
+                    ticks: {
+                        stepSize: xStep,
+                        maxTicksLimit: 9,
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        font: { size: 10 },
+                        padding: 6,
+                        callback: function(val) {
+                            if (n <= 1) return '6:00';
+                            const hour = 6 + Math.round(16 * val / xMax);
+                            return `${hour}:00`;
+                        }
+                    },
+                    border: { display: false },
+                    afterBuildTicks: (axis) => {
+                        if (n <= 1) return;
+                        const step = xMax / 8;
+                        axis.ticks = Array.from({ length: 9 }, (_, i) => ({ value: i * step }));
+                    }
                 },
-                border: {
-                    display: false
+                y: {
+                    min: 0,
+                    max: 500,
+                    position: 'left',
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.15)',
+                        lineWidth: 1,
+                        borderDash: [4, 4],
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        font: { size: 11 },
+                        padding: 8,
+                        callback: (v) => (LEFT_Y_TICKS.includes(v) ? v : '')
+                    },
+                    border: { display: false },
+                    afterBuildTicks: (axis) => {
+                        axis.ticks = LEFT_Y_TICKS.map((v) => ({ value: v }));
+                    }
+                },
+                yRight: {
+                    min: 0,
+                    max: 50,
+                    position: 'right',
+                    grid: { display: false },
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        font: { size: 11 },
+                        padding: 8,
+                        callback: (v) => (RIGHT_Y_TICKS.includes(v) ? v : '')
+                    },
+                    border: { display: false },
+                    afterBuildTicks: (axis) => {
+                        axis.ticks = RIGHT_Y_TICKS.map((v) => ({ value: v }));
+                    }
                 }
-            }
-        },
-        animation: {
-            duration: 0
-        },
-        elements: {
-            point: {
-                radius: 0,
-                hoverRadius: 4
             },
-            line: {
-                tension: 0,
-                borderWidth: 1.5
-            }
-        },
-        interaction: {
-            intersect: false,
-            mode: 'index'
-        },
-        layout: {
-            padding: {
-                top: 10,
-                bottom: 10,
-                left: 10,
-                right: 10
-            }
-        }
-    });
+            animation: { duration: 0 },
+            elements: {
+                point: { radius: 0, hoverRadius: 4 },
+                line: { tension: 0, borderWidth: 1.5 }
+            },
+            interaction: { intersect: false, mode: 'index' },
+            layout: { padding: { top: 8, bottom: 8, left: 8, right: 8 } }
+        };
+    };
 
-    // Подготовка данных для графиков (в стиле осциллограммы)
+    // Конфигурация нижнего графика (напряжение + вторая линия): две оси Y, ось X 6:00–22:00
+    const getVoltageChartOptions = (dataLength) => {
+        const n = Math.max(dataLength, 1);
+        const xMax = Math.max(0, n - 1);
+        const xStep = n <= 1 ? 1 : xMax / 8;
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#FFFFFF',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
+                    displayColors: true,
+                    callbacks: {
+                        label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    min: 0,
+                    max: xMax,
+                    display: true,
+                    grid: {
+                        display: true,
+                        color: 'rgba(255, 255, 255, 0.15)',
+                        lineWidth: 1,
+                        borderDash: [4, 4]
+                    },
+                    ticks: {
+                        stepSize: xStep,
+                        maxTicksLimit: 9,
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        font: { size: 10 },
+                        padding: 6,
+                        callback: function(val) {
+                            if (n <= 1) return '6:00';
+                            const hour = 6 + Math.round(16 * val / xMax);
+                            return `${hour}:00`;
+                        }
+                    },
+                    border: { display: false },
+                    afterBuildTicks: (axis) => {
+                        if (n <= 1) return;
+                        const step = xMax / 8;
+                        axis.ticks = Array.from({ length: 9 }, (_, i) => ({ value: i * step }));
+                    }
+                },
+                y: {
+                    min: 0,
+                    max: 500,
+                    position: 'left',
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.15)',
+                        lineWidth: 1,
+                        borderDash: [4, 4],
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        font: { size: 11 },
+                        padding: 8,
+                        callback: (v) => (LEFT_Y_TICKS.includes(v) ? v : '')
+                    },
+                    border: { display: false },
+                    afterBuildTicks: (axis) => {
+                        axis.ticks = LEFT_Y_TICKS.map((v) => ({ value: v }));
+                    }
+                },
+                yRight: {
+                    min: 0,
+                    max: 50,
+                    position: 'right',
+                    grid: { display: false },
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        font: { size: 11 },
+                        padding: 8,
+                        callback: (v) => (RIGHT_Y_TICKS.includes(v) ? v : '')
+                    },
+                    border: { display: false },
+                    afterBuildTicks: (axis) => {
+                        axis.ticks = RIGHT_Y_TICKS.map((v) => ({ value: v }));
+                    }
+                }
+            },
+            animation: { duration: 0 },
+            elements: {
+                point: { radius: 0, hoverRadius: 4 },
+                line: { tension: 0, borderWidth: 1.5 }
+            },
+            interaction: { intersect: false, mode: 'index' },
+            layout: { padding: { top: 8, bottom: 8, left: 8, right: 8 } }
+        };
+    };
+
+    // Данные для верхнего графика (ток): синяя линия, ось Y 0–500
     const getCurrentChartData = () => ({
-        labels: currentChartData.map((_, index) => ''),
         datasets: [{
             label: 'Ток (А)',
-            data: currentChartData.map(d => d.y),
+            data: currentChartData.map((d, i) => ({ x: i, y: Number(d.y) || 0 })),
             borderColor: '#3ec7ff',
-            backgroundColor: 'rgba(62, 199, 255, 0.05)', // Минимальная заливка для осциллограммы
-            fill: false, // Без заливки для осциллограммы
-            borderWidth: 3, // Толщина линии как в дизайне
+            backgroundColor: 'rgba(62, 199, 255, 0.05)',
+            fill: false,
+            borderWidth: 2,
             pointRadius: 0,
             pointHoverRadius: 4,
             pointHoverBackgroundColor: '#3ec7ff',
             pointHoverBorderColor: '#FFFFFF',
             pointHoverBorderWidth: 2,
-            tension: 0, // Резкие углы, без сглаживания (как осциллограмма)
-            stepped: false
+            tension: 0,
+            yAxisID: 'y'
         }]
     });
 
-    const getVoltageChartData = () => ({
-        labels: voltageChartData.map((_, index) => ''),
-        datasets: [{
-            label: 'Напряжение (В)',
-            data: voltageChartData.map(d => d.y),
-            borderColor: '#ff61c8',
-            backgroundColor: 'rgba(255, 97, 200, 0.05)', // Минимальная заливка для осциллограммы
-            fill: false, // Без заливки для осциллограммы
-            borderWidth: 3, // Толщина линии как в дизайне
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            pointHoverBackgroundColor: '#ff61c8',
-            pointHoverBorderColor: '#FFFFFF',
-            pointHoverBorderWidth: 2,
-            tension: 0, // Резкие углы, без сглаживания (как осциллограмма)
-            stepped: false
-        }]
-    });
+    // Данные для нижнего графика: розовая линия (напряжение, правая ось 0–50), оранжевая (левая ось 0–500)
+    const getVoltageChartData = () => {
+        const voltagePoints = voltageChartData.map((d, i) => ({ x: i, y: Number(d.y) || 0 }));
+        const orangePoints = currentChartData.map((d, i) => ({ x: i, y: Math.min(Number(d.y) || 0, 250) }));
+        return {
+            datasets: [
+                {
+                    label: 'Напряжение (В)',
+                    data: voltagePoints,
+                    borderColor: '#ff61c8',
+                    backgroundColor: 'rgba(255, 97, 200, 0.05)',
+                    fill: false,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointHoverBackgroundColor: '#ff61c8',
+                    pointHoverBorderColor: '#FFFFFF',
+                    pointHoverBorderWidth: 2,
+                    tension: 0,
+                    yAxisID: 'yRight'
+                },
+                {
+                    label: 'Ток (А)',
+                    data: orangePoints,
+                    borderColor: '#ffae64',
+                    backgroundColor: 'rgba(255, 174, 100, 0.05)',
+                    fill: false,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointHoverBackgroundColor: '#ffae64',
+                    pointHoverBorderColor: '#FFFFFF',
+                    pointHoverBorderWidth: 2,
+                    tension: 0,
+                    yAxisID: 'y'
+                }
+            ]
+        };
+    };
 
     // Функции для форматирования данных
     const getCurrentValue = () => {
@@ -2358,10 +2452,6 @@ const DeviceMonitorPage = () => {
                                     <span className="info-tile-label">RFID код</span>
                                     <span className="info-tile-value">{getRfidCode() || '—'}</span>
                                 </div>
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">MAC адрес</span>
-                                    <span className="info-tile-value">{machineMac}</span>
-                                </div>
                             </div>
                         </div>
                     )}
@@ -2376,7 +2466,7 @@ const DeviceMonitorPage = () => {
                                     <div className="chart-canvas">
                                         <Line
                                             data={getCurrentChartData()}
-                                            options={getChartOptions(0, 500, 'Ток (А)', 350, '350A')}
+                                            options={getCurrentChartOptions(currentChartData.length)}
                                             ref={(chart) => {
                                                 if (chart && chart.canvas) {
                                                     chart.canvas.id = 'current-chart';
@@ -2385,28 +2475,24 @@ const DeviceMonitorPage = () => {
                                             }}
                                         />
                                     </div>
-                                    <div className="chart-axis">
-                                        <span>08:00</span>
-                                        <span>10:00</span>
-                                        <span>12:00</span>
-                                        <span>14:00</span>
-                                        <span>16:00</span>
-                                        <span>18:00</span>
-                                        <span>20:00</span>
-                                        <span>22:00</span>
-                                    </div>
                                 </div>
                                 <div className="chart-controls">
                                     <button type="button" className="chart-control-btn" title="Увеличить">
-                                        <span>+</span>
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                                            <circle cx="7" cy="7" r="5"/>
+                                            <path d="M7 4v6M4 7h6"/>
+                                        </svg>
                                     </button>
                                     <button type="button" className="chart-control-btn" title="Уменьшить">
-                                        <span>−</span>
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                                            <circle cx="7" cy="7" r="5"/>
+                                            <path d="M4 7h6"/>
+                                        </svg>
                                     </button>
                                     <button type="button" className="chart-control-btn" title="Обновить">
-                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                            <path d="M7 1V3M7 11V13M1 7H3M11 7H13M2.343 2.343L3.757 3.757M10.243 10.243L11.657 11.657M2.343 11.657L3.757 10.243M10.243 3.757L11.657 2.343" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                                            <circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                                            <path d="M7 1v2.5M7 10.5V13M1 7h2.5M10.5 7H13M2.5 2.5l1.8 1.8M9.7 9.7l1.8 1.8M2.5 11.5l1.8-1.8M9.7 4.3l1.8-1.8"/>
+                                            <circle cx="7" cy="7" r="4"/>
                                         </svg>
                                     </button>
                                 </div>
@@ -2423,7 +2509,7 @@ const DeviceMonitorPage = () => {
                                     <div className="chart-canvas">
                                         <Line
                                             data={getVoltageChartData()}
-                                            options={getChartOptions(0, 50.0, 'Напряжение (В)', 35, '35В')}
+                                            options={getVoltageChartOptions(Math.max(voltageChartData.length, currentChartData.length))}
                                             ref={(chart) => {
                                                 if (chart && chart.canvas) {
                                                     chart.canvas.id = 'voltage-chart';
@@ -2432,28 +2518,24 @@ const DeviceMonitorPage = () => {
                                             }}
                                         />
                                     </div>
-                                    <div className="chart-axis">
-                                        <span>08:00</span>
-                                        <span>10:00</span>
-                                        <span>12:00</span>
-                                        <span>14:00</span>
-                                        <span>16:00</span>
-                                        <span>18:00</span>
-                                        <span>20:00</span>
-                                        <span>22:00</span>
-                                    </div>
                                 </div>
                                 <div className="chart-controls">
                                     <button type="button" className="chart-control-btn" title="Увеличить">
-                                        <span>+</span>
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                                            <circle cx="7" cy="7" r="5"/>
+                                            <path d="M7 4v6M4 7h6"/>
+                                        </svg>
                                     </button>
                                     <button type="button" className="chart-control-btn" title="Уменьшить">
-                                        <span>−</span>
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                                            <circle cx="7" cy="7" r="5"/>
+                                            <path d="M4 7h6"/>
+                                        </svg>
                                     </button>
                                     <button type="button" className="chart-control-btn" title="Обновить">
-                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                            <path d="M7 1V3M7 11V13M1 7H3M11 7H13M2.343 2.343L3.757 3.757M10.243 10.243L11.657 11.657M2.343 11.657L3.757 10.243M10.243 3.757L11.657 2.343" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                                            <circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                                            <path d="M7 1v2.5M7 10.5V13M1 7h2.5M10.5 7H13M2.5 2.5l1.8 1.8M9.7 9.7l1.8 1.8M2.5 11.5l1.8-1.8M9.7 4.3l1.8-1.8"/>
+                                            <circle cx="7" cy="7" r="4"/>
                                         </svg>
                                     </button>
                                 </div>

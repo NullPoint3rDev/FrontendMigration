@@ -1236,7 +1236,7 @@
     display: flex;
     flex-direction: row;
     gap: 8px;
-    padding: 19px;
+    padding: 9px;
     border-radius: 0;
     background: transparent;
     border: none;
@@ -1284,11 +1284,10 @@
 .chart-canvas {
     position: relative;
     flex: 1;
-    min-height: 140px;
-    border-radius: 14px;
+    border-radius: 3px;
     overflow: hidden;
     background: linear-gradient(180deg, rgba(30, 25, 37, 0.95), rgba(26, 21, 32, 0.96));
-    border: 1px solid rgba(82, 69, 94, 0.4);
+    border: none;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1304,15 +1303,9 @@
     height: 100% !important;
 }
 
+/* Сетка рисуется только Chart.js по делениям осей (без лишних линий) */
 .chart-canvas::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-            linear-gradient(rgba(87, 73, 103, 0.25) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(87, 73, 103, 0.18) 1px, transparent 1px);
-    background-size: 100% 48px, 72px 100%;
-    pointer-events: none;
+    content: none;
 }
 
 .chart-canvas::after {

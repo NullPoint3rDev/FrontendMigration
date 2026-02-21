@@ -1734,6 +1734,16 @@ const ReportsPage = () => {
             return
         }
 
+        // Не допускаем два отчёта с одинаковым названием (без учёта регистра)
+        const nameNorm = templateName.trim().toLowerCase()
+        const hasDuplicateName = templates.some(
+            t => t.name && t.name.trim().toLowerCase() === nameNorm && t.id !== currentTemplateId
+        )
+        if (hasDuplicateName) {
+            alert('Отчёт с названием «' + templateName.trim() + '» уже существует. Выберите другое название.')
+            return
+        }
+
         // Для нового шаблона тип отчёта обязателен — подсвечиваем и раскрываем выпадающий список
         if (!currentTemplateId && !(selectedReportType && selectedReportType.trim())) {
             setReportTypeDropdownHighlight(true)
@@ -1754,6 +1764,21 @@ const ReportsPage = () => {
             setReportTypeDropdownHighlight(true)
             setReportTypeDropdownOpen(true)
             throw new Error('REPORT_TYPE_REQUIRED')
+        }
+
+        // Проверка дубликата названия (в т.ч. при нажатии «Да» в модалке — иначе можно обойти проверку)
+        if (templateName.trim()) {
+            const nameNorm = templateName.trim().toLowerCase()
+            const hasDuplicateName = templates.some(
+                t => t.name && t.name.trim().toLowerCase() === nameNorm && t.id !== currentTemplateId
+            )
+            if (hasDuplicateName) {
+                setShowUnsavedConfirm(false)
+                pendingActionRef.current = null
+                reportsUnsaved?.setPendingLeavePath(null)
+                alert('Отчёт с названием «' + templateName.trim() + '» уже существует. Выберите другое название.')
+                return
+            }
         }
 
         try {

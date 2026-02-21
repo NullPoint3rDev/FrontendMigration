@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch, FaBell, FaArrowRight, FaTimes } from 'react-icons/fa';
 import UserProfile from './UserProfile';
 import CreateOrganizationUnitModal from './CreateOrganizationUnitModal';
+import MoveOrganizationUnitModal from './MoveOrganizationUnitModal';
 import OrganizationLogo from '../images/OrganizationLogo.png';
 import OrganizationUnitsList from './OrganizationUnitsList';
 import UnitDetailsPanel from './UnitDetailsPanel';
@@ -11,9 +12,63 @@ import { getAllWelders } from '../api/welderApi';
 import { getAllWeldingMachines } from '../api/weldingMachineApi';
 import '../styles/enterpriseMapPage.css';
 
+const ENTERPRISE_MAP_EXPANDED_KEY = 'enterpriseMapExpandedUnits';
+const ENTERPRISE_MAP_SELECTED_UNIT_KEY = 'enterpriseMapSelectedUnit';
+
+function loadExpandedUnitsFromStorage() {
+    try {
+        const raw = localStorage.getItem(ENTERPRISE_MAP_EXPANDED_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return {};
+        // Нормализуем ключи к числам для надёжного совпадения с unit.id в дереве
+        const result = {};
+        Object.keys(parsed).forEach((k) => {
+            const num = /^\d+$/.test(k) ? parseInt(k, 10) : k;
+            result[num] = !!parsed[k];
+        });
+        return result;
+    } catch (_) {}
+    return {};
+}
+
+function saveExpandedUnitsToStorage(obj) {
+    try {
+        if (!obj || typeof obj !== 'object') return;
+        localStorage.setItem(ENTERPRISE_MAP_EXPANDED_KEY, JSON.stringify(obj));
+    } catch (_) {}
+}
+
+function loadSelectedUnitFromStorage() {
+    try {
+        const raw = localStorage.getItem(ENTERPRISE_MAP_SELECTED_UNIT_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const id = parsed?.selectedUnitId;
+        if (id == null) return null;
+        const numId = typeof id === 'string' && /^\d+$/.test(id) ? parseInt(id, 10) : id;
+        return {
+            selectedUnitId: numId,
+            selectedUnitLevel: typeof parsed.selectedUnitLevel === 'number' ? parsed.selectedUnitLevel : 0
+        };
+    } catch (_) {}
+    return null;
+}
+
+function saveSelectedUnitToStorage(selectedUnitId, selectedUnitLevel) {
+    try {
+        if (selectedUnitId == null) {
+            localStorage.removeItem(ENTERPRISE_MAP_SELECTED_UNIT_KEY);
+        } else {
+            localStorage.setItem(ENTERPRISE_MAP_SELECTED_UNIT_KEY, JSON.stringify({ selectedUnitId, selectedUnitLevel }));
+        }
+    } catch (_) {}
+}
+
 const EnterpriseMapPageSimple = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
     const [organizationUnits, setOrganizationUnits] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -21,11 +76,12 @@ const EnterpriseMapPageSimple = () => {
     const [isDeleting, setIsDeleting] = useState(false);
     const [selectedUnit, setSelectedUnit] = useState(null);
     const [selectedUnitLevel, setSelectedUnitLevel] = useState(0);
-    const [expandedUnits, setExpandedUnits] = useState({});
+    const [expandedUnits, setExpandedUnits] = useState(() => loadExpandedUnitsFromStorage());
     const [welders, setWelders] = useState([]);
     const [weldingMachines, setWeldingMachines] = useState([]);
     const [unitStats, setUnitStats] = useState({});
     const navigate = useNavigate();
+    const hasRestoredSelectionRef = useRef(false);
 
     // Загружаем подразделения из API при монтировании компонента
     useEffect(() => {
@@ -40,6 +96,39 @@ const EnterpriseMapPageSimple = () => {
             calculateStats();
         }
     }, [organizationUnits, welders, weldingMachines]);
+
+    // Сохраняем развернутые подразделения в localStorage при изменении
+    useEffect(() => {
+        saveExpandedUnitsToStorage(expandedUnits);
+    }, [expandedUnits]);
+
+    // Сохраняем выбранное подразделение (для unit-details-content) при изменении
+    useEffect(() => {
+        saveSelectedUnitToStorage(selectedUnit?.id ?? null, selectedUnitLevel);
+    }, [selectedUnit?.id, selectedUnitLevel]);
+
+    // Восстанавливаем выбранное подразделение и развёрнутые узлы после первой загрузки списка
+    useEffect(() => {
+        if (organizationUnits.length === 0 || hasRestoredSelectionRef.current) return;
+        hasRestoredSelectionRef.current = true;
+        const hierarchy = buildHierarchy(organizationUnits);
+        const saved = loadSelectedUnitFromStorage();
+        if (!saved || saved.selectedUnitId == null) return;
+        const found = findUnitAndLevelInHierarchy(hierarchy, saved.selectedUnitId);
+        if (!found) return;
+        setSelectedUnit(found.unit);
+        setSelectedUnitLevel(found.level);
+        // Разворачиваем всех предков выбранного узла, чтобы путь к нему был виден
+        const ancestorIds = getAncestorIds(hierarchy, saved.selectedUnitId);
+        if (ancestorIds && ancestorIds.length > 0) {
+            setExpandedUnits((prev) => {
+                const next = { ...prev };
+                ancestorIds.forEach((id) => { next[id] = true; });
+                next[found.unit.id] = true;
+                return next;
+            });
+        }
+    }, [organizationUnits]);
 
     const loadWelders = async () => {
         try {
@@ -109,6 +198,32 @@ const EnterpriseMapPageSimple = () => {
         });
 
         return rootUnits;
+    };
+
+    // Поиск подразделения в иерархии по id с возвратом уровня (для восстановления выбора)
+    const findUnitAndLevelInHierarchy = (units, targetId, level = 0) => {
+        if (!units || !units.length) return null;
+        const norm = (id) => id == null ? null : (typeof id === 'string' ? parseInt(id, 10) : id);
+        const target = norm(targetId);
+        for (const unit of units) {
+            if (norm(unit.id) === target) return { unit, level };
+            const found = findUnitAndLevelInHierarchy(unit.children || [], target, level + 1);
+            if (found) return found;
+        }
+        return null;
+    };
+
+    // Собрать id всех предков узла (путь от корня до родителя узла) для разворота дерева
+    const getAncestorIds = (units, targetId, ancestorIds = []) => {
+        if (!units || !units.length) return null;
+        const norm = (id) => id == null ? null : (typeof id === 'string' ? parseInt(id, 10) : id);
+        const target = norm(targetId);
+        for (const unit of units) {
+            if (norm(unit.id) === target) return ancestorIds;
+            const found = getAncestorIds(unit.children || [], target, [...ancestorIds, unit.id]);
+            if (found) return found;
+        }
+        return null;
     };
 
     // Функция для подсчета всех дочерних подразделений (рекурсивно) используя иерархию
@@ -326,7 +441,11 @@ const EnterpriseMapPageSimple = () => {
                 {/* Right side tiles */}
                 <div className="tiles-right">
                     <div className="action-tile">
-                        <button className="tile-btn move-btn">
+                        <button
+                            type="button"
+                            className="tile-btn move-btn"
+                            onClick={() => setIsMoveModalOpen(true)}
+                        >
                             <FaArrowRight className="btn-icon" />
                             Переместить
                         </button>
@@ -357,13 +476,12 @@ const EnterpriseMapPageSimple = () => {
                             selectedUnits={selectedUnits}
                             onSelectionChange={setSelectedUnits}
                             selectedUnitId={selectedUnit?.id}
+                            expandedUnits={expandedUnits}
                             onUnitClick={(unit, level) => {
                                 setSelectedUnit(unit);
                                 setSelectedUnitLevel(level || 0);
                             }}
-                            onExpandedUnitsChange={(expanded) => {
-                                setExpandedUnits(expanded);
-                            }}
+                            onExpandedUnitsChange={setExpandedUnits}
                             onEdit={(unit) => {
                                 console.log('Edit unit:', unit);
                                 // TODO: Implement edit functionality
@@ -396,7 +514,14 @@ const EnterpriseMapPageSimple = () => {
                 onClose={() => setIsCreateModalOpen(false)}
                 existingUnits={organizationUnits}
                 onSuccess={async () => {
-                    // После успешного создания перезагружаем список из API
+                    await loadOrganizationUnits();
+                }}
+            />
+            <MoveOrganizationUnitModal
+                isOpen={isMoveModalOpen}
+                onClose={() => setIsMoveModalOpen(false)}
+                existingUnits={organizationUnits}
+                onSuccess={async () => {
                     await loadOrganizationUnits();
                 }}
             />

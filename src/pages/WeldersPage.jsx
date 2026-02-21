@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FaChevronRight, FaChevronDown } from 'react-icons/fa';
 import '../styles/weldersPage.css';
 import { useNavigate } from 'react-router-dom';
@@ -14,21 +14,49 @@ import {
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { getCertificationsByWelderId } from '../api/certificationApi';
 
-// Данные теперь загружаются с API сервера
+const WELDERS_PAGE_STATE_KEY = 'weldersPageState';
 
+function loadWeldersPageState() {
+    try {
+        const raw = localStorage.getItem(WELDERS_PAGE_STATE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+    } catch (_) {}
+    return null;
+}
 
+function saveWeldersPageState(state) {
+    try {
+        localStorage.setItem(WELDERS_PAGE_STATE_KEY, JSON.stringify(state));
+    } catch (_) {}
+}
 
 function WeldersPage() {
+    const savedState = useMemo(() => loadWeldersPageState(), []);
     const [welders, setWelders] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
     const [editData, setEditData] = useState({});
     const [errors, setErrors] = useState({});
     const [organizationUnits, setOrganizationUnits] = useState([]);
-    const [organizationUnitFilter, setOrganizationUnitFilter] = useState([]); // Массив выбранных подразделений
-    const [hazardousGroupsFilter, setHazardousGroupsFilter] = useState([]); // Массив выбранных групп опасных произв. объектов
-    const [searchTerm, setSearchTerm] = useState('');
-    const [sortField, setSortField] = useState(null);
-    const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
+    const [organizationUnitFilter, setOrganizationUnitFilter] = useState(
+        Array.isArray(savedState?.organizationUnitFilter) ? savedState.organizationUnitFilter : []
+    );
+    const [hazardousGroupsFilter, setHazardousGroupsFilter] = useState(
+        Array.isArray(savedState?.hazardousGroupsFilter) ? savedState.hazardousGroupsFilter : []
+    );
+    const [withoutGroupFilter, setWithoutGroupFilter] = useState(
+        savedState?.withoutGroupFilter === true
+    );
+    const [searchTerm, setSearchTerm] = useState(
+        typeof savedState?.searchTerm === 'string' ? savedState.searchTerm : ''
+    );
+    const [sortField, setSortField] = useState(
+        typeof savedState?.sortField === 'string' ? savedState.sortField : 'name'
+    );
+    const [sortDirection, setSortDirection] = useState(
+        savedState?.sortDirection === 'desc' ? 'desc' : 'asc'
+    );
     const [expandedFilters, setExpandedFilters] = useState({
         department: true,
         hazardousGroups: true
@@ -44,6 +72,18 @@ function WeldersPage() {
         loadWelders();
         loadOrganizationUnits();
     }, []);
+
+    // Сохраняем фильтры и сортировку в localStorage при изменении
+    useEffect(() => {
+        saveWeldersPageState({
+            organizationUnitFilter,
+            hazardousGroupsFilter,
+            withoutGroupFilter,
+            searchTerm,
+            sortField,
+            sortDirection,
+        });
+    }, [organizationUnitFilter, hazardousGroupsFilter, withoutGroupFilter, searchTerm, sortField, sortDirection]);
 
 
     const openAddModal = () => {
@@ -316,21 +356,53 @@ function WeldersPage() {
             }
         }
 
-        // Фильтр по группам опасных произв. объектов
-        if (hazardousGroupsFilter.length > 0) {
+        // Фильтр по группам опасных произв. объектов и «Без группы»
+        // Когда выбрано «Все» (hazardousGroupsFilter.length === 0) — не фильтруем по группам, показываем всех
+        const hasNoGroup = (item) => ((item.activeTechGroups || []).length === 0);
+        if (hazardousGroupsFilter.length === 0) {
+            // «Все» — фильтр по группам не применяем
+        } else if (withoutGroupFilter) {
+            // «Без группы» включена
+            if (hazardousGroupsFilter.length === 1 && hazardousGroupsFilter[0] === '__NONE__') {
+                filtered = filtered.filter(hasNoGroup);
+            } else if (
+                allHazardousGroupIds.length > 0 &&
+                hazardousGroupsFilter.length === allHazardousGroupIds.length &&
+                hazardousGroupsFilter.every((id) => allHazardousGroupIds.includes(id))
+            ) {
+                // Выбраны все группы и «Без группы» — показываем всех сварщиков
+            } else {
+                const filterStrings = hazardousGroupsFilter
+                    .map(filterId => filterIdToTechGroupString(filterId))
+                    .filter(str => str !== null);
+                filtered = filtered.filter(item => {
+                    const noGroup = hasNoGroup(item);
+                    const hasSelectedGroup = filterStrings.some(filterStr =>
+                        (item.activeTechGroups || []).includes(filterStr)
+                    );
+                    return noGroup || hasSelectedGroup;
+                });
+            }
+        } else if (hazardousGroupsFilter.length > 0) {
             if (hazardousGroupsFilter.length === 1 && hazardousGroupsFilter[0] === '__NONE__') {
                 filtered = [];
+            } else if (
+                allHazardousGroupIds.length > 0 &&
+                hazardousGroupsFilter.length === allHazardousGroupIds.length &&
+                hazardousGroupsFilter.every((id) => allHazardousGroupIds.includes(id))
+            ) {
+                if (withoutGroupFilter) {
+                    // Выбраны все группы и «Без группы» — показываем всех сварщиков
+                } else {
+                    // Выбраны все группы, но «Без группы» снята — только сварщики с группами
+                    filtered = filtered.filter(item => (item.activeTechGroups || []).length > 0);
+                }
             } else {
                 filtered = filtered.filter(item => {
-                    // Получаем активные группы опасных производств из аттестаций сварщика
                     const activeTechGroups = item.activeTechGroups || [];
-
-                    // Преобразуем ID фильтра в строки формата "ГРУППА: пп. N"
                     const filterStrings = hazardousGroupsFilter
                         .map(filterId => filterIdToTechGroupString(filterId))
-                        .filter(str => str !== null); // Убираем null значения
-
-                    // Проверяем, есть ли хотя бы одна выбранная группа в активных аттестациях сварщика
+                        .filter(str => str !== null);
                     return filterStrings.some(filterStr =>
                         activeTechGroups.includes(filterStr)
                     );
@@ -580,6 +652,16 @@ function WeldersPage() {
         }
     ];
 
+    // Список всех id групп (для проверки «все выбраны» = не фильтровать)
+    const allHazardousGroupIds = useMemo(() => {
+        const ids = [];
+        hazardousGroups.forEach((group) => {
+            ids.push(group.id);
+            if (group.children?.length) group.children.forEach((c) => ids.push(c.id));
+        });
+        return ids;
+    }, []);
+
     const toggleHazardousGroupExpanded = (groupId) => {
         setExpandedHazardousGroups(prev => ({
             ...prev,
@@ -827,7 +909,7 @@ function WeldersPage() {
                             };
                             const allGroupIds = getAllGroupIds(hazardousGroups);
                             const isNoneSelected = hazardousGroupsFilter.length === 1 && hazardousGroupsFilter[0] === '__NONE__';
-                            const isAllSelected = (hazardousGroupsFilter.length === 0 || hazardousGroupsFilter.length === allGroupIds.length) && !isNoneSelected;
+                            const isAllSelected = (hazardousGroupsFilter.length === 0 || (hazardousGroupsFilter.length === allGroupIds.length && withoutGroupFilter)) && !isNoneSelected;
                             const showAllChecked = hazardousGroupsFilter.length === 0 && !isNoneSelected;
 
                             // Рекурсивная функция для рендеринга групп
@@ -891,15 +973,34 @@ function WeldersPage() {
                                             checked={isAllSelected}
                                             onChange={(e) => {
                                                 if (e.target.checked) {
-                                                    // Выбираем все
-                                                    setHazardousGroupsFilter(allGroupIds);
+                                                    // «Все» = не фильтровать по группам, показывать всех; «Без группы» тоже ставим
+                                                    setHazardousGroupsFilter([]);
+                                                    setWithoutGroupFilter(true);
                                                 } else {
-                                                    // При снятии галочки с активного "Все" - сбрасываем все галочки
+                                                    // При снятии галочки с активного "Все" — сбрасываем все галочки и «Без группы»
                                                     setHazardousGroupsFilter(['__NONE__']);
+                                                    setWithoutGroupFilter(false);
                                                 }
                                             }}
                                         />
                                         <span>Все</span>
+                                    </label>
+                                    <label className="filter-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={withoutGroupFilter || isAllSelected}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setWithoutGroupFilter(true);
+                                                } else {
+                                                    setWithoutGroupFilter(false);
+                                                    if (isAllSelected || hazardousGroupsFilter.length === 0) {
+                                                        setHazardousGroupsFilter([...allHazardousGroupIds]);
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                        <span>Без группы</span>
                                     </label>
                                     {hazardousGroups.length > 0 ? (
                                         hazardousGroups.map(group => renderGroup(group))

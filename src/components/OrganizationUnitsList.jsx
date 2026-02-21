@@ -5,8 +5,9 @@ import ResourcesLogo from '../images/ResourcesLogo.png';
 import WelderIcon from '../images/WelderIcon.png';
 import '../styles/organizationUnitsList.css';
 
-const OrganizationUnitsList = ({ units, onEdit, selectedUnits, onSelectionChange, onUnitClick, selectedUnitId, onExpandedUnitsChange, selectedUnitLevel, unitStats }) => {
-    const [expandedUnits, setExpandedUnits] = useState({});
+const OrganizationUnitsList = ({ units, onEdit, selectedUnits, onSelectionChange, onUnitClick, selectedUnitId, expandedUnits: expandedUnitsProp, onExpandedUnitsChange, selectedUnitLevel, unitStats }) => {
+    const [internalExpanded, setInternalExpanded] = useState({});
+    const expandedUnits = expandedUnitsProp !== undefined ? expandedUnitsProp : internalExpanded;
 
     // Компонент Tooltip для всплывающих подсказок
     const Tooltip = ({ text, children }) => {
@@ -51,17 +52,16 @@ const OrganizationUnitsList = ({ units, onEdit, selectedUnits, onSelectionChange
     };
 
     const toggleExpand = (unitId) => {
-        setExpandedUnits(prev => {
-            const newExpanded = {
-                ...prev,
-                [unitId]: !prev[unitId]
-            };
-            // Передаем информацию о развернутых подразделениях в родительский компонент
-            if (onExpandedUnitsChange) {
-                onExpandedUnitsChange(newExpanded);
-            }
-            return newExpanded;
-        });
+        const newExpanded = {
+            ...expandedUnits,
+            [unitId]: !expandedUnits[unitId]
+        };
+        if (expandedUnitsProp !== undefined) {
+            onExpandedUnitsChange?.(newExpanded);
+        } else {
+            setInternalExpanded(newExpanded);
+            onExpandedUnitsChange?.(newExpanded);
+        }
     };
 
     // Построение иерархии

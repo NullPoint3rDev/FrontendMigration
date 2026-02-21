@@ -73,6 +73,29 @@
     gap: 8px;
 }
 
+/* Два сварщика в строке в секции Сварщики */
+.welders-section .section-list.welders-list-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    align-content: start;
+}
+
+.welders-section .section-item.welder-item {
+    min-width: 0;
+}
+
+/* Чередование по строкам: оба сварщика в одной строке — один цвет (специфичность выше, чем у .section-list > .section-item) */
+.welders-section .section-list.welders-list-grid .section-item.welder-item:nth-child(4n+1),
+.welders-section .section-list.welders-list-grid .section-item.welder-item:nth-child(4n+2) {
+    background: #122536;
+}
+
+.welders-section .section-list.welders-list-grid .section-item.welder-item:nth-child(4n+3),
+.welders-section .section-list.welders-list-grid .section-item.welder-item:nth-child(4n+4) {
+    background: #1A1420;
+}
+
 .section-item {
     display: flex;
     align-items: center;
@@ -237,6 +260,11 @@
     font-size: 13px;
     text-align: center;
     padding: 20px;
+}
+
+.welders-list-grid .loading-message,
+.welders-list-grid .empty-message {
+    grid-column: 1 / -1;
 }
 
 /* Адаптивность для мобильных устройств */

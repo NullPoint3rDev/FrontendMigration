@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { FaEdit, FaUser } from 'react-icons/fa';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FaEdit } from 'react-icons/fa';
 import { getAllWeldingMachines } from '../api/weldingMachineApi';
 import { getAllWelders } from '../api/welderApi';
 import ResourcesLogo from '../images/ResourcesLogo.png';
+import WelderIcon from '../images/WelderIcon.png';
 import '../styles/unitDetailsPanel.css';
 
 const UnitDetailsPanel = ({ selectedUnit, level = 0 }) => {
+    const navigate = useNavigate();
     const [machines, setMachines] = useState([]);
     const [welders, setWelders] = useState([]);
     const [selectedMachines, setSelectedMachines] = useState([]);
@@ -38,12 +41,12 @@ const UnitDetailsPanel = ({ selectedUnit, level = 0 }) => {
             // Загружаем всех сварщиков и фильтруем по подразделению
             const allWelders = await getAllWelders();
             const unitWelders = allWelders.filter(welder => {
-                // Проверяем разные варианты структуры данных
-                const welderUnitId = welder.organizationUnit?.id ||
-                    welder.organizationUnitId ||
-                    welder.department?.id ||
-                    (typeof welder.department === 'string' ? welder.department : null);
-                return welderUnitId === selectedUnit.id;
+                // Сначала по id подразделения (если есть в ответе API)
+                const welderUnitId = welder.organizationUnit?.id ?? welder.organizationUnitId ?? welder.department?.id;
+                if (welderUnitId != null && welderUnitId === selectedUnit.id) return true;
+                // Иначе по названию подразделения (бэкенд может отдавать только department как строку)
+                const deptName = welder.department || welder.organizationUnit?.name;
+                return typeof deptName === 'string' && deptName.trim() === (selectedUnit.name || '').trim();
             });
             setWelders(unitWelders || []);
         } catch (error) {
@@ -53,6 +56,33 @@ const UnitDetailsPanel = ({ selectedUnit, level = 0 }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const sortedMachines = useMemo(() => {
+        return [...machines].sort((a, b) => {
+            const nameA = (a.name || a.deviceModel || 'Без названия').toLowerCase();
+            const nameB = (b.name || b.deviceModel || 'Без названия').toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+    }, [machines]);
+
+    const sortedWelders = useMemo(() => {
+        return [...welders].sort((a, b) => {
+            const nameA = (a.name || a.fullName || 'Без имени').toLowerCase();
+            const nameB = (b.name || b.fullName || 'Без имени').toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+    }, [welders]);
+
+    /** Формат "Фамилия И.О." из полного ФИО */
+    const formatWelderShortName = (fullName) => {
+        if (!fullName || typeof fullName !== 'string') return 'Без имени';
+        const parts = fullName.trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 0) return 'Без имени';
+        if (parts.length === 1) return parts[0];
+        const surname = parts[0];
+        const initials = parts.slice(1).map(p => (p.charAt(0) || '').toUpperCase() + '.').join('');
+        return `${surname} ${initials}`;
     };
 
     if (!selectedUnit) return null;
@@ -74,10 +104,10 @@ const UnitDetailsPanel = ({ selectedUnit, level = 0 }) => {
                     <div className="section-list">
                         {loading ? (
                             <div className="loading-message">Загрузка...</div>
-                        ) : machines.length === 0 ? (
+                        ) : sortedMachines.length === 0 ? (
                             <div className="empty-message">Нет аппаратов</div>
                         ) : (
-                            machines.map(machine => {
+                            sortedMachines.map(machine => {
                                 const machineName = machine.name || machine.deviceModel || 'Без названия';
                                 const assignedWelders = machine.assignedWelders || machine.welders || [];
                                 const hasWelders = assignedWelders.length > 0;
@@ -121,7 +151,16 @@ const UnitDetailsPanel = ({ selectedUnit, level = 0 }) => {
                                             )}
                                             <button
                                                 className="item-edit-btn"
-                                                onClick={(e) => e.stopPropagation()}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const params = new URLSearchParams({
+                                                        machine: machine.name || '',
+                                                        mac: machine.mac || '',
+                                                        name: machine.name || '',
+                                                        organizationUnit: machine.organizationUnit?.name || ''
+                                                    });
+                                                    navigate(`/device-monitor?${params.toString()}`);
+                                                }}
                                             >
                                                 <FaEdit className="edit-icon" />
                                             </button>
@@ -157,36 +196,45 @@ const UnitDetailsPanel = ({ selectedUnit, level = 0 }) => {
                 <div className="unit-details-section welders-section">
                     <div className="section-header">
                         <div className="section-title">
-                            <FaUser className="section-icon" />
+                            <img src={WelderIcon} alt="Сварщики" className="section-icon-img" />
                             <span>Сварщики: {welders.length}</span>
                         </div>
                         <span className="section-selected">Выбрано: {selectedWelders.length}</span>
                     </div>
-                    <div className="section-list">
+                    <div className="section-list welders-list-grid">
                         {loading ? (
                             <div className="loading-message">Загрузка...</div>
-                        ) : welders.length === 0 ? (
+                        ) : sortedWelders.length === 0 ? (
                             <div className="empty-message">Нет сварщиков</div>
                         ) : (
-                            welders.map(welder => (
+                            sortedWelders.map(welder => (
                                 <div
                                     key={welder.id}
-                                    className={`section-item ${selectedWelders.includes(welder.id) ? 'selected' : ''}`}
+                                    className={`section-item welder-item ${selectedWelders.includes(welder.id) ? 'selected' : ''}`}
                                 >
                                     <input
                                         type="checkbox"
                                         className="item-checkbox"
                                         checked={selectedWelders.includes(welder.id)}
                                         onChange={(e) => {
+                                            e.stopPropagation();
                                             if (e.target.checked) {
                                                 setSelectedWelders([...selectedWelders, welder.id]);
                                             } else {
                                                 setSelectedWelders(selectedWelders.filter(id => id !== welder.id));
                                             }
                                         }}
+                                        onClick={(e) => e.stopPropagation()}
                                     />
-                                    <span className="item-name">{welder.name || welder.fullName || 'Без имени'}</span>
-                                    <button className="item-edit-btn">
+                                    <span className="item-name">{formatWelderShortName(welder.name || welder.fullName)}</span>
+                                    <button
+                                        className="item-edit-btn"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate(`/welders/add/${welder.id}`);
+                                        }}
+                                        title="Редактировать"
+                                    >
                                         <FaEdit className="edit-icon" />
                                     </button>
                                 </div>
