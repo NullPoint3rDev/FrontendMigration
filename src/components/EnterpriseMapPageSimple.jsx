@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch, FaBell, FaArrowRight, FaTimes } from 'react-icons/fa';
 import UserProfile from './UserProfile';
@@ -260,11 +260,13 @@ const EnterpriseMapPageSimple = () => {
         const unitIds = [unitId];
         const unitNames = [unit.name];
 
-        // Собираем все дочерние подразделения
+        // Собираем все дочерние подразделения (рекурсивно)
+        const norm = (id) => (id == null ? null : typeof id === 'string' ? parseInt(id, 10) : id);
         const collectChildIds = (parentId) => {
+            const normParentId = norm(parentId);
             allUnits.forEach(u => {
-                const parentIdValue = u.parentId || u.parent_id;
-                if (parentIdValue === parentId || parentIdValue === parseInt(parentId)) {
+                const parentIdValue = u.parentId ?? u.parent_id ?? (u.parentDepartment?.id != null ? u.parentDepartment.id : null);
+                if (norm(parentIdValue) === normParentId) {
                     unitIds.push(u.id);
                     unitNames.push(u.name);
                     collectChildIds(u.id);
@@ -299,11 +301,13 @@ const EnterpriseMapPageSimple = () => {
         const unitIds = [unitId];
         const unitNames = [unit.name];
 
-        // Собираем все дочерние подразделения
+        // Собираем все дочерние подразделения (рекурсивно)
+        const norm = (id) => (id == null ? null : typeof id === 'string' ? parseInt(id, 10) : id);
         const collectChildIds = (parentId) => {
+            const normParentId = norm(parentId);
             allUnits.forEach(u => {
-                const parentIdValue = u.parentId || u.parent_id;
-                if (parentIdValue === parentId || parentIdValue === parseInt(parentId)) {
+                const parentIdValue = u.parentId ?? u.parent_id ?? (u.parentDepartment?.id != null ? u.parentDepartment.id : null);
+                if (norm(parentIdValue) === normParentId) {
                     unitIds.push(u.id);
                     unitNames.push(u.name);
                     collectChildIds(u.id);
@@ -336,14 +340,63 @@ const EnterpriseMapPageSimple = () => {
         organizationUnits.forEach(unit => {
             const unitId = unit.id;
             stats[unitId] = {
-                users: 0, // Пока нет API для пользователей
+                users: 0, // Пользователи: пока нет API по подразделениям; при появлении — считать с учётом вложенных
                 subdivisions: countChildUnits(unitId, hierarchy),
-                weldingMachines: countWeldingMachinesInUnit(unitId, organizationUnits),
-                welders: countWeldersInUnit(unitId, organizationUnits)
+                weldingMachines: countWeldingMachinesInUnit(unitId, organizationUnits), // с учётом вложенных
+                welders: countWeldersInUnit(unitId, organizationUnits) // с учётом вложенных
             };
         });
         setUnitStats(stats);
     };
+
+    // Поиск: показываем подразделения, в названии которых есть запрос, и всех их предков (путь в дереве)
+    const filteredOrganizationUnits = useMemo(() => {
+        const term = (searchTerm || '').trim().toLowerCase();
+        if (!term) return organizationUnits;
+        const norm = (id) => (id == null ? null : typeof id === 'string' ? parseInt(id, 10) : id);
+        const matching = organizationUnits.filter(
+            (u) => (u.name || '').toLowerCase().includes(term)
+        );
+        if (matching.length === 0) return organizationUnits;
+        const parentMap = new Map();
+        organizationUnits.forEach((u) => {
+            const pid = u.parentId ?? u.parent_id ?? u.parentDepartment?.id;
+            if (pid != null) parentMap.set(norm(u.id), norm(pid));
+        });
+        const visibleIds = new Set(matching.map((u) => norm(u.id)));
+        matching.forEach((u) => {
+            let id = norm(u.id);
+            while (parentMap.has(id)) {
+                id = parentMap.get(id);
+                visibleIds.add(id);
+            }
+        });
+        return organizationUnits.filter((u) => visibleIds.has(norm(u.id)));
+    }, [organizationUnits, searchTerm]);
+
+    // При поиске автоматически раскрываем путь до каждого совпадения
+    useEffect(() => {
+        const term = (searchTerm || '').trim().toLowerCase();
+        if (!term || organizationUnits.length === 0) return;
+        const norm = (id) => (id == null ? null : typeof id === 'string' ? parseInt(id, 10) : id);
+        const matching = organizationUnits.filter((u) => (u.name || '').toLowerCase().includes(term));
+        if (matching.length === 0) return;
+        const parentMap = new Map();
+        organizationUnits.forEach((u) => {
+            const pid = u.parentId ?? u.parent_id ?? u.parentDepartment?.id;
+            if (pid != null) parentMap.set(norm(u.id), norm(pid));
+        });
+        const toExpand = {};
+        matching.forEach((u) => {
+            let id = norm(u.id);
+            toExpand[id] = true;
+            while (parentMap.has(id)) {
+                id = parentMap.get(id);
+                toExpand[id] = true;
+            }
+        });
+        setExpandedUnits((prev) => ({ ...prev, ...toExpand }));
+    }, [searchTerm, organizationUnits]);
 
     const loadOrganizationUnits = async () => {
         try {
@@ -472,7 +525,7 @@ const EnterpriseMapPageSimple = () => {
                 ) : (
                     <>
                         <OrganizationUnitsList
-                            units={organizationUnits}
+                            units={filteredOrganizationUnits}
                             selectedUnits={selectedUnits}
                             onSelectionChange={setSelectedUnits}
                             selectedUnitId={selectedUnit?.id}

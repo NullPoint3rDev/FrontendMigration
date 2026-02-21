@@ -1469,7 +1469,7 @@ function WeldingEquipmentPage() {
                         <div className="welders-stats-tile">
                             <div className="stat-item">
                                 <img src={ResourcesLogo} alt="" className="stat-icon" />
-                                <span>Всего: {equipment.length}</span>
+                                <span>Всего в компании: {equipment.length}</span>
                             </div>
                             <div className="stat-item">
                                 <img src={ResourcesLogo} alt="" className="stat-icon" />

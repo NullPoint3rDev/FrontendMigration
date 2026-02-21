@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FaChevronRight, FaChevronDown } from 'react-icons/fa';
+import { FaChevronRight, FaChevronDown, FaBell, FaArrowRight } from 'react-icons/fa';
 import '../styles/weldersPage.css';
 import { useNavigate } from 'react-router-dom';
-import { FaBell } from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
+import MoveWeldersModal from '../components/MoveWeldersModal';
 import WelderIcon from '../images/WelderIcon.png';
 import {
     getAllWelders,
@@ -64,6 +64,7 @@ function WeldersPage() {
     const [expandedHazardousGroups, setExpandedHazardousGroups] = useState({});
     const [expandedOrganizationUnits, setExpandedOrganizationUnits] = useState({});
     const [selectedWelders, setSelectedWelders] = useState([]);
+    const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
     const navigate = useNavigate();
 
 
@@ -1031,10 +1032,21 @@ function WeldersPage() {
                                 Открыть реестр НАКС
                             </button>
                         </div>
+                        <div className="action-tile">
+                            <button
+                                type="button"
+                                className="tile-btn move-btn"
+                                onClick={() => setIsMoveModalOpen(true)}
+                                disabled={selectedWelders.length === 0}
+                            >
+                                <FaArrowRight className="btn-icon" />
+                                Переместить
+                            </button>
+                        </div>
                         <div className="welders-stats-tile">
                             <div className="stat-item">
                                 <img src={WelderIcon} alt="Welder" className="stat-icon" />
-                                <span>Всего: {getFilteredWelders().length}</span>
+                                <span>Всего в компании: {getFilteredWelders().length}</span>
                             </div>
                             <div className="stat-item">
                                 <img
@@ -1247,6 +1259,17 @@ function WeldersPage() {
                     </div>
                 </div>
             )}
+            <MoveWeldersModal
+                isOpen={isMoveModalOpen}
+                onClose={() => setIsMoveModalOpen(false)}
+                selectedWelderIds={selectedWelders}
+                welders={welders}
+                organizationUnits={organizationUnits}
+                onSuccess={async () => {
+                    await loadWelders();
+                    setSelectedWelders([]);
+                }}
+            />
         </div>
     );
 }

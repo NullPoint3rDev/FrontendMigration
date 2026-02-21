@@ -188,7 +188,7 @@ const OrganizationUnitsList = ({ units, onEdit, selectedUnits, onSelectionChange
                         </div>
                     </td>
                     <td>
-                        <Tooltip text="Количество пользователей в подразделении">
+                        <Tooltip text="Количество пользователей в подразделении и во вложенных">
                             <div className="org-unit-stat-tile">
                                 <FaUser className="stat-icon" />
                                 <span className="stat-number">{unitStats[unit.id]?.users || 0}</span>
@@ -196,7 +196,7 @@ const OrganizationUnitsList = ({ units, onEdit, selectedUnits, onSelectionChange
                         </Tooltip>
                     </td>
                     <td>
-                        <Tooltip text="Количество подразделений">
+                        <Tooltip text="Количество дочерних подразделений">
                             <div className="org-unit-stat-tile">
                                 <img src={OrganizationLogo} alt="Organization" className="stat-icon-img" />
                                 <span className="stat-number">{unitStats[unit.id]?.subdivisions || 0}</span>
@@ -204,7 +204,7 @@ const OrganizationUnitsList = ({ units, onEdit, selectedUnits, onSelectionChange
                         </Tooltip>
                     </td>
                     <td>
-                        <Tooltip text="Количество сварочных аппаратов в подразделении">
+                        <Tooltip text="Количество сварочных аппаратов в подразделении и во вложенных">
                             <div className="org-unit-stat-tile">
                                 <img src={ResourcesLogo} alt="Resources" className="stat-icon-img" />
                                 <span className="stat-number">{unitStats[unit.id]?.weldingMachines || 0}</span>
@@ -212,7 +212,7 @@ const OrganizationUnitsList = ({ units, onEdit, selectedUnits, onSelectionChange
                         </Tooltip>
                     </td>
                     <td>
-                        <Tooltip text="Количество сварщиков в подразделении">
+                        <Tooltip text="Количество сварщиков в подразделении и во вложенных">
                             <div className="org-unit-stat-tile">
                                 <img src={WelderIcon} alt="Welder" className="stat-icon-img" />
                                 <span className="stat-number">{unitStats[unit.id]?.welders || 0}</span>

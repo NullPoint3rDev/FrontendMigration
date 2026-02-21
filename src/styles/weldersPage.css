@@ -345,6 +345,46 @@
     color: #f2f1f4;
 }
 
+/* Move button in content-header (как на Карте предприятия) */
+.welders-page .content-header .action-tile {
+    background: #122536;
+    padding: 2px;
+    flex-shrink: 0;
+    border-radius: 3px;
+}
+
+.welders-page .content-header .tile-btn.move-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: #d9d6df;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.welders-page .content-header .tile-btn.move-btn:hover:not(:disabled) {
+    color: #f2f1f4;
+}
+
+.welders-page .content-header .tile-btn.move-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.welders-page .content-header .tile-btn.move-btn .btn-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
 /* Welders Table */
 /* Удален глобальный стиль - используется только с префиксом .welders-page */
 
