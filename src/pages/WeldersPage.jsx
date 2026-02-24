@@ -1046,7 +1046,11 @@ function WeldersPage() {
                         <div className="welders-stats-tile">
                             <div className="stat-item">
                                 <img src={WelderIcon} alt="Welder" className="stat-icon" />
-                                <span>Всего в компании: {getFilteredWelders().length}</span>
+                                <span>Всего в компании: {welders.length}</span>
+                            </div>
+                            <div className="stat-item">
+                                <img src={WelderIcon} alt="Welder" className="stat-icon" />
+                                <span>Всего отфильтровано: {getFilteredWelders().length}</span>
                             </div>
                             <div className="stat-item">
                                 <img

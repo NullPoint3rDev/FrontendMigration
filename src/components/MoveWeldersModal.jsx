@@ -154,8 +154,8 @@ const MoveWeldersModal = ({ isOpen, onClose, selectedWelderIds = [], welders = [
     if (!isOpen) return null;
 
     return (
-        <div className="create-org-unit-modal-overlay" onClick={handleClose}>
-            <div className="create-org-unit-modal-content move-org-unit-modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="create-org-unit-modal-overlay">
+            <div className="create-org-unit-modal-content move-org-unit-modal-content">
                 <button type="button" className="create-org-unit-modal-close" onClick={handleClose}>
                     ×
                 </button>
@@ -195,6 +195,9 @@ const MoveWeldersModal = ({ isOpen, onClose, selectedWelderIds = [], welders = [
                     {error && <div className="create-org-unit-error-message">{error}</div>}
 
                     <div className="create-org-unit-modal-actions">
+                        <button type="button" className="create-org-unit-btn cancel" onClick={handleClose}>
+                            Отмена
+                        </button>
                         <button type="submit" className="create-org-unit-btn create" disabled={loading}>
                             <FaCheck className="btn-icon" />
                             Переместить

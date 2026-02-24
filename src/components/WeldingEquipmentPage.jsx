@@ -1473,7 +1473,7 @@ function WeldingEquipmentPage() {
                             </div>
                             <div className="stat-item">
                                 <img src={ResourcesLogo} alt="" className="stat-icon" />
-                                <span>Выбрано: {filteredEquipment.length}</span>
+                                <span>Всего отфильтровано: {filteredEquipment.length}</span>
                             </div>
                         </div>
                         <div className="view-toggle">
