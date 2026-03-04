@@ -18,6 +18,37 @@ import { deleteWeldingMachine, getAllWeldingMachines, updateWeldingMachine, getW
 import machineImage from '../images/Untitled 3 копия.png';
 import AddEquipmentModal from './AddEquipmentModal';
 
+// Названия ошибок по коду 1–23 (синхронно с EquipmentErrorMessages и протоколом аппарата: 1–10, 17–21)
+const EQUIPMENT_ERROR_MESSAGES = [
+    'Ошибка драйвера подающего механизма',          // 1
+    'Реверс энкодера подающего механизма',          // 2
+    'Нет сигнала от энк. подающего механизма',      // 3
+    'Отказ связи с подающим механизмом',            // 4
+    'Ошибка ограничения драйвера платы сварки',     // 5
+    'Отказ связи с платой сварки',                  // 6
+    'Ошибка превышения макс. тока платы сварки',   // 7
+    'Ошибка калибровки датчиков платы сварки',      // 8
+    'Ошибка обратной связи по напряжению платы сварки',   // 9
+    'Ошибка обратной связи по мощности платы сварки',     // 10
+    'Ошибка 11', 'Ошибка 12', 'Ошибка 13', 'Ошибка 14', 'Ошибка 15', 'Ошибка 16',
+    'Перегрев БВО',                                 // 17
+    'Отказ связи с БВО',                            // 18
+    'Пустая помпа БВО (нет жидкости)',               // 19
+    'Обрыв датчика температуры жидкости БВО',       // 20
+    'КЗ датчика температуры жидкости БВО',          // 21
+    'Ошибка 22', 'Ошибка 23'
+];
+
+function getEquipmentErrorName(errorCode) {
+    if (errorCode === undefined || errorCode === null || String(errorCode).trim() === '') return null;
+    const s = String(errorCode).trim();
+    const num = parseInt(s, 10);
+    if (!Number.isNaN(num) && num >= 1 && num <= EQUIPMENT_ERROR_MESSAGES.length) {
+        return EQUIPMENT_ERROR_MESSAGES[num - 1];
+    }
+    return s;
+}
+
 // Плагин пороговой линии отключён (белую линию на графике убрали по запросу)
 const thresholdLinePlugin = {
     id: 'thresholdLinePlugin',
@@ -1819,33 +1850,29 @@ const DeviceMonitorPage = () => {
         const timeStr = errorDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
         const dateStr = errorDate.toLocaleDateString('ru-RU');
 
-        // Получаем ошибки из разных возможных источников
-        // 1. errorCode из корня объекта
+        // Ошибки: приоритет у свойства "Ошибки" — там полный список от парсера (несколько через запятую/точку с запятой).
+        // Если "Ошибки" нет — показываем одну по errorCode (первый код от аппарата).
         const errorCode = data['errorCode'] || data.errorCode;
-        if (errorCode !== undefined && errorCode !== null && errorCode !== 'null' && String(errorCode) !== '0' && String(errorCode).trim() !== '') {
-            errors.push({
-                code: `E${String(errorCode).padStart(2, '0')}`,
-                time: timeStr,
-                date: dateStr,
-                severity: 'error',
-                message: `Ошибка ${errorCode}`
-            });
-        }
-
-        // 2. Свойство "Ошибки" из properties
         const errorsProperty = data['Ошибки'] || data['Errors'] || data.errors;
-        if (errorsProperty &&
+        const hasErrorsText = errorsProperty &&
             errorsProperty !== 'Нет ошибок' &&
             errorsProperty !== 'No errors' &&
             String(errorsProperty).trim() !== '' &&
-            String(errorsProperty).toLowerCase() !== 'null') {
-            errors.push({
-                code: 'ERR',
-                time: timeStr,
-                date: dateStr,
-                severity: 'error',
-                message: String(errorsProperty)
+            String(errorsProperty).toLowerCase() !== 'null';
+
+        if (hasErrorsText) {
+            // Парсер отдаёт несколько ошибок через ", " или "; " — показываем каждую отдельной карточкой
+            const parts = String(errorsProperty).split(/,|;/).map(s => s.trim()).filter(Boolean);
+            parts.forEach((message) => {
+                errors.push({ code: 'ERR', time: timeStr, date: dateStr, severity: 'error', message });
             });
+        } else {
+            const resolvedFromCode = (errorCode !== undefined && errorCode !== null && errorCode !== 'null' && String(errorCode).trim() !== '' && String(errorCode) !== '0')
+                ? getEquipmentErrorName(errorCode)
+                : null;
+            if (resolvedFromCode) {
+                errors.push({ code: 'ERR', time: timeStr, date: dateStr, severity: 'error', message: resolvedFromCode });
+            }
         }
         return errors;
     };

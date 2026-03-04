@@ -444,9 +444,8 @@ function WeldingEquipmentPage() {
 
     const fetchAllStatuses = async () => {
         if (!Array.isArray(equipment) || equipment.length === 0) return;
-        // Берём устройства после фильтров поиска/модели/подразделения чтобы не опрашивать лишнее
-        // Получаем отфильтрованное оборудование без сортировки
-        const list = getFilteredEquipment(false); // без сортировки
+        // Список для опроса: без фильтра по статусу, иначе после "Назад" deviceStatusesByMac пустой и список пустой
+        const list = getFilteredEquipment(false, false); // без сортировки, без фильтра по статусу
         const macs = list.map(m => m.mac).filter(Boolean);
         if (macs.length === 0) return;
 
@@ -837,7 +836,7 @@ function WeldingEquipmentPage() {
         }));
     };
 
-    const getFilteredEquipment = (applySort = true) => {
+    const getFilteredEquipment = (applySort = true, applyStatusFilter = true) => {
         // Создаем копию массива equipment, чтобы не мутировать исходный
         let filtered = [...equipment];
 
@@ -861,19 +860,18 @@ function WeldingEquipmentPage() {
             }
         }
 
-        // Фильтр по состоянию
-        // Если установлено "__NONE__", ничего не показываем
-        if (statusFilter.length === 1 && statusFilter[0] === '__NONE__') {
-            filtered = [];
-        } else if (statusFilter.length === 0) {
-            // Если массив пустой - ничего не выбрано, показываем пустой список
-            filtered = [];
-        } else {
-            // Фильтруем по выбранным статусам
-            filtered = filtered.filter(item => {
-                const status = deviceStatusesByMac[item.mac] || 'off';
-                return statusFilter.includes(status);
-            });
+        // Фильтр по состоянию (не применяем при сборе списка для опроса статусов — иначе после "Назад" список пустой)
+        if (applyStatusFilter) {
+            if (statusFilter.length === 1 && statusFilter[0] === '__NONE__') {
+                filtered = [];
+            } else if (statusFilter.length === 0) {
+                filtered = [];
+            } else {
+                filtered = filtered.filter(item => {
+                    const status = deviceStatusesByMac[item.mac] || 'off';
+                    return statusFilter.includes(status);
+                });
+            }
         }
 
         // Фильтр по поисковому запросу
@@ -1114,7 +1112,7 @@ function WeldingEquipmentPage() {
 
     const statuses = [
         { id: 'all', label: 'Все' },
-        { id: 'on', label: 'Включен' },
+        { id: 'on', label: 'Деж. режим' },
         { id: 'welding', label: 'Сварка' },
         { id: 'error', label: 'Ошибка' },
         { id: 'off', label: 'Выключен' }

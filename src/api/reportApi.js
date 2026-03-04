@@ -124,6 +124,7 @@ export const reportApi = {
             'materials': `${BASE_URL}/materials`,
             'welds': `${BASE_URL}/welds`,
             'errors': `${BASE_URL}/errors`,
+            'equipmentMalfunction': `${BASE_URL}/equipment-malfunction/generate`,
             'violations': `${BASE_URL}/violations`,
             'tasks': `${BASE_URL}/tasks`
         };
@@ -134,7 +135,8 @@ export const reportApi = {
             'По расходу проволоки': 'WIRE_CONSUMPTION',
             'По работе сварщика (швы)': 'WELDER_REPORT',
             'По работе оборудования (швы)': 'equipment',
-            'По работе оборудования': 'equipment'
+            'По работе оборудования': 'equipment',
+            'По неисправностям оборудования': 'equipmentMalfunction'
         };
         const endpointKey = keyByRussian[reportTypeNorm] || reportTypeNorm;
         const endpoint = endpoints[endpointKey];
@@ -408,6 +410,57 @@ export const reportApi = {
             document.body.removeChild(a);
         } catch (error) {
             console.error('Ошибка генерации отчета по работе сварщика:', error);
+            throw error;
+        }
+    },
+
+    // Генерация отчёта по неисправностям оборудования
+    // periodType: «За 24 часа», «За 7 дней», «Произвольный период» — при «За 24 часа» бэкенд считает период «сейчас − 24 ч» … «сейчас»
+    generateEquipmentMalfunctionReport: async (periodStartDate, periodEndDate, periodStartTime, periodEndTime, selectedEquipmentIds, periodType = null) => {
+        try {
+            const requestBody = {
+                periodStartDate: periodStartDate,
+                periodEndDate: periodEndDate,
+                periodStartTime: periodStartTime || '00:00',
+                periodEndTime: periodEndTime || '23:59',
+                selectedEquipmentIds: selectedEquipmentIds || []
+            };
+            if (periodType) requestBody.periodType = periodType;
+
+            const response = await fetch(`${BASE_URL}/equipment-malfunction/generate`, {
+                method: 'POST',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'equipment_malfunction_report.xlsx';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
+
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Ошибка генерации отчёта по неисправностям оборудования:', error);
             throw error;
         }
     },

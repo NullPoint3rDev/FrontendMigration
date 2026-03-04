@@ -45,7 +45,8 @@ const ReportsPage = () => {
         'Все',
         'По работе сварщика (швы)',
         'По расходу проволоки',
-        'По работе оборудования (швы)'
+        'По работе оборудования (швы)',
+        'По неисправностям оборудования'
     ]) // По умолчанию все типы выбраны
     const [templateTypeDropdownOpen, setTemplateTypeDropdownOpen] = useState(false)
     const [reportTypeDropdownOpen, setReportTypeDropdownOpen] = useState(false)
@@ -234,6 +235,8 @@ const ReportsPage = () => {
         loadOrganizationUnits()
     }, [])
 
+    const STORAGE_KEY_SELECTED_EQUIPMENT = 'reportsPage_selectedEquipment'
+
     // Load welding machines from API
     useEffect(() => {
         const loadEquipment = async () => {
@@ -270,6 +273,33 @@ const ReportsPage = () => {
         }
         loadEquipment()
     }, [])
+
+    // Сохраняем выбор оборудования в localStorage для отчётов «По работе оборудования» и «По неисправностям» — не слетает при обновлении/уходе
+    useEffect(() => {
+        const type = selectedReportType || ''
+        if (type !== 'По работе оборудования (швы)' && type !== 'По неисправностям оборудования') return
+        try {
+            const obj = {}
+            Object.keys(selectedEquipment || {}).forEach(k => { if (selectedEquipment[k]) obj[k] = true })
+            localStorage.setItem(STORAGE_KEY_SELECTED_EQUIPMENT, JSON.stringify(obj))
+        } catch (e) { /* ignore */ }
+    }, [selectedReportType, selectedEquipment])
+
+    // Восстанавливаем выбор оборудования из localStorage при открытии отчёта по оборудованию/неисправностям, если выбор пустой
+    useEffect(() => {
+        const type = selectedReportType || ''
+        if (type !== 'По работе оборудования (швы)' && type !== 'По неисправностям оборудования') return
+        const hasSelection = selectedEquipment && Object.keys(selectedEquipment).some(k => selectedEquipment[k])
+        if (hasSelection) return
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY_SELECTED_EQUIPMENT)
+            if (!raw) return
+            const parsed = JSON.parse(raw)
+            if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+                setSelectedEquipment({ ...parsed })
+            }
+        } catch (e) { /* ignore */ }
+    }, [selectedReportType])
 
     // Очистка таймера мигания кнопки «Сохранить» при размонтировании
     useEffect(() => {
@@ -398,11 +428,13 @@ const ReportsPage = () => {
     const REPORT_TYPE_WIRE = 'По расходу проволоки'
     const REPORT_TYPE_WELDER = 'По работе сварщика (швы)'
     const REPORT_TYPE_EQUIPMENT = 'По работе оборудования (швы)'
+    const REPORT_TYPE_MALFUNCTION = 'По неисправностям оборудования'
     const normalizeReportType = (raw) => {
         if (raw == null || typeof raw !== 'string') return ''
         const t = String(raw).trim()
         if (!t) return ''
-        if (t === REPORT_TYPE_WIRE || t === REPORT_TYPE_WELDER || t === REPORT_TYPE_EQUIPMENT) return t
+        if (t === REPORT_TYPE_WIRE || t === REPORT_TYPE_WELDER || t === REPORT_TYPE_EQUIPMENT || t === REPORT_TYPE_MALFUNCTION) return t
+        if (t.toLowerCase().includes('неисправност')) return REPORT_TYPE_MALFUNCTION
         if (t.toLowerCase().includes('сварщика') || t === 'WELDER_WORK' || t === 'welder') return REPORT_TYPE_WELDER
         if (t.toLowerCase().includes('оборудован') || t === 'EQUIPMENT_WORK' || t === 'equipment') return REPORT_TYPE_EQUIPMENT
         if (t.toLowerCase().includes('проволок') || t === 'WIRE_CONSUMPTION' || t === 'wire') return REPORT_TYPE_WIRE
@@ -411,7 +443,7 @@ const ReportsPage = () => {
     const isWelderOrEquipmentReportType = (type) => {
         if (!type || typeof type !== 'string') return false
         const t = type.trim()
-        return t === REPORT_TYPE_WELDER || t === REPORT_TYPE_EQUIPMENT || t.includes('сварщика') || t.includes('оборудован')
+        return t === REPORT_TYPE_WELDER || t === REPORT_TYPE_EQUIPMENT || t === REPORT_TYPE_MALFUNCTION || t.includes('сварщика') || t.includes('оборудован') || t.includes('неисправност')
     }
 
     const buildSnapshotFromTemplate = (template) => {
@@ -1531,10 +1563,11 @@ const ReportsPage = () => {
         'По работе оборудования (швы)',
         'По работе сварщика (швы)',
         'По расходу проволоки',
+        'По неисправностям оборудования',
     ]
 
     // Типы отчетов для выбора (константы REPORT_TYPE_* и normalizeReportType объявлены выше)
-    const reportTypes = [REPORT_TYPE_WIRE, REPORT_TYPE_WELDER, REPORT_TYPE_EQUIPMENT]
+    const reportTypes = [REPORT_TYPE_WIRE, REPORT_TYPE_WELDER, REPORT_TYPE_EQUIPMENT, REPORT_TYPE_MALFUNCTION]
 
     // Типы периода
     const periodTypes = [
@@ -1787,7 +1820,7 @@ const ReportsPage = () => {
             // ВАЖНО: backend ReportTemplateDTO не имеет отдельного поля reportType,
             // поэтому сохраняем тип отчёта внутри reportParameters (как часть JSON).
             const reportParams = { ...parameters, reportType: selectedReportType || null }
-            if (selectedReportType === REPORT_TYPE_EQUIPMENT) {
+            if (selectedReportType === REPORT_TYPE_EQUIPMENT || selectedReportType === REPORT_TYPE_MALFUNCTION) {
                 reportParams.selectedEquipmentIds = Object.keys(selectedEquipment)
                     .filter(key => selectedEquipment[key])
                     .map(key => parseInt(key, 10))
@@ -2256,6 +2289,22 @@ const ReportsPage = () => {
                     minSeamIntervalEnabled,
                     minSeamDurationEnabled
                 )
+            } else if (normalizedReportType === REPORT_TYPE_MALFUNCTION) {
+                const selectedEquipmentIds = Object.keys(selectedEquipment)
+                    .filter(key => selectedEquipment[key])
+                    .map(key => parseInt(key, 10))
+                if (selectedEquipmentIds.length === 0) {
+                    alert('Выберите хотя бы один аппарат')
+                    return
+                }
+                await reportApi.generateEquipmentMalfunctionReport(
+                    formatDate(periodStartDate),
+                    formatDate(periodEndDate),
+                    periodStartTime,
+                    periodEndTime,
+                    selectedEquipmentIds,
+                    periodType
+                )
             } else {
                 alert('Неизвестный тип отчета: ' + (normalizedReportType || selectedReportType))
             }
@@ -2520,7 +2569,7 @@ const ReportsPage = () => {
                             {/* Left sub-panel - Welders or Equipment selection */}
                             <div className="middle-subpanel middle-subpanel-left">
                                 <div className="parameters-list">
-                                    {selectedReportType === REPORT_TYPE_EQUIPMENT ? (
+                                    {(selectedReportType === REPORT_TYPE_EQUIPMENT || selectedReportType === REPORT_TYPE_MALFUNCTION) ? (
                                         (() => {
                                             const equipmentHierarchy = buildEquipmentHierarchy()
                                             const allEquipmentIds = getAllEquipmentFromHierarchy(equipmentHierarchy)
@@ -2970,7 +3019,36 @@ const ReportsPage = () => {
                             {/* Right sub-panel - Report columns selection (зависит от типа отчёта) */}
                             <div className="middle-subpanel middle-subpanel-right">
                                 <div className="parameters-list">
-                                    {isWelderOrEquipmentReportType(selectedReportType) ? (
+                                    {selectedReportType === REPORT_TYPE_MALFUNCTION ? (
+                                        /* Отчёт по неисправностям оборудования: только эти колонки, все включены и не снимаются */
+                                        <>
+                                            <div className="subpanel-title">Колонки отчёта</div>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">Модель оборудования</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">Наименование оборудования</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">Подразделение</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">Серийный №</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">Инв. №</span>
+                                            </label>
+                                            <label className="parameter-item">
+                                                <input type="checkbox" checked={true} disabled={true} />
+                                                <span className="parameter-label">Неисправности</span>
+                                            </label>
+                                        </>
+                                    ) : (selectedReportType === REPORT_TYPE_EQUIPMENT || selectedReportType === REPORT_TYPE_WELDER) ? (
                                         /* Параметры отчёта по работе сварщика / по работе оборудования: одинаковый набор */
                                         <>
                                             <label className="parameter-item">
