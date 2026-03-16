@@ -525,33 +525,34 @@ function WeldingEquipmentPage() {
 
     const getSorted = (arr) => {
         if (!sortField) return arr;
-        // Создаем копию массива перед сортировкой
+        const dir = sortDirection === 'asc' ? 1 : -1;
         const sorted = [...arr].sort((a, b) => {
             const getVal = (item) => {
                 switch (sortField) {
                     case 'name': return (item.name || '').toLowerCase();
-                    case 'model': {
-                        return getModelDisplayForSort(item).toLowerCase();
-                    }
+                    case 'model': return getModelDisplayForSort(item).toLowerCase();
                     case 'mac': return (item.mac || '').toLowerCase();
                     case 'unit': return (item.organizationUnit?.name || '').toLowerCase();
                     case 'inventory': return (item.inventoryNumber || '').toLowerCase();
                     case 'welder': return getWelderDisplayForSort(item).toLowerCase();
-                    case 'status': {
-                        const status = deviceStatusesByMac[item.mac] || 'off';
-                        return status;
-                    }
+                    case 'status': return deviceStatusesByMac[item.mac] || 'off';
                     default: return '';
                 }
             };
             const va = getVal(a);
             const vb = getVal(b);
-            if (va < vb) return -1;
-            if (va > vb) return 1;
+            if (va < vb) return -1 * dir;
+            if (va > vb) return 1 * dir;
+            // При сортировке по подразделению — вторичная сортировка по названию аппарата
+            if (sortField === 'unit') {
+                const na = (a.name || '').toLowerCase();
+                const nb = (b.name || '').toLowerCase();
+                if (na < nb) return -1 * dir;
+                if (na > nb) return 1 * dir;
+            }
             return 0;
         });
-        // Создаем новый массив при reverse, чтобы не мутировать исходный
-        return sortDirection === 'asc' ? sorted : [...sorted].reverse();
+        return sorted;
     };
 
     const handleSave = async (e, customEditData = null) => {

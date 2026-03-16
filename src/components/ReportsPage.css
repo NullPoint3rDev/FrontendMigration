@@ -1062,6 +1062,40 @@
     color: #F6B243;
 }
 
+/* Месячный отчёт — выбор месяцев */
+.right-panel-months-row {
+    margin-top: 8px;
+}
+
+.right-panel-months-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.right-panel-month-btn {
+    padding: 6px 12px;
+    background: #1B1622;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: #7B8BA6;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.right-panel-month-btn:hover {
+    background: rgba(62, 52, 69, 0.95);
+    border-color: #1B1622;
+}
+
+.right-panel-month-btn.selected {
+    background: #F6B243;
+    border-color: #F6B243;
+    color: #1B1622;
+    font-weight: 600;
+}
+
 .right-panel-date-range-section {
     display: flex;
     flex-direction: row;
@@ -1076,6 +1110,96 @@
     gap: 8px;
     flex: 1;
     min-width: 0;
+}
+
+/* Произвольный период: компактная строка даты с выпадающим календарём */
+.right-panel-arbitrary-date-trigger-group {
+    position: relative;
+}
+
+.right-panel-arbitrary-date-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #1B1622;
+    border: 1px solid rgba(87, 77, 95, 0.6);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    min-height: 40px;
+    box-sizing: border-box;
+}
+
+.right-panel-arbitrary-date-trigger:hover {
+    background: rgba(39, 32, 45, 0.9);
+    border-color: rgba(178, 172, 182, 0.4);
+}
+
+.right-panel-arbitrary-date-trigger.open {
+    border-color: #F6B243;
+    box-shadow: 0 0 0 1px rgba(246, 178, 67, 0.25);
+}
+
+.right-panel-arbitrary-date-chevron {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #b2acb6;
+    font-size: 14px;
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+}
+
+.right-panel-arbitrary-date-chevron:hover:not(:disabled) {
+    background: rgba(178, 172, 182, 0.1);
+    color: #f0f4ff;
+}
+
+.right-panel-arbitrary-date-chevron:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.right-panel-arbitrary-date-text {
+    flex: 1;
+    font-size: 13px;
+    color: #f0f4ff;
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.right-panel-arbitrary-date-calendar-icon {
+    flex-shrink: 0;
+    font-size: 16px;
+    opacity: 0.8;
+}
+
+.right-panel-arbitrary-date-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    z-index: 100;
+    background: #1B1622;
+    border: 1px solid rgba(87, 77, 95, 0.6);
+    border-radius: 6px;
+    padding: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    min-width: 260px;
+}
+
+.right-panel-arbitrary-date-dropdown .right-panel-date-picker {
+    background: transparent;
+    padding: 0;
 }
 
 .right-panel-date-picker-label {
@@ -1889,6 +2013,15 @@
     font-size: 11px;
     font-weight: 500;
     margin-left: 8px;
+}
+
+.right-panel-auto-report-checkbox-disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.right-panel-auto-report-checkbox-disabled input[type="checkbox"]:disabled {
+    cursor: not-allowed;
 }
 
 /* Стили для периода формирования отчета */

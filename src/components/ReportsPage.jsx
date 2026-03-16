@@ -56,6 +56,8 @@ const ReportsPage = () => {
     const [periodType, setPeriodType] = useState('Произвольный период')
     const [workingDaysEnabled, setWorkingDaysEnabled] = useState(false)
     const [selectedWorkingDays, setSelectedWorkingDays] = useState([])
+    const [selectedReportMonths, setSelectedReportMonths] = useState([]) // Для «Месячный отчёт»: индексы месяцев 0–11
+    const [openArbitraryDatePicker, setOpenArbitraryDatePicker] = useState(null) // 'start' | 'end' | null — для выпадающего календаря произвольного периода
     const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false)
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [generateError, setGenerateError] = useState('')
@@ -374,6 +376,7 @@ const ReportsPage = () => {
             periodType: periodType || '',
             workingDaysEnabled: workingDaysEnabled || false,
             selectedWorkingDays: [...(selectedWorkingDays || [])].sort((a, b) => a - b),
+            selectedReportMonths: [...(selectedReportMonths || [])].sort((a, b) => a - b),
             autoReportEnabled: autoReportEnabled || false,
             autoReportTime: autoReportTime || '08:00',
             autoReportWeekDays: [...(autoReportWeekDays || [])].sort((a, b) => a - b),
@@ -412,6 +415,7 @@ const ReportsPage = () => {
             periodType: 'Произвольный период',
             workingDaysEnabled: false,
             selectedWorkingDays: [],
+            selectedReportMonths: [],
             autoReportEnabled: false,
             autoReportTime: '08:00',
             autoReportWeekDays: [],
@@ -488,6 +492,7 @@ const ReportsPage = () => {
             periodType: ps.periodType || 'Произвольный период',
             workingDaysEnabled: ps.workingDaysEnabled || false,
             selectedWorkingDays: [...(ps.selectedWorkingDays || [])].sort((a, b) => a - b),
+            selectedReportMonths: [...(ps.selectedReportMonths || [])].sort((a, b) => a - b),
             autoReportEnabled: hasAutoReport,
             autoReportTime: ars.autoReportTime || '08:00',
             autoReportWeekDays: [...(ars.autoReportWeekDays || [])].sort((a, b) => a - b),
@@ -1522,6 +1527,13 @@ const ReportsPage = () => {
         return `${months[date.getMonth()]} ${date.getFullYear()}`
     }
 
+    const formatDateDisplay = (date) => {
+        if (!date || !(date instanceof Date) || isNaN(date.getTime())) return 'Выберите дату'
+        const months = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+            'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+        return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`
+    }
+
     // Проверяет, является ли дата будущей
     const isFutureDate = (date) => {
         if (!date) return false
@@ -1544,8 +1556,64 @@ const ReportsPage = () => {
         return day >= start && day <= end
     }
 
+    const todayStart = () => {
+        const t = new Date()
+        t.setHours(0, 0, 0, 0)
+        return t
+    }
+
+    // Изменение даты начала периода на ±1 день (стрелки в компактной строке)
+    const adjustArbitraryStartDay = (delta) => {
+        const today = todayStart()
+        if (startDate) {
+            const d = new Date(startDate)
+            d.setDate(d.getDate() + delta)
+            d.setHours(0, 0, 0, 0)
+            if (d > today) return
+            setStartDate(d)
+            setStartMonth(new Date(d.getFullYear(), d.getMonth()))
+        } else {
+            if (delta > 0) {
+                const first = new Date(startMonth.getFullYear(), startMonth.getMonth(), 1)
+                setStartDate(first)
+            } else {
+                const lastPrev = new Date(startMonth.getFullYear(), startMonth.getMonth(), 0)
+                setStartDate(lastPrev)
+                setStartMonth(new Date(lastPrev.getFullYear(), lastPrev.getMonth()))
+            }
+        }
+    }
+
+    // Изменение даты окончания периода на ±1 день
+    const adjustArbitraryEndDay = (delta) => {
+        const today = todayStart()
+        if (endDate) {
+            const d = new Date(endDate)
+            d.setDate(d.getDate() + delta)
+            d.setHours(0, 0, 0, 0)
+            if (d > today) return
+            if (startDate) {
+                const start = new Date(startDate)
+                start.setHours(0, 0, 0, 0)
+                if (d < start) return
+            }
+            setEndDate(d)
+            setEndMonth(new Date(d.getFullYear(), d.getMonth()))
+        } else {
+            if (delta > 0) {
+                const first = new Date(endMonth.getFullYear(), endMonth.getMonth(), 1)
+                setEndDate(first)
+            } else {
+                const lastPrev = new Date(endMonth.getFullYear(), endMonth.getMonth(), 0)
+                setEndDate(lastPrev)
+                setEndMonth(new Date(lastPrev.getFullYear(), lastPrev.getMonth()))
+            }
+        }
+    }
+
     const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
     const monthDays = Array.from({ length: 31 }, (_, i) => i + 1)
+    const monthLabelsShort = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
 
     // При создании нового шаблона настройки (чекбоксы, даты) недоступны, пока не выбран тип отчета
     const configDisabled = isCreatingTemplate && !selectedReportType
@@ -1573,7 +1641,8 @@ const ReportsPage = () => {
     const periodTypes = [
         'Произвольный период',
         'За 24 часа',
-        'За 7 дней'
+        'За 7 дней',
+        'Месячный отчёт'
     ]
 
     // Закрытие выпадающего списка типов шаблонов при клике вне его области
@@ -1609,6 +1678,19 @@ const ReportsPage = () => {
             document.removeEventListener('mousedown', handleClickOutside)
         }
     }, [reportTypeDropdownOpen])
+
+    // Закрытие выпадающего календаря произвольного периода при клике вне
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (openArbitraryDatePicker && !event.target.closest('.right-panel-arbitrary-date-trigger-group')) {
+                setOpenArbitraryDatePicker(null)
+            }
+        }
+        if (openArbitraryDatePicker) {
+            document.addEventListener('mousedown', handleClickOutside)
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [openArbitraryDatePicker])
 
     // Показ модалки несохранённых изменений при попытке уйти со страницы через сайдбар
     useEffect(() => {
@@ -1700,6 +1782,7 @@ const ReportsPage = () => {
         setPeriodType('Произвольный период')
         setWorkingDaysEnabled(false)
         setSelectedWorkingDays([])
+        setSelectedReportMonths([])
         setSelectedReportType('')
         setReportTypeDropdownHighlight(false)
         setSelectedTemplateTypes([
@@ -1870,7 +1953,8 @@ const ReportsPage = () => {
                     timeRangeEnabled,
                     periodType,
                     workingDaysEnabled,
-                    selectedWorkingDays: [...selectedWorkingDays]
+                    selectedWorkingDays: [...selectedWorkingDays],
+                    selectedReportMonths: periodType === 'Месячный отчёт' ? [...selectedReportMonths] : []
                 },
                 autoReportSettings: autoReportEnabled ? {
                     autoReportTime,
@@ -1972,6 +2056,7 @@ const ReportsPage = () => {
             }
             setTimeRange(template.periodSettings.timeRange || { start: '00:00', end: '23:59' })
             setTimeRangeEnabled(template.periodSettings.timeRangeEnabled || false)
+            setSelectedReportMonths(Array.isArray(template.periodSettings.selectedReportMonths) ? [...template.periodSettings.selectedReportMonths] : [])
         }
 
         // Загружаем настройки автоматического отчета
@@ -2210,6 +2295,15 @@ const ReportsPage = () => {
                 periodStartDate = new Date(today)
                 periodStartDate.setDate(periodStartDate.getDate() - 7)
                 periodEndDate = new Date(today)
+                periodStartTime = timeRange?.start || '00:00'
+                periodEndTime = timeRange?.end || '23:59'
+            } else if (periodType === 'Месячный отчёт') {
+                const year = today.getFullYear()
+                const months = selectedReportMonths.length > 0 ? selectedReportMonths : [today.getMonth()]
+                const minMonth = Math.min(...months)
+                const maxMonth = Math.max(...months)
+                periodStartDate = new Date(year, minMonth, 1)
+                periodEndDate = new Date(year, maxMonth + 1, 0)
                 periodStartTime = timeRange?.start || '00:00'
                 periodEndTime = timeRange?.end || '23:59'
             } else {
@@ -3554,6 +3648,9 @@ const ReportsPage = () => {
                                             if (newType === 'За 7 дней') {
                                                 setSelectedWorkingDays([...weekDays])
                                             }
+                                            if (newType === 'Произвольный период') {
+                                                setAutoReportEnabled(false)
+                                            }
                                         }}
                                     >
                                         {periodTypes.map(type => (
@@ -3614,130 +3711,139 @@ const ReportsPage = () => {
                                     </div>
                                 )}
 
+                                {periodType === 'Месячный отчёт' && (
+                                    <div className="right-panel-months-row">
+                                        <div className="right-panel-months-buttons">
+                                            {monthLabelsShort.map((label, index) => (
+                                                <button
+                                                    key={index}
+                                                    type="button"
+                                                    className={`right-panel-month-btn ${selectedReportMonths.includes(index) ? 'selected' : ''}`}
+                                                    onClick={() => {
+                                                        setSelectedReportMonths(prev => (prev[0] === index ? [] : [index]))
+                                                    }}
+                                                >
+                                                    {label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {periodType === 'Произвольный период' && (
                                     <div className="right-panel-date-range-section">
-                                        <div className="right-panel-date-picker-group">
+                                        <div className="right-panel-date-picker-group right-panel-arbitrary-date-trigger-group">
                                             <label className="right-panel-date-picker-label">Дата начала периода</label>
-                                            <div className="right-panel-date-picker">
-                                                <div className="right-panel-month-navigation">
-                                                    <button
-                                                        type="button"
-                                                        className="right-panel-month-nav-btn"
-                                                        onClick={() => navigateMonth(true, -1)}
-                                                    >
-                                                        &lt;
-                                                    </button>
-                                                    <span className="right-panel-month-year">{formatMonthYear(startMonth)}</span>
-                                                    <button
-                                                        type="button"
-                                                        className="right-panel-month-nav-btn"
-                                                        onClick={() => navigateMonth(true, 1)}
-                                                        disabled={!canNavigateNext(startMonth)}
-                                                    >
-                                                        &gt;
-                                                    </button>
-                                                </div>
-                                                <div className="right-panel-calendar-grid">
-                                                    <div className="right-panel-calendar-weekdays">
-                                                        {weekDays.map(day => (
-                                                            <div key={day} className="right-panel-calendar-weekday">{day}</div>
-                                                        ))}
-                                                    </div>
-                                                    <div className="right-panel-calendar-days">
-                                                        {getDaysInMonth(startMonth).map((day, idx) => {
-                                                            const dayDate = day ? new Date(startMonth.getFullYear(), startMonth.getMonth(), day) : null
-                                                            const isSelected = startDate && dayDate &&
-                                                                startDate.getDate() === dayDate.getDate() &&
-                                                                startDate.getMonth() === dayDate.getMonth() &&
-                                                                startDate.getFullYear() === dayDate.getFullYear()
-                                                            const isFuture = dayDate && isFutureDate(dayDate)
-                                                            const isInRange = dayDate && startDate && endDate && isDateInRange(dayDate, startDate, endDate)
-                                                            return (
-                                                                <button
-                                                                    key={idx}
-                                                                    type="button"
-                                                                    className={`right-panel-calendar-day ${isSelected ? 'selected' : ''} ${!day ? 'empty' : ''} ${isInRange ? 'in-range' : ''}`}
-                                                                    onClick={() => {
-                                                                        if (day && !isFuture) {
-                                                                            // Если дата уже выбрана, снимаем выбор, иначе устанавливаем
-                                                                            if (isSelected) {
-                                                                                setStartDate(null)
-                                                                            } else {
-                                                                                setStartDate(new Date(startMonth.getFullYear(), startMonth.getMonth(), day))
-                                                                            }
-                                                                        }
-                                                                    }}
-                                                                    disabled={!day || isFuture}
-                                                                >
-                                                                    {day}
-                                                                </button>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                </div>
+                                            <div
+                                                className={`right-panel-arbitrary-date-trigger ${openArbitraryDatePicker === 'start' ? 'open' : ''}`}
+                                                onClick={() => setOpenArbitraryDatePicker(prev => prev === 'start' ? null : 'start')}
+                                                role="button"
+                                                tabIndex={0}
+                                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenArbitraryDatePicker(prev => prev === 'start' ? null : 'start'); } }}
+                                            >
+                                                <button type="button" className="right-panel-arbitrary-date-chevron" onClick={(e) => { e.stopPropagation(); adjustArbitraryStartDay(-1); }} aria-label="Предыдущий день">&lt;</button>
+                                                <span className="right-panel-arbitrary-date-text">{startDate ? formatDateDisplay(startDate) : formatMonthYear(startMonth)}</span>
+                                                <span className="right-panel-arbitrary-date-calendar-icon" aria-hidden>📅</span>
+                                                <button type="button" className="right-panel-arbitrary-date-chevron" onClick={(e) => { e.stopPropagation(); adjustArbitraryStartDay(1); }} disabled={!!(startDate && new Date(startDate).toDateString() === todayStart().toDateString())} aria-label="Следующий день">&gt;</button>
                                             </div>
+                                            {openArbitraryDatePicker === 'start' && (
+                                                <div className="right-panel-arbitrary-date-dropdown" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="right-panel-date-picker">
+                                                        <div className="right-panel-month-navigation">
+                                                            <button type="button" className="right-panel-month-nav-btn" onClick={() => navigateMonth(true, -1)}>&lt;</button>
+                                                            <span className="right-panel-month-year">{formatMonthYear(startMonth)}</span>
+                                                            <button type="button" className="right-panel-month-nav-btn" onClick={() => navigateMonth(true, 1)} disabled={!canNavigateNext(startMonth)}>&gt;</button>
+                                                        </div>
+                                                        <div className="right-panel-calendar-grid">
+                                                            <div className="right-panel-calendar-weekdays">
+                                                                {weekDays.map(day => (<div key={day} className="right-panel-calendar-weekday">{day}</div>))}
+                                                            </div>
+                                                            <div className="right-panel-calendar-days">
+                                                                {getDaysInMonth(startMonth).map((day, idx) => {
+                                                                    const dayDate = day ? new Date(startMonth.getFullYear(), startMonth.getMonth(), day) : null
+                                                                    const isSelected = startDate && dayDate && startDate.getDate() === dayDate.getDate() && startDate.getMonth() === dayDate.getMonth() && startDate.getFullYear() === dayDate.getFullYear()
+                                                                    const isFuture = dayDate && isFutureDate(dayDate)
+                                                                    const isInRange = dayDate && startDate && endDate && isDateInRange(dayDate, startDate, endDate)
+                                                                    return (
+                                                                        <button
+                                                                            key={idx}
+                                                                            type="button"
+                                                                            className={`right-panel-calendar-day ${isSelected ? 'selected' : ''} ${!day ? 'empty' : ''} ${isInRange ? 'in-range' : ''}`}
+                                                                            onClick={() => {
+                                                                                if (day && !isFuture) {
+                                                                                    if (isSelected) setStartDate(null)
+                                                                                    else setStartDate(new Date(startMonth.getFullYear(), startMonth.getMonth(), day))
+                                                                                    setOpenArbitraryDatePicker(null)
+                                                                                }
+                                                                            }}
+                                                                            disabled={!day || isFuture}
+                                                                        >
+                                                                            {day}
+                                                                        </button>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        <div className="right-panel-date-picker-group">
+                                        <div className="right-panel-date-picker-group right-panel-arbitrary-date-trigger-group">
                                             <label className="right-panel-date-picker-label">Дата окончания периода</label>
-                                            <div className="right-panel-date-picker">
-                                                <div className="right-panel-month-navigation">
-                                                    <button
-                                                        type="button"
-                                                        className="right-panel-month-nav-btn"
-                                                        onClick={() => navigateMonth(false, -1)}
-                                                    >
-                                                        &lt;
-                                                    </button>
-                                                    <span className="right-panel-month-year">{formatMonthYear(endMonth)}</span>
-                                                    <button
-                                                        type="button"
-                                                        className="right-panel-month-nav-btn"
-                                                        onClick={() => navigateMonth(false, 1)}
-                                                        disabled={!canNavigateNext(endMonth)}
-                                                    >
-                                                        &gt;
-                                                    </button>
-                                                </div>
-                                                <div className="right-panel-calendar-grid">
-                                                    <div className="right-panel-calendar-weekdays">
-                                                        {weekDays.map(day => (
-                                                            <div key={day} className="right-panel-calendar-weekday">{day}</div>
-                                                        ))}
-                                                    </div>
-                                                    <div className="right-panel-calendar-days">
-                                                        {getDaysInMonth(endMonth).map((day, idx) => {
-                                                            const dayDate = day ? new Date(endMonth.getFullYear(), endMonth.getMonth(), day) : null
-                                                            const isSelected = endDate && dayDate &&
-                                                                endDate.getDate() === dayDate.getDate() &&
-                                                                endDate.getMonth() === dayDate.getMonth() &&
-                                                                endDate.getFullYear() === dayDate.getFullYear()
-                                                            const isFuture = dayDate && isFutureDate(dayDate)
-                                                            const isInRange = dayDate && startDate && endDate && isDateInRange(dayDate, startDate, endDate)
-                                                            return (
-                                                                <button
-                                                                    key={idx}
-                                                                    type="button"
-                                                                    className={`right-panel-calendar-day ${isSelected ? 'selected' : ''} ${!day ? 'empty' : ''} ${isInRange ? 'in-range' : ''}`}
-                                                                    onClick={() => {
-                                                                        if (day && !isFuture) {
-                                                                            // Если дата уже выбрана, снимаем выбор, иначе устанавливаем
-                                                                            if (isSelected) {
-                                                                                setEndDate(null)
-                                                                            } else {
-                                                                                setEndDate(new Date(endMonth.getFullYear(), endMonth.getMonth(), day))
-                                                                            }
-                                                                        }
-                                                                    }}
-                                                                    disabled={!day || isFuture}
-                                                                >
-                                                                    {day}
-                                                                </button>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                </div>
+                                            <div
+                                                className={`right-panel-arbitrary-date-trigger ${openArbitraryDatePicker === 'end' ? 'open' : ''}`}
+                                                onClick={() => setOpenArbitraryDatePicker(prev => prev === 'end' ? null : 'end')}
+                                                role="button"
+                                                tabIndex={0}
+                                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenArbitraryDatePicker(prev => prev === 'end' ? null : 'end'); } }}
+                                            >
+                                                <button type="button" className="right-panel-arbitrary-date-chevron" onClick={(e) => { e.stopPropagation(); adjustArbitraryEndDay(-1); }} disabled={!!(endDate && startDate && new Date(endDate).toDateString() === new Date(startDate).toDateString())} aria-label="Предыдущий день">&lt;</button>
+                                                <span className="right-panel-arbitrary-date-text">{endDate ? formatDateDisplay(endDate) : formatMonthYear(endMonth)}</span>
+                                                <span className="right-panel-arbitrary-date-calendar-icon" aria-hidden>📅</span>
+                                                <button type="button" className="right-panel-arbitrary-date-chevron" onClick={(e) => { e.stopPropagation(); adjustArbitraryEndDay(1); }} disabled={!!(endDate && new Date(endDate).toDateString() === todayStart().toDateString())} aria-label="Следующий день">&gt;</button>
                                             </div>
+                                            {openArbitraryDatePicker === 'end' && (
+                                                <div className="right-panel-arbitrary-date-dropdown" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="right-panel-date-picker">
+                                                        <div className="right-panel-month-navigation">
+                                                            <button type="button" className="right-panel-month-nav-btn" onClick={() => navigateMonth(false, -1)}>&lt;</button>
+                                                            <span className="right-panel-month-year">{formatMonthYear(endMonth)}</span>
+                                                            <button type="button" className="right-panel-month-nav-btn" onClick={() => navigateMonth(false, 1)} disabled={!canNavigateNext(endMonth)}>&gt;</button>
+                                                        </div>
+                                                        <div className="right-panel-calendar-grid">
+                                                            <div className="right-panel-calendar-weekdays">
+                                                                {weekDays.map(day => (<div key={day} className="right-panel-calendar-weekday">{day}</div>))}
+                                                            </div>
+                                                            <div className="right-panel-calendar-days">
+                                                                {getDaysInMonth(endMonth).map((day, idx) => {
+                                                                    const dayDate = day ? new Date(endMonth.getFullYear(), endMonth.getMonth(), day) : null
+                                                                    const isSelected = endDate && dayDate && endDate.getDate() === dayDate.getDate() && endDate.getMonth() === dayDate.getMonth() && endDate.getFullYear() === dayDate.getFullYear()
+                                                                    const isFuture = dayDate && isFutureDate(dayDate)
+                                                                    const isInRange = dayDate && startDate && endDate && isDateInRange(dayDate, startDate, endDate)
+                                                                    return (
+                                                                        <button
+                                                                            key={idx}
+                                                                            type="button"
+                                                                            className={`right-panel-calendar-day ${isSelected ? 'selected' : ''} ${!day ? 'empty' : ''} ${isInRange ? 'in-range' : ''}`}
+                                                                            onClick={() => {
+                                                                                if (day && !isFuture) {
+                                                                                    if (isSelected) setEndDate(null)
+                                                                                    else setEndDate(new Date(endMonth.getFullYear(), endMonth.getMonth(), day))
+                                                                                    setOpenArbitraryDatePicker(null)
+                                                                                }
+                                                                            }}
+                                                                            disabled={!day || isFuture}
+                                                                        >
+                                                                            {day}
+                                                                        </button>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -3746,10 +3852,11 @@ const ReportsPage = () => {
                             {/* Под периодом: настройки автоматического отчёта (чекбокс, затем почта, затем детали) */}
                             {(isCreatingTemplate || currentTemplateId) ? (
                                 <>
-                                    <label className="right-panel-auto-report-checkbox-simple">
+                                    <label className={`right-panel-auto-report-checkbox-simple ${periodType === 'Произвольный период' ? 'right-panel-auto-report-checkbox-disabled' : ''}`}>
                                         <input
                                             type="checkbox"
                                             checked={autoReportEnabled}
+                                            disabled={periodType === 'Произвольный период'}
                                             onChange={(e) => {
                                                 setAutoReportEnabled(e.target.checked)
                                                 if (e.target.checked) {
@@ -3785,46 +3892,50 @@ const ReportsPage = () => {
                                                         onChange={(e) => setAutoReportTime(e.target.value)}
                                                     />
                                                 </div>
-                                                <div className="right-panel-auto-report-monthdays">
-                                                    <label className="right-panel-auto-report-monthdays-label">По каким числам месяца?</label>
-                                                    <div className="right-panel-date-picker right-panel-auto-report-monthdays-calendar">
-                                                        <div className="right-panel-calendar-grid">
-                                                            <div className="right-panel-calendar-weekdays">
-                                                                {weekDays.map(day => (
-                                                                    <div key={day} className="right-panel-calendar-weekday">{day}</div>
-                                                                ))}
-                                                            </div>
-                                                            <div className="right-panel-calendar-days">
-                                                                {monthDays.map(day => (
-                                                                    <button
-                                                                        key={day}
-                                                                        type="button"
-                                                                        className={`right-panel-calendar-day ${autoReportMonthDays.includes(day) ? 'selected' : ''}`}
-                                                                        onClick={(e) => toggleAutoReportMonthDay(day, e)}
-                                                                    >
-                                                                        {day}
-                                                                    </button>
-                                                                ))}
+                                                {periodType !== 'За 7 дней' && (
+                                                    <div className="right-panel-auto-report-monthdays">
+                                                        <label className="right-panel-auto-report-monthdays-label">По каким числам месяца?</label>
+                                                        <div className="right-panel-date-picker right-panel-auto-report-monthdays-calendar">
+                                                            <div className="right-panel-calendar-grid">
+                                                                <div className="right-panel-calendar-weekdays">
+                                                                    {weekDays.map(day => (
+                                                                        <div key={day} className="right-panel-calendar-weekday">{day}</div>
+                                                                    ))}
+                                                                </div>
+                                                                <div className="right-panel-calendar-days">
+                                                                    {monthDays.map(day => (
+                                                                        <button
+                                                                            key={day}
+                                                                            type="button"
+                                                                            className={`right-panel-calendar-day ${autoReportMonthDays.includes(day) ? 'selected' : ''}`}
+                                                                            onClick={(e) => toggleAutoReportMonthDay(day, e)}
+                                                                        >
+                                                                            {day}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                )}
                                             </div>
-                                            <div className="right-panel-auto-report-weekdays">
-                                                <label className="right-panel-auto-report-weekdays-label">По каким дням недели?</label>
-                                                <div className="right-panel-auto-report-weekdays-buttons">
-                                                    {weekDays.map(day => (
-                                                        <button
-                                                            key={day}
-                                                            type="button"
-                                                            className={`right-panel-auto-report-weekday-btn ${autoReportWeekDays.includes(day) ? 'selected' : ''}`}
-                                                            onClick={() => toggleAutoReportWeekDay(day)}
-                                                        >
-                                                            {day}
-                                                        </button>
-                                                    ))}
+                                            {periodType !== 'Месячный отчёт' && (
+                                                <div className="right-panel-auto-report-weekdays">
+                                                    <label className="right-panel-auto-report-weekdays-label">По каким дням недели?*</label>
+                                                    <div className="right-panel-auto-report-weekdays-buttons">
+                                                        {weekDays.map(day => (
+                                                            <button
+                                                                key={day}
+                                                                type="button"
+                                                                className={`right-panel-auto-report-weekday-btn ${autoReportWeekDays.includes(day) ? 'selected' : ''}`}
+                                                                onClick={() => toggleAutoReportWeekDay(day)}
+                                                            >
+                                                                {day}
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     )}
                                 </>
