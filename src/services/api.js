@@ -1,6 +1,6 @@
 // API service for making HTTP requests to WT backend
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://89.109.8.59:8085/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://192.168.10.137:8084/api';
 
 // Helper function for handling API responses
 const handleResponse = async (response) => {
@@ -10,13 +10,27 @@ const handleResponse = async (response) => {
     if (response.status === 401) {
         console.log('Unauthorized response, clearing token and redirecting to login');
         localStorage.removeItem('token');
+        localStorage.removeItem('sessionId');
+        // Используем window.location.href для гарантированного редиректа
+        // даже если пользователь находится на защищенной странице
         window.location.href = '/login';
-        return;
+        // Бросаем ошибку, чтобы прервать выполнение
+        throw new Error('Session expired');
     }
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Error response:', errorData);
-        throw new Error(errorData.message || 'Something went wrong');
+        if (response.status !== 404) {
+            console.error('Error response:', errorData);
+        }
+        const msg = errorData.message || errorData.error || `HTTP ${response.status}`;
+        const err = new Error(msg);
+        // attach HTTP status for callers that need to handle 403 gracefully
+        err.status = response.status;
+        throw err;
+    }
+
+    if (response.status === 204) {
+        return null;
     }
 
     try {
@@ -93,7 +107,7 @@ export const api = {
                 },
                 body: JSON.stringify(credentials)
             });
-            
+
             console.log('Login response status:', response.status);
             const data = await handleAuthResponse(response);
             console.log('Login successful:', data);
@@ -218,6 +232,32 @@ export const api = {
             return handleResponse(response);
         } catch (error) {
             console.error('Get organizations error:', error);
+            throw error;
+        }
+    },
+
+    getOrganizationById: async (id) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/organizations/${id}`, {
+                headers: getAuthHeaders(),
+            });
+            return handleResponse(response);
+        } catch (error) {
+            console.error('Get organization by id error:', error);
+            throw error;
+        }
+    },
+
+    createOrganization: async (data) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/organizations`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(data),
+            });
+            return handleResponse(response);
+        } catch (error) {
+            console.error('Create organization error:', error);
             throw error;
         }
     },

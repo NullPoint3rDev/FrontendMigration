@@ -106,7 +106,10 @@ export const getWelderByRfidCode = async (rfidCode) => {
         const response = await api.get(`${API_URL}/rfid/${encodeURIComponent(rfidCode)}`);
         return response;
     } catch (error) {
-        console.error('Error fetching welder by RFID code:', error);
+        const st = error?.status;
+        if (st !== 404 && st !== 400) {
+            console.error('Error fetching welder by RFID code:', error);
+        }
         throw error;
     }
 };

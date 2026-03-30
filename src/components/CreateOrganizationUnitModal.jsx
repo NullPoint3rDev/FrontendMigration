@@ -1,14 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FaExclamationTriangle, FaCheck } from 'react-icons/fa';
 import { createOrganizationUnit } from '../api/organizationUnitApi';
 import '../styles/createOrganizationUnitModal.css';
 
-const CreateOrganizationUnitModal = ({ isOpen, onClose, onSuccess, existingUnits = [] }) => {
+const CreateOrganizationUnitModal = ({ isOpen, onClose, onSuccess, existingUnits = [], organizationId = null }) => {
     const [name, setName] = useState('');
     const [parentId, setParentId] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [nameError, setNameError] = useState('');
+    const normalizedOrganizationId = useMemo(() => {
+        if (organizationId == null || organizationId === '') return null;
+        const n = typeof organizationId === 'string' ? parseInt(organizationId, 10) : organizationId;
+        return Number.isFinite(n) ? n : null;
+    }, [organizationId]);
 
     useEffect(() => {
         if (isOpen) {
@@ -41,7 +46,9 @@ const CreateOrganizationUnitModal = ({ isOpen, onClose, onSuccess, existingUnits
             // API ожидает parentDepartment как объект с id, а не просто parent_id
             const unitData = {
                 name: name.trim(),
-                parentDepartment: parsedParentId ? { id: parsedParentId } : null
+                parentDepartment: parsedParentId ? { id: parsedParentId } : null,
+                // IMPORTANT: backend defaults organizationId=1 when organization is omitted
+                organization: normalizedOrganizationId ? { id: normalizedOrganizationId } : null,
             };
 
             const createdUnit = await createOrganizationUnit(unitData);

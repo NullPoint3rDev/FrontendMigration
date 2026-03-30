@@ -1,0 +1,207 @@
+.create-enterprise-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 24px;
+    box-sizing: border-box;
+}
+
+.create-enterprise-modal {
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #1A1420;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    color: #f0f4ff;
+}
+
+.create-enterprise-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(59, 49, 74, 0.55);
+}
+
+.create-enterprise-modal-back {
+    background: none;
+    border: none;
+    color: #d9d6df;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    border-radius: 4px;
+}
+
+.create-enterprise-modal-back:hover {
+    color: #F9F3FD;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.create-enterprise-modal-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: #F9F3FD;
+}
+
+.create-enterprise-modal-body {
+    padding: 20px 24px 24px;
+}
+
+.create-enterprise-logo-section {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.create-enterprise-logo-box {
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.create-enterprise-logo-letter {
+    font-size: 36px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.create-enterprise-logo-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+}
+
+.create-enterprise-name-preview {
+    font-size: 18px;
+    font-weight: 600;
+    color: #F9F3FD;
+}
+
+.create-enterprise-change-photo {
+    align-self: flex-start;
+    padding: 6px 12px;
+    background: #122536;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    color: #d9d6df;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.create-enterprise-change-photo:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #F9F3FD;
+}
+
+.create-enterprise-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.create-enterprise-field {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.create-enterprise-field label {
+    flex: 0 0 160px;
+    padding-top: 10px;
+    font-size: 13px;
+    color: #9CA3B8;
+}
+
+.create-enterprise-field .required {
+    color: #f59e0b;
+}
+
+.create-enterprise-field input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    background: #122536;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #F9F3FD;
+    font-size: 14px;
+}
+
+.create-enterprise-field select {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    background: #122536;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #F9F3FD;
+    font-size: 14px;
+}
+
+.create-enterprise-field input::placeholder {
+    color: rgba(156, 163, 184, 0.6);
+}
+
+.create-enterprise-field input:focus {
+    outline: none;
+    border-color: rgba(246, 178, 67, 0.5);
+}
+
+.create-enterprise-field select:focus {
+    outline: none;
+    border-color: rgba(246, 178, 67, 0.5);
+}
+
+.create-enterprise-field-note {
+    margin-left: 8px;
+    padding-top: 10px;
+    font-size: 12px;
+    color: #9CA3B8;
+    white-space: nowrap;
+}
+
+.create-enterprise-next-btn {
+    width: 100%;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #F6B243 0%, #e59a2b 100%);
+    border: none;
+    border-radius: 6px;
+    color: #1A1420;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, filter 0.2s;
+}
+
+.create-enterprise-next-btn:hover:not(:disabled) {
+    filter: brightness(1.08);
+}
+
+.create-enterprise-next-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.create-enterprise-step-indicator {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 13px;
+    color: #9CA3B8;
+}

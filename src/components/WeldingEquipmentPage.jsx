@@ -17,6 +17,8 @@ import {
 } from '../api/weldingMachineApi';
 import { getAllEmployees } from '../api/employeeApi';
 import { getArchivePanelState } from '../api/archiveDeviceApi';
+import { api } from '../services/api';
+import { getRoles } from '../api/userAccountApi';
 
 // Данные теперь загружаются с API сервера
 
@@ -134,11 +136,33 @@ function WeldingEquipmentPage() {
     const [deviceStatesByMac, setDeviceStatesByMac] = useState({}); // { [mac]: 'Дежурный режим' | 'Ожидание' | 'Заблокирован' | ... }
     const [statusIntervalId, setStatusIntervalId] = useState(null);
     const [shownErrors, setShownErrors] = useState(new Set());
+    const [currentUserOrgId, setCurrentUserOrgId] = useState(null);
+    const [isEnterpriseScopedRole, setIsEnterpriseScopedRole] = useState(false);
     const lastGoodStateByMacRef = useRef({});
     const lastGoodSeenAtRef = useRef({});
     const STATUS_STALE_MS = 10000;
 
     const todayDateString = new Date().toISOString().split('T')[0];
+
+    const visibleOrganizationUnits = useMemo(() => {
+        if (!isEnterpriseScopedRole || currentUserOrgId == null) return organizationUnits;
+        return organizationUnits.filter(
+            (u) => String(u.organizationId ?? u.organization?.id ?? u.organization_id ?? '') === String(currentUserOrgId)
+        );
+    }, [organizationUnits, isEnterpriseScopedRole, currentUserOrgId]);
+
+    const visibleUnitIdSet = useMemo(
+        () => new Set(visibleOrganizationUnits.map((u) => String(u.id))),
+        [visibleOrganizationUnits]
+    );
+
+    const visibleEquipment = useMemo(() => {
+        if (!isEnterpriseScopedRole || currentUserOrgId == null) return equipment;
+        return equipment.filter((m) => {
+            const unitId = m.organizationUnit?.id ?? m.organizationUnitId ?? null;
+            return unitId != null && visibleUnitIdSet.has(String(unitId));
+        });
+    }, [equipment, isEnterpriseScopedRole, currentUserOrgId, visibleUnitIdSet]);
 
     const formatDateForInput = (value) => {
         if (!value) return '';
@@ -154,9 +178,9 @@ function WeldingEquipmentPage() {
     };
 
     const findRootOrganizationUnit = () => {
-        if (!Array.isArray(organizationUnits) || organizationUnits.length === 0) return null;
-        const root = organizationUnits.find(unit => unit.parentId == null || unit.parent_id == null);
-        return root || organizationUnits[0];
+        if (!Array.isArray(visibleOrganizationUnits) || visibleOrganizationUnits.length === 0) return null;
+        const root = visibleOrganizationUnits.find(unit => unit.parentId == null || unit.parent_id == null);
+        return root || visibleOrganizationUnits[0];
     };
 
     // Load welders from localStorage
@@ -377,11 +401,29 @@ function WeldingEquipmentPage() {
         }
     };
 
+    const loadCurrentUserScope = async () => {
+        try {
+            const [currentUser, rolesData] = await Promise.all([api.getCurrentUser(), getRoles()]);
+            const roleId = currentUser?.userRoleId ?? currentUser?.userRole?.id;
+            const role = (Array.isArray(rolesData) ? rolesData : []).find(
+                (r) => r.id === roleId || r.id === parseInt(roleId, 10)
+            );
+            const roleName = String(role?.name || '').toUpperCase();
+            const isEnterpriseRole = roleName === 'ADMIN_ENTERPRISE' || roleName === 'USER_ENTERPRISE';
+            setIsEnterpriseScopedRole(isEnterpriseRole);
+            setCurrentUserOrgId(currentUser?.organizationId ?? currentUser?.organization?.id ?? null);
+        } catch (_) {
+            setIsEnterpriseScopedRole(false);
+            setCurrentUserOrgId(null);
+        }
+    };
+
     useEffect(() => {
         loadEquipment();
         loadOrganizationUnits();
         loadWeldingMachineTypes();
         loadResponsibleUsers();
+        loadCurrentUserScope();
     }, []);
 
     // Сохраняем фильтры в sessionStorage при изменении, чтобы при возврате со страницы мониторинга они не сбрасывались
@@ -839,7 +881,7 @@ function WeldingEquipmentPage() {
 
     const getFilteredEquipment = (applySort = true, applyStatusFilter = true) => {
         // Создаем копию массива equipment, чтобы не мутировать исходный
-        let filtered = [...equipment];
+        let filtered = [...visibleEquipment];
 
         // Фильтр по модели
         if (modelFilter.length > 0) {
@@ -1002,7 +1044,7 @@ function WeldingEquipmentPage() {
 
     // Построение иерархии подразделений (аналогично ReportsPage)
     const buildOrganizationHierarchy = () => {
-        if (!organizationUnits || organizationUnits.length === 0) return [];
+        if (!visibleOrganizationUnits || visibleOrganizationUnits.length === 0) return [];
 
         const unitMap = new Map();
         const rootUnits = [];
@@ -1013,7 +1055,7 @@ function WeldingEquipmentPage() {
         };
 
         // Создаем карту всех подразделений с пустыми массивами children
-        organizationUnits.forEach(unit => {
+        visibleOrganizationUnits.forEach(unit => {
             const normalizedId = normalizeId(unit.id);
             unitMap.set(normalizedId, {
                 ...unit,
@@ -1023,7 +1065,7 @@ function WeldingEquipmentPage() {
         });
 
         // Строим дерево
-        organizationUnits.forEach(unit => {
+        visibleOrganizationUnits.forEach(unit => {
             const normalizedId = normalizeId(unit.id);
             const unitNode = unitMap.get(normalizedId);
 
@@ -1468,7 +1510,7 @@ function WeldingEquipmentPage() {
                         <div className="welders-stats-tile">
                             <div className="stat-item">
                                 <img src={ResourcesLogo} alt="" className="stat-icon" />
-                                <span>Всего в компании: {equipment.length}</span>
+                                <span>Всего в компании: {visibleEquipment.length}</span>
                             </div>
                             <div className="stat-item">
                                 <img src={ResourcesLogo} alt="" className="stat-icon" />
@@ -1622,8 +1664,12 @@ function WeldingEquipmentPage() {
             <AddEquipmentModal
                 isOpen={modalOpen}
                 onClose={closeModal}
-                welders={welders}
-                organizationUnits={organizationUnits}
+                welders={welders.filter((w) => {
+                    if (!isEnterpriseScopedRole || currentUserOrgId == null) return true;
+                    const unitId = w.organizationUnit?.id ?? w.organizationUnitId ?? null;
+                    return unitId != null && visibleUnitIdSet.has(String(unitId));
+                })}
+                organizationUnits={visibleOrganizationUnits}
                 onSave={async (data) => {
                     try {
                         console.log('🟢 WeldingEquipmentPage: onSave вызван с данными:', data);
@@ -1656,7 +1702,7 @@ function WeldingEquipmentPage() {
                             commissionDate: data.commissioningDate || '',
                             serialNumber: data.serialNumber || '',
                             inventoryNumber: data.inventoryNumber || '',
-                            organizationUnit: organizationUnits.find(unit => unit.name === data.department) || null,
+                            organizationUnit: visibleOrganizationUnits.find(unit => unit.name === data.department) || null,
                             coreOptions: {
                                 gasControl: data.options?.gasControl || false,
                                 rfid: data.options?.rfid || false,

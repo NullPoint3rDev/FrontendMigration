@@ -19,7 +19,7 @@ const UserProfile = () => {
             } catch (e) {
                 // Если токен невалиден, разлогиниваем
                 localStorage.removeItem('token');
-               // navigate('/login');
+                // navigate('/login');
             }
         };
         fetchUser();
@@ -40,8 +40,14 @@ const UserProfile = () => {
 
     const handleLogout = () => {
         handleClose();
-        localStorage.removeItem('token');
-        navigate('/login');
+        try {
+            localStorage.clear();
+        } catch (_) {}
+        try {
+            sessionStorage.clear();
+        } catch (_) {}
+        // Принудительно перезагружаем приложение, чтобы пересчитать scope/кэш
+        window.location.replace('/login');
     };
 
     return (

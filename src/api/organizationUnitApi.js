@@ -59,7 +59,8 @@ export const deleteOrganizationUnit = async (id) => {
 export const getOrganizationUnitsByOrganization = async (organizationId) => {
     try {
         const response = await api.get(`/organization-units/organization/${organizationId}`);
-        return response;
+        const list = Array.isArray(response) ? response : (response && response.content);
+        return Array.isArray(list) ? list : [];
     } catch (error) {
         console.error('Ошибка получения подразделений по организации:', error);
         throw error;

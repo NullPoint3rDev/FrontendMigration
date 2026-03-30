@@ -28,6 +28,7 @@ export const getCertificationsByWelderId = async (welderId) => {
         return response;
     } catch (error) {
         console.error('Error fetching certifications by welder id:', error);
+        if (error?.status === 403) return [];
         throw error;
     }
 };

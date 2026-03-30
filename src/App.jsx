@@ -14,6 +14,7 @@ import WPSPage from './components/WPSPage';
 import SettingsPage from './components/SettingsPage';
 import EnterpriseMapPage from './components/EnterpriseMapPage';
 import EnterpriseMapPageSimple from './components/EnterpriseMapPageSimple';
+import EnterpriseListPage from './pages/EnterpriseListPage';
 import InteractiveMapPage from './components/InteractiveMapPage';
 import OrganizationsPage from './pages/OrganizationsPage';
 import WeldersPage from './pages/WeldersPage';
@@ -26,6 +27,7 @@ import UserProfilePage from './components/UserProfilePage';
 import ReportsPage from './components/ReportsPage';
 import NotificationsPage from './components/NotificationsPage';
 import EmployeesPage from './components/EmployeesPage';
+import AddUserPage from './pages/AddUserPage';
 import DeviceMonitorPage from './components/DeviceMonitorPage';
 import DeviceTestPage from './components/DeviceTestPage';
 import './App.css';
@@ -51,9 +53,11 @@ const Layout = ({ children }) => {
     const location = useLocation();
     const isEquipmentPage = location.pathname === '/equipment';
     const isWeldersPage = location.pathname === '/welders' || location.pathname.startsWith('/welders/');
+    const isEmployeesPage = location.pathname === '/employees' || location.pathname.startsWith('/employees/');
+    const isEnterpriseMapPage = location.pathname === '/enterprise-map' || location.pathname.startsWith('/enterprise-map/');
 
-    // Для страницы оборудования и сварщиков не используем Material-UI вообще, чтобы избежать конфликтов
-    if (isEquipmentPage || isWeldersPage) {
+    // Для страниц без Material-UI обёртки (избегаем конфликтов стилей и пустого контента)
+    if (isEquipmentPage || isWeldersPage || isEmployeesPage || isEnterpriseMapPage) {
         return (
             <div className="app">
                 <Sidebar />
@@ -89,8 +93,12 @@ function App() {
                     const url = args[0]?.toString() || '';
                     if (!url.includes('/auth/login') && !url.includes('/login')) {
                         console.log('Session expired, redirecting to login');
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('sessionId');
+                        try {
+                            localStorage.clear();
+                        } catch (_) {}
+                        try {
+                            sessionStorage.clear();
+                        } catch (_) {}
                         window.location.href = '/login';
                         // Возвращаем response, чтобы не ломать существующую обработку
                         return response;
@@ -127,6 +135,8 @@ function App() {
                                         {/* 1. Предприятие */}
                                         <Route path="/departments" element={<DepartmentsPage />} />
                                         <Route path="/employees" element={<EmployeesPage />} />
+                                        <Route path="/employees/add" element={<AddUserPage />} />
+                                        <Route path="/employees/add/:id" element={<AddUserPage />} />
                                         <Route path="/welders" element={<WeldersPage />} />
                                         <Route path="/welders/add" element={<AddWelderPage />} />
                                         <Route path="/welders/add/:id" element={<AddWelderPage />} />
@@ -144,7 +154,8 @@ function App() {
                                         <Route path="/device-test" element={<DeviceTestPage />} />
 
                                         {/* 3. Мониторинг */}
-                                        <Route path="/enterprise-map" element={<EnterpriseMapPageSimple />} />
+                                        <Route path="/enterprise-map" element={<EnterpriseListPage />} />
+                                        <Route path="/enterprise-map/:organizationId" element={<EnterpriseMapPageSimple />} />
                                         <Route path="/interactive-map" element={<InteractiveMapPage />} />
                                         <Route path="/equipment-list" element={<div className="main-content"><h2>Перечень оборудования</h2></div>} />
 

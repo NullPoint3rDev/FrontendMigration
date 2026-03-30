@@ -20,6 +20,33 @@
     flex-shrink: 0;
 }
 
+.enterprise-map-back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: #122536;
+    border: none;
+    border-radius: 4px;
+    color: #d9d6df;
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+    flex-shrink: 0;
+}
+
+.enterprise-map-back-btn:hover {
+    color: #ff9800;
+    background: rgba(255, 152, 0, 0.15);
+}
+
+.enterprise-map-back-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+
 .enterprise-map-page-title {
     margin: 0 !important;
     padding: 0 !important;
@@ -90,6 +117,13 @@
 
 .add-tile {
     width: 300px;
+    flex-shrink: 0;
+}
+
+.enterprise-map-extra-tile {
+    width: auto;
+    min-width: 200px;
+    max-width: 280px;
     flex-shrink: 0;
 }
 
@@ -245,10 +279,23 @@
 /* Main Content Area */
 .enterprise-map-content {
     flex: 1;
+    min-height: 200px;
     background: #1A1420;
     overflow: auto;
     padding: 0;
     border-radius: 5px;
+}
+
+.enterprise-map-units-container {
+    min-height: 120px;
+}
+
+.enterprise-map-empty-state {
+    padding: 24px 20px;
+    color: #9CA3B8;
+    font-size: 14px;
+    line-height: 1.5;
+    background: #1A1420;
 }
 
 /* Responsive Design */

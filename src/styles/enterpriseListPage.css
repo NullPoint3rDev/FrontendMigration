@@ -1,0 +1,20 @@
+.enterprise-list-page .enterprise-list-content {
+    padding: 0;
+}
+
+.enterprise-list-loading {
+    padding: 20px;
+    color: #F9F3FD;
+}
+
+.enterprise-list-page .org-units-list-container {
+    min-height: 120px;
+}
+
+.enterprise-list-row-selected {
+    background-color: rgba(246, 178, 67, 0.15) !important;
+}
+
+.enterprise-list-row-selected:hover {
+    background-color: rgba(246, 178, 67, 0.2) !important;
+}

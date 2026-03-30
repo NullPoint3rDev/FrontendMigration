@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaSearch, FaBell, FaArrowRight, FaTimes } from 'react-icons/fa';
+import { useNavigate, useParams } from 'react-router-dom';
+import { FaSearch, FaBell, FaArrowRight, FaTimes, FaArrowLeft } from 'react-icons/fa';
 import UserProfile from './UserProfile';
 import CreateOrganizationUnitModal from './CreateOrganizationUnitModal';
 import MoveOrganizationUnitModal from './MoveOrganizationUnitModal';
 import OrganizationLogo from '../images/OrganizationLogo.png';
+import ResourcesLogo from '../images/ResourcesLogo.png';
+import WelderIcon from '../images/WelderIcon.png';
 import OrganizationUnitsList from './OrganizationUnitsList';
 import UnitDetailsPanel from './UnitDetailsPanel';
-import { getAllOrganizationUnits, deleteOrganizationUnit } from '../api/organizationUnitApi';
+import AddEquipmentModal from './AddEquipmentModal';
+import { getAllOrganizationUnits, getOrganizationUnitsByOrganization, deleteOrganizationUnit } from '../api/organizationUnitApi';
 import { getAllWelders } from '../api/welderApi';
-import { getAllWeldingMachines } from '../api/weldingMachineApi';
+import { getAllWeldingMachines, createWeldingMachine } from '../api/weldingMachineApi';
+import { api } from '../services/api';
 import '../styles/enterpriseMapPage.css';
 
 const ENTERPRISE_MAP_EXPANDED_KEY = 'enterpriseMapExpandedUnits';
@@ -66,8 +70,11 @@ function saveSelectedUnitToStorage(selectedUnitId, selectedUnitLevel) {
 }
 
 const EnterpriseMapPageSimple = () => {
+    const { organizationId } = useParams();
+    const [enterpriseName, setEnterpriseName] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isAddEquipmentModalOpen, setIsAddEquipmentModalOpen] = useState(false);
     const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
     const [organizationUnits, setOrganizationUnits] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -83,17 +90,26 @@ const EnterpriseMapPageSimple = () => {
     const navigate = useNavigate();
     const hasRestoredSelectionRef = useRef(false);
 
-    // Загружаем подразделения из API при монтировании компонента
+    // Загружаем подразделения и название предприятия при монтировании
     useEffect(() => {
+        if (organizationId) {
+            api.get(`/organizations/${organizationId}`)
+                .then((org) => {
+                    setEnterpriseName(org?.name || '');
+                })
+                .catch(() => setEnterpriseName(''));
+        }
         loadOrganizationUnits();
         loadWelders();
         loadWeldingMachines();
-    }, []);
+    }, [organizationId]);
 
-    // Вычисляем статистику при изменении данных
+    // Вычисляем статистику при изменении данных; при пустом списке сбрасываем
     useEffect(() => {
         if (organizationUnits.length > 0) {
             calculateStats();
+        } else {
+            setUnitStats({});
         }
     }, [organizationUnits, welders, weldingMachines]);
 
@@ -402,7 +418,9 @@ const EnterpriseMapPageSimple = () => {
         try {
             setLoading(true);
             setError('');
-            const units = await getAllOrganizationUnits();
+            const units = organizationId
+                ? await getOrganizationUnitsByOrganization(organizationId)
+                : await getAllOrganizationUnits();
             console.log('Загружены подразделения из API:', units);
             setOrganizationUnits(units || []);
         } catch (err) {
@@ -447,11 +465,195 @@ const EnterpriseMapPageSimple = () => {
         }
     };
 
+    const weldersForEquipmentModal = useMemo(() => {
+        if (!Array.isArray(organizationUnits) || organizationUnits.length === 0) return [];
+        const unitIds = new Set(organizationUnits.map((u) => String(u.id)));
+        const unitNames = new Set(organizationUnits.map((u) => u.name).filter(Boolean));
+        return (welders || []).filter((w) => {
+            const ouId = w.organizationUnit?.id ?? w.organizationUnitId;
+            if (ouId != null && unitIds.has(String(ouId))) return true;
+            const name = w.organizationUnit?.name || w.department;
+            return name && unitNames.has(name);
+        });
+    }, [welders, organizationUnits]);
+
+    const openAddEquipmentModal = () => {
+        setIsAddEquipmentModalOpen(true);
+    };
+
+    const handleSaveEquipmentFromModal = async (data) => {
+        const convertDateToISO = (dateString) => {
+            if (!dateString) return null;
+            if (/^\d{4}-\d{2}-\d{2}/.test(dateString)) {
+                return `${dateString}T00:00:00`;
+            }
+            if (/^\d{2}\.\d{2}\.\d{4}/.test(dateString)) {
+                const [day, month, year] = dateString.split('.');
+                return `${year}-${month}-${day}T00:00:00`;
+            }
+            try {
+                const date = new Date(dateString);
+                if (!isNaN(date.getTime())) {
+                    const y = date.getFullYear();
+                    const m = String(date.getMonth() + 1).padStart(2, '0');
+                    const d = String(date.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}T00:00:00`;
+                }
+            } catch (_) {}
+            return null;
+        };
+
+        let deviceModel = '';
+        const modelLower = (data.model || '').toLowerCase().trim();
+        if (modelLower === 'core' || modelLower === 'core pulse' || modelLower.includes('core')) {
+            deviceModel = 'CORE';
+        } else if (modelLower === 'блок мониторинга' || modelLower === 'monitoring_block' || modelLower.includes('мониторинг')) {
+            deviceModel = 'MONITORING_BLOCK';
+        } else {
+            const upperModel = (data.model || '').toUpperCase().trim();
+            if (upperModel === 'CORE' || upperModel === 'MONITORING_BLOCK') {
+                deviceModel = upperModel;
+            } else {
+                deviceModel = data.model || '';
+            }
+        }
+
+        const trimmedName = (data.name || '').trim();
+        const newErrors = {};
+        if (!trimmedName) newErrors.name = 'Это поле обязательно';
+        if (!deviceModel) newErrors.deviceModel = 'Выберите модель устройства';
+        let mac = (data.macAddress || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+        if (!mac || mac.length !== 12) {
+            newErrors.mac = 'MAC-адрес должен содержать 12 символов (только 0-9, A-F)';
+        }
+        const orgUnit = organizationUnits.find((unit) => unit.name === data.department);
+        if (!orgUnit) {
+            newErrors.organizationUnit = 'Выберите подразделение';
+        }
+        if (!data.commissioningDate) {
+            newErrors.commissionDate = 'Укажите дату ввода в эксплуатацию';
+        } else {
+            const commissionDateObj = new Date(data.commissioningDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (commissionDateObj > today) {
+                newErrors.commissionDate = 'Дата ввода в эксплуатацию не может быть в будущем';
+            }
+        }
+
+        const selectedUnitId = orgUnit?.id;
+        if (trimmedName && selectedUnitId) {
+            const duplicateName = (weldingMachines || []).some((machine) => {
+                const machineUnitId = machine.organizationUnit?.id || machine.organizationUnitId;
+                return machineUnitId === selectedUnitId &&
+                    (machine.name || '').trim().toLowerCase() === trimmedName.toLowerCase();
+            });
+            if (duplicateName) {
+                newErrors.name = 'В этом подразделении уже есть аппарат с таким названием';
+            }
+        }
+
+        const maintenanceIntervalValue = data.maintenanceInterval !== '' && data.maintenanceInterval != null
+            ? Number(data.maintenanceInterval)
+            : null;
+        if (maintenanceIntervalValue != null && (Number.isNaN(maintenanceIntervalValue) || maintenanceIntervalValue < 0)) {
+            newErrors.maintenanceInterval = 'Значение должно быть неотрицательным числом';
+        }
+
+        const maintenanceReminderValue = data.maintenanceReminderHours !== '' && data.maintenanceReminderHours != null
+            ? Number(data.maintenanceReminderHours)
+            : null;
+        if (maintenanceReminderValue != null && (Number.isNaN(maintenanceReminderValue) || maintenanceReminderValue < 0)) {
+            newErrors.maintenanceReminderHours = 'Укажите корректное количество часов';
+        }
+
+        if (Object.keys(newErrors).length) {
+            const validationError = new Error('Ошибки валидации');
+            validationError.errors = newErrors;
+            throw validationError;
+        }
+
+        const commissionDateValue = convertDateToISO(data.commissioningDate);
+        const lastServiceValue = convertDateToISO(data.lastMaintenanceDate);
+
+        const organizationUnitForApi = orgUnit
+            ? { id: orgUnit.id, name: orgUnit.name || '' }
+            : null;
+
+        const machineData = {
+            name: trimmedName,
+            deviceModel,
+            mac,
+            commissionDate: commissionDateValue,
+            manufactureYear: null,
+            lastService: lastServiceValue,
+            serialNumber: data.serialNumber || '',
+            inventoryNumber: data.inventoryNumber || '',
+            organizationUnit: organizationUnitForApi,
+            weldingMachineType: null,
+            assignedWelders: data.approvedWelders || [],
+            maintenanceInterval: maintenanceIntervalValue,
+            maintenanceRegulation: maintenanceIntervalValue,
+            userServiceNotifiedBeforeHours: maintenanceReminderValue,
+        };
+
+        const isCoreSelected = deviceModel === 'CORE';
+        if (isCoreSelected) {
+            const corePayload = {
+                options: {
+                    gasControl: Boolean(data.options?.gasControl),
+                    rfid: Boolean(data.options?.rfid),
+                    bvo: Boolean(data.options?.bvo),
+                },
+                wtModuleMac: '',
+                maintenance: {
+                    intervalHours: maintenanceIntervalValue,
+                    lastServiceDate: lastServiceValue,
+                    technicianName: '',
+                    technicianPass: '',
+                },
+                responsibleUserId: null,
+                allowedWelders: data.approvedWelders || [],
+                maintenanceReminderHours: maintenanceReminderValue,
+            };
+            machineData.modules = JSON.stringify(corePayload);
+        } else {
+            machineData.modules = null;
+        }
+
+        try {
+            await createWeldingMachine(machineData);
+        } catch (err) {
+            const apiError = new Error(err.message || 'Ошибка сохранения оборудования');
+            apiError.errors = { api: err.message || 'Ошибка сохранения оборудования' };
+            throw apiError;
+        }
+        alert('Оборудование успешно создано');
+        await loadWeldingMachines();
+        setIsAddEquipmentModalOpen(false);
+    };
+
     return (
         <div className="enterprise-map-page">
             {/* Page Title and Controls - Same line */}
             <div className="enterprise-map-header-row">
-                <h1 className="enterprise-map-page-title">Карта предприятия</h1>
+                {organizationId ? (
+                    <>
+                        <button
+                            type="button"
+                            className="enterprise-map-back-btn"
+                            onClick={() => navigate('/enterprise-map')}
+                            aria-label="Назад к списку предприятий"
+                        >
+                            <FaArrowLeft className="enterprise-map-back-icon" />
+                        </button>
+                        <h1 className="enterprise-map-page-title">
+                            Карта предприятия «{enterpriseName || '...'}»
+                        </h1>
+                    </>
+                ) : (
+                    <h1 className="enterprise-map-page-title">Карта предприятия</h1>
+                )}
                 <div className="tiles-controls">
                     <button
                         className="control-btn notifications-btn"
@@ -489,6 +691,26 @@ const EnterpriseMapPageSimple = () => {
                             Добавить подразделение +
                         </button>
                     </div>
+                    <div className="action-tile add-tile enterprise-map-extra-tile">
+                        <button
+                            type="button"
+                            className="tile-btn add-btn"
+                            onClick={openAddEquipmentModal}
+                        >
+                            <img src={ResourcesLogo} alt="" className="add-btn-icon" />
+                            Добавить аппарат
+                        </button>
+                    </div>
+                    <div className="action-tile add-tile enterprise-map-extra-tile">
+                        <button
+                            type="button"
+                            className="tile-btn add-btn"
+                            onClick={() => navigate('/welders/add')}
+                        >
+                            <img src={WelderIcon} alt="" className="add-btn-icon" />
+                            Добавить сварщика
+                        </button>
+                    </div>
                 </div>
 
                 {/* Right side tiles */}
@@ -521,26 +743,34 @@ const EnterpriseMapPageSimple = () => {
                 {loading ? (
                     <div style={{ padding: '20px', color: '#F9F3FD' }}>Загрузка подразделений...</div>
                 ) : error ? (
-                    <div style={{ padding: '20px', color: '#ff6b6b' }}>{error}</div>
+                    <div className="enterprise-map-empty-state" style={{ color: '#ff6b6b' }}>{error}</div>
                 ) : (
                     <>
-                        <OrganizationUnitsList
-                            units={filteredOrganizationUnits}
-                            selectedUnits={selectedUnits}
-                            onSelectionChange={setSelectedUnits}
-                            selectedUnitId={selectedUnit?.id}
-                            expandedUnits={expandedUnits}
-                            onUnitClick={(unit, level) => {
-                                setSelectedUnit(unit);
-                                setSelectedUnitLevel(level || 0);
-                            }}
-                            onExpandedUnitsChange={setExpandedUnits}
-                            onEdit={(unit) => {
-                                console.log('Edit unit:', unit);
-                                // TODO: Implement edit functionality
-                            }}
-                            unitStats={unitStats}
-                        />
+                        <div className="org-units-list-container enterprise-map-units-container">
+                            {filteredOrganizationUnits.length === 0 ? (
+                                <div className="enterprise-map-empty-state">
+                                    Подразделений пока нет. Нажмите «Добавить подразделение» выше, чтобы создать первое.
+                                </div>
+                            ) : (
+                                <OrganizationUnitsList
+                                    units={filteredOrganizationUnits}
+                                    selectedUnits={selectedUnits}
+                                    onSelectionChange={setSelectedUnits}
+                                    selectedUnitId={selectedUnit?.id}
+                                    expandedUnits={expandedUnits}
+                                    onUnitClick={(unit, level) => {
+                                        setSelectedUnit(unit);
+                                        setSelectedUnitLevel(level || 0);
+                                    }}
+                                    onExpandedUnitsChange={setExpandedUnits}
+                                    onEdit={(unit) => {
+                                        console.log('Edit unit:', unit);
+                                        // TODO: Implement edit functionality
+                                    }}
+                                    unitStats={unitStats}
+                                />
+                            )}
+                        </div>
                         {selectedUnit && (
                             <UnitDetailsPanel selectedUnit={selectedUnit} level={selectedUnitLevel} />
                         )}
@@ -566,6 +796,7 @@ const EnterpriseMapPageSimple = () => {
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
                 existingUnits={organizationUnits}
+                organizationId={organizationId ?? null}
                 onSuccess={async () => {
                     await loadOrganizationUnits();
                 }}
@@ -577,6 +808,13 @@ const EnterpriseMapPageSimple = () => {
                 onSuccess={async () => {
                     await loadOrganizationUnits();
                 }}
+            />
+            <AddEquipmentModal
+                isOpen={isAddEquipmentModalOpen}
+                onClose={() => setIsAddEquipmentModalOpen(false)}
+                welders={weldersForEquipmentModal}
+                organizationUnits={organizationUnits}
+                onSave={handleSaveEquipmentFromModal}
             />
         </div>
     );

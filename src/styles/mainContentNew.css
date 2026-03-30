@@ -646,17 +646,127 @@
 
 .welder-header-tile {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 10px;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 8px 10px;
     position: relative;
     z-index: 1;
+    gap: 6px;
+}
+
+.welder-header-main {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+}
+
+.welder-header-rfid-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+}
+
+.welder-header-rfid-row .rfid-pass-badge {
+    flex-shrink: 0;
+}
+
+.welder-header-rfid-row .create-welder-from-rfid-btn {
+    flex-shrink: 0;
+}
+
+.welder-header-rfid-row .welder-known-block {
+    flex: 1;
+    min-width: 0;
 }
 
 .welder-header-content {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.rfid-pass-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.28);
+    border-radius: 6px;
+    padding: 4px 10px;
+    border: 1px solid rgba(82, 69, 94, 0.35);
+}
+
+.rfid-pass-badge-icon {
+    color: #ff9800;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.rfid-pass-badge-text {
+    font-weight: 600;
+    font-size: 14px;
+    color: #f5f5f5;
+    letter-spacing: 0.03em;
+}
+
+.welder-known-block {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.welder-header-welder-icon {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    opacity: 0.88;
+}
+
+.welder-name-short {
+    font-size: 14px;
+    font-weight: 600;
+    color: #6ecf7e;
+}
+
+.create-welder-from-rfid-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    background: #1A1420;
+    border: 1px solid rgba(82, 69, 94, 0.48);
+    border-radius: 3px;
+    padding: 5px 1px;
+    color: #e8e4f0;
+    font-size: 12px;
+    font-weight: 100;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.create-welder-from-rfid-btn:hover {
+    background: #1A1420;
+    border-color: #1A1420;
+}
+
+.create-welder-from-rfid-icon {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    opacity: 0.9;
+}
+
+.welder-rfid-lookup-hint,
+.welder-no-rfid-hint {
+    font-size: 12px;
+    color: rgba(188, 183, 197, 0.65);
 }
 
 .welder-alerts-card {
@@ -1236,7 +1346,7 @@
     display: flex;
     flex-direction: row;
     gap: 8px;
-    padding: 9px;
+    padding: 19px;
     border-radius: 0;
     background: transparent;
     border: none;
@@ -1284,10 +1394,11 @@
 .chart-canvas {
     position: relative;
     flex: 1;
-    border-radius: 3px;
+    min-height: 140px;
+    border-radius: 14px;
     overflow: hidden;
     background: linear-gradient(180deg, rgba(30, 25, 37, 0.95), rgba(26, 21, 32, 0.96));
-    border: none;
+    border: 1px solid rgba(82, 69, 94, 0.4);
     display: flex;
     align-items: center;
     justify-content: center;

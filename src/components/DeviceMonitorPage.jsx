@@ -15,8 +15,11 @@ import {
 import '../styles/mainContentNew.css';
 import * as archiveDeviceApi from '../api/archiveDeviceApi';
 import { deleteWeldingMachine, getAllWeldingMachines, updateWeldingMachine, getWeldingMachineById, getAllOrganizationUnits } from '../api/weldingMachineApi';
+import { getWelderByRfidCode } from '../api/welderApi';
 import machineImage from '../images/Untitled 3 копия.png';
+import WelderIcon from '../images/WelderIcon.png';
 import AddEquipmentModal from './AddEquipmentModal';
+import { RiRfidFill } from 'react-icons/ri';
 
 // Названия ошибок по коду 1–23 (синхронно с EquipmentErrorMessages и протоколом аппарата: 1–10, 17–21)
 const EQUIPMENT_ERROR_MESSAGES = [
@@ -47,6 +50,64 @@ function getEquipmentErrorName(errorCode) {
         return EQUIPMENT_ERROR_MESSAGES[num - 1];
     }
     return s;
+}
+
+function formatWelderShortName(welder) {
+    const full = (welder?.name || '').trim();
+    if (!full) return '—';
+    const parts = full.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return parts[0];
+    const last = parts[0];
+    const fi = parts[1] ? `${parts[1][0].toUpperCase()}.` : '';
+    const mi = parts[2] ? `${parts[2][0].toUpperCase()}.` : '';
+    const initials = [fi, mi].filter(Boolean).join(' ');
+    return initials ? `${last} ${initials}` : last;
+}
+
+async function fetchWelderByRfidVariants(rfidRaw) {
+    const raw = String(rfidRaw || '').trim();
+    if (!raw) return null;
+    const compact = raw.replace(/\s+/g, '');
+    const variants = [];
+    const seen = new Set();
+    const push = (v) => {
+        if (!v || seen.has(v)) return;
+        seen.add(v);
+        variants.push(v);
+    };
+    push(raw);
+    push(compact);
+    if (compact.toUpperCase() !== compact) push(compact.toUpperCase());
+    if (raw.toUpperCase() !== raw && raw.toUpperCase() !== compact.toUpperCase()) push(raw.toUpperCase());
+
+    for (const v of variants) {
+        try {
+            const w = await getWelderByRfidCode(v);
+            if (w && (w.id != null || w.name)) return w;
+        } catch (e) {
+            const st = e?.status;
+            if (st !== 404 && st !== 400) {
+                console.warn('RFID welder lookup:', e);
+            }
+        }
+    }
+    return null;
+}
+
+function extractRfidFromDeviceData(deviceData, machineMac, hasData) {
+    if (Object.keys(deviceData).length === 0 || !hasData) return null;
+    const data = deviceData[machineMac];
+    if (!data) return null;
+    const rfidCode = data.RFID || data.Rfid || data.rfid || data.RFIDCode || data.RfidCode ||
+        data.rfidCode || data['RFID'] || data['Rfid'] || data['RFID Code'] ||
+        data['RFID.Hex'] ||
+        data.properties?.RFID?.value || data.properties?.Rfid?.value || data.properties?.rfid?.value ||
+        data.properties?.['RFID.Hex']?.value || data.properties?.['RFID.Hex'] ||
+        data.properties?.RFID || data.properties?.Rfid || data.properties?.rfid;
+    if (rfidCode && rfidCode !== 'null' && String(rfidCode).trim() !== '') {
+        return String(rfidCode).trim();
+    }
+    return null;
 }
 
 // Плагин пороговой линии отключён (белую линию на графике убрали по запросу)
@@ -105,6 +166,9 @@ const DeviceMonitorPage = () => {
 
     // Состояние для хранения ID аппарата (для удаления)
     const [machineId, setMachineId] = useState(null);
+    const [rfidLookup, setRfidLookup] = useState({ status: 'idle' });
+    /** Кэш поиска по RFID: не перезапрашивать при каждом poll телеметрии, только при смене кода */
+    const rfidLookupCacheRef = useRef({ code: null, snapshot: null });
 
     // Состояние для редактирования названия аппарата (инлайн — оставлено для совместимости, но карандаш открывает модалку)
     const [isEditingName, setIsEditingName] = useState(false);
@@ -207,6 +271,44 @@ const DeviceMonitorPage = () => {
         };
         fetchMachineId();
     }, [machineMac]);
+
+    useEffect(() => {
+        const code = extractRfidFromDeviceData(deviceData, machineMac, hasData);
+        if (!code) {
+            rfidLookupCacheRef.current = { code: null, snapshot: null };
+            setRfidLookup({ status: 'idle' });
+            return;
+        }
+        const cached = rfidLookupCacheRef.current;
+        if (cached.code === code && cached.snapshot) {
+            return;
+        }
+        if (cached.code === code && cached.snapshot === null) {
+            return;
+        }
+        rfidLookupCacheRef.current = { code, snapshot: null };
+        let cancelled = false;
+        setRfidLookup({ status: 'loading' });
+        (async () => {
+            try {
+                const w = await fetchWelderByRfidVariants(code);
+                if (cancelled) return;
+                if (rfidLookupCacheRef.current.code !== code) return;
+                const snap = w ? { status: 'known', welder: w } : { status: 'unknown' };
+                rfidLookupCacheRef.current = { code, snapshot: snap };
+                setRfidLookup(snap);
+            } catch {
+                if (!cancelled && rfidLookupCacheRef.current.code === code) {
+                    const snap = { status: 'unknown' };
+                    rfidLookupCacheRef.current = { code, snapshot: snap };
+                    setRfidLookup(snap);
+                }
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [deviceData, machineMac, hasData]);
 
     // Обновление текущего времени каждую секунду для таймера
     useEffect(() => {
@@ -1877,41 +1979,7 @@ const DeviceMonitorPage = () => {
         return errors;
     };
 
-    const getRfidCode = () => {
-        if (Object.keys(deviceData).length === 0 || !hasData) return null;
-        const data = deviceData[machineMac];
-        if (!data) {
-            console.log('🔍 getRfidCode: data is null');
-            return null;
-        }
-
-        console.log('🔍 getRfidCode: проверяем данные:', {
-            hasRFID: !!data.RFID,
-            hasRfid: !!data.Rfid,
-            hasrfid: !!data.rfid,
-            hasRFIDCode: !!data.RFIDCode,
-            hasRfidCode: !!data.RfidCode,
-            hasrfidCode: !!data.rfidCode,
-            hasRFIDHex: !!data['RFID.Hex'],
-            hasProperties: !!data.properties,
-            propertiesKeys: data.properties ? Object.keys(data.properties) : null
-        });
-
-        // Пробуем разные возможные названия поля для RFID кода
-        const rfidCode = data.RFID || data.Rfid || data.rfid || data.RFIDCode || data.RfidCode ||
-            data.rfidCode || data['RFID'] || data['Rfid'] || data['RFID Code'] ||
-            data['RFID.Hex'] ||
-            data.properties?.RFID?.value || data.properties?.Rfid?.value || data.properties?.rfid?.value ||
-            data.properties?.['RFID.Hex']?.value || data.properties?.['RFID.Hex'] ||
-            data.properties?.RFID || data.properties?.Rfid || data.properties?.rfid;
-
-        console.log('🔍 getRfidCode: найденный код:', rfidCode);
-
-        if (rfidCode && rfidCode !== 'null' && String(rfidCode).trim() !== '') {
-            return String(rfidCode).trim();
-        }
-        return null;
-    };
+    const getRfidCode = () => extractRfidFromDeviceData(deviceData, machineMac, hasData);
 
     const getInputPower = () => {
         if (Object.keys(deviceData).length === 0 || !hasData) return '0 кВт';
@@ -2055,6 +2123,15 @@ const DeviceMonitorPage = () => {
             return lastUpdate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
         }
         return new Date().toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    const handleNavigateCreateWelderFromRfid = () => {
+        navigate('/welders/add', {
+            state: {
+                prefilledRfidCode: rfidCode,
+                prefilledMachineId: machineId,
+            },
+        });
     };
 
     return (
@@ -2261,12 +2338,36 @@ const DeviceMonitorPage = () => {
 
                 <div className="welder-section">
                     <div className="card welder-header-tile">
-                        <span className="welder-label">Сварщик</span>
-                        <div className="welder-header-content">
-                            {hasRfidCode && <span className="welder-name">{rfidCode}</span>}
-                            <span className="welder-indicator">
-                                <span className={`indicator-dot ${hasRfidCode ? 'active' : 'inactive'}`} />
-                            </span>
+                        <div className="welder-header-main">
+                            {hasRfidCode ? (
+                                <div className="welder-header-rfid-row">
+                                    <div className="rfid-pass-badge" title="RFID">
+                                        <RiRfidFill className="rfid-pass-badge-icon" aria-hidden />
+                                        <span className="rfid-pass-badge-text">{rfidCode}</span>
+                                    </div>
+                                    {rfidLookup.status === 'known' && rfidLookup.welder && (
+                                        <div className="welder-known-block">
+                                            <img src={WelderIcon} alt="" className="welder-header-welder-icon" />
+                                            <span className="welder-name-short">{formatWelderShortName(rfidLookup.welder)}</span>
+                                        </div>
+                                    )}
+                                    {rfidLookup.status === 'unknown' && (
+                                        <button
+                                            type="button"
+                                            className="create-welder-from-rfid-btn"
+                                            onClick={handleNavigateCreateWelderFromRfid}
+                                        >
+                                            <img src={WelderIcon} alt="" className="create-welder-from-rfid-icon" />
+                                            Создать сварщика
+                                        </button>
+                                    )}
+                                    {rfidLookup.status === 'loading' && (
+                                        <span className="welder-rfid-lookup-hint">Проверка пропуска…</span>
+                                    )}
+                                </div>
+                            ) : (
+                                <span className="welder-no-rfid-hint">Нет данных RFID</span>
+                            )}
                         </div>
                     </div>
 

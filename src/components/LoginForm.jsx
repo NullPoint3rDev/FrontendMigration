@@ -43,6 +43,14 @@ const LoginForm = () => {
                 throw new Error('Пожалуйста, заполните все поля');
             }
 
+            // Чтобы не залипали кэш/скопы от предыдущего аккаунта
+            try {
+                localStorage.clear();
+            } catch (_) {}
+            try {
+                sessionStorage.clear();
+            } catch (_) {}
+
             const response = await api.login(formData);
             console.log('Успешный ответ от сервера:', response);
 
@@ -56,7 +64,7 @@ const LoginForm = () => {
             if (response.sessionId) {
                 localStorage.setItem('sessionId', response.sessionId);
             }
-            
+
             // Сохраняем информацию о пользователе
             console.log('LoginForm: Response from server:', response);
             if (response.user) {
@@ -73,8 +81,8 @@ const LoginForm = () => {
 
             console.log('Успешный вход, перенаправление на главную страницу');
 
-            // Используем navigate вместо window.location
-            navigate('/', { replace: true });
+            // Принудительно перезагружаем приложение, чтобы заново пересчитать scope
+            window.location.replace('/');
         } catch (err) {
             console.error('Ошибка при авторизации:', err);
             setError(err.message || 'Ошибка при входе. Пожалуйста, проверьте ваши учетные данные.');

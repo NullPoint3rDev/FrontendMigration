@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { FaBell, FaChevronRight, FaChevronDown } from 'react-icons/fa';
 import { RiRfidFill } from 'react-icons/ri';
 import { FaTrash } from 'react-icons/fa';
@@ -14,6 +14,7 @@ import '../styles/addWelderPage.css';
 
 function AddWelderPage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { id } = useParams();
     const isEditMode = !!id;
     const [formData, setFormData] = useState({
@@ -60,6 +61,38 @@ function AddWelderPage() {
             }
         };
     }, [id, isEditMode]);
+
+    useEffect(() => {
+        if (isEditMode) return;
+        const st = location.state;
+        if (!st || (st.prefilledRfidCode == null && st.prefilledMachineId == null)) return;
+        let cancelled = false;
+        (async () => {
+            if (st.prefilledRfidCode != null && String(st.prefilledRfidCode).trim() !== '') {
+                const code = String(st.prefilledRfidCode).trim();
+                setRfidPasses((prev) => {
+                    if (prev.some((p) => p.code === code)) return prev;
+                    return [...prev, { id: Date.now(), code }];
+                });
+            }
+            if (st.prefilledMachineId != null) {
+                try {
+                    const machine = await getWeldingMachineById(st.prefilledMachineId);
+                    if (!cancelled && machine?.id) {
+                        setRelatedMachines((prev) => {
+                            if (prev.some((m) => m.id === machine.id)) return prev;
+                            return [...prev, machine];
+                        });
+                    }
+                } catch (e) {
+                    console.error('Не удалось подставить аппарат:', e);
+                }
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [location.key, isEditMode, id]);
 
     // Закрытие dropdown при клике вне его
     useEffect(() => {

@@ -13,6 +13,8 @@ import {
 } from '../api/welderApi';
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { getCertificationsByWelderId } from '../api/certificationApi';
+import { api } from '../services/api';
+import { getRoles } from '../api/userAccountApi';
 
 const WELDERS_PAGE_STATE_KEY = 'weldersPageState';
 
@@ -65,6 +67,8 @@ function WeldersPage() {
     const [expandedOrganizationUnits, setExpandedOrganizationUnits] = useState({});
     const [selectedWelders, setSelectedWelders] = useState([]);
     const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+    const [currentUserOrgId, setCurrentUserOrgId] = useState(null);
+    const [isEnterpriseScopedRole, setIsEnterpriseScopedRole] = useState(false);
     const navigate = useNavigate();
 
 
@@ -72,7 +76,25 @@ function WeldersPage() {
     useEffect(() => {
         loadWelders();
         loadOrganizationUnits();
+        loadCurrentUserScope();
     }, []);
+
+    const loadCurrentUserScope = async () => {
+        try {
+            const [currentUser, rolesData] = await Promise.all([api.getCurrentUser(), getRoles()]);
+            const roleId = currentUser?.userRoleId ?? currentUser?.userRole?.id;
+            const role = (Array.isArray(rolesData) ? rolesData : []).find(
+                (r) => r.id === roleId || r.id === parseInt(roleId, 10)
+            );
+            const roleName = String(role?.name || '').toUpperCase();
+            const isEnterpriseRole = roleName === 'ADMIN_ENTERPRISE' || roleName === 'USER_ENTERPRISE';
+            setIsEnterpriseScopedRole(isEnterpriseRole);
+            setCurrentUserOrgId(currentUser?.organizationId ?? currentUser?.organization?.id ?? null);
+        } catch (_) {
+            setIsEnterpriseScopedRole(false);
+            setCurrentUserOrgId(null);
+        }
+    };
 
     // Сохраняем фильтры и сортировку в localStorage при изменении
     useEffect(() => {
@@ -178,6 +200,40 @@ function WeldersPage() {
         loadOrganizationUnits();
     }, []);
 
+    const visibleOrganizationUnits = useMemo(() => {
+        if (!isEnterpriseScopedRole || currentUserOrgId == null) return organizationUnits;
+        return organizationUnits.filter(
+            (u) => String(u.organizationId ?? u.organization?.id ?? u.organization_id ?? '') === String(currentUserOrgId)
+        );
+    }, [organizationUnits, isEnterpriseScopedRole, currentUserOrgId]);
+
+    const visibleUnitIdSet = useMemo(
+        () => new Set(visibleOrganizationUnits.map((u) => String(u.id))),
+        [visibleOrganizationUnits]
+    );
+
+    const visibleUnitNameSet = useMemo(
+        () =>
+            new Set(
+                visibleOrganizationUnits
+                    .map((u) => String(u.name || '').trim().toLowerCase())
+                    .filter(Boolean)
+            ),
+        [visibleOrganizationUnits]
+    );
+
+    const visibleWelders = useMemo(() => {
+        if (!isEnterpriseScopedRole || currentUserOrgId == null) return welders;
+        return welders.filter((w) => {
+            const unitId = w.organizationUnit?.id ?? w.organizationUnitId ?? null;
+            if (unitId != null && visibleUnitIdSet.has(String(unitId))) {
+                return true;
+            }
+            const departmentName = String(w.department || '').trim().toLowerCase();
+            return departmentName && visibleUnitNameSet.has(departmentName);
+        });
+    }, [welders, isEnterpriseScopedRole, currentUserOrgId, visibleUnitIdSet, visibleUnitNameSet]);
+
     // Функция для получения названия подразделения с проверкой его существования
     const getOrganizationUnitName = (welder) => {
         const unitName = welder.organizationUnit?.name || welder.department;
@@ -186,7 +242,7 @@ function WeldersPage() {
         }
 
         // Проверяем, существует ли подразделение в текущем списке
-        const unitExists = organizationUnits.some(unit =>
+        const unitExists = visibleOrganizationUnits.some(unit =>
             unit.name === unitName ||
             (welder.organizationUnit?.id && unit.id === welder.organizationUnit.id)
         );
@@ -339,7 +395,7 @@ function WeldersPage() {
     };
 
     const getFilteredWelders = (applySort = true) => {
-        let filtered = welders;
+        let filtered = visibleWelders;
 
         // Фильтр по подразделению
         if (organizationUnitFilter.length > 0) {
@@ -427,7 +483,7 @@ function WeldersPage() {
 
     // Построение иерархии подразделений (аналогично WeldingEquipmentPage)
     const buildOrganizationHierarchy = () => {
-        if (!organizationUnits || organizationUnits.length === 0) return [];
+        if (!visibleOrganizationUnits || visibleOrganizationUnits.length === 0) return [];
 
         const unitMap = new Map();
         const rootUnits = [];
@@ -438,7 +494,7 @@ function WeldersPage() {
         };
 
         // Создаем карту всех подразделений с пустыми массивами children
-        organizationUnits.forEach(unit => {
+        visibleOrganizationUnits.forEach(unit => {
             const normalizedId = normalizeId(unit.id);
             unitMap.set(normalizedId, {
                 ...unit,
@@ -449,7 +505,7 @@ function WeldersPage() {
         });
 
         // Строим дерево
-        organizationUnits.forEach(unit => {
+        visibleOrganizationUnits.forEach(unit => {
             const normalizedId = normalizeId(unit.id);
             const unitNode = unitMap.get(normalizedId);
 
@@ -1046,7 +1102,7 @@ function WeldersPage() {
                         <div className="welders-stats-tile">
                             <div className="stat-item">
                                 <img src={WelderIcon} alt="Welder" className="stat-icon" />
-                                <span>Всего в компании: {welders.length}</span>
+                                <span>Всего в компании: {visibleWelders.length}</span>
                             </div>
                             <div className="stat-item">
                                 <img src={WelderIcon} alt="Welder" className="stat-icon" />
@@ -1230,7 +1286,7 @@ function WeldersPage() {
                                     }}
                                 >
                                     <option value="">Выберите подразделение</option>
-                                    {organizationUnits.map(unit => (
+                                    {visibleOrganizationUnits.map(unit => (
                                         <option key={unit.id} value={unit.id}>{unit.name}</option>
                                     ))}
                                 </select>
@@ -1267,8 +1323,8 @@ function WeldersPage() {
                 isOpen={isMoveModalOpen}
                 onClose={() => setIsMoveModalOpen(false)}
                 selectedWelderIds={selectedWelders}
-                welders={welders}
-                organizationUnits={organizationUnits}
+                welders={visibleWelders}
+                organizationUnits={visibleOrganizationUnits}
                 onSuccess={async () => {
                     await loadWelders();
                     setSelectedWelders([]);
