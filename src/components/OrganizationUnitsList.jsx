@@ -5,7 +5,18 @@ import ResourcesLogo from '../images/ResourcesLogo.png';
 import WelderIcon from '../images/WelderIcon.png';
 import '../styles/organizationUnitsList.css';
 
-const OrganizationUnitsList = ({ units, onEdit, selectedUnits, onSelectionChange, onUnitClick, selectedUnitId, expandedUnits: expandedUnitsProp, onExpandedUnitsChange, selectedUnitLevel, unitStats }) => {
+const OrganizationUnitsList = ({
+                                   units,
+                                   onEdit,
+                                   selectedUnits,
+                                   onSelectionChange,
+                                   onUnitClick,
+                                   selectedUnitId,
+                                   expandedUnits: expandedUnitsProp,
+                                   onExpandedUnitsChange,
+                                   selectedUnitLevel,
+                                   unitStats,
+                               }) => {
     const [internalExpanded, setInternalExpanded] = useState({});
     const expandedUnits = expandedUnitsProp !== undefined ? expandedUnitsProp : internalExpanded;
 
@@ -153,6 +164,7 @@ const OrganizationUnitsList = ({ units, onEdit, selectedUnits, onSelectionChange
                             <input
                                 type="checkbox"
                                 className="org-unit-checkbox"
+                                title="Удаление"
                                 checked={selectedUnits && selectedUnits.includes(unit.id)}
                                 onChange={(e) => {
                                     e.stopPropagation();

@@ -86,12 +86,15 @@ const EnterpriseMapPageSimple = () => {
     const [expandedUnits, setExpandedUnits] = useState(() => loadExpandedUnitsFromStorage());
     const [welders, setWelders] = useState([]);
     const [weldingMachines, setWeldingMachines] = useState([]);
+    /** Аппарат/сварщик для перемещения (галочка в панели). Подразделение — по выбранной строке дерева (selectedUnit). */
+    const [moveSelection, setMoveSelection] = useState(null);
     const [unitStats, setUnitStats] = useState({});
     const navigate = useNavigate();
     const hasRestoredSelectionRef = useRef(false);
 
     // Загружаем подразделения и название предприятия при монтировании
     useEffect(() => {
+        setMoveSelection(null);
         if (organizationId) {
             api.get(`/organizations/${organizationId}`)
                 .then((org) => {
@@ -477,8 +480,37 @@ const EnterpriseMapPageSimple = () => {
         });
     }, [welders, organizationUnits]);
 
+    const machinesForMoveModal = useMemo(() => {
+        if (!Array.isArray(organizationUnits) || organizationUnits.length === 0) return [];
+        const unitIds = new Set(organizationUnits.map((u) => String(u.id)));
+        const unitNames = new Set(organizationUnits.map((u) => u.name).filter(Boolean));
+        return (weldingMachines || []).filter((m) => {
+            const ouId = m.organizationUnit?.id ?? m.organizationUnitId;
+            if (ouId != null && unitIds.has(String(ouId))) return true;
+            const name = m.organizationUnit?.name || m.department;
+            return name && unitNames.has(name);
+        });
+    }, [weldingMachines, organizationUnits]);
+
+    /** Цель для модалки «Переместить»: сначала аппарат/сварщик из панели, иначе подразделение по клику в дереве */
+    const moveTargetForModal = useMemo(() => {
+        if (moveSelection?.id != null) return moveSelection;
+        if (selectedUnit?.id != null) return { kind: 'unit', id: selectedUnit.id };
+        return null;
+    }, [moveSelection, selectedUnit]);
+
     const openAddEquipmentModal = () => {
         setIsAddEquipmentModalOpen(true);
+    };
+
+    const openMoveModal = () => {
+        if (!moveTargetForModal) {
+            alert(
+                'Выберите подразделение в дереве (клик по строке) или отметьте аппарат или сварщика в панели справа.'
+            );
+            return;
+        }
+        setIsMoveModalOpen(true);
     };
 
     const handleSaveEquipmentFromModal = async (data) => {
@@ -719,7 +751,7 @@ const EnterpriseMapPageSimple = () => {
                         <button
                             type="button"
                             className="tile-btn move-btn"
-                            onClick={() => setIsMoveModalOpen(true)}
+                            onClick={openMoveModal}
                         >
                             <FaArrowRight className="btn-icon" />
                             Переместить
@@ -772,7 +804,12 @@ const EnterpriseMapPageSimple = () => {
                             )}
                         </div>
                         {selectedUnit && (
-                            <UnitDetailsPanel selectedUnit={selectedUnit} level={selectedUnitLevel} />
+                            <UnitDetailsPanel
+                                selectedUnit={selectedUnit}
+                                level={selectedUnitLevel}
+                                moveSelection={moveSelection}
+                                onMoveSelectionChange={setMoveSelection}
+                            />
                         )}
                         {/* Секция "Неорганизованные" отображается после панелей */}
                         <div className="org-units-list-container">
@@ -804,9 +841,15 @@ const EnterpriseMapPageSimple = () => {
             <MoveOrganizationUnitModal
                 isOpen={isMoveModalOpen}
                 onClose={() => setIsMoveModalOpen(false)}
+                moveSelection={moveTargetForModal}
                 existingUnits={organizationUnits}
+                machines={machinesForMoveModal}
+                welders={weldersForEquipmentModal}
                 onSuccess={async () => {
+                    setMoveSelection(null);
                     await loadOrganizationUnits();
+                    await loadWelders();
+                    await loadWeldingMachines();
                 }}
             />
             <AddEquipmentModal

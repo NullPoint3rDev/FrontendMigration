@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { FaChevronRight, FaChevronDown, FaCheck } from 'react-icons/fa';
 import { updateOrganizationUnit } from '../api/organizationUnitApi';
+import { getWeldingMachineById, updateWeldingMachine } from '../api/weldingMachineApi';
+import { getWelderById, updateWelder } from '../api/welderApi';
 import '../styles/createOrganizationUnitModal.css';
 import '../styles/moveOrganizationUnitModal.css';
 
@@ -51,97 +53,81 @@ function collectUnitAndDescendantIds(unit) {
     return ids;
 }
 
-const MoveOrganizationUnitModal = ({ isOpen, onClose, existingUnits = [], onSuccess }) => {
-    const [moveUnitId, setMoveUnitId] = useState(null);
+function findUnitInHierarchy(nodes, unitId) {
+    const nid = normalizeId(unitId);
+    for (const node of nodes || []) {
+        if (normalizeId(node.id) === nid) return node;
+        const found = findUnitInHierarchy(node.children, unitId);
+        if (found) return found;
+    }
+    return null;
+}
+
+const TITLES = {
+    unit: 'Переместить подразделение',
+    machine: 'Переместить аппарат',
+    welder: 'Переместить сварщика',
+};
+
+/**
+ * moveSelection: { kind: 'unit'|'machine'|'welder', id: number } — объект уже выбран на карте (галочка)
+ * Один дропдаун: целевое подразделение внутри предприятия
+ */
+const MoveOrganizationUnitModal = ({
+                                       isOpen,
+                                       onClose,
+                                       moveSelection = null,
+                                       existingUnits = [],
+                                       machines = [],
+                                       welders = [],
+                                       onSuccess,
+                                   }) => {
     const [targetParentId, setTargetParentId] = useState('');
-    const [fromDropdownOpen, setFromDropdownOpen] = useState(false);
     const [toDropdownOpen, setToDropdownOpen] = useState(false);
-    const [expandedFrom, setExpandedFrom] = useState({});
     const [expandedTo, setExpandedTo] = useState({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
     const hierarchy = useMemo(() => buildHierarchy(existingUnits), [existingUnits]);
 
-    /** Дерево только перемещаемых: корни = дети корневых подразделений (родительские в модалке не показываем) */
-    const movableTree = useMemo(() => {
-        const roots = [];
-        (hierarchy || []).forEach((root) => {
-            (root.children || []).forEach((child) => roots.push(child));
-        });
-        return roots;
-    }, [hierarchy]);
-
-    const moveUnit = useMemo(() => {
-        if (moveUnitId == null) return null;
-        const find = (nodes) => {
-            for (const node of nodes || []) {
-                if (normalizeId(node.id) === normalizeId(moveUnitId)) return node;
-                const inChild = find(node.children);
-                if (inChild) return inChild;
-            }
-            return null;
-        };
-        return find(hierarchy);
-    }, [moveUnitId, hierarchy, movableTree]);
+    const moveUnitNode = useMemo(() => {
+        if (!moveSelection || moveSelection.kind !== 'unit') return null;
+        return findUnitInHierarchy(hierarchy, moveSelection.id);
+    }, [moveSelection, hierarchy]);
 
     const forbiddenTargetIds = useMemo(() => {
-        if (!moveUnit) return new Set();
-        return collectUnitAndDescendantIds(moveUnit);
-    }, [moveUnit]);
+        if (!moveUnitNode) return new Set();
+        return collectUnitAndDescendantIds(moveUnitNode);
+    }, [moveUnitNode]);
 
+    const currentMachineUnitId = useMemo(() => {
+        if (!moveSelection || moveSelection.kind !== 'machine') return null;
+        const m = machines.find((x) => normalizeId(x.id) === normalizeId(moveSelection.id));
+        if (!m) return null;
+        return normalizeId(m.organizationUnit?.id ?? m.organizationUnitId ?? null);
+    }, [moveSelection, machines]);
+
+    const currentWelderUnitId = useMemo(() => {
+        if (!moveSelection || moveSelection.kind !== 'welder') return null;
+        const w = welders.find((x) => normalizeId(x.id) === normalizeId(moveSelection.id));
+        if (!w) return null;
+        return normalizeId(w.organizationUnit?.id ?? w.organizationUnitId ?? null);
+    }, [moveSelection, welders]);
+
+    // Сброс только при открытии/закрытии окна (не при смене moveSelection), иначе форма и loading ломаются во время запроса
     useEffect(() => {
-        if (isOpen) {
-            setMoveUnitId(null);
-            setTargetParentId('');
-            setFromDropdownOpen(false);
-            setToDropdownOpen(false);
-            setError('');
+        if (!isOpen) {
+            setLoading(false);
+            return;
         }
+        setTargetParentId('');
+        setToDropdownOpen(false);
+        setExpandedTo({});
+        setError('');
     }, [isOpen]);
 
-    const toggleFromExpand = (unitId) => {
-        setExpandedFrom((prev) => ({ ...prev, [unitId]: !prev[unitId] }));
-    };
     const toggleToExpand = (unitId) => {
         setExpandedTo((prev) => ({ ...prev, [unitId]: !prev[unitId] }));
-    };
-
-    const renderFromOption = (unit, level = 0) => {
-        const hasChildren = unit.children && unit.children.length > 0;
-        const isExpanded = expandedFrom[unit.id];
-        const indent = level * 32;
-        const isSelected = normalizeId(moveUnitId) === normalizeId(unit.id);
-        return (
-            <React.Fragment key={unit.id}>
-                <div
-                    className={`move-modal-unit-option ${isSelected ? 'selected' : ''}`}
-                    style={{ marginLeft: `${indent}px`, paddingLeft: '12px' }}
-                    onClick={() => {
-                        setMoveUnitId(unit.id);
-                        setFromDropdownOpen(false);
-                        setTargetParentId('');
-                    }}
-                >
-                    {hasChildren ? (
-                        <button
-                            type="button"
-                            className="move-modal-expand-btn"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                toggleFromExpand(unit.id);
-                            }}
-                        >
-                            {isExpanded ? <FaChevronDown className="expand-icon" /> : <FaChevronRight className="expand-icon" />}
-                        </button>
-                    ) : (
-                        <span className="move-modal-spacer" />
-                    )}
-                    <span className="move-modal-option-name">{unit.name}</span>
-                </div>
-                {hasChildren && isExpanded && unit.children.map((child) => renderFromOption(child, level + 1))}
-            </React.Fragment>
-        );
     };
 
     const renderToOption = (unit, level = 0) => {
@@ -149,7 +135,14 @@ const MoveOrganizationUnitModal = ({ isOpen, onClose, existingUnits = [], onSucc
         const isExpanded = expandedTo[unit.id];
         const indent = level * 32;
         const id = normalizeId(unit.id);
-        const isForbidden = forbiddenTargetIds.has(id);
+        let isForbidden = false;
+        if (moveSelection?.kind === 'unit') {
+            isForbidden = forbiddenTargetIds.has(id);
+        } else if (moveSelection?.kind === 'machine' && currentMachineUnitId != null) {
+            isForbidden = id === currentMachineUnitId;
+        } else if (moveSelection?.kind === 'welder' && currentWelderUnitId != null) {
+            isForbidden = id === currentWelderUnitId;
+        }
         const isSelected = targetParentId !== '' && normalizeId(targetParentId) === id;
         return (
             <React.Fragment key={unit.id}>
@@ -186,32 +179,73 @@ const MoveOrganizationUnitModal = ({ isOpen, onClose, existingUnits = [], onSucc
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
-        if (moveUnitId == null || moveUnitId === '') {
-            setError('Выберите подразделение для перемещения');
+        if (!moveSelection || !moveSelection.kind || moveSelection.id == null) {
+            setError('Не выбран объект для перемещения');
             return;
         }
         const targetId = targetParentId === '' || targetParentId == null ? null : normalizeId(targetParentId);
         if (targetId == null) {
-            setError('Выберите подразделение «В»');
+            setError('Выберите подразделение');
             return;
         }
-        if (forbiddenTargetIds.has(targetId)) {
-            setError('Нельзя переместить подразделение в себя или в своего потомка');
+
+        const targetUnit = existingUnits.find((u) => normalizeId(u.id) === targetId);
+        if (!targetUnit) {
+            setError('Целевое подразделение не найдено');
             return;
         }
+
+        if (moveSelection.kind === 'unit') {
+            if (forbiddenTargetIds.has(targetId)) {
+                setError('Нельзя переместить подразделение в себя или в своего потомка');
+                return;
+            }
+        }
+
         setLoading(true);
         try {
-            const unit = existingUnits.find((u) => normalizeId(u.id) === normalizeId(moveUnitId));
-            const payload = {
-                name: unit?.name ?? '',
-                parentDepartment: targetId ? { id: targetId } : null
-            };
-            await updateOrganizationUnit(moveUnitId, payload);
-            if (onSuccess) onSuccess();
+            if (moveSelection.kind === 'unit') {
+                const unit = existingUnits.find((u) => normalizeId(u.id) === normalizeId(moveSelection.id));
+                const payload = {
+                    name: unit?.name ?? '',
+                    parentDepartment: targetId ? { id: targetId } : null,
+                };
+                await updateOrganizationUnit(moveSelection.id, payload);
+            } else if (moveSelection.kind === 'machine') {
+                const machine = await getWeldingMachineById(moveSelection.id);
+                if (!machine || machine.id == null) {
+                    setError('Аппарат не найден');
+                    setLoading(false);
+                    return;
+                }
+                await updateWeldingMachine(machine.id, {
+                    ...machine,
+                    organizationUnit: { id: targetUnit.id, name: targetUnit.name || '' },
+                });
+            } else if (moveSelection.kind === 'welder') {
+                const welder = await getWelderById(moveSelection.id);
+                if (!welder || !welder.id) {
+                    setError('Сварщик не найден');
+                    setLoading(false);
+                    return;
+                }
+                await updateWelder(welder.id, {
+                    ...welder,
+                    department: targetUnit.name || '',
+                    organizationUnit: { id: targetUnit.id, name: targetUnit.name || '' },
+                });
+            }
+            if (onSuccess) {
+                await Promise.resolve(onSuccess());
+            }
             onClose();
         } catch (err) {
-            console.error('Ошибка перемещения подразделения:', err);
-            const msg = err.response?.data?.message ?? err.response?.data?.error ?? err.message ?? 'Не удалось переместить подразделение';
+            console.error('Ошибка перемещения:', err);
+            const msg =
+                err.response?.data?.message ??
+                err.response?.data?.error ??
+                err.message ??
+                'Не удалось выполнить перемещение';
             setError(msg);
         } finally {
             setLoading(false);
@@ -219,20 +253,19 @@ const MoveOrganizationUnitModal = ({ isOpen, onClose, existingUnits = [], onSucc
     };
 
     const handleClose = () => {
-        setMoveUnitId(null);
         setTargetParentId('');
         setError('');
         onClose();
     };
 
-    const fromLabel = moveUnitId != null
-        ? (existingUnits.find((u) => normalizeId(u.id) === normalizeId(moveUnitId))?.name ?? 'Выберите подразделение')
-        : 'Выберите подразделение';
-    const toLabel = targetParentId !== '' && targetParentId != null
-        ? (existingUnits.find((u) => normalizeId(u.id) === normalizeId(targetParentId))?.name ?? 'В:')
-        : 'Выберите подразделение';
+    const toLabel =
+        targetParentId !== '' && targetParentId != null
+            ? existingUnits.find((u) => normalizeId(u.id) === normalizeId(targetParentId))?.name ?? 'Выберите подразделение'
+            : 'Выберите подразделение';
 
-    if (!isOpen) return null;
+    if (!isOpen || !moveSelection || !moveSelection.kind) return null;
+
+    const title = TITLES[moveSelection.kind] || 'Переместить';
 
     return (
         <div className="create-org-unit-modal-overlay">
@@ -240,47 +273,15 @@ const MoveOrganizationUnitModal = ({ isOpen, onClose, existingUnits = [], onSucc
                 <button type="button" className="create-org-unit-modal-close" onClick={handleClose}>
                     ×
                 </button>
-                <h2 className="create-org-unit-modal-title">Переместить подразделение</h2>
+                <h2 className="create-org-unit-modal-title">{title}</h2>
 
                 <form onSubmit={handleSubmit} className="create-org-unit-form">
                     <div className="create-org-unit-form-field">
-                        <label>Переместить подразделение:</label>
-                        <div className="move-modal-unit-select-container">
-                            <div
-                                className={`move-modal-unit-select-dropdown ${fromDropdownOpen ? 'open' : ''}`}
-                                onClick={() => {
-                                    setFromDropdownOpen(!fromDropdownOpen);
-                                    setToDropdownOpen(false);
-                                }}
-                            >
-                                <span className="move-modal-unit-select-label">{fromLabel}</span>
-                                <span className={`move-modal-unit-select-arrow ${fromDropdownOpen ? 'open' : ''}`}>
-                                    <FaChevronDown />
-                                </span>
-                            </div>
-                            {fromDropdownOpen && (
-                                <div className="move-modal-unit-select-options">
-                                    {movableTree.length > 0 ? (
-                                        movableTree.map((unit) => renderFromOption(unit))
-                                    ) : (
-                                        <div className="move-modal-unit-option" style={{ padding: '8px 12px', color: '#7B8BA6' }}>
-                                            Нет подразделений для перемещения (родительские перемещать нельзя)
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="create-org-unit-form-field">
-                        <label>В:</label>
+                        <label>Выберите подразделение</label>
                         <div className="move-modal-unit-select-container">
                             <div
                                 className={`move-modal-unit-select-dropdown ${toDropdownOpen ? 'open' : ''}`}
-                                onClick={() => {
-                                    setToDropdownOpen(!toDropdownOpen);
-                                    setFromDropdownOpen(false);
-                                }}
+                                onClick={() => setToDropdownOpen(!toDropdownOpen)}
                             >
                                 <span className="move-modal-unit-select-label">{toLabel}</span>
                                 <span className={`move-modal-unit-select-arrow ${toDropdownOpen ? 'open' : ''}`}>

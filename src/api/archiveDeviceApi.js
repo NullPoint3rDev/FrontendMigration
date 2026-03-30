@@ -105,19 +105,11 @@ export async function getArchiveOutboundQueueSize() {
 
 // Получить текущее состояние устройства (для polling)
 export async function getArchivePanelState(mac) {
-    console.log('🌐 [archiveDeviceApi] Запрос panel-state для MAC:', mac);
-    console.log('🌐 [archiveDeviceApi] URL:', `${API_URL}/panel-state?mac=${encodeURIComponent(mac)}`);
-
     try {
         const res = await fetch(`${API_URL}/panel-state?mac=${encodeURIComponent(mac)}`, {
             headers: getAuthHeaders()
         });
 
-        console.log('🌐 [archiveDeviceApi] Response status:', res.status, res.statusText);
-        console.log('🌐 [archiveDeviceApi] Response ok:', res.ok);
-        console.log('🌐 [archiveDeviceApi] Response headers:', Object.fromEntries(res.headers.entries()));
-
-        // Проверяем статус ответа
         if (!res.ok) {
             console.error('❌ [archiveDeviceApi] HTTP Error:', res.status, res.statusText);
             const errorText = await res.text();
@@ -125,23 +117,14 @@ export async function getArchivePanelState(mac) {
             return null;
         }
 
-        // Проверяем, есть ли контент для парсинга
         const text = await res.text();
-        console.log('🌐 [archiveDeviceApi] Response text length:', text.length);
-        console.log('🌐 [archiveDeviceApi] Response text preview:', text.substring(0, 200));
-        console.log('🌐 [archiveDeviceApi] Response text is empty?', !text || text.trim() === '');
-        console.log('🌐 [archiveDeviceApi] Response text is "null"?', text.trim() === 'null');
 
         if (!text || text.trim() === '' || text.trim() === 'null') {
-            console.log('⚠️ [archiveDeviceApi] Пустой ответ или null, возвращаем null');
             return null;
         }
 
         try {
-            const parsed = JSON.parse(text);
-            console.log('✅ [archiveDeviceApi] JSON успешно распарсен');
-            console.log('✅ [archiveDeviceApi] Parsed object keys:', Object.keys(parsed || {}));
-            return parsed;
+            return JSON.parse(text);
         } catch (error) {
             console.error('❌ [archiveDeviceApi] Ошибка парсинга JSON:', error);
             console.error('❌ [archiveDeviceApi] Текст для парсинга:', text.substring(0, 500));

@@ -7,6 +7,7 @@ import UserProfile from '../components/UserProfile';
 import AddRfidPassModal from '../components/AddRfidPassModal';
 import AddMachineModal from '../components/AddMachineModal';
 import { createWelder, getWelderById, updateWelder, uploadWelderPhoto, getWelderPhoto, getWelderPhotoUrl } from '../api/welderApi';
+import { getWeldingMachineById } from '../api/weldingMachineApi';
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { getCertificationsByWelderId } from '../api/certificationApi';
 import machineImage from '../images/Untitled 3 копия.png';

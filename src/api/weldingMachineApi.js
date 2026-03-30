@@ -132,7 +132,13 @@ export async function updateWeldingMachine(id, machine) {
         throw error;
     }
 
-    return res.json();
+    const text = await res.text();
+    if (!text || !text.trim()) return null;
+    try {
+        return JSON.parse(text);
+    } catch (_) {
+        return null;
+    }
 }
 
 // Удалить машину

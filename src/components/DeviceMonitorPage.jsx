@@ -85,10 +85,7 @@ async function fetchWelderByRfidVariants(rfidRaw) {
             const w = await getWelderByRfidCode(v);
             if (w && (w.id != null || w.name)) return w;
         } catch (e) {
-            const st = e?.status;
-            if (st !== 404 && st !== 400) {
-                console.warn('RFID welder lookup:', e);
-            }
+            // 404/400 — ожидаемо; прочие ошибки не логируем в консоль при polling
         }
     }
     return null;
@@ -649,8 +646,6 @@ const DeviceMonitorPage = () => {
 
     // Простая функция как в archive проекте - просто обновляем состояние
     const updateConnectionStatus = (connected, hasStateData) => {
-        console.log('🔄 updateConnectionStatus:', { connected, hasStateData });
-
         // Если устройство подключено - сразу обновляем состояние
         if (connected && hasStateData) {
             // Очищаем таймаут отключения если он есть
@@ -686,8 +681,6 @@ const DeviceMonitorPage = () => {
 
     // Функция для опроса состояния устройства (как в archive проекте)
     const startPolling = () => {
-        console.log('🔄 Запуск polling для MAC:', machineMac);
-
         // Останавливаем предыдущий polling если он есть
         if (pollingInterval) {
             clearInterval(pollingInterval);
@@ -711,7 +704,6 @@ const DeviceMonitorPage = () => {
 
     // Функция для остановки polling
     const stopPolling = () => {
-        console.log('🛑 Остановка polling');
         setIsPolling(false);
         if (pollingInterval) {
             clearInterval(pollingInterval);
@@ -724,11 +716,7 @@ const DeviceMonitorPage = () => {
         try {
             const response = await archiveDeviceApi.getArchivePanelState(machineMac);
 
-            console.log('🔍 API Response:', response);
-
             if (response && response !== null) {
-                console.log('✅ Устройство подключено, обновляем данные');
-
                 // Обрабатываем данные
                 processStructuredData({
                     mac: machineMac,
@@ -752,7 +740,6 @@ const DeviceMonitorPage = () => {
                 ]);
             } else {
                 // Нет данных - просто обновляем состояние
-                console.log('❌ Нет данных от устройства');
                 updateConnectionStatus(false, false);
                 setError('Устройство не найдено');
             }
@@ -854,8 +841,6 @@ const DeviceMonitorPage = () => {
 
     const processStructuredData = (data) => {
         try {
-            // console.log('🔍 processStructuredData вызвана с данными:', data); // Убрали лишний лог
-
             if (data.state && data.state.properties) {
                 const mac = data.mac || machineMac; // берём из payload, fallback на выбранный MAC
                 const params = {};
@@ -864,7 +849,6 @@ const DeviceMonitorPage = () => {
                 // status может быть: "Offline", "Welding", "On", "Error" и т.д.
                 if (data.state.status !== undefined && data.state.status !== null) {
                     params.status = data.state.status;
-                    console.log('🔍 Сохраняем status в params:', data.state.status);
                 }
 
                 // Сохраняем errorCode из корня state, если он есть
@@ -873,11 +857,6 @@ const DeviceMonitorPage = () => {
                 }
 
                 // Извлекаем ВСЕ параметры из структурированных данных
-                console.log('🔍 Все ключи properties:', Object.keys(data.state.properties || {}));
-                // Проверяем наличие RFID.Hex в исходных данных
-                if (data.state.properties && data.state.properties['RFID.Hex']) {
-                    console.log('🔍 Найден RFID.Hex в properties:', data.state.properties['RFID.Hex']);
-                }
                 Object.entries(data.state.properties).forEach(([key, prop]) => {
                     if (prop && prop.value) {
                         // Обрабатываем все параметры Core
@@ -912,7 +891,6 @@ const DeviceMonitorPage = () => {
                         } else if (key.startsWith('VoltagePhase')) {
                             // Напряжения фаз
                             params[key] = prop.value;
-                            console.log(`🔍 Найдено напряжение фазы: ${key} = ${prop.value}`);
                         } else if (key.startsWith('Temperature') || key.includes('Temperature')) {
                             // Температуры
                             params[key] = prop.value;
@@ -927,7 +905,6 @@ const DeviceMonitorPage = () => {
                             params[key] = prop.value;
                             // Также сохраняем как RFID для единообразия
                             params.RFID = prop.value;
-                            console.log(`🔍 Сохранен RFID код: key="${key}", value="${prop.value}"`);
                         } else if (key === 'State.I' || key === 'State.U') {
                             // Старые параметры (для совместимости)
                             const decimalValue = parseInt(prop.value, 16);
@@ -939,40 +916,20 @@ const DeviceMonitorPage = () => {
                         } else {
                             // Все остальные параметры
                             params[key] = prop.value;
-                            // Логируем напряжения фаз для отладки
-                            if (key && (key.includes('Напряжение фазы') || key.includes('фазы'))) {
-                                console.log(`🔍 Сохранено напряжение фазы: key="${key}", value="${prop.value}"`);
-                            }
                         }
                     }
                 });
 
-                // console.log('🔍 Обновляем данные устройства:', params); // Убрали лишний лог
-
                 // Убеждаемся, что status сохраняется (приоритет params.status, если он был установлен выше)
                 const finalStatus = params.status || data.state.status || null;
-
-                console.log('🔍 processStructuredData - finalStatus:', finalStatus);
-                console.log('🔍 processStructuredData - data.state.status:', data.state.status);
-                console.log('🔍 processStructuredData - params.status:', params.status);
 
                 // Сохраняем RFID код из предыдущих данных, если он не пришел в новом ответе
                 const existingData = deviceData[mac];
                 if (existingData && existingData.RFID && !params.RFID) {
                     params.RFID = existingData.RFID;
-                    console.log('🔍 Сохраняем RFID из предыдущих данных:', existingData.RFID);
                 }
                 if (existingData && existingData['RFID.Hex'] && !params['RFID.Hex']) {
                     params['RFID.Hex'] = existingData['RFID.Hex'];
-                    console.log('🔍 Сохраняем RFID.Hex из предыдущих данных:', existingData['RFID.Hex']);
-                }
-
-                // Логируем сохранение RFID перед обновлением
-                if (params.RFID) {
-                    console.log('🔍 Сохраняем RFID в deviceData:', params.RFID);
-                }
-                if (params['RFID.Hex']) {
-                    console.log('🔍 Сохраняем RFID.Hex в deviceData:', params['RFID.Hex']);
                 }
 
                 updateDeviceData({
@@ -985,12 +942,6 @@ const DeviceMonitorPage = () => {
                         dateCreated: data.state.dateCreated || null
                     }
                 });
-
-                if (finalStatus) {
-                    console.log('✅ Status сохранен в deviceData:', finalStatus);
-                } else {
-                    console.log('⚠️ Status не был сохранен (null или undefined)');
-                }
 
             }
         } catch (err) {
@@ -1206,11 +1157,8 @@ const DeviceMonitorPage = () => {
 
         setIsSavingName(true);
         try {
-            console.log('💾 Начинаем сохранение названия аппарата:', { machineId, trimmedName });
-
             // Получаем текущие данные аппарата по ID
             const machine = await getWeldingMachineById(machineId);
-            console.log('📦 Получены данные аппарата:', machine);
 
             if (!machine || !machine.id) {
                 throw new Error('Аппарат не найден');
@@ -1221,11 +1169,9 @@ const DeviceMonitorPage = () => {
                 ...machine,
                 name: trimmedName
             };
-            console.log('📤 Отправляем данные на обновление:', updateData);
 
             // Обновляем только название
-            const result = await updateWeldingMachine(machineId, updateData);
-            console.log('✅ Название успешно обновлено:', result);
+            await updateWeldingMachine(machineId, updateData);
 
             // Обновляем локальное состояние сразу
             setDisplayName(trimmedName);
@@ -1778,16 +1724,6 @@ const DeviceMonitorPage = () => {
             data.Voltage_Phase_B
         ) : null;
 
-        // Логируем для отладки, если значение не найдено
-        if (data && !voltagePhaseB && voltagePhaseA) {
-            console.log('⚠️ Напряжение фазы B не найдено. Доступные ключи в data:', Object.keys(data).filter(k =>
-                k.toLowerCase().includes('voltage') ||
-                k.toLowerCase().includes('фазы') ||
-                k.toLowerCase().includes('phase')
-            ));
-            console.log('🔍 Все ключи data:', Object.keys(data));
-        }
-
         params.push({
             label: 'Напряжение фазы В',
             value: isDeviceOff ? '—' : (voltagePhaseB !== undefined && voltagePhaseB !== null ? `${voltagePhaseB} В` : '—')
@@ -2007,20 +1943,6 @@ const DeviceMonitorPage = () => {
         const data = deviceData[machineMac];
         if (!data) return false;
 
-        // Отладка: выводим все ключи и значения, связанные с состоянием
-        const stateKeys = Object.keys(data).filter(key =>
-            key.toLowerCase().includes('state') ||
-            key.toLowerCase().includes('status') ||
-            key.toLowerCase().includes('состояние') ||
-            key.toLowerCase().includes('welding')
-        );
-        if (stateKeys.length > 0) {
-            console.log('🔍 Ключи состояния:', stateKeys);
-            stateKeys.forEach(key => {
-                console.log(`  ${key}:`, data[key]);
-            });
-        }
-
         // 1. ПРИОРИТЕТ: Проверяем состояние аппарата из properties (это основное поле для определения сварки!)
         // status из корня может быть "Offline" даже когда идет сварка, поэтому проверяем WeldingMachineState первым
         const weldingMachineState = data['Состояние аппарата'] ||
@@ -2031,13 +1953,11 @@ const DeviceMonitorPage = () => {
             data.properties?.['Состояние аппарата'];
         if (weldingMachineState) {
             const stateLower = String(weldingMachineState).toLowerCase().trim();
-            console.log('🔍 Проверка WeldingMachineState (приоритет):', weldingMachineState, '->', stateLower);
             // Проверяем, содержит ли состояние информацию о сварке
             // ВАЖНО: только явное указание "Сварка" или "Welding", не "Аппарат включен"
             if (stateLower === 'сварка' || stateLower === 'welding' ||
                 stateLower.includes('сварка') || stateLower.includes('welding') ||
                 stateLower.includes('сварочн') || stateLower.includes('weld')) {
-                console.log('✅ Сварка обнаружена по WeldingMachineState:', weldingMachineState);
                 return true;
             }
             // Если явно указано, что сварки нет (включен, ожидание, выключен и т.д.)
@@ -2046,11 +1966,8 @@ const DeviceMonitorPage = () => {
                 stateLower.includes('включен') || stateLower.includes('on') ||
                 stateLower === 'выкл' || stateLower === 'off' ||
                 stateLower === 'аппарат включен') {
-                console.log('❌ WeldingMachineState указывает на отсутствие сварки:', weldingMachineState);
                 return false;
             }
-        } else {
-            console.log('⚠️ WeldingMachineState не найден в данных');
         }
 
         // 2. Проверяем status из корня объекта (вторичная проверка)
@@ -2058,22 +1975,13 @@ const DeviceMonitorPage = () => {
         const status = data.status || data.Status;
         if (status) {
             const statusLower = String(status).toLowerCase().trim();
-            console.log('🔍 Проверка status (вторичная):', status, '->', statusLower);
             // Проверяем различные варианты статуса "Сварка"
             if (statusLower === 'welding' || statusLower === 'сварка' ||
                 statusLower === 'weld' ||
                 statusLower.includes('сварка') ||
                 statusLower.includes('welding')) {
-                console.log('✅ Сварка обнаружена по status:', status);
                 return true;
             }
-            // Если статус явно не "сварка", но это не критично, так как приоритет у WeldingMachineState
-            if (statusLower === 'offline' || statusLower === 'off' ||
-                statusLower === 'выключен' || statusLower === 'выкл') {
-                console.log('⚠️ status = "Offline", но проверяем WeldingMachineState выше');
-            }
-        } else {
-            console.log('⚠️ status не найден в данных');
         }
 
         // 3. Проверяем ток сварки ТОЛЬКО если WeldingMachineState не определен или неоднозначен
@@ -2081,11 +1989,9 @@ const DeviceMonitorPage = () => {
         const current = parseFloat(data.Current || data['State.I'] || 0);
         if (current > 1 && !weldingMachineState) {
             // Только если WeldingMachineState не определен, используем ток как индикатор
-            console.log('✅ Сварка обнаружена по току (WeldingMachineState не определен):', current);
             return true;
         }
 
-        console.log('❌ Сварка не обнаружена');
         return false;
     };
 

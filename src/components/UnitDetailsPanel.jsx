@@ -7,12 +7,12 @@ import ResourcesLogo from '../images/ResourcesLogo.png';
 import WelderIcon from '../images/WelderIcon.png';
 import '../styles/unitDetailsPanel.css';
 
-const UnitDetailsPanel = ({ selectedUnit, level = 0 }) => {
+const normalizeId = (id) => (id == null ? null : typeof id === 'string' ? parseInt(id, 10) : id);
+
+const UnitDetailsPanel = ({ selectedUnit, level = 0, moveSelection, onMoveSelectionChange }) => {
     const navigate = useNavigate();
     const [machines, setMachines] = useState([]);
     const [welders, setWelders] = useState([]);
-    const [selectedMachines, setSelectedMachines] = useState([]);
-    const [selectedWelders, setSelectedWelders] = useState([]);
     const [expandedMachines, setExpandedMachines] = useState({});
     const [loading, setLoading] = useState(false);
 
@@ -99,7 +99,13 @@ const UnitDetailsPanel = ({ selectedUnit, level = 0 }) => {
                             <img src={ResourcesLogo} alt="Аппараты" className="section-icon-img" />
                             <span>Аппараты: {machines.length}</span>
                         </div>
-                        <span className="section-selected">Выбрано: {selectedMachines.length}</span>
+                        <span className="section-selected">
+                            Для перемещения:{' '}
+                            {moveSelection?.kind === 'machine' &&
+                            machines.some((m) => normalizeId(m.id) === normalizeId(moveSelection.id))
+                                ? 1
+                                : 0}
+                        </span>
                     </div>
                     <div className="section-list">
                         {loading ? (
@@ -119,13 +125,22 @@ const UnitDetailsPanel = ({ selectedUnit, level = 0 }) => {
                                             <input
                                                 type="checkbox"
                                                 className="item-checkbox"
-                                                checked={selectedMachines.includes(machine.id)}
+                                                title="Переместить"
+                                                disabled={!onMoveSelectionChange}
+                                                checked={
+                                                    moveSelection?.kind === 'machine' &&
+                                                    normalizeId(moveSelection.id) === normalizeId(machine.id)
+                                                }
                                                 onChange={(e) => {
                                                     e.stopPropagation();
+                                                    if (!onMoveSelectionChange) return;
                                                     if (e.target.checked) {
-                                                        setSelectedMachines([...selectedMachines, machine.id]);
-                                                    } else {
-                                                        setSelectedMachines(selectedMachines.filter(id => id !== machine.id));
+                                                        onMoveSelectionChange({ kind: 'machine', id: machine.id });
+                                                    } else if (
+                                                        moveSelection?.kind === 'machine' &&
+                                                        normalizeId(moveSelection.id) === normalizeId(machine.id)
+                                                    ) {
+                                                        onMoveSelectionChange(null);
                                                     }
                                                 }}
                                                 onClick={(e) => e.stopPropagation()}
@@ -199,7 +214,13 @@ const UnitDetailsPanel = ({ selectedUnit, level = 0 }) => {
                             <img src={WelderIcon} alt="Сварщики" className="section-icon-img" />
                             <span>Сварщики: {welders.length}</span>
                         </div>
-                        <span className="section-selected">Выбрано: {selectedWelders.length}</span>
+                        <span className="section-selected">
+                            Для перемещения:{' '}
+                            {moveSelection?.kind === 'welder' &&
+                            welders.some((w) => normalizeId(w.id) === normalizeId(moveSelection.id))
+                                ? 1
+                                : 0}
+                        </span>
                     </div>
                     <div className="section-list welders-list-grid">
                         {loading ? (
@@ -210,18 +231,32 @@ const UnitDetailsPanel = ({ selectedUnit, level = 0 }) => {
                             sortedWelders.map(welder => (
                                 <div
                                     key={welder.id}
-                                    className={`section-item welder-item ${selectedWelders.includes(welder.id) ? 'selected' : ''}`}
+                                    className={`section-item welder-item ${
+                                        moveSelection?.kind === 'welder' &&
+                                        normalizeId(moveSelection.id) === normalizeId(welder.id)
+                                            ? 'selected'
+                                            : ''
+                                    }`}
                                 >
                                     <input
                                         type="checkbox"
                                         className="item-checkbox"
-                                        checked={selectedWelders.includes(welder.id)}
+                                        title="Переместить"
+                                        disabled={!onMoveSelectionChange}
+                                        checked={
+                                            moveSelection?.kind === 'welder' &&
+                                            normalizeId(moveSelection.id) === normalizeId(welder.id)
+                                        }
                                         onChange={(e) => {
                                             e.stopPropagation();
+                                            if (!onMoveSelectionChange) return;
                                             if (e.target.checked) {
-                                                setSelectedWelders([...selectedWelders, welder.id]);
-                                            } else {
-                                                setSelectedWelders(selectedWelders.filter(id => id !== welder.id));
+                                                onMoveSelectionChange({ kind: 'welder', id: welder.id });
+                                            } else if (
+                                                moveSelection?.kind === 'welder' &&
+                                                normalizeId(moveSelection.id) === normalizeId(welder.id)
+                                            ) {
+                                                onMoveSelectionChange(null);
                                             }
                                         }}
                                         onClick={(e) => e.stopPropagation()}
