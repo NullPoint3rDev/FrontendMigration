@@ -195,11 +195,6 @@ function WeldersPage() {
         }
     };
 
-    useEffect(() => {
-        loadWelders();
-        loadOrganizationUnits();
-    }, []);
-
     const visibleOrganizationUnits = useMemo(() => {
         if (!isEnterpriseScopedRole || currentUserOrgId == null) return organizationUnits;
         return organizationUnits.filter(

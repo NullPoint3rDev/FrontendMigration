@@ -191,12 +191,6 @@ function WeldingEquipmentPage() {
         }
     }, []);
 
-    // Load equipment from API only
-    useEffect(() => {
-        // Убираем загрузку из localStorage, используем только API
-        loadEquipment();
-    }, []);
-
     // Navigation logic
     const handleNavClick = (item, e) => {
         if (item.dropdown) {
