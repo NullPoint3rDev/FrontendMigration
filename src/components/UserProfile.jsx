@@ -5,13 +5,18 @@ import { AccountCircle, Logout } from '@mui/icons-material';
 import { api } from '../services/api';
 import '../styles/userProfile.css';
 
-const UserProfile = () => {
+const UserProfile = ({ userData: externalUserData = null }) => {
     const [anchorEl, setAnchorEl] = useState(null);
     const [userData, setUserData] = useState(null);
     const navigate = useNavigate();
     const menuRef = useRef(null);
 
     useEffect(() => {
+        if (externalUserData) {
+            setUserData(externalUserData);
+            return;
+        }
+
         const fetchUser = async () => {
             try {
                 const data = await api.getCurrentUser();
@@ -23,7 +28,7 @@ const UserProfile = () => {
             }
         };
         fetchUser();
-    }, [navigate]);
+    }, [navigate, externalUserData]);
 
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget);

@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useMemo, useRef } from 'react';
 import { FaChevronRight, FaChevronDown, FaBell } from 'react-icons/fa';
 import '../styles/weldingEquipmentPageNew.css';
 import { useNavigate } from 'react-router-dom';
-import AddEquipmentModal from './AddEquipmentModal';
-import UserProfile from './UserProfile';
 import machineImage from '../images/Untitled 3 копия.png';
 import ResourcesLogo from '../images/ResourcesLogo.png';
 // WebSocket отключен — используем только polling API
@@ -21,6 +19,8 @@ import { api } from '../services/api';
 import { getRoles } from '../api/userAccountApi';
 
 // Данные теперь загружаются с API сервера
+const AddEquipmentModal = lazy(() => import('./AddEquipmentModal'));
+const UserProfile = lazy(() => import('./UserProfile'));
 
 const defaultCoreOptions = {
     gasControl: false,
@@ -138,6 +138,7 @@ function WeldingEquipmentPage() {
     const [shownErrors, setShownErrors] = useState(new Set());
     const [currentUserOrgId, setCurrentUserOrgId] = useState(null);
     const [isEnterpriseScopedRole, setIsEnterpriseScopedRole] = useState(false);
+    const [currentUserData, setCurrentUserData] = useState(null);
     const lastGoodStateByMacRef = useRef({});
     const lastGoodSeenAtRef = useRef({});
     const STATUS_STALE_MS = 10000;
@@ -398,6 +399,7 @@ function WeldingEquipmentPage() {
     const loadCurrentUserScope = async () => {
         try {
             const [currentUser, rolesData] = await Promise.all([api.getCurrentUser(), getRoles()]);
+            setCurrentUserData(currentUser || null);
             const roleId = currentUser?.userRoleId ?? currentUser?.userRole?.id;
             const role = (Array.isArray(rolesData) ? rolesData : []).find(
                 (r) => r.id === roleId || r.id === parseInt(roleId, 10)
@@ -407,6 +409,7 @@ function WeldingEquipmentPage() {
             setIsEnterpriseScopedRole(isEnterpriseRole);
             setCurrentUserOrgId(currentUser?.organizationId ?? currentUser?.organization?.id ?? null);
         } catch (_) {
+            setCurrentUserData(null);
             setIsEnterpriseScopedRole(false);
             setCurrentUserOrgId(null);
         }
@@ -1194,7 +1197,9 @@ function WeldingEquipmentPage() {
                         <FaBell className="notifications-icon" />
                         <span className="notifications-badge"></span>
                     </button>
-                    <UserProfile />
+                    <Suspense fallback={<div className="control-btn" style={{ width: 32, height: 32 }} />}>
+                        <UserProfile userData={currentUserData} />
+                    </Suspense>
                 </div>
             </div>
             <div className="welding-equipment-page-content">
@@ -1655,79 +1660,83 @@ function WeldingEquipmentPage() {
                 </div>
             </div>
 
-            <AddEquipmentModal
-                isOpen={modalOpen}
-                onClose={closeModal}
-                welders={welders.filter((w) => {
-                    if (!isEnterpriseScopedRole || currentUserOrgId == null) return true;
-                    const unitId = w.organizationUnit?.id ?? w.organizationUnitId ?? null;
-                    return unitId != null && visibleUnitIdSet.has(String(unitId));
-                })}
-                organizationUnits={visibleOrganizationUnits}
-                onSave={async (data) => {
-                    try {
-                        console.log('🟢 WeldingEquipmentPage: onSave вызван с данными:', data);
-                        // Преобразуем данные из AddEquipmentModal в формат для handleSave
-                        // Преобразуем модель: "Core Pulse" или "Core" -> "CORE", "Блок мониторинга" -> "MONITORING_BLOCK"
-                        let deviceModel = '';
-                        const modelLower = (data.model || '').toLowerCase().trim();
-                        if (modelLower === 'core' || modelLower === 'core pulse' || modelLower.includes('core')) {
-                            deviceModel = 'CORE';
-                        } else if (modelLower === 'блок мониторинга' || modelLower === 'monitoring_block' || modelLower.includes('мониторинг')) {
-                            deviceModel = 'MONITORING_BLOCK';
-                        } else {
-                            // Если модель уже в правильном формате (CORE или MONITORING_BLOCK), используем как есть
-                            const upperModel = (data.model || '').toUpperCase().trim();
-                            if (upperModel === 'CORE' || upperModel === 'MONITORING_BLOCK') {
-                                deviceModel = upperModel;
-                            } else {
-                                deviceModel = data.model || '';
+            {modalOpen && (
+                <Suspense fallback={null}>
+                    <AddEquipmentModal
+                        isOpen={modalOpen}
+                        onClose={closeModal}
+                        welders={welders.filter((w) => {
+                            if (!isEnterpriseScopedRole || currentUserOrgId == null) return true;
+                            const unitId = w.organizationUnit?.id ?? w.organizationUnitId ?? null;
+                            return unitId != null && visibleUnitIdSet.has(String(unitId));
+                        })}
+                        organizationUnits={visibleOrganizationUnits}
+                        onSave={async (data) => {
+                            try {
+                                console.log('🟢 WeldingEquipmentPage: onSave вызван с данными:', data);
+                                // Преобразуем данные из AddEquipmentModal в формат для handleSave
+                                // Преобразуем модель: "Core Pulse" или "Core" -> "CORE", "Блок мониторинга" -> "MONITORING_BLOCK"
+                                let deviceModel = '';
+                                const modelLower = (data.model || '').toLowerCase().trim();
+                                if (modelLower === 'core' || modelLower === 'core pulse' || modelLower.includes('core')) {
+                                    deviceModel = 'CORE';
+                                } else if (modelLower === 'блок мониторинга' || modelLower === 'monitoring_block' || modelLower.includes('мониторинг')) {
+                                    deviceModel = 'MONITORING_BLOCK';
+                                } else {
+                                    // Если модель уже в правильном формате (CORE или MONITORING_BLOCK), используем как есть
+                                    const upperModel = (data.model || '').toUpperCase().trim();
+                                    if (upperModel === 'CORE' || upperModel === 'MONITORING_BLOCK') {
+                                        deviceModel = upperModel;
+                                    } else {
+                                        deviceModel = data.model || '';
+                                    }
+                                }
+
+                                console.log('🟢 WeldingEquipmentPage: Исходная модель:', data.model);
+                                console.log('🟢 WeldingEquipmentPage: Преобразованная модель:', deviceModel);
+
+                                const newEditData = {
+                                    ...editData,
+                                    name: data.name || '',
+                                    deviceModel: deviceModel,
+                                    mac: data.macAddress || '',
+                                    commissionDate: data.commissioningDate || '',
+                                    serialNumber: data.serialNumber || '',
+                                    inventoryNumber: data.inventoryNumber || '',
+                                    organizationUnit: visibleOrganizationUnits.find(unit => unit.name === data.department) || null,
+                                    coreOptions: {
+                                        gasControl: data.options?.gasControl || false,
+                                        rfid: data.options?.rfid || false,
+                                        bvo: data.options?.bvo || false
+                                    },
+                                    assignedWelders: data.approvedWelders || []
+                                };
+                                console.log('🟢 WeldingEquipmentPage: newEditData:', newEditData);
+                                setEditData(newEditData);
+
+                                // Вызываем handleSave с переданными данными напрямую
+                                console.log('🟢 WeldingEquipmentPage: Вызываем handleSave с данными...');
+                                const fakeEvent = { preventDefault: () => {} };
+                                await handleSave(fakeEvent, newEditData);
+                                console.log('✅ WeldingEquipmentPage: handleSave завершен');
+                            } catch (error) {
+                                console.error('❌ WeldingEquipmentPage: Ошибка в onSave:', error);
+                                console.error('❌ WeldingEquipmentPage: error.errors:', error.errors);
+                                // Сохраняем исходную ошибку, если у неё уже есть errors
+                                if (error.errors) {
+                                    // Если ошибка уже содержит объект errors, просто пробрасываем её дальше
+                                    throw error;
+                                } else {
+                                    // Если это общая ошибка API без errors, создаем объект ошибки
+                                    const errorObj = new Error(error.message || 'Произошла ошибка при сохранении');
+                                    errorObj.errors = { api: error.message || 'Произошла ошибка при сохранении' };
+                                    throw errorObj;
+                                }
                             }
-                        }
-
-                        console.log('🟢 WeldingEquipmentPage: Исходная модель:', data.model);
-                        console.log('🟢 WeldingEquipmentPage: Преобразованная модель:', deviceModel);
-
-                        const newEditData = {
-                            ...editData,
-                            name: data.name || '',
-                            deviceModel: deviceModel,
-                            mac: data.macAddress || '',
-                            commissionDate: data.commissioningDate || '',
-                            serialNumber: data.serialNumber || '',
-                            inventoryNumber: data.inventoryNumber || '',
-                            organizationUnit: visibleOrganizationUnits.find(unit => unit.name === data.department) || null,
-                            coreOptions: {
-                                gasControl: data.options?.gasControl || false,
-                                rfid: data.options?.rfid || false,
-                                bvo: data.options?.bvo || false
-                            },
-                            assignedWelders: data.approvedWelders || []
-                        };
-                        console.log('🟢 WeldingEquipmentPage: newEditData:', newEditData);
-                        setEditData(newEditData);
-
-                        // Вызываем handleSave с переданными данными напрямую
-                        console.log('🟢 WeldingEquipmentPage: Вызываем handleSave с данными...');
-                        const fakeEvent = { preventDefault: () => {} };
-                        await handleSave(fakeEvent, newEditData);
-                        console.log('✅ WeldingEquipmentPage: handleSave завершен');
-                    } catch (error) {
-                        console.error('❌ WeldingEquipmentPage: Ошибка в onSave:', error);
-                        console.error('❌ WeldingEquipmentPage: error.errors:', error.errors);
-                        // Сохраняем исходную ошибку, если у неё уже есть errors
-                        if (error.errors) {
-                            // Если ошибка уже содержит объект errors, просто пробрасываем её дальше
-                            throw error;
-                        } else {
-                            // Если это общая ошибка API без errors, создаем объект ошибки
-                            const errorObj = new Error(error.message || 'Произошла ошибка при сохранении');
-                            errorObj.errors = { api: error.message || 'Произошла ошибка при сохранении' };
-                            throw errorObj;
-                        }
-                    }
-                }}
-            />
+                        }}
+                    />
+                </Suspense>
+            )}
         </div>
     );
 }
