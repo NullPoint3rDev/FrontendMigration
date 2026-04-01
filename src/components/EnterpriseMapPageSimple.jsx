@@ -10,6 +10,7 @@ import WelderIcon from '../images/WelderIcon.png';
 import OrganizationUnitsList from './OrganizationUnitsList';
 import UnitDetailsPanel from './UnitDetailsPanel';
 import AddEquipmentModal from './AddEquipmentModal';
+import { getRoles } from '../api/userAccountApi';
 import { getAllOrganizationUnits, getOrganizationUnitsByOrganization, deleteOrganizationUnit } from '../api/organizationUnitApi';
 import { getAllWelders } from '../api/welderApi';
 import { getAllWeldingMachines, createWeldingMachine } from '../api/weldingMachineApi';
@@ -88,6 +89,9 @@ const EnterpriseMapPageSimple = () => {
     const [weldingMachines, setWeldingMachines] = useState([]);
     /** Аппарат/сварщик для перемещения (галочка в панели). Подразделение — по выбранной строке дерева (selectedUnit). */
     const [moveSelection, setMoveSelection] = useState(null);
+    const [isAlloyAdmin, setIsAlloyAdmin] = useState(false);
+    const [allUnitsForAdminMove, setAllUnitsForAdminMove] = useState([]);
+    const [activeOrganizationsForAdminMove, setActiveOrganizationsForAdminMove] = useState([]);
     const [unitStats, setUnitStats] = useState({});
     const navigate = useNavigate();
     const hasRestoredSelectionRef = useRef(false);
@@ -105,6 +109,39 @@ const EnterpriseMapPageSimple = () => {
         loadOrganizationUnits();
         loadWelders();
         loadWeldingMachines();
+    }, [organizationId]);
+
+    useEffect(() => {
+        const detectAdminAlloyScope = async () => {
+            try {
+                const [currentUser, rolesData] = await Promise.all([api.getCurrentUser(), getRoles()]);
+                const roleId = currentUser?.userRoleId ?? currentUser?.userRole?.id;
+                const role = (Array.isArray(rolesData) ? rolesData : []).find(
+                    (r) => String(r.id) === String(roleId)
+                );
+                const roleName = String(role?.name || '').toUpperCase();
+                const adminAlloy =
+                    roleName.includes('ADMIN') &&
+                    (roleName.includes('ALLOY') || roleName.includes('ЭЛЛОЙ'));
+                setIsAlloyAdmin(adminAlloy);
+                if (adminAlloy) {
+                    const [units, organizations] = await Promise.all([
+                        getAllOrganizationUnits(),
+                        api.get('/organizations'),
+                    ]);
+                    setAllUnitsForAdminMove(Array.isArray(units) ? units : []);
+                    setActiveOrganizationsForAdminMove(Array.isArray(organizations) ? organizations : []);
+                } else {
+                    setAllUnitsForAdminMove([]);
+                    setActiveOrganizationsForAdminMove([]);
+                }
+            } catch (_) {
+                setIsAlloyAdmin(false);
+                setAllUnitsForAdminMove([]);
+                setActiveOrganizationsForAdminMove([]);
+            }
+        };
+        detectAdminAlloyScope();
     }, [organizationId]);
 
     // Вычисляем статистику при изменении данных; при пустом списке сбрасываем
@@ -492,6 +529,37 @@ const EnterpriseMapPageSimple = () => {
         });
     }, [weldingMachines, organizationUnits]);
 
+    const unitsForMoveModal = useMemo(() => {
+        if (!isAlloyAdmin) return organizationUnits;
+        const activeOrgIds = new Set(
+            (activeOrganizationsForAdminMove || [])
+                .map((o) => o?.id)
+                .filter((id) => id != null)
+                .map(String)
+        );
+        if (activeOrgIds.size === 0) return [];
+        return (allUnitsForAdminMove || []).filter((u) => {
+            const orgId = u?.organization?.id ?? u?.organizationId ?? u?.organization_id ?? null;
+            return orgId != null && activeOrgIds.has(String(orgId));
+        });
+    }, [isAlloyAdmin, allUnitsForAdminMove, activeOrganizationsForAdminMove, organizationUnits]);
+
+    const handleUnitCheckboxSelectionChange = (nextSelectedUnits) => {
+        // Нельзя одновременно выбирать типы: выбор подразделения снимает выбор аппарата/сварщика
+        if (Array.isArray(nextSelectedUnits) && nextSelectedUnits.length > 0) {
+            setMoveSelection(null);
+        }
+        setSelectedUnits(nextSelectedUnits);
+    };
+
+    const handleMoveSelectionChange = (nextMoveSelection) => {
+        // Нельзя одновременно выбирать типы: выбор аппарата/сварщика снимает чекбоксы подразделений
+        if (nextMoveSelection && nextMoveSelection.id != null) {
+            setSelectedUnits([]);
+        }
+        setMoveSelection(nextMoveSelection);
+    };
+
     /** Цель для модалки «Переместить»: сначала аппарат/сварщик из панели, иначе подразделение по клику в дереве */
     const moveTargetForModal = useMemo(() => {
         if (moveSelection?.id != null) return moveSelection;
@@ -787,7 +855,7 @@ const EnterpriseMapPageSimple = () => {
                                 <OrganizationUnitsList
                                     units={filteredOrganizationUnits}
                                     selectedUnits={selectedUnits}
-                                    onSelectionChange={setSelectedUnits}
+                                    onSelectionChange={handleUnitCheckboxSelectionChange}
                                     selectedUnitId={selectedUnit?.id}
                                     expandedUnits={expandedUnits}
                                     onUnitClick={(unit, level) => {
@@ -808,7 +876,7 @@ const EnterpriseMapPageSimple = () => {
                                 selectedUnit={selectedUnit}
                                 level={selectedUnitLevel}
                                 moveSelection={moveSelection}
-                                onMoveSelectionChange={setMoveSelection}
+                                onMoveSelectionChange={handleMoveSelectionChange}
                             />
                         )}
                         {/* Секция "Неорганизованные" отображается после панелей */}
@@ -842,14 +910,14 @@ const EnterpriseMapPageSimple = () => {
                 isOpen={isMoveModalOpen}
                 onClose={() => setIsMoveModalOpen(false)}
                 moveSelection={moveTargetForModal}
-                existingUnits={organizationUnits}
+                existingUnits={unitsForMoveModal}
                 machines={machinesForMoveModal}
                 welders={weldersForEquipmentModal}
                 onSuccess={async () => {
                     setMoveSelection(null);
-                    await loadOrganizationUnits();
-                    await loadWelders();
-                    await loadWeldingMachines();
+                    setSelectedUnits([]);
+                    // Обновляем данные параллельно, чтобы быстрее увидеть результат перемещения
+                    await Promise.all([loadOrganizationUnits(), loadWelders(), loadWeldingMachines()]);
                 }}
             />
             <AddEquipmentModal

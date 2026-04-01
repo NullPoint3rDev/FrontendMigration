@@ -166,6 +166,7 @@ const OrganizationUnitsList = ({
                                 className="org-unit-checkbox"
                                 title="Удаление"
                                 checked={selectedUnits && selectedUnits.includes(unit.id)}
+                                onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => {
                                     e.stopPropagation();
                                     if (onSelectionChange) {

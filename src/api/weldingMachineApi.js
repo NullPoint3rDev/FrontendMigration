@@ -3,6 +3,26 @@ import { getAuthHeaders } from '../services/api';
 
 const API_URL = `${API_BASE_URL}/welding-machines`;
 
+/** Ограничивает время ожидания ответа (сервер может «висеть» на PUT без ответа — UI тогда залипает). */
+async function fetchWithTimeout(url, options = {}, timeoutMs = 60000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        return await fetch(url, { ...options, signal: controller.signal });
+    } catch (e) {
+        if (e && e.name === 'AbortError') {
+            const err = new Error(
+                `Превышено время ожидания ответа сервера (${Math.round(timeoutMs / 1000)} с). Проверьте бэкенд или сеть.`
+            );
+            err.name = 'AbortError';
+            throw err;
+        }
+        throw e;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 // Получить все машины
 export async function getAllWeldingMachines() {
     const res = await fetch(API_URL, {
@@ -13,9 +33,11 @@ export async function getAllWeldingMachines() {
 
 // Получить машину по ID
 export async function getWeldingMachineById(id) {
-    const res = await fetch(`${API_URL}/${id}`, {
-        headers: getAuthHeaders()
-    });
+    const res = await fetchWithTimeout(
+        `${API_URL}/${id}`,
+        { headers: getAuthHeaders() },
+        60000
+    );
     return res.json();
 }
 
@@ -102,11 +124,15 @@ export async function updateWeldingMachine(id, machine) {
         'Content-Type': 'application/json'
     };
 
-    const res = await fetch(`${API_URL}/${id}`, {
-        method: 'PUT',
-        headers: headers,
-        body: JSON.stringify(machine),
-    });
+    const res = await fetchWithTimeout(
+        `${API_URL}/${id}`,
+        {
+            method: 'PUT',
+            headers: headers,
+            body: JSON.stringify(machine),
+        },
+        60000
+    );
 
     if (!res.ok) {
         let errorData;
@@ -132,7 +158,15 @@ export async function updateWeldingMachine(id, machine) {
         throw error;
     }
 
-    const text = await res.text();
+    const text = await Promise.race([
+        res.text(),
+        new Promise((_, reject) =>
+            setTimeout(
+                () => reject(new Error('Сервер не отдал тело ответа вовремя (таймаут чтения).')),
+                30000
+            )
+        ),
+    ]);
     if (!text || !text.trim()) return null;
     try {
         return JSON.parse(text);

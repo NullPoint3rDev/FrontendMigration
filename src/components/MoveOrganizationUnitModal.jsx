@@ -8,6 +8,22 @@ import '../styles/moveOrganizationUnitModal.css';
 
 const normalizeId = (id) => (id == null ? null : typeof id === 'string' ? parseInt(id, 10) : id);
 
+function isDeletedLike(value) {
+    if (value == null) return false;
+    const s = String(value).trim().toLowerCase();
+    return s === 'deleted' || s === 'true' || s === '1';
+}
+
+function isActiveUnit(unit) {
+    if (!unit) return false;
+    if (isDeletedLike(unit.status) || isDeletedLike(unit.deleted) || isDeletedLike(unit.isDeleted)) return false;
+    const org = unit.organization;
+    if (org && (isDeletedLike(org.status) || isDeletedLike(org.deleted) || isDeletedLike(org.isDeleted))) return false;
+    const parent = unit.parentDepartment;
+    if (parent && (isDeletedLike(parent.status) || isDeletedLike(parent.deleted) || isDeletedLike(parent.isDeleted))) return false;
+    return true;
+}
+
 function buildHierarchy(units) {
     if (!units || units.length === 0) return [];
     const unitMap = new Map();
@@ -39,6 +55,29 @@ function buildHierarchy(units) {
         }
     });
     return rootUnits;
+}
+
+function buildOrganizationTrees(units) {
+    if (!Array.isArray(units) || units.length === 0) return [];
+    const byOrg = new Map();
+    units.forEach((unit) => {
+        const orgId = normalizeId(unit.organization?.id ?? unit.organizationId ?? unit.organization_id ?? null);
+        const orgName = unit.organization?.name || unit.organizationName || 'Предприятие без названия';
+        const key = orgId != null ? `org:${orgId}` : `name:${orgName}`;
+        if (!byOrg.has(key)) {
+            byOrg.set(key, { key, orgId, orgName, units: [] });
+        }
+        byOrg.get(key).units.push(unit);
+    });
+    const trees = [];
+    byOrg.forEach((group) => {
+        trees.push({
+            ...group,
+            tree: buildHierarchy(group.units),
+        });
+    });
+    trees.sort((a, b) => String(a.orgName || '').localeCompare(String(b.orgName || '')));
+    return trees;
 }
 
 /** Все id поддерева (сам узел + все потомки) */
@@ -88,7 +127,13 @@ const MoveOrganizationUnitModal = ({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const hierarchy = useMemo(() => buildHierarchy(existingUnits), [existingUnits]);
+    const activeUnits = useMemo(
+        () => (Array.isArray(existingUnits) ? existingUnits.filter(isActiveUnit) : []),
+        [existingUnits]
+    );
+
+    const hierarchy = useMemo(() => buildHierarchy(activeUnits), [activeUnits]);
+    const organizationTrees = useMemo(() => buildOrganizationTrees(activeUnits), [activeUnits]);
 
     const moveUnitNode = useMemo(() => {
         if (!moveSelection || moveSelection.kind !== 'unit') return null;
@@ -176,6 +221,41 @@ const MoveOrganizationUnitModal = ({
         );
     };
 
+    const renderEnterpriseGroup = (group) => {
+        const enterpriseNodeId = `enterprise:${group.key}`;
+        const expanded = !!expandedTo[enterpriseNodeId];
+        const hasChildren = Array.isArray(group.tree) && group.tree.length > 0;
+        return (
+            <React.Fragment key={group.key}>
+                <div
+                    className="move-modal-unit-option"
+                    style={{ marginLeft: '0px', paddingLeft: '12px', fontWeight: 600 }}
+                    onClick={() => {
+                        if (!hasChildren) return;
+                        setExpandedTo((prev) => ({ ...prev, [enterpriseNodeId]: !prev[enterpriseNodeId] }));
+                    }}
+                >
+                    {hasChildren ? (
+                        <button
+                            type="button"
+                            className="move-modal-expand-btn"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedTo((prev) => ({ ...prev, [enterpriseNodeId]: !prev[enterpriseNodeId] }));
+                            }}
+                        >
+                            {expanded ? <FaChevronDown className="expand-icon" /> : <FaChevronRight className="expand-icon" />}
+                        </button>
+                    ) : (
+                        <span className="move-modal-spacer" />
+                    )}
+                    <span className="move-modal-option-name">{group.orgName}</span>
+                </div>
+                {hasChildren && expanded && group.tree.map((unit) => renderToOption(unit, 1))}
+            </React.Fragment>
+        );
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -189,7 +269,7 @@ const MoveOrganizationUnitModal = ({
             return;
         }
 
-        const targetUnit = existingUnits.find((u) => normalizeId(u.id) === targetId);
+        const targetUnit = activeUnits.find((u) => normalizeId(u.id) === targetId);
         if (!targetUnit) {
             setError('Целевое подразделение не найдено');
             return;
@@ -205,17 +285,18 @@ const MoveOrganizationUnitModal = ({
         setLoading(true);
         try {
             if (moveSelection.kind === 'unit') {
-                const unit = existingUnits.find((u) => normalizeId(u.id) === normalizeId(moveSelection.id));
+                const unit = activeUnits.find((u) => normalizeId(u.id) === normalizeId(moveSelection.id));
                 const payload = {
                     name: unit?.name ?? '',
                     parentDepartment: targetId ? { id: targetId } : null,
                 };
                 await updateOrganizationUnit(moveSelection.id, payload);
             } else if (moveSelection.kind === 'machine') {
+                // Как в DeviceMonitorPage: получаем актуальный DTO по ID и затем делаем PUT.
+                // В weldingMachineApi.js для GET тоже добавлен timeout, чтобы не зависать бесконечно.
                 const machine = await getWeldingMachineById(moveSelection.id);
                 if (!machine || machine.id == null) {
                     setError('Аппарат не найден');
-                    setLoading(false);
                     return;
                 }
                 await updateWeldingMachine(machine.id, {
@@ -235,9 +316,14 @@ const MoveOrganizationUnitModal = ({
                     organizationUnit: { id: targetUnit.id, name: targetUnit.name || '' },
                 });
             }
+            // Закрываем модалку сразу, а перезагрузку данных делаем "в фоне".
+            // Иначе при долгих/падающих запросах в onSuccess кнопка останется disabled.
             if (onSuccess) {
-                await Promise.resolve(onSuccess());
+                Promise.resolve(onSuccess()).catch((err) => {
+                    console.error('Ошибка после перемещения (onSuccess):', err);
+                });
             }
+            setLoading(false);
             onClose();
         } catch (err) {
             console.error('Ошибка перемещения:', err);
@@ -260,7 +346,7 @@ const MoveOrganizationUnitModal = ({
 
     const toLabel =
         targetParentId !== '' && targetParentId != null
-            ? existingUnits.find((u) => normalizeId(u.id) === normalizeId(targetParentId))?.name ?? 'Выберите подразделение'
+            ? activeUnits.find((u) => normalizeId(u.id) === normalizeId(targetParentId))?.name ?? 'Выберите подразделение'
             : 'Выберите подразделение';
 
     if (!isOpen || !moveSelection || !moveSelection.kind) return null;
@@ -290,8 +376,8 @@ const MoveOrganizationUnitModal = ({
                             </div>
                             {toDropdownOpen && (
                                 <div className="move-modal-unit-select-options">
-                                    {hierarchy.length > 0 ? (
-                                        hierarchy.map((unit) => renderToOption(unit))
+                                    {organizationTrees.length > 0 ? (
+                                        organizationTrees.map((group) => renderEnterpriseGroup(group))
                                     ) : (
                                         <div className="move-modal-unit-option" style={{ padding: '8px 12px', color: '#7B8BA6' }}>
                                             Нет подразделений
