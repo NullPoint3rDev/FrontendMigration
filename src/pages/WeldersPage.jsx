@@ -15,6 +15,11 @@ import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { getCertificationsByWelderId } from '../api/certificationApi';
 import { api } from '../services/api';
 import { getRoles } from '../api/userAccountApi';
+import {
+    groupUnitsByOrganization,
+    findUnitInForest,
+    flattenUnitNamesFromForest,
+} from '../utils/organizationUnitFilterGroups';
 
 const WELDERS_PAGE_STATE_KEY = 'weldersPageState';
 
@@ -65,6 +70,8 @@ function WeldersPage() {
     });
     const [expandedHazardousGroups, setExpandedHazardousGroups] = useState({});
     const [expandedOrganizationUnits, setExpandedOrganizationUnits] = useState({});
+    const [expandedOrgInFilter, setExpandedOrgInFilter] = useState({});
+    const [organizationsList, setOrganizationsList] = useState([]);
     const [selectedWelders, setSelectedWelders] = useState([]);
     const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
     const [currentUserOrgId, setCurrentUserOrgId] = useState(null);
@@ -76,8 +83,19 @@ function WeldersPage() {
     useEffect(() => {
         loadWelders();
         loadOrganizationUnits();
+        loadOrganizations();
         loadCurrentUserScope();
     }, []);
+
+    const loadOrganizations = async () => {
+        try {
+            const data = await api.getOrganizations();
+            setOrganizationsList(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Ошибка загрузки организаций:', err);
+            setOrganizationsList([]);
+        }
+    };
 
     const loadCurrentUserScope = async () => {
         try {
@@ -215,6 +233,11 @@ function WeldersPage() {
                     .filter(Boolean)
             ),
         [visibleOrganizationUnits]
+    );
+
+    const organizationsForFilter = useMemo(
+        () => groupUnitsByOrganization(visibleOrganizationUnits, organizationsList),
+        [visibleOrganizationUnits, organizationsList]
     );
 
     const visibleWelders = useMemo(() => {
@@ -476,61 +499,6 @@ function WeldersPage() {
     };
 
 
-    // Построение иерархии подразделений (аналогично WeldingEquipmentPage)
-    const buildOrganizationHierarchy = () => {
-        if (!visibleOrganizationUnits || visibleOrganizationUnits.length === 0) return [];
-
-        const unitMap = new Map();
-        const rootUnits = [];
-
-        const normalizeId = (id) => {
-            if (id == null) return null;
-            return typeof id === 'string' ? parseInt(id) : id;
-        };
-
-        // Создаем карту всех подразделений с пустыми массивами children
-        visibleOrganizationUnits.forEach(unit => {
-            const normalizedId = normalizeId(unit.id);
-            unitMap.set(normalizedId, {
-                ...unit,
-                id: normalizedId,
-                name: unit.name,
-                children: []
-            });
-        });
-
-        // Строим дерево
-        visibleOrganizationUnits.forEach(unit => {
-            const normalizedId = normalizeId(unit.id);
-            const unitNode = unitMap.get(normalizedId);
-
-            let parentIdValue = null;
-            if (unit.parentId != null) {
-                parentIdValue = unit.parentId;
-            } else if (unit.parent_id != null) {
-                parentIdValue = unit.parent_id;
-            } else if (unit.parentDepartment != null && unit.parentDepartment.id != null) {
-                parentIdValue = unit.parentDepartment.id;
-            }
-
-            if (parentIdValue != null) {
-                const normalizedParentId = normalizeId(parentIdValue);
-                if (unitMap.has(normalizedParentId)) {
-                    const parent = unitMap.get(normalizedParentId);
-                    parent.children.push(unitNode);
-                } else {
-                    rootUnits.push(unitNode);
-                }
-            } else {
-                rootUnits.push(unitNode);
-            }
-        });
-
-        return rootUnits;
-    };
-
-    const organizationHierarchy = buildOrganizationHierarchy();
-
     const toggleOrganizationUnitExpanded = (unitId) => {
         setExpandedOrganizationUnits(prev => ({
             ...prev,
@@ -551,9 +519,8 @@ function WeldersPage() {
 
     // Функция для переключения подразделения
     const toggleOrganizationUnit = (unitId) => {
-        const hierarchy = buildOrganizationHierarchy();
-        const unit = hierarchy.find(u => u.id === unitId) ||
-            hierarchy.flatMap(u => getAllChildUnits(u)).find(u => u.id === unitId);
+        const allRoots = organizationsForFilter.flatMap((o) => o.hierarchy);
+        const unit = findUnitInForest(allRoots, unitId);
         if (!unit) return;
 
         const allChildUnits = getAllChildUnits(unit);
@@ -586,6 +553,40 @@ function WeldersPage() {
                 return newFilter;
             }
         });
+    };
+
+    const toggleOrganizationOrg = (orgKey) => {
+        const entry = organizationsForFilter.find((e) => e.orgKey === orgKey);
+        if (!entry) return;
+        const names = flattenUnitNamesFromForest(entry.hierarchy);
+        if (names.length === 0) return;
+        setOrganizationUnitFilter((prev) => {
+            const isNoneSelected = prev.length === 1 && prev[0] === '__NONE__';
+            const currentlyChecked = !isNoneSelected && names.every((name) => prev.includes(name));
+            const willBeChecked = !currentlyChecked;
+
+            if (willBeChecked) {
+                if (isNoneSelected) {
+                    return names;
+                }
+                const newFilter = [...prev];
+                names.forEach((name) => {
+                    if (!newFilter.includes(name)) {
+                        newFilter.push(name);
+                    }
+                });
+                return newFilter;
+            }
+            const newFilter = prev.filter((name) => !names.includes(name));
+            if (newFilter.length === 0) {
+                return ['__NONE__'];
+            }
+            return newFilter;
+        });
+    };
+
+    const toggleOrgExpandInFilter = (orgKey) => {
+        setExpandedOrgInFilter((prev) => ({ ...prev, [orgKey]: !prev[orgKey] }));
     };
 
     // Функция для преобразования ID фильтра в строку формата "ГРУППА: пп. N"
@@ -844,18 +845,9 @@ function WeldersPage() {
                             <span className="filter-arrow">{expandedFilters.department ? '▾' : '▸'}</span>
                         </button>
                         {expandedFilters.department && (() => {
-                            // Получаем все подразделения (родительские и дочерние) для проверки "Все"
-                            const getAllUnitNames = (units) => {
-                                const names = [];
-                                units.forEach(unit => {
-                                    names.push(unit.name);
-                                    if (unit.children && unit.children.length > 0) {
-                                        names.push(...getAllUnitNames(unit.children));
-                                    }
-                                });
-                                return names;
-                            };
-                            const allUnitNames = getAllUnitNames(organizationHierarchy);
+                            const allUnitNames = organizationsForFilter.flatMap((o) =>
+                                flattenUnitNamesFromForest(o.hierarchy)
+                            );
                             const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
                             const allSelected = (organizationUnitFilter.length === 0 ||
                                 organizationUnitFilter.length === allUnitNames.length) && !isNoneSelected;
@@ -925,8 +917,57 @@ function WeldersPage() {
                                         />
                                         <span>Все</span>
                                     </label>
-                                    {organizationHierarchy.length > 0 ? (
-                                        organizationHierarchy.map(unit => renderUnit(unit))
+                                    {organizationsForFilter.length > 0 ? (
+                                        organizationsForFilter.map(({ orgKey, orgName, hierarchy }) => {
+                                            const orgNames = flattenUnitNamesFromForest(hierarchy);
+                                            const isOrgExpanded = expandedOrgInFilter[orgKey] === true;
+                                            const isNoneSelectedOrg = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
+                                            const orgShowAllChecked = organizationUnitFilter.length === 0 && !isNoneSelectedOrg;
+                                            const isOrgRowChecked =
+                                                orgShowAllChecked ||
+                                                (!isNoneSelectedOrg &&
+                                                    orgNames.length > 0 &&
+                                                    orgNames.every((n) => organizationUnitFilter.includes(n)));
+
+                                            return (
+                                                <div key={orgKey} className="filter-org-block">
+                                                    <label className="filter-checkbox filter-org-header-row">
+                                                        <button
+                                                            type="button"
+                                                            className="org-unit-expand-btn"
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                toggleOrgExpandInFilter(orgKey);
+                                                            }}
+                                                        >
+                                                            {isOrgExpanded ? (
+                                                                <FaChevronDown className="expand-icon" />
+                                                            ) : (
+                                                                <FaChevronRight className="expand-icon" />
+                                                            )}
+                                                        </button>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isOrgRowChecked}
+                                                            onChange={() => toggleOrganizationOrg(orgKey)}
+                                                        />
+                                                        <span className="filter-org-title">{orgName}</span>
+                                                    </label>
+                                                    {isOrgExpanded &&
+                                                        hierarchy.length > 0 &&
+                                                        hierarchy.map((unit) => renderUnit(unit))}
+                                                    {isOrgExpanded && hierarchy.length === 0 && (
+                                                        <div
+                                                            className="filter-checkbox"
+                                                            style={{ color: '#7B8BA6', fontSize: '12px', padding: '4px 12px 8px 36px' }}
+                                                        >
+                                                            Нет подразделений
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
                                     ) : (
                                         <div className="filter-checkbox" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
                                             Нет доступных подразделений

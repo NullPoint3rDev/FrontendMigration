@@ -29,7 +29,12 @@ const Sidebar = () => {
     }
 
     const handleNavigate = (path) => {
-        if (location.pathname === '/reports' && reportsUnsaved?.isDirtyRef?.current?.()) {
+        const isWelderFormPage =
+            location.pathname === '/welders/add' || /^\/welders\/add\/\d+$/.test(location.pathname)
+        const shouldConfirmLeave =
+            (location.pathname === '/reports' || isWelderFormPage) &&
+            reportsUnsaved?.isDirtyRef?.current?.()
+        if (shouldConfirmLeave) {
             reportsUnsaved.requestLeave(path)
         } else {
             navigate(path)

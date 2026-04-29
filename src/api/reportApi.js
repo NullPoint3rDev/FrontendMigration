@@ -3,6 +3,47 @@ import { getAuthHeaders } from '../services/api';
 
 const BASE_URL = `${API_BASE_URL}/reports`;
 
+function parseFilenameFromContentDisposition(contentDisposition, fallback) {
+    if (!contentDisposition) return fallback;
+    const m = contentDisposition.match(/filename\*=UTF-8''([^;\s]+)/i);
+    if (m) {
+        try {
+            return decodeURIComponent(m[1].replace(/"/g, ''));
+        } catch (_) {
+            return m[1];
+        }
+    }
+    const m2 = contentDisposition.match(/filename="([^"]+)"/i);
+    if (m2) return m2[1].trim();
+    const m3 = contentDisposition.match(/filename=([^;\s]+)/i);
+    if (m3) return m3[1].replace(/^["']|["']$/g, '').trim();
+    return fallback;
+}
+
+function scheduleRevokeObjectURL(url) {
+    window.setTimeout(() => {
+        try {
+            window.URL.revokeObjectURL(url);
+        } catch (_) {}
+    }, 60_000);
+}
+
+/**
+ * Скачивание blob через программный клик. Нельзя вызывать revokeObjectURL сразу после click —
+ * в части браузеров загрузка стартует асинхронно; при переходе на другую страницу SPA файл может не сохраниться.
+ */
+export function downloadBlobAsFile(blob, filename) {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'report.xlsx';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    scheduleRevokeObjectURL(url);
+}
+
 export const reportApi = {
     // Получить типы отчетов
     getReportTypes: async () => {
@@ -276,29 +317,10 @@ export const reportApi = {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            // Получаем файл как blob
             const blob = await response.blob();
-
-            // Создаем ссылку для скачивания
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-
-            // Получаем имя файла из заголовков
             const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'report.xlsx';
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-                if (filenameMatch) {
-                    filename = filenameMatch[1];
-                }
-            }
-
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            const filename = parseFilenameFromContentDisposition(contentDisposition, 'report.xlsx');
+            downloadBlobAsFile(blob, filename);
 
             return { success: true };
         } catch (error) {
@@ -332,24 +354,12 @@ export const reportApi = {
             }
 
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-
             const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'wire_consumption_report.xlsx';
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-                if (filenameMatch) {
-                    filename = filenameMatch[1];
-                }
-            }
-
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            const filename = parseFilenameFromContentDisposition(
+                contentDisposition,
+                'wire_consumption_report.xlsx'
+            );
+            downloadBlobAsFile(blob, filename);
         } catch (error) {
             console.error('Ошибка генерации отчета по расходу проволоки:', error);
             throw error;
@@ -390,24 +400,12 @@ export const reportApi = {
             }
 
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-
             const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'welder_work_report.xlsx';
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-                if (filenameMatch) {
-                    filename = filenameMatch[1];
-                }
-            }
-
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            const filename = parseFilenameFromContentDisposition(
+                contentDisposition,
+                'welder_work_report.xlsx'
+            );
+            downloadBlobAsFile(blob, filename);
         } catch (error) {
             console.error('Ошибка генерации отчета по работе сварщика:', error);
             throw error;
@@ -441,24 +439,12 @@ export const reportApi = {
             }
 
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-
             const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'equipment_malfunction_report.xlsx';
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-                if (filenameMatch) {
-                    filename = filenameMatch[1];
-                }
-            }
-
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            const filename = parseFilenameFromContentDisposition(
+                contentDisposition,
+                'equipment_malfunction_report.xlsx'
+            );
+            downloadBlobAsFile(blob, filename);
         } catch (error) {
             console.error('Ошибка генерации отчёта по неисправностям оборудования:', error);
             throw error;
@@ -501,24 +487,12 @@ export const reportApi = {
             }
 
             const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-
             const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'equipment_work_report.xlsx';
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-                if (filenameMatch) {
-                    filename = filenameMatch[1];
-                }
-            }
-
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            const filename = parseFilenameFromContentDisposition(
+                contentDisposition,
+                'equipment_work_report.xlsx'
+            );
+            downloadBlobAsFile(blob, filename);
         } catch (error) {
             console.error('Ошибка генерации отчета по работе оборудования:', error);
             throw error;
@@ -530,14 +504,7 @@ export const reportApi = {
 export const reportHelpers = {
     // Скачать файл отчета
     downloadReport: (blob, filename) => {
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        downloadBlobAsFile(blob, filename);
     },
 
     // Создать стандартный запрос отчета

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Line } from 'react-chartjs-2';
 import {
@@ -20,6 +20,8 @@ import machineImage from '../images/Untitled 3 копия.png';
 import WelderIcon from '../images/WelderIcon.png';
 import AddEquipmentModal from './AddEquipmentModal';
 import { RiRfidFill } from 'react-icons/ri';
+import {FaBell} from "react-icons/fa";
+import UserProfile from '../components/UserProfile';
 
 // Названия ошибок по коду 1–23 (синхронно с EquipmentErrorMessages и протоколом аппарата: 1–10, 17–21)
 const EQUIPMENT_ERROR_MESSAGES = [
@@ -41,6 +43,60 @@ const EQUIPMENT_ERROR_MESSAGES = [
     'КЗ датчика температуры жидкости БВО',          // 21
     'Ошибка 22', 'Ошибка 23'
 ];
+
+const TELEMETRY_CHANNELS_CONFIG = [
+    { key: 'weldingCurrent', label: 'Сварочный ток', color: '#3ec7ff' },
+    { key: 'weldingVoltage', label: 'Сварочное напряжение', color: '#ff61c8' },
+    { key: 'gasFlow', label: 'Расход газа', color: '#2fe4a8' },
+    { key: 'wireConsumption', label: 'Расход проволоки', color: '#ffae64' },
+    { key: 'mainsVoltage', label: 'Напряжение сети', color: '#a07dff' },
+    { key: 'radiatorTemp', label: 'Темп. радиатора', color: '#66d1ff' },
+    { key: 'inverterTemp', label: 'Темп. инвертора', color: '#7cffb2' },
+    { key: 'chillerTempIn', label: 'Вход. темп. охл. жидкости', color: '#f1ca06' },
+    { key: 'chillerTempOut', label: 'Исход. темп. охл. жидкости', color: '#ffd95a' },
+    { key: 'powerConsumption', label: 'Потр. мощность', color: '#6d8bff' }
+];
+
+const DEFAULT_TELEMETRY_SERIES = TELEMETRY_CHANNELS_CONFIG.reduce((acc, channel) => {
+    acc[channel.key] = [];
+    return acc;
+}, { mainsVoltageA: [], mainsVoltageB: [], mainsVoltageC: [] });
+
+const parseNumberOrNull = (value) => {
+    if (value === undefined || value === null || value === '') return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+
+    // 1) HEX (аппарат иногда может присылать значения HEX-строкой)
+    const hex = raw.startsWith('0x') ? raw.slice(2) : raw;
+    if (/^[0-9A-Fa-f]+$/.test(hex) && /[A-Fa-f]/.test(hex)) {
+        const parsedHex = parseInt(hex, 16);
+        if (Number.isFinite(parsedHex)) return parsedHex;
+    }
+
+    // 1) Обычные числа (в т.ч. с запятой и единицами измерения)
+    const normalized = raw.replace(',', '.').replace(/[^\d.+-]/g, '');
+    const decimal = parseFloat(normalized);
+    if (Number.isFinite(decimal)) return decimal;
+
+    return null;
+};
+
+const getStateNumberByKeys = (state, keys) => {
+    if (!state) return null;
+    const props = state.properties || {};
+    for (const key of keys) {
+        const fromPropValue = parseNumberOrNull(props?.[key]?.value);
+        if (fromPropValue != null) return fromPropValue;
+
+        const fromPropDirect = parseNumberOrNull(props?.[key]);
+        if (fromPropDirect != null) return fromPropDirect;
+
+        const fromStateDirect = parseNumberOrNull(state?.[key]);
+        if (fromStateDirect != null) return fromStateDirect;
+    }
+    return null;
+};
 
 function getEquipmentErrorName(errorCode) {
     if (errorCode === undefined || errorCode === null || String(errorCode).trim() === '') return null;
@@ -89,6 +145,161 @@ async function fetchWelderByRfidVariants(rfidRaw) {
         }
     }
     return null;
+}
+
+/** Ток и напряжение из сырого panel-state (логика согласована с processStructuredData / getCurrentValue). */
+function extractCurrentVoltageFromPanelState(state) {
+    if (!state || !state.properties) {
+        return { current: 0, voltage: 0 };
+    }
+    let fromCurrent = null;
+    let fromStateI = null;
+    let fromVoltage = null;
+    let fromStateU = null;
+    Object.entries(state.properties).forEach(([key, prop]) => {
+        if (!prop || prop.value === undefined || prop.value === null) return;
+        if (key === 'Voltage') {
+            const decimalValue = parseInt(String(prop.value), 10);
+            if (!Number.isNaN(decimalValue)) fromVoltage = decimalValue / 10;
+        } else if (key === 'Current') {
+            const v = parseFloat(String(prop.value));
+            if (!Number.isNaN(v)) fromCurrent = v;
+        } else if (key === 'State.I') {
+            const decimalValue = parseInt(String(prop.value), 16);
+            if (!Number.isNaN(decimalValue)) fromStateI = decimalValue;
+        } else if (key === 'State.U') {
+            const decimalValue = parseInt(String(prop.value), 16);
+            if (!Number.isNaN(decimalValue)) fromStateU = decimalValue / 10;
+        }
+    });
+    const current = fromCurrent != null ? fromCurrent : (fromStateI != null ? fromStateI : 0);
+    const voltage = fromVoltage != null ? fromVoltage : (fromStateU != null ? fromStateU : 0);
+    return { current, voltage };
+}
+
+function extractTelemetrySampleFromPanelState(state) {
+    const { current, voltage } = extractCurrentVoltageFromPanelState(state);
+
+    // Нормализуем формат как в processStructuredData/status-card:
+    // собираем плоский словарь значений из state + state.properties.
+    const flat = { ...(state || {}) };
+    if (state?.properties && typeof state.properties === 'object') {
+        Object.entries(state.properties).forEach(([key, prop]) => {
+            if (prop && typeof prop === 'object' && Object.prototype.hasOwnProperty.call(prop, 'value')) {
+                flat[key] = prop.value;
+            } else {
+                flat[key] = prop;
+            }
+        });
+    }
+    const wrappedState = { ...state, properties: flat };
+
+    const phaseA = getStateNumberByKeys(wrappedState, [
+        'Напряжение фазы А', 'VoltagePhaseA', 'voltagePhaseA', 'voltage_phase_a', 'Voltage_Phase_A'
+    ]) ?? 0;
+    const phaseB = getStateNumberByKeys(wrappedState, [
+        'Напряжение фазы B', 'Напряжение фазы В', 'VoltagePhaseB', 'voltagePhaseB', 'voltage_phase_b', 'Voltage_Phase_B'
+    ]) ?? 0;
+    const phaseC = getStateNumberByKeys(wrappedState, [
+        'Напряжение фазы С', 'VoltagePhaseC', 'voltagePhaseC', 'voltage_phase_c', 'Voltage_Phase_C'
+    ]) ?? 0;
+
+    return {
+        weldingCurrent: current,
+        weldingVoltage: voltage,
+        gasFlow: 0,
+        wireConsumption: getStateNumberByKeys(wrappedState, ['Расход проволоки', 'WireConsumption', 'wireConsumption']) ?? 0,
+        mainsVoltageA: phaseA,
+        mainsVoltageB: phaseB,
+        mainsVoltageC: phaseC,
+        radiatorTemp: getStateNumberByKeys(wrappedState, ['Температура первичной обмотки', 'PrimaryCoilTemperature', 'primaryCoilTemperature']) ?? 0,
+        inverterTemp: getStateNumberByKeys(wrappedState, ['Температура вторичной обмотки', 'SecondaryCoilTemperature', 'secondaryCoilTemperature']) ?? 0,
+        chillerTempIn: getStateNumberByKeys(wrappedState, ['Температура охлаждающей жидкости на входе', 'ChillerTemperature1', 'chillerTemperature1']) ?? 0,
+        chillerTempOut: getStateNumberByKeys(wrappedState, ['Температура охлаждающей жидкости на выходе', 'ChillerTemperature2', 'chillerTemperature2']) ?? 0,
+        powerConsumption: 0
+    };
+}
+
+/** Плоский объект как в deviceData после processStructuredData (для isWelding). */
+function flattenPanelState(state) {
+    if (!state) return {};
+    const flat = { ...state };
+    if (state.properties && typeof state.properties === 'object') {
+        Object.entries(state.properties).forEach(([k, v]) => {
+            if (v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, 'value')) {
+                flat[k] = v.value;
+            } else {
+                flat[k] = v;
+            }
+        });
+    }
+    return flat;
+}
+
+/** Та же логика, что у isWelding(), но по сырому ответу panel-state (синхронно с poll). */
+function isWeldingFromPanelState(state) {
+    const data = flattenPanelState(state);
+    const weldingMachineState = data['Состояние аппарата'] ||
+        data['WeldingMachineState'] ||
+        data.weldingMachineState ||
+        data['State.WeldingMachineState'] ||
+        data.properties?.['WeldingMachineState'] ||
+        data.properties?.['Состояние аппарата'];
+    if (weldingMachineState) {
+        const stateLower = String(weldingMachineState).toLowerCase().trim();
+        if (stateLower === 'сварка' || stateLower === 'welding' ||
+            stateLower.includes('сварка') || stateLower.includes('welding') ||
+            stateLower.includes('сварочн') || stateLower.includes('weld')) {
+            return true;
+        }
+        if (stateLower.includes('ожидан') || stateLower.includes('waiting') ||
+            stateLower.includes('выключ') || stateLower.includes('off') ||
+            stateLower.includes('включен') || stateLower.includes('on') ||
+            stateLower === 'выкл' || stateLower === 'off' ||
+            stateLower === 'аппарат включен') {
+            return false;
+        }
+    }
+    const status = data.status || data.Status;
+    if (status) {
+        const statusLower = String(status).toLowerCase().trim();
+        if (statusLower === 'welding' || statusLower === 'сварка' ||
+            statusLower === 'weld' ||
+            statusLower.includes('сварка') ||
+            statusLower.includes('welding')) {
+            return true;
+        }
+    }
+    const { current: weldCurrent } = extractCurrentVoltageFromPanelState(state);
+    if (weldCurrent > 1 && !weldingMachineState) {
+        return true;
+    }
+    return false;
+}
+
+/** Вертикальные фронты на старт/стоп сварки: две точки с одним x (дубликат x = вертикаль в Chart.js). */
+function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, xPoll) {
+    const y = Math.round(Number(yRaw) * 10) / 10;
+    let next = [...prev];
+
+    if (!wasWelding && !nowWelding) {
+        next.push({ x: xPoll, y: 0 });
+    } else if (!wasWelding && nowWelding) {
+        next.push({ x: xPoll, y: 0 });
+        next.push({ x: xPoll, y: y });
+        lastYRef.current = y;
+    } else if (wasWelding && nowWelding) {
+        next.push({ x: xPoll, y: y });
+        lastYRef.current = y;
+    } else if (wasWelding && !nowWelding) {
+        const last = lastYRef.current ?? y;
+        next.push({ x: xPoll, y: last });
+        next.push({ x: xPoll, y: 0 });
+        lastYRef.current = 0;
+    }
+
+    if (next.length > 200) next = next.slice(-100);
+    return next;
 }
 
 function extractRfidFromDeviceData(deviceData, machineMac, hasData) {
@@ -166,6 +377,13 @@ const DeviceMonitorPage = () => {
     const [rfidLookup, setRfidLookup] = useState({ status: 'idle' });
     /** Кэш поиска по RFID: не перезапрашивать при каждом poll телеметрии, только при смене кода */
     const rfidLookupCacheRef = useRef({ code: null, snapshot: null });
+    const rfidFetchInFlightRef = useRef(false);
+
+    /** Строка RFID из телеметрии — отдельно от deviceData, чтобы эффект не перезапускался на каждом poll */
+    const telemetryRfidCode = useMemo(
+        () => extractRfidFromDeviceData(deviceData, machineMac, hasData),
+        [deviceData, machineMac, hasData]
+    );
 
     // Состояние для редактирования названия аппарата (инлайн — оставлено для совместимости, но карандаш открывает модалку)
     const [isEditingName, setIsEditingName] = useState(false);
@@ -180,10 +398,26 @@ const DeviceMonitorPage = () => {
     // Реф для предотвращения конфликта между кликом на карандаш и onBlur
     const saveTimeoutRef = useRef(null);
 
-    // Состояние для графиков
-    const [currentChartData, setCurrentChartData] = useState([]);
-    const [voltageChartData, setVoltageChartData] = useState([]);
-    const maxDataPoints = 100; // Максимальное количество точек на графике
+    // Состояние для графиков (серии — только telemetrySeries; импульс тока/напряжения по фронту сварки)
+    const [telemetrySeries, setTelemetrySeries] = useState(DEFAULT_TELEMETRY_SERIES);
+    const prevWeldingForChartRef = useRef(null);
+    const lastWeldingCurrentChartRef = useRef(0);
+    const lastWeldingVoltageChartRef = useRef(0);
+    const [telemetrySelection, setTelemetrySelection] = useState({
+        slot1: 'weldingCurrent',
+        slot2: 'weldingVoltage',
+    });
+    const [telemetryPhaseSelection, setTelemetryPhaseSelection] = useState({
+        slot1: 'A',
+        slot2: 'B',
+    });
+    /** Масштаб по оси X: 1 — весь диапазон; больше — «приближение» к последним точкам (окно справа). */
+    const [telemetryChartZoom, setTelemetryChartZoom] = useState({ top: 1, bottom: 1 });
+    /** Как в archive WeldingMachinePanel: при >200 точек оставляем последние 100 */
+    const trimChartSeries = (prev, point) => {
+        const next = [...prev, point];
+        return next.length > 200 ? next.slice(-100) : next;
+    };
 
     // Состояние для таймера сварки
     const [weldingStartTime, setWeldingStartTime] = useState(null); // Время начала сварки
@@ -270,9 +504,10 @@ const DeviceMonitorPage = () => {
     }, [machineMac]);
 
     useEffect(() => {
-        const code = extractRfidFromDeviceData(deviceData, machineMac, hasData);
+        const code = telemetryRfidCode;
         if (!code) {
             rfidLookupCacheRef.current = { code: null, snapshot: null };
+            rfidFetchInFlightRef.current = false;
             setRfidLookup({ status: 'idle' });
             return;
         }
@@ -280,10 +515,11 @@ const DeviceMonitorPage = () => {
         if (cached.code === code && cached.snapshot) {
             return;
         }
-        if (cached.code === code && cached.snapshot === null) {
+        if (cached.code === code && rfidFetchInFlightRef.current) {
             return;
         }
         rfidLookupCacheRef.current = { code, snapshot: null };
+        rfidFetchInFlightRef.current = true;
         let cancelled = false;
         setRfidLookup({ status: 'loading' });
         (async () => {
@@ -300,12 +536,17 @@ const DeviceMonitorPage = () => {
                     rfidLookupCacheRef.current = { code, snapshot: snap };
                     setRfidLookup(snap);
                 }
+            } finally {
+                if (!cancelled) {
+                    rfidFetchInFlightRef.current = false;
+                }
             }
         })();
         return () => {
             cancelled = true;
+            rfidFetchInFlightRef.current = false;
         };
-    }, [deviceData, machineMac, hasData]);
+    }, [telemetryRfidCode]);
 
     // Обновление текущего времени каждую секунду для таймера
     useEffect(() => {
@@ -330,34 +571,29 @@ const DeviceMonitorPage = () => {
         };
     }, [disconnectTimeout]);
 
-    // Рефы для отслеживания предыдущих значений
-    const prevCurrentRef = useRef(null);
-    const prevVoltageRef = useRef(null);
-    const prevWeldingStateRef = useRef(null); // Отслеживание предыдущего состояния сварки
-
-    // Рефы для графиков
+    // Рефы для экземпляров Chart.js
     const currentChartInstanceRef = useRef(null);
     const voltageChartInstanceRef = useRef(null);
 
-    // Рефы для отслеживания времени последнего обновления графика
-    const lastChartUpdateTimeRef = useRef(null);
-    const chartUpdateIntervalRef = useRef(null);
-
-    // Refs для хранения актуальных данных в интервале
-    const deviceDataRef = useRef(deviceData);
-    const machineMacRef = useRef(machineMac);
-    const hasDataRef = useRef(hasData);
-    const currentChartDataRef = useRef(currentChartData);
-    const voltageChartDataRef = useRef(voltageChartData);
-
-    // Обновляем refs при изменении данных
+    // Сброс графиков при смене MAC (другой аппарат)
     useEffect(() => {
-        deviceDataRef.current = deviceData;
-        machineMacRef.current = machineMac;
-        hasDataRef.current = hasData;
-        currentChartDataRef.current = currentChartData;
-        voltageChartDataRef.current = voltageChartData;
-    }, [deviceData, machineMac, hasData, currentChartData, voltageChartData]);
+        prevWeldingForChartRef.current = null;
+        lastWeldingCurrentChartRef.current = 0;
+        lastWeldingVoltageChartRef.current = 0;
+        setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
+        setTelemetryChartZoom({ top: 1, bottom: 1 });
+    }, [machineMac]);
+
+    // Очистка серий при потере связи (не завязываем на deviceData — он обновляется с дебаунсом и мог бы сбрасывать график после poll)
+    useEffect(() => {
+        if (!hasData) {
+            prevWeldingForChartRef.current = null;
+            lastWeldingCurrentChartRef.current = 0;
+            lastWeldingVoltageChartRef.current = 0;
+            setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
+            setTelemetryChartZoom({ top: 1, bottom: 1 });
+        }
+    }, [hasData]);
 
     // Отслеживание состояния сварки для таймера
     useEffect(() => {
@@ -415,235 +651,6 @@ const DeviceMonitorPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [deviceData, hasData, machineMac, currentTime]);
 
-    // Обновление данных графиков при изменении состояния сварки
-    useEffect(() => {
-        if (Object.keys(deviceData).length === 0 || !hasData) {
-            // Нет данных - очищаем графики
-            setCurrentChartData([]);
-            setVoltageChartData([]);
-            prevCurrentRef.current = null;
-            prevVoltageRef.current = null;
-            prevWeldingStateRef.current = null;
-            lastChartUpdateTimeRef.current = null;
-            // Останавливаем интервал обновления
-            if (chartUpdateIntervalRef.current) {
-                clearInterval(chartUpdateIntervalRef.current);
-                chartUpdateIntervalRef.current = null;
-            }
-            return;
-        }
-
-        const data = deviceData[machineMac];
-        if (!data) {
-            // Нет данных для этого аппарата - очищаем графики
-            setCurrentChartData([]);
-            setVoltageChartData([]);
-            prevCurrentRef.current = null;
-            prevVoltageRef.current = null;
-            prevWeldingStateRef.current = null;
-            lastChartUpdateTimeRef.current = null;
-            // Останавливаем интервал обновления
-            if (chartUpdateIntervalRef.current) {
-                clearInterval(chartUpdateIntervalRef.current);
-                chartUpdateIntervalRef.current = null;
-            }
-            return;
-        }
-
-        const isCurrentlyWelding = isWelding();
-        const prevWeldingState = prevWeldingStateRef.current;
-
-        // Проверяем, изменилось ли состояние сварки
-        // Учитываем случай, когда сварка начинается впервые (prevWeldingState === null)
-        const weldingStateChanged = prevWeldingState !== isCurrentlyWelding;
-
-        // Если сварка идет, всегда проверяем, инициализирован ли график
-        if (isCurrentlyWelding) {
-            // Проверяем, нужно ли инициализировать график (изменилось состояние ИЛИ график пустой)
-            const needsInitialization = weldingStateChanged || currentChartDataRef.current.length === 0;
-
-            if (needsInitialization) {
-                const current = parseFloat(data.Current || data['State.I'] || 0);
-                const voltage = parseFloat(data.Voltage || data['State.U'] || 0);
-                const timestamp = new Date();
-
-                // Сварка только что началась или график не инициализирован - резкий подъем
-                // График должен быть пустым, поэтому добавляем точку с 0, затем сразу точку с реальным значением
-                const timestamp0 = new Date(timestamp.getTime() - 10); // Небольшое смещение для визуализации
-
-                setCurrentChartData(() => {
-                    // Начинаем с пустого графика, добавляем 0, затем реальное значение
-                    return [
-                        { x: timestamp0, y: 0 },
-                        { x: timestamp, y: current }
-                    ];
-                });
-                prevCurrentRef.current = current;
-
-                setVoltageChartData(() => {
-                    // Начинаем с пустого графика, добавляем 0, затем реальное значение
-                    return [
-                        { x: timestamp0, y: 0 },
-                        { x: timestamp, y: voltage }
-                    ];
-                });
-                prevVoltageRef.current = voltage;
-
-                lastChartUpdateTimeRef.current = timestamp.getTime();
-            }
-
-            // Останавливаем старый интервал (если был для нулей) и запускаем новый для сварки
-            if (chartUpdateIntervalRef.current) {
-                clearInterval(chartUpdateIntervalRef.current);
-            }
-
-            // Запускаем интервал обновления графика раз в секунду
-            chartUpdateIntervalRef.current = setInterval(() => {
-                const currentDeviceData = deviceDataRef.current;
-                const currentMac = machineMacRef.current;
-
-                if (Object.keys(currentDeviceData).length === 0 || !hasDataRef.current) {
-                    // Нет данных - останавливаем интервал
-                    if (chartUpdateIntervalRef.current) {
-                        clearInterval(chartUpdateIntervalRef.current);
-                        chartUpdateIntervalRef.current = null;
-                    }
-                    return;
-                }
-
-                const data = currentDeviceData[currentMac];
-                if (!data) {
-                    return;
-                }
-
-                // Проверяем, идет ли сварка, используя актуальные данные
-                const isCurrentlyWelding = (() => {
-                    const weldingMachineState = data['Состояние аппарата'] ||
-                        data['WeldingMachineState'] ||
-                        data.weldingMachineState ||
-                        data['State.WeldingMachineState'] ||
-                        data.properties?.['WeldingMachineState'] ||
-                        data.properties?.['Состояние аппарата'];
-                    if (weldingMachineState) {
-                        const stateLower = String(weldingMachineState).toLowerCase().trim();
-                        if (stateLower === 'сварка' || stateLower === 'welding' ||
-                            stateLower.includes('сварка') || stateLower.includes('welding') ||
-                            stateLower.includes('сварочн') || stateLower.includes('weld')) {
-                            return true;
-                        }
-                    }
-                    const status = data.status || data.Status;
-                    if (status) {
-                        const statusLower = String(status).toLowerCase().trim();
-                        if (statusLower === 'welding' || statusLower === 'сварка' ||
-                            statusLower === 'weld' ||
-                            statusLower.includes('сварка') ||
-                            statusLower.includes('welding')) {
-                            return true;
-                        }
-                    }
-                    const current = parseFloat(data.Current || data['State.I'] || 0);
-                    return current > 1;
-                })();
-
-                if (isCurrentlyWelding) {
-                    const current = parseFloat(data.Current || data['State.I'] || 0);
-                    const voltage = parseFloat(data.Voltage || data['State.U'] || 0);
-                    const timestamp = new Date();
-
-                    setCurrentChartData(prev => {
-                        const newData = [...prev, { x: timestamp, y: current }];
-                        return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
-                    });
-                    prevCurrentRef.current = current;
-
-                    setVoltageChartData(prev => {
-                        const newData = [...prev, { x: timestamp, y: voltage }];
-                        return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
-                    });
-                    prevVoltageRef.current = voltage;
-
-                    lastChartUpdateTimeRef.current = timestamp.getTime();
-                } else {
-                    // Сварка закончилась - останавливаем интервал
-                    if (chartUpdateIntervalRef.current) {
-                        clearInterval(chartUpdateIntervalRef.current);
-                        chartUpdateIntervalRef.current = null;
-                    }
-                }
-            }, 1000); // Обновление раз в секунду
-
-            prevWeldingStateRef.current = isCurrentlyWelding;
-        } else if (!isCurrentlyWelding) {
-            // Сварка не идет
-            if (weldingStateChanged) {
-                // Сварка только что закончилась - резкий спад
-                const timestamp = new Date();
-                const lastCurrent = prevCurrentRef.current !== null ? prevCurrentRef.current : 0;
-                const lastVoltage = prevVoltageRef.current !== null ? prevVoltageRef.current : 0;
-
-                setCurrentChartData(prev => {
-                    const newData = [...prev, { x: timestamp, y: lastCurrent }];
-                    // Затем сразу точку с 0
-                    return [...newData, { x: new Date(timestamp.getTime() + 1), y: 0 }];
-                });
-                prevCurrentRef.current = 0;
-
-                setVoltageChartData(prev => {
-                    const newData = [...prev, { x: timestamp, y: lastVoltage }];
-                    // Затем сразу точку с 0
-                    return [...newData, { x: new Date(timestamp.getTime() + 1), y: 0 }];
-                });
-                prevVoltageRef.current = 0;
-            }
-
-            // Инициализируем график нулями, если он пустой
-            if (currentChartDataRef.current.length === 0) {
-                const timestamp = new Date();
-                setCurrentChartData([{ x: timestamp, y: 0 }]);
-                setVoltageChartData([{ x: timestamp, y: 0 }]);
-                prevCurrentRef.current = 0;
-                prevVoltageRef.current = 0;
-            }
-
-            // Останавливаем старый интервал (если был для сварки) и запускаем новый для нулей
-            if (chartUpdateIntervalRef.current) {
-                clearInterval(chartUpdateIntervalRef.current);
-            }
-
-            // Запускаем интервал обновления графика нулями раз в секунду
-            chartUpdateIntervalRef.current = setInterval(() => {
-                const timestamp = new Date();
-
-                setCurrentChartData(prev => {
-                    const newData = [...prev, { x: timestamp, y: 0 }];
-                    return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
-                });
-                prevCurrentRef.current = 0;
-
-                setVoltageChartData(prev => {
-                    const newData = [...prev, { x: timestamp, y: 0 }];
-                    return newData.length > maxDataPoints ? newData.slice(-maxDataPoints) : newData;
-                });
-                prevVoltageRef.current = 0;
-            }, 1000); // Обновление раз в секунду
-
-            prevWeldingStateRef.current = isCurrentlyWelding;
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [deviceData, hasData, machineMac]);
-
-    // Очистка интервала при размонтировании
-    useEffect(() => {
-        return () => {
-            if (chartUpdateIntervalRef.current) {
-                clearInterval(chartUpdateIntervalRef.current);
-            }
-        };
-    }, []);
-
-    // Убираем сложную синхронизацию - теперь простое состояние
-
     // Простая функция как в archive проекте - просто обновляем состояние
     const updateConnectionStatus = (connected, hasStateData) => {
         // Если устройство подключено - сразу обновляем состояние
@@ -667,11 +674,11 @@ const DeviceMonitorPage = () => {
                 setIsConnected(false);
                 setHasData(false);
                 setDeviceData({}); // Очищаем данные
-                setCurrentChartData([]); // Очищаем график тока
-                setVoltageChartData([]); // Очищаем график напряжения
-                prevCurrentRef.current = null; // Сбрасываем предыдущее значение тока
-                prevVoltageRef.current = null; // Сбрасываем предыдущее значение напряжения
-                prevWeldingStateRef.current = null; // Сбрасываем предыдущее состояние сварки
+                prevWeldingForChartRef.current = null;
+                lastWeldingCurrentChartRef.current = 0;
+                lastWeldingVoltageChartRef.current = 0;
+                setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
+                setTelemetryChartZoom({ top: 1, bottom: 1 });
                 setDisconnectTimeout(null);
             }, 3000); // 3 секунды задержки
 
@@ -694,10 +701,10 @@ const DeviceMonitorPage = () => {
         // Первый запрос сразу
         fetchDeviceState();
 
-        // Устанавливаем интервал опроса каждые 500ms (как в archive проекте)
+        // Интервал опроса panel-state: 1 с (реалтайм-графики синхронизированы с этим же опросом)
         const interval = setInterval(() => {
             fetchDeviceState();
-        }, 500);
+        }, 1300);
 
         setPollingInterval(interval);
     };
@@ -722,6 +729,51 @@ const DeviceMonitorPage = () => {
                     mac: machineMac,
                     state: response
                 });
+
+                // Реалтайм-графики: одна точка на каждый успешный poll (как WeldingMachinePanel.updateChart)
+                const { current: iRaw, voltage: uRaw } = extractCurrentVoltageFromPanelState(response);
+                const telemetrySample = extractTelemetrySampleFromPanelState(response);
+                const xPoll = Date.now();
+                const wNow = isWeldingFromPanelState(response);
+                const wasWelding = prevWeldingForChartRef.current === true;
+                const yi = Math.round(Number(iRaw) * 10) / 10;
+                const yu = Math.round(Number(uRaw) * 10) / 10;
+                setTelemetrySeries(prev => {
+                    const next = { ...prev };
+                    TELEMETRY_CHANNELS_CONFIG.forEach(channel => {
+                        if (channel.key === 'mainsVoltage') {
+                            const yA = Math.round(Number(telemetrySample.mainsVoltageA ?? 0) * 10) / 10;
+                            const yB = Math.round(Number(telemetrySample.mainsVoltageB ?? 0) * 10) / 10;
+                            const yC = Math.round(Number(telemetrySample.mainsVoltageC ?? 0) * 10) / 10;
+                            next.mainsVoltageA = trimChartSeries(prev.mainsVoltageA || [], { x: xPoll, y: yA });
+                            next.mainsVoltageB = trimChartSeries(prev.mainsVoltageB || [], { x: xPoll, y: yB });
+                            next.mainsVoltageC = trimChartSeries(prev.mainsVoltageC || [], { x: xPoll, y: yC });
+                        } else if (channel.key === 'weldingCurrent') {
+                            next.weldingCurrent = appendWeldingPulseSeries(
+                                prev.weldingCurrent || [],
+                                yi,
+                                wasWelding,
+                                wNow,
+                                lastWeldingCurrentChartRef,
+                                xPoll
+                            );
+                        } else if (channel.key === 'weldingVoltage') {
+                            next.weldingVoltage = appendWeldingPulseSeries(
+                                prev.weldingVoltage || [],
+                                yu,
+                                wasWelding,
+                                wNow,
+                                lastWeldingVoltageChartRef,
+                                xPoll
+                            );
+                        } else {
+                            const y = Math.round(Number(telemetrySample[channel.key] ?? 0) * 10) / 10;
+                            next[channel.key] = trimChartSeries(prev[channel.key] || [], { x: xPoll, y });
+                        }
+                    });
+                    return next;
+                });
+                prevWeldingForChartRef.current = wNow;
 
                 // Просто обновляем состояние - есть данные
                 updateConnectionStatus(true, true);
@@ -1303,116 +1355,26 @@ const DeviceMonitorPage = () => {
     const LEFT_Y_TICKS = [0, 100, 200, 300, 400, 500];
     const RIGHT_Y_TICKS = [0, 10, 20, 30, 40, 50];
 
-    // Конфигурация верхнего графика (ток): левая ось 0–500, правая 0–50, ось X 6:00–22:00
-    const getCurrentChartOptions = (dataLength) => {
-        const n = Math.max(dataLength, 1);
-        const xMax = Math.max(0, n - 1);
-        const xStep = n <= 1 ? 1 : xMax / 8;
-        return {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                    titleColor: '#FFFFFF',
-                    bodyColor: '#FFFFFF',
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                    borderWidth: 1,
-                    padding: 12,
-                    cornerRadius: 8,
-                    displayColors: true,
-                    callbacks: {
-                        label: (ctx) => `Ток (А): ${ctx.parsed.y.toFixed(1)}`
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    type: 'linear',
-                    min: 0,
-                    max: xMax,
-                    display: true,
-                    grid: {
-                        display: true,
-                        color: 'rgba(255, 255, 255, 0.15)',
-                        lineWidth: 1,
-                        borderDash: [4, 4]
-                    },
-                    ticks: {
-                        stepSize: xStep,
-                        maxTicksLimit: 9,
-                        color: 'rgba(255, 255, 255, 0.6)',
-                        font: { size: 10 },
-                        padding: 6,
-                        callback: function(val) {
-                            if (n <= 1) return '6:00';
-                            const hour = 6 + Math.round(16 * val / xMax);
-                            return `${hour}:00`;
-                        }
-                    },
-                    border: { display: false },
-                    afterBuildTicks: (axis) => {
-                        if (n <= 1) return;
-                        const step = xMax / 8;
-                        axis.ticks = Array.from({ length: 9 }, (_, i) => ({ value: i * step }));
-                    }
-                },
-                y: {
-                    min: 0,
-                    max: 500,
-                    position: 'left',
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.15)',
-                        lineWidth: 1,
-                        borderDash: [4, 4],
-                        drawBorder: false
-                    },
-                    ticks: {
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        font: { size: 11 },
-                        padding: 8,
-                        callback: (v) => (LEFT_Y_TICKS.includes(v) ? v : '')
-                    },
-                    border: { display: false },
-                    afterBuildTicks: (axis) => {
-                        axis.ticks = LEFT_Y_TICKS.map((v) => ({ value: v }));
-                    }
-                },
-                yRight: {
-                    min: 0,
-                    max: 50,
-                    position: 'right',
-                    grid: { display: false },
-                    ticks: {
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        font: { size: 11 },
-                        padding: 8,
-                        callback: (v) => (RIGHT_Y_TICKS.includes(v) ? v : '')
-                    },
-                    border: { display: false },
-                    afterBuildTicks: (axis) => {
-                        axis.ticks = RIGHT_Y_TICKS.map((v) => ({ value: v }));
-                    }
-                }
-            },
-            animation: { duration: 0 },
-            elements: {
-                point: { radius: 0, hoverRadius: 4 },
-                line: { tension: 0, borderWidth: 1.5 }
-            },
-            interaction: { intersect: false, mode: 'index' },
-            layout: { padding: { top: 8, bottom: 8, left: 8, right: 8 } }
-        };
+    /** Ось X: zoom 1 — весь диапазон времени; >1 — окно у правого края (последние точки крупнее). */
+    const getTelemetryXViewport = (bounds, zoomLevel) => {
+        const fallbackMax = Date.now();
+        const minBound = Number.isFinite(bounds?.minX) ? bounds.minX : (fallbackMax - 60_000);
+        const maxBound = Number.isFinite(bounds?.maxX) ? bounds.maxX : fallbackMax;
+        const safeMax = Math.max(maxBound, minBound + 1);
+        const z = Math.max(1, Math.min(zoomLevel ?? 1, 100));
+        const fullRange = Math.max(safeMax - minBound, 1);
+        const span = fullRange / z;
+        const xMin = Math.max(minBound, safeMax - span);
+        const xMax = safeMax;
+        const range = Math.max(xMax - xMin, 1e-9);
+        return { xMin, xMax, range };
     };
 
-    // Конфигурация нижнего графика (напряжение + вторая линия): две оси Y, ось X 6:00–22:00
-    const getVoltageChartOptions = (dataLength) => {
-        const n = Math.max(dataLength, 1);
-        const xMax = Math.max(0, n - 1);
-        const xStep = n <= 1 ? 1 : xMax / 8;
+    // Реалтайм-графики телеметрии (верх и низ): две оси Y, ось X с реальным временем; zoom только по X
+    const getTelemetryLineChartOptions = (timeBounds, zoomLevel) => {
+        const { xMin, xMax, range } = getTelemetryXViewport(timeBounds, zoomLevel);
+        const xStep = range <= 1 ? 1 : range / 8;
+        const showSeconds = range < 10 * 60 * 1000;
         return {
             responsive: true,
             maintainAspectRatio: false,
@@ -1430,6 +1392,10 @@ const DeviceMonitorPage = () => {
                     cornerRadius: 8,
                     displayColors: true,
                     callbacks: {
+                        title: () => '',
+                        beforeBody: () => '',
+                        afterBody: () => '',
+                        footer: () => '',
                         label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}`
                     }
                 }
@@ -1437,7 +1403,7 @@ const DeviceMonitorPage = () => {
             scales: {
                 x: {
                     type: 'linear',
-                    min: 0,
+                    min: xMin,
                     max: xMax,
                     display: true,
                     grid: {
@@ -1453,16 +1419,18 @@ const DeviceMonitorPage = () => {
                         font: { size: 10 },
                         padding: 6,
                         callback: function(val) {
-                            if (n <= 1) return '6:00';
-                            const hour = 6 + Math.round(16 * val / xMax);
-                            return `${hour}:00`;
+                            return new Date(val).toLocaleTimeString('ru-RU', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: showSeconds ? '2-digit' : undefined
+                            });
                         }
                     },
                     border: { display: false },
                     afterBuildTicks: (axis) => {
-                        if (n <= 1) return;
-                        const step = xMax / 8;
-                        axis.ticks = Array.from({ length: 9 }, (_, i) => ({ value: i * step }));
+                        if (range <= 1e-9) return;
+                        const step = range / 8;
+                        axis.ticks = Array.from({ length: 9 }, (_, i) => ({ value: xMin + i * step }));
                     }
                 },
                 y: {
@@ -1513,63 +1481,45 @@ const DeviceMonitorPage = () => {
         };
     };
 
-    // Данные для верхнего графика (ток): синяя линия, ось Y 0–500
-    const getCurrentChartData = () => ({
-        datasets: [{
-            label: 'Ток (А)',
-            data: currentChartData.map((d, i) => ({ x: i, y: Number(d.y) || 0 })),
-            borderColor: '#3ec7ff',
-            backgroundColor: 'rgba(62, 199, 255, 0.05)',
+    const resolveMainsVoltageSeriesKey = (slotName) => {
+        const phase = telemetryPhaseSelection[slotName] || 'A';
+        return phase === 'C' ? 'mainsVoltageC' : (phase === 'B' ? 'mainsVoltageB' : 'mainsVoltageA');
+    };
+
+    const buildTelemetryDataset = (slotName, slotKey) => {
+        if (!slotKey) return null;
+        const channel = TELEMETRY_CHANNELS_CONFIG.find(item => item.key === slotKey);
+        if (!channel) return null;
+        const sourceSeriesKey = slotKey === 'mainsVoltage' ? resolveMainsVoltageSeriesKey(slotName) : slotKey;
+        const series = telemetrySeries[sourceSeriesKey] || [];
+        return {
+            label: channel.label,
+            data: series.map((d, i) => ({
+                x: typeof d.x === 'number' ? d.x : i,
+                y: Number(d.y) || 0
+            })),
+            borderColor: channel.color,
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
             fill: false,
             borderWidth: 2,
             pointRadius: 0,
             pointHoverRadius: 4,
-            pointHoverBackgroundColor: '#3ec7ff',
+            pointHoverBackgroundColor: channel.color,
             pointHoverBorderColor: '#FFFFFF',
             pointHoverBorderWidth: 2,
             tension: 0,
-            yAxisID: 'y'
-        }]
-    });
-
-    // Данные для нижнего графика: розовая линия (напряжение, правая ось 0–50), оранжевая (левая ось 0–500)
-    const getVoltageChartData = () => {
-        const voltagePoints = voltageChartData.map((d, i) => ({ x: i, y: Number(d.y) || 0 }));
-        const orangePoints = currentChartData.map((d, i) => ({ x: i, y: Math.min(Number(d.y) || 0, 250) }));
-        return {
-            datasets: [
-                {
-                    label: 'Напряжение (В)',
-                    data: voltagePoints,
-                    borderColor: '#ff61c8',
-                    backgroundColor: 'rgba(255, 97, 200, 0.05)',
-                    fill: false,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    pointHoverRadius: 4,
-                    pointHoverBackgroundColor: '#ff61c8',
-                    pointHoverBorderColor: '#FFFFFF',
-                    pointHoverBorderWidth: 2,
-                    tension: 0,
-                    yAxisID: 'yRight'
-                },
-                {
-                    label: 'Ток (А)',
-                    data: orangePoints,
-                    borderColor: '#ffae64',
-                    backgroundColor: 'rgba(255, 174, 100, 0.05)',
-                    fill: false,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    pointHoverRadius: 4,
-                    pointHoverBackgroundColor: '#ffae64',
-                    pointHoverBorderColor: '#FFFFFF',
-                    pointHoverBorderWidth: 2,
-                    tension: 0,
-                    yAxisID: 'y'
-                }
-            ]
+            yAxisID: slotKey === 'weldingVoltage' ? 'yRight' : 'y'
         };
+    };
+
+    const getCurrentChartData = () => {
+        const dataset = buildTelemetryDataset('slot1', telemetrySelection.slot1);
+        return { datasets: dataset ? [dataset] : [] };
+    };
+
+    const getVoltageChartData = () => {
+        const dataset = buildTelemetryDataset('slot2', telemetrySelection.slot2);
+        return { datasets: dataset ? [dataset] : [] };
     };
 
     // Функции для форматирования данных
@@ -1912,6 +1862,22 @@ const DeviceMonitorPage = () => {
                 errors.push({ code: 'ERR', time: timeStr, date: dateStr, severity: 'error', message: resolvedFromCode });
             }
         }
+
+        // Предупреждения: добавляем отдельные карточки (если парсер прислал "Предупреждения")
+        const warningsProperty = data['Предупреждения'] || data['Warnings'] || data.warnings;
+        const hasWarningsText = warningsProperty &&
+            warningsProperty !== 'Нет предупреждений' &&
+            warningsProperty !== 'No warnings' &&
+            String(warningsProperty).trim() !== '' &&
+            String(warningsProperty).toLowerCase() !== 'null';
+
+        if (hasWarningsText) {
+            const parts = String(warningsProperty).split(/,|;/).map(s => s.trim()).filter(Boolean);
+            parts.forEach((message) => {
+                errors.push({ code: 'WRN', time: timeStr, date: dateStr, severity: 'warning', message });
+            });
+        }
+
         return errors;
     };
 
@@ -1995,19 +1961,30 @@ const DeviceMonitorPage = () => {
         return false;
     };
 
-    // Телеметрия каналы
-    const telemetryChannels = [
-        { label: 'Сварочный ток', color: '#3ec7ff', active: true, tile1: true, tile2: false },
-        { label: 'Сварочное напряжение', color: '#ff61c8', active: true, tile1: false, tile2: true },
-        { label: 'Расход газа', color: '#2fe4a8', active: false, tile1: false, tile2: false },
-        { label: 'Расход проволоки', color: '#ffae64', active: false, tile1: false, tile2: false },
-        { label: 'Напряжение сети', color: '#a07dff', active: false, tile1: false, tile2: false },
-        { label: 'Темп. радиатора', color: '#66d1ff', active: false, tile1: false, tile2: false },
-        { label: 'Темп. инвертора', color: '#7cffb2', active: false, tile1: false, tile2: false },
-        { label: 'Темп. выпрямителя', color: '#ffc96a', active: false, tile1: false, tile2: false },
-        { label: 'Темп. БВО', color: '#f1ca06', active: true, tile1: true, tile2: true },
-        { label: 'Потр. мощность', color: '#6d8bff', active: false, tile1: false, tile2: false }
-    ];
+    const handleTelemetryTileClick = (channelKey, slot) => {
+        setTelemetrySelection(prev => {
+            const next = { ...prev };
+            const slotName = slot === 1 ? 'slot1' : 'slot2';
+            const otherSlotName = slot === 1 ? 'slot2' : 'slot1';
+            next[slotName] = prev[slotName] === channelKey ? null : channelKey;
+            // Разрешаем один и тот же канал "Напряжение сети" в обоих слотах,
+            // чтобы показывать разные фазы на разных графиках.
+            if (next[slotName] && next[otherSlotName] === next[slotName] && channelKey !== 'mainsVoltage') {
+                next[otherSlotName] = null;
+            }
+            return next;
+        });
+    };
+    const handleMainsPhaseChange = (slotName, phase) => {
+        setTelemetryPhaseSelection(prev => ({ ...prev, [slotName]: phase }));
+    };
+
+    const telemetryChannels = TELEMETRY_CHANNELS_CONFIG.map(channel => ({
+        ...channel,
+        active: telemetrySelection.slot1 === channel.key || telemetrySelection.slot2 === channel.key,
+        tile1: telemetrySelection.slot1 === channel.key,
+        tile2: telemetrySelection.slot2 === channel.key,
+    }));
 
     const systemParameters = getSystemParameters();
     const incidentLog = getErrors();
@@ -2040,6 +2017,38 @@ const DeviceMonitorPage = () => {
         });
     };
 
+    const topChartData = getCurrentChartData();
+    const bottomChartData = getVoltageChartData();
+    const telemetryChartXs = (chartData) => {
+        const ds = chartData.datasets || [];
+        return ds.flatMap((d) => (d.data || []).map((p) => (typeof p.x === 'number' ? p.x : 0)));
+    };
+    const getTimeBounds = (xs) => {
+        const finite = xs.filter((x) => Number.isFinite(x));
+        if (!finite.length) {
+            const now = Date.now();
+            return { minX: now - 60_000, maxX: now };
+        }
+        return { minX: Math.min(...finite), maxX: Math.max(...finite) };
+    };
+    const topTimeBounds = getTimeBounds(telemetryChartXs(topChartData));
+    const bottomTimeBounds = getTimeBounds(telemetryChartXs(bottomChartData));
+
+    const handleTelemetryChartZoom = (panel, direction) => {
+        setTelemetryChartZoom((prev) => {
+            const key = panel === 'top' ? 'top' : 'bottom';
+            let z = prev[key];
+            if (direction === 'in') {
+                z = Math.min(z * 1.25, 100);
+            } else if (direction === 'out') {
+                z = Math.max(1, z / 1.25);
+            } else {
+                z = 1;
+            }
+            return { ...prev, [key]: z };
+        });
+    };
+
     return (
         <main className="main-panel">
             <div className="top-grid">
@@ -2064,10 +2073,11 @@ const DeviceMonitorPage = () => {
                                 <span className="machine-info-icon">✕</span>
                             </button>
                         )}
-                        <div className="machine-title">
-                            <span className="machine-title-main">CORE</span>
-                            <span className="machine-title-accent">PULSE</span>
-                        </div>
+
+                    </div>
+                    <div className="machine-title">
+                        <span className="machine-title-main">CORE</span>
+                        <span className="machine-title-accent">PULSE</span>
                     </div>
                     <div className="machine-info-tiles">
                         <div className="machine-info-row">
@@ -2125,10 +2135,6 @@ const DeviceMonitorPage = () => {
                     <div className="card control-mode-tile">
                         <span className="control-label">Режим работы</span>
                         <span className="control-value">Без ограничений</span>
-                    </div>
-
-                    <div className="card control-config-tile">
-                        <span className="config-label">Настройка ограничений</span>
                     </div>
 
                     <section className="card control-card" aria-label="Параметры сварки">
@@ -2342,30 +2348,59 @@ const DeviceMonitorPage = () => {
                                 </div>
                                 <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
                                     {activeTab === 'graphs' && telemetryChannels.map((channel) => (
-                                        <div
-                                            key={channel.label}
-                                            className={`telemetry-item ${channel.active ? 'active' : ''}`}
-                                        >
-                                            <span className="telemetry-label">{channel.label}</span>
-                                            <div className="telemetry-tiles">
-                                                <button
-                                                    type="button"
-                                                    className={`telemetry-tile ${channel.active && channel.tile1 ? 'active' : ''}`}
-                                                    style={{ color: channel.active && channel.tile1 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
-                                                >
-                                                    <span className="wave-icon">~</span>
-                                                    <span className="tile-number">1</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className={`telemetry-tile ${channel.active && channel.tile2 ? 'active' : ''}`}
-                                                    style={{ color: channel.active && channel.tile2 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
-                                                >
-                                                    <span className="wave-icon">~</span>
-                                                    <span className="tile-number">2</span>
-                                                </button>
+                                        <React.Fragment key={channel.key}>
+                                            <div
+                                                className={`telemetry-item ${channel.active ? 'active' : ''}`}
+                                            >
+                                                <span className="telemetry-label">{channel.label}</span>
+                                                <div className="telemetry-tiles">
+                                                    <button
+                                                        type="button"
+                                                        className={`telemetry-tile ${channel.active && channel.tile1 ? 'active' : ''}`}
+                                                        style={{ color: channel.active && channel.tile1 ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                                        onClick={() => handleTelemetryTileClick(channel.key, 1)}
+                                                    >
+                                                        <span className="wave-icon">~</span>
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
+                                            {channel.key === 'mainsVoltage' && (channel.tile1 || channel.tile2) && (
+                                                <div className="telemetry-item" style={{ paddingTop: 4, paddingBottom: 4 }}>
+                                                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                                        {channel.tile1 && (
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                {['A', 'B', 'C'].map((phase) => (
+                                                                    <button
+                                                                        key={`slot1_${phase}`}
+                                                                        type="button"
+                                                                        className={`telemetry-tile ${telemetryPhaseSelection.slot1 === phase ? 'active' : ''}`}
+                                                                        style={{ color: telemetryPhaseSelection.slot1 === phase ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                                                        onClick={() => handleMainsPhaseChange('slot1', phase)}
+                                                                    >
+                                                                        <span className="tile-number">{phase}</span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {channel.tile2 && (
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                {['A', 'B', 'C'].map((phase) => (
+                                                                    <button
+                                                                        key={`slot2_${phase}`}
+                                                                        type="button"
+                                                                        className={`telemetry-tile ${telemetryPhaseSelection.slot2 === phase ? 'active' : ''}`}
+                                                                        style={{ color: telemetryPhaseSelection.slot2 === phase ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                                                        onClick={() => handleMainsPhaseChange('slot2', phase)}
+                                                                    >
+                                                                        <span className="tile-number">{phase}</span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </React.Fragment>
                                     ))}
                                     {activeTab === 'info' && (
                                         <div className="info-content info-content-placeholder">
@@ -2499,8 +2534,8 @@ const DeviceMonitorPage = () => {
                                 <div className="chart-wrapper">
                                     <div className="chart-canvas">
                                         <Line
-                                            data={getCurrentChartData()}
-                                            options={getCurrentChartOptions(currentChartData.length)}
+                                            data={topChartData}
+                                            options={getTelemetryLineChartOptions(topTimeBounds, telemetryChartZoom.top)}
                                             ref={(chart) => {
                                                 if (chart && chart.canvas) {
                                                     chart.canvas.id = 'current-chart';
@@ -2511,62 +2546,34 @@ const DeviceMonitorPage = () => {
                                     </div>
                                 </div>
                                 <div className="chart-controls">
-                                    <button type="button" className="chart-control-btn" title="Увеличить">
+                                    <button
+                                        type="button"
+                                        className="chart-control-btn"
+                                        title="Увеличить масштаб"
+                                        onClick={() => handleTelemetryChartZoom('top', 'in')}
+                                    >
                                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                                             <circle cx="7" cy="7" r="5"/>
                                             <path d="M7 4v6M4 7h6"/>
                                         </svg>
                                     </button>
-                                    <button type="button" className="chart-control-btn" title="Уменьшить">
+                                    <button
+                                        type="button"
+                                        className="chart-control-btn"
+                                        title="Уменьшить масштаб"
+                                        onClick={() => handleTelemetryChartZoom('top', 'out')}
+                                    >
                                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                                             <circle cx="7" cy="7" r="5"/>
                                             <path d="M4 7h6"/>
                                         </svg>
                                     </button>
-                                    <button type="button" className="chart-control-btn" title="Обновить">
-                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                                            <path d="M7 1v2.5M7 10.5V13M1 7h2.5M10.5 7H13M2.5 2.5l1.8 1.8M9.7 9.7l1.8 1.8M2.5 11.5l1.8-1.8M9.7 4.3l1.8-1.8"/>
-                                            <circle cx="7" cy="7" r="4"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="chart-card medium">
-                                <div className="chart-card__header">
-                                    <div>
-                                    </div>
-                                    <div className="chart-legend">
-                                    </div>
-                                </div>
-                                <div className="chart-wrapper">
-                                    <div className="chart-canvas">
-                                        <Line
-                                            data={getVoltageChartData()}
-                                            options={getVoltageChartOptions(Math.max(voltageChartData.length, currentChartData.length))}
-                                            ref={(chart) => {
-                                                if (chart && chart.canvas) {
-                                                    chart.canvas.id = 'voltage-chart';
-                                                    voltageChartInstanceRef.current = chart;
-                                                }
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="chart-controls">
-                                    <button type="button" className="chart-control-btn" title="Увеличить">
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                                            <circle cx="7" cy="7" r="5"/>
-                                            <path d="M7 4v6M4 7h6"/>
-                                        </svg>
-                                    </button>
-                                    <button type="button" className="chart-control-btn" title="Уменьшить">
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                                            <circle cx="7" cy="7" r="5"/>
-                                            <path d="M4 7h6"/>
-                                        </svg>
-                                    </button>
-                                    <button type="button" className="chart-control-btn" title="Обновить">
+                                    <button
+                                        type="button"
+                                        className="chart-control-btn"
+                                        title="Сбросить масштаб"
+                                        onClick={() => handleTelemetryChartZoom('top', 'reset')}
+                                    >
                                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                                             <path d="M7 1v2.5M7 10.5V13M1 7h2.5M10.5 7H13M2.5 2.5l1.8 1.8M9.7 9.7l1.8 1.8M2.5 11.5l1.8-1.8M9.7 4.3l1.8-1.8"/>
                                             <circle cx="7" cy="7" r="4"/>

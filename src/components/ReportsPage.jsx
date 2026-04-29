@@ -536,6 +536,13 @@ const ReportsPage = () => {
         }
     }
 
+    /** Безопасная строка для сортировки: name с бэка может быть числом или объектом. */
+    const toSortableName = (value) => {
+        if (typeof value === 'string') return value
+        if (value === null || value === undefined) return ''
+        return String(value)
+    }
+
     // Build organization hierarchy with welders - древовидная структура как на странице Карта предприятия
     const buildOrganizationHierarchy = () => {
         const hierarchy = {}
@@ -664,7 +671,7 @@ const ReportsPage = () => {
         // Рекурсивная функция для сортировки иерархии
         const sortHierarchy = (units) => {
             return units.sort((a, b) => {
-                return (a.name || '').localeCompare(b.name || '')
+                return toSortableName(a?.name).localeCompare(toSortableName(b?.name), 'ru', { sensitivity: 'base', numeric: true })
             }).map(unit => {
                 if (unit.children.length > 0) {
                     unit.children = sortHierarchy(unit.children)
@@ -673,7 +680,7 @@ const ReportsPage = () => {
                 }
                 // Сортируем сварщиков внутри подразделения
                 unit.welders.sort((a, b) => {
-                    return (a.name || '').localeCompare(b.name || '')
+                    return toSortableName(a?.name).localeCompare(toSortableName(b?.name), 'ru', { sensitivity: 'base', numeric: true })
                 })
                 return unit
             })
@@ -740,9 +747,13 @@ const ReportsPage = () => {
             }
         })
         const sortHierarchy = (units) => {
-            return units.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(unit => {
+            return units.sort((a, b) =>
+                toSortableName(a?.name).localeCompare(toSortableName(b?.name), 'ru', { sensitivity: 'base', numeric: true })
+            ).map(unit => {
                 if (unit.children.length > 0) unit.children = sortHierarchy(unit.children)
-                unit.machines.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                unit.machines.sort((a, b) =>
+                    toSortableName(a?.name).localeCompare(toSortableName(b?.name), 'ru', { sensitivity: 'base', numeric: true })
+                )
                 return unit
             })
         }
@@ -2282,14 +2293,16 @@ const ReportsPage = () => {
             today.setHours(0, 0, 0, 0)
 
             if (periodType === 'За 24 часа') {
-                // Суточный отчёт: с (сегодня − 1 сутки) в выбранное время по сегодня в то же время (ровно 24 ч)
-                const startTime = timeRange?.start || '00:00'
-                const endTime = startTime // одно и то же время = 24 часа
-                periodStartDate = new Date(today)
-                periodStartDate.setDate(periodStartDate.getDate() - 1)
-                periodEndDate = new Date(today)
-                periodStartTime = startTime
-                periodEndTime = endTime
+                // Последние 24 часа до текущего момента (а не «вчера 00:00 — сегодня 00:00», иначе отрезается всё,
+                // что произошло сегодня после полуночи — отчёт выглядит «пустым» при сварке в последние сутки).
+                const end = new Date()
+                const start = new Date(end.getTime() - 24 * 60 * 60 * 1000)
+                const pad2 = (n) => String(n).padStart(2, '0')
+                const formatHms = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
+                periodStartDate = start
+                periodEndDate = end
+                periodStartTime = formatHms(start)
+                periodEndTime = formatHms(end)
             } else if (periodType === 'За 7 дней') {
                 // 7 дней: с (сегодня − 7 дней) по сегодня
                 periodStartDate = new Date(today)
@@ -4052,7 +4065,7 @@ const ReportsPage = () => {
                             ×
                         </button>
                         <div className="resave-confirm-icon">⚠</div>
-                        <div className="resave-confirm-question">Удалить шаблон отчёта?</div>
+                        <div className="resave-confirm-question">Удалить отчёт?</div>
                         <div className="resave-confirm-buttons">
                             <button
                                 className="resave-confirm-btn resave-confirm-btn-no"

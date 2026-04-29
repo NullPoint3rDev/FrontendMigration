@@ -81,6 +81,15 @@
     border: 2px solid #1A1420;
 }
 
+/* Плейсхолдер пока грузится тело страницы (lazy-чанк) */
+.equipment-page-body-skeleton {
+    flex: 1;
+    min-height: 200px;
+    min-width: 0;
+    background: rgba(45, 37, 54, 0.28);
+    border-radius: 6px;
+}
+
 .welding-equipment-page-content {
     display: flex;
     flex: 1;
@@ -275,7 +284,7 @@
     align-items: center;
     gap: 16px;
     flex-shrink: 0;
-    margin-left: 400px;
+    margin-left: 480px;
 }
 
 .welding-equipment-page .welders-stats-tile .stat-item {

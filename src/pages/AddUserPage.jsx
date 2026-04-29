@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { FaBell, FaChevronRight } from 'react-icons/fa';
+import { FaBell, FaChevronRight, FaChevronDown } from 'react-icons/fa';
 import { RiRfidFill } from 'react-icons/ri';
 import { FaTrash } from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
 import AddRfidPassModal from '../components/AddRfidPassModal';
+import EmailVerifyModal from '../components/EmailVerifyModal';
 import { getRoles, createUserAccount, getUserAccountById, updateUserAccount } from '../api/userAccountApi';
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { api } from '../services/api';
+import { buildOrganizationHierarchy } from '../utils/organizationUnitTree';
 import '../styles/addUserPage.css';
 
 function AddUserPage() {
@@ -29,10 +31,14 @@ function AddUserPage() {
     const [permissionChecks, setPermissionChecks] = useState({});
     const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
     const [departmentDropdownOpen, setDepartmentDropdownOpen] = useState(false);
+    const [expandedUnits, setExpandedUnits] = useState({});
     const typeRef = useRef(null);
     const departmentRef = useRef(null);
     const [rfidPasses, setRfidPasses] = useState([]);
     const [isRfidModalOpen, setIsRfidModalOpen] = useState(false);
+    const [emailVerifyModalOpen, setEmailVerifyModalOpen] = useState(false);
+    const [verifyEmailSnapshot, setVerifyEmailSnapshot] = useState('');
+    const [savedEmailFromServer, setSavedEmailFromServer] = useState('');
     const [submitError, setSubmitError] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -46,6 +52,7 @@ function AddUserPage() {
         position: '',
         phone: '',
         email: '',
+        emailVerified: false,
         personnelNumber: '',
         blocked: false,
     });
@@ -142,9 +149,11 @@ function AddUserPage() {
                                 position: userData.position || '',
                                 phone: userData.phone || '',
                                 email: userData.email || '',
+                                emailVerified: !!userData.emailVerified,
                                 personnelNumber: userData.personnelNumber || '',
                                 blocked: (userData.status || '').toLowerCase() === 'blocked',
                             });
+                            setSavedEmailFromServer((userData.email || '').trim());
                             if (userData.rfid) {
                                 const codes = userData.rfid.split(',').map((c) => c.trim()).filter(Boolean);
                                 setRfidPasses(codes.map((code, i) => ({ id: Date.now() + i, code })));
@@ -188,6 +197,10 @@ function AddUserPage() {
         document.addEventListener('mousedown', handleClick);
         return () => document.removeEventListener('mousedown', handleClick);
     }, []);
+
+    useEffect(() => {
+        setExpandedUnits({});
+    }, [formData.organizationId]);
 
     const userTypeOptions = useMemo(() => {
         let all = [
@@ -606,6 +619,68 @@ function AddUserPage() {
                 String(formData.organizationId)
         );
     }, [organizationUnits, formData.organizationId]);
+
+    const organizationUnitHierarchy = useMemo(
+        () => buildOrganizationHierarchy(filteredOrganizationUnits),
+        [filteredOrganizationUnits]
+    );
+
+    const toggleUnitExpand = (unitId) => {
+        setExpandedUnits((prev) => ({
+            ...prev,
+            [unitId]: !prev[unitId],
+        }));
+    };
+
+    const renderDepartmentUnitOption = (unit, level = 0) => {
+        const isExpanded = expandedUnits[unit.id];
+        const hasChildren = unit.children && unit.children.length > 0;
+        const indent = level * 32;
+        const isSelected = String(formData.departmentId) === String(unit.id);
+        const isChild = level > 0;
+        const displayName = (unit.name != null && String(unit.name).trim() !== '') ? unit.name : '—';
+
+        return (
+            <React.Fragment key={unit.id}>
+                <div
+                    className={`unit-option ${isSelected ? 'selected' : ''} ${isChild ? 'unit-option-child' : ''}`}
+                    style={{
+                        marginLeft: `${indent}px`,
+                        paddingLeft: '12px',
+                    }}
+                    onClick={() => {
+                        handleInput('departmentId', unit.id);
+                        setDepartmentDropdownOpen(false);
+                    }}
+                >
+                    {hasChildren ? (
+                        <button
+                            type="button"
+                            className="org-unit-expand-btn"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                toggleUnitExpand(unit.id);
+                            }}
+                        >
+                            {isExpanded ? (
+                                <FaChevronDown className="expand-icon" />
+                            ) : (
+                                <FaChevronRight className="expand-icon" />
+                            )}
+                        </button>
+                    ) : (
+                        <span className="org-unit-spacer" style={{ width: '16px', display: 'inline-block' }} />
+                    )}
+                    <span className="unit-option-name">{displayName}</span>
+                </div>
+                {hasChildren && isExpanded && (
+                    <div className="unit-children">
+                        {unit.children.map((child) => renderDepartmentUnitOption(child, level + 1))}
+                    </div>
+                )}
+            </React.Fragment>
+        );
+    };
     // AllowedUserActions are an Alloy-level capability switchboard.
     // We intentionally show this panel only to Admin Alloy (who is allowed to configure these flags).
     const canConfigureAllowedActions = currentUserIsAdminAlloy === true || currentUserIsAdminDealer === true;
@@ -631,6 +706,34 @@ function AddUserPage() {
                             : permissionsUserAlloy;
     const selectedUnit = filteredOrganizationUnits.find((u) => String(u.id) === String(formData.departmentId));
     const showSelectTypeMessage = formData.userTypeId == null;
+
+    const emailTrim = (formData.email || '').trim();
+    const savedEmailTrim = (savedEmailFromServer || '').trim();
+    const emailUnsavedForVerify = isEditMode && emailTrim !== savedEmailTrim;
+    const canOpenEmailVerify =
+        isEditMode &&
+        id &&
+        emailTrim.length > 0 &&
+        !formData.emailVerified &&
+        !emailUnsavedForVerify;
+
+    const handleOpenEmailVerify = () => {
+        if (!emailTrim) {
+            alert('Укажите email');
+            return;
+        }
+        if (emailUnsavedForVerify) {
+            alert('Сначала сохраните изменения email (кнопка «Сохранить»).');
+            return;
+        }
+        setVerifyEmailSnapshot(emailTrim);
+        setEmailVerifyModalOpen(true);
+    };
+
+    const handleEmailVerified = (updated) => {
+        setFormData((prev) => ({ ...prev, emailVerified: !!updated?.emailVerified }));
+        if (updated?.email != null) setSavedEmailFromServer(String(updated.email).trim());
+    };
 
     const handleInput = (field, value) => {
         if (field === 'organizationId') {
@@ -743,7 +846,7 @@ function AddUserPage() {
                 userRoleId: role.id,
                 position: formData.position?.trim() || null,
                 phone: formData.phone?.trim() || null,
-                email: formData.email?.trim() || null,
+                email: isEditMode ? formData.email?.trim() || null : null,
                 personnelNumber: formData.personnelNumber?.trim() || null,
                 status: formData.blocked ? 'Blocked' : 'Active',
                 rfid: rfidString || null,
@@ -944,43 +1047,47 @@ function AddUserPage() {
                             {!fromCreateEnterprise && (
                                 <div className="form-group">
                                     <label>Подразделение:</label>
-                                    <div ref={departmentRef} style={{ position: 'relative' }}>
-                                        <button
-                                            type="button"
-                                            className={`add-user-department-select ${selectedUnit ? 'has-value' : ''} ${!formData.organizationId ? 'disabled' : ''}`}
-                                            disabled={!formData.organizationId}
-                                            onClick={() => setDepartmentDropdownOpen((v) => !v)}
+                                    <div ref={departmentRef} className="unit-select-container">
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
+                                            className={`unit-select-dropdown ${departmentDropdownOpen ? 'open' : ''} ${!formData.organizationId ? 'disabled' : ''} ${selectedUnit ? 'has-value' : ''}`}
+                                            onClick={() => {
+                                                if (!formData.organizationId) return;
+                                                setDepartmentDropdownOpen((v) => !v);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    if (!formData.organizationId) return;
+                                                    setDepartmentDropdownOpen((v) => !v);
+                                                }
+                                            }}
                                         >
-                                            <span>
+                                            <span className="unit-select-label">
                                                 {!formData.organizationId
                                                     ? 'Сначала выберите предприятие'
                                                     : selectedUnit
-                                                        ? selectedUnit.name
+                                                        ? (String(selectedUnit.name || '').trim() || '—')
                                                         : filteredOrganizationUnits.length
                                                             ? 'Выбрать'
                                                             : 'Нет подразделений'}
                                             </span>
-                                            <FaChevronRight className="chevron" />
-                                        </button>
-                                        {departmentDropdownOpen && (
-                                            <div className="add-user-department-dropdown">
-                                                {filteredOrganizationUnits.length === 0 ? (
-                                                    <div className="add-user-department-option disabled">
+                                            <span className={`unit-select-arrow ${departmentDropdownOpen ? 'open' : ''}`}>
+                                                <FaChevronDown />
+                                            </span>
+                                        </div>
+                                        {departmentDropdownOpen && formData.organizationId && (
+                                            <div className="unit-select-options">
+                                                {organizationUnitHierarchy.length > 0 ? (
+                                                    organizationUnitHierarchy.map((unit) => renderDepartmentUnitOption(unit))
+                                                ) : (
+                                                    <div
+                                                        className="unit-option"
+                                                        style={{ padding: '8px 12px', color: '#7B8BA6', cursor: 'default' }}
+                                                    >
                                                         Нет подразделений
                                                     </div>
-                                                ) : (
-                                                    filteredOrganizationUnits.map((unit) => (
-                                                        <div
-                                                            key={unit.id}
-                                                            className={`add-user-department-option ${formData.departmentId === unit.id ? 'selected' : ''}`}
-                                                            onClick={() => {
-                                                                handleInput('departmentId', unit.id);
-                                                                setDepartmentDropdownOpen(false);
-                                                            }}
-                                                        >
-                                                            {unit.name}
-                                                        </div>
-                                                    ))
                                                 )}
                                             </div>
                                         )}
@@ -1008,15 +1115,44 @@ function AddUserPage() {
                                 />
                             </div>
 
-                            <div className="form-group">
-                                <label>Email:</label>
-                                <input
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => handleInput('email', e.target.value)}
-                                    placeholder=""
-                                />
-                            </div>
+                            {isEditMode && (
+                                <div className="form-group">
+                                    <label>Email:</label>
+                                    <div className="add-user-email-row">
+                                        <input
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={(e) => handleInput('email', e.target.value)}
+                                            placeholder=""
+                                        />
+                                        <div className="add-user-email-actions">
+                                            {formData.emailVerified ? (
+                                                <span className="add-user-email-badge">Подтверждён</span>
+                                            ) : null}
+                                            <button
+                                                type="button"
+                                                className="add-user-verify-email-btn"
+                                                onClick={handleOpenEmailVerify}
+                                                disabled={!canOpenEmailVerify}
+                                                title={
+                                                    emailUnsavedForVerify && emailTrim
+                                                        ? 'Сохраните email перед подтверждением'
+                                                        : formData.emailVerified
+                                                            ? 'Email уже подтверждён'
+                                                            : !emailTrim
+                                                                ? 'Укажите email'
+                                                                : ''
+                                                }
+                                            >
+                                                Подтвердить
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {emailUnsavedForVerify && emailTrim ? (
+                                        <p className="add-user-email-hint">Сохраните карточку, чтобы подтвердить этот адрес.</p>
+                                    ) : null}
+                                </div>
+                            )}
 
                             <div className="form-group">
                                 <label>Табельный №:</label>
@@ -1156,6 +1292,13 @@ function AddUserPage() {
                 isOpen={isRfidModalOpen}
                 onClose={() => setIsRfidModalOpen(false)}
                 onAdd={handleRfidPassAdded}
+            />
+            <EmailVerifyModal
+                isOpen={emailVerifyModalOpen}
+                onClose={() => setEmailVerifyModalOpen(false)}
+                userId={id ? parseInt(id, 10) : null}
+                email={verifyEmailSnapshot}
+                onVerified={handleEmailVerified}
             />
         </div>
     );

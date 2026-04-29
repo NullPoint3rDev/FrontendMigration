@@ -206,6 +206,31 @@
     flex-shrink: 0;
 }
 
+/* Группа «предприятие → подразделения» в фильтре */
+.filter-org-block {
+    display: flex;
+    flex-direction: column;
+    margin-top: 8px;
+}
+
+.filter-org-block:first-of-type {
+    margin-top: 4px;
+}
+
+.filter-org-header-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0 4px 0;
+    font-weight: 500;
+    color: #e8e4ef;
+}
+
+.filter-org-header-row .filter-org-title {
+    flex: 1;
+    font-size: 12px;
+}
+
 /* Стилизованный скроллбар для фильтров */
 .filters-column::-webkit-scrollbar {
     width: 6px;

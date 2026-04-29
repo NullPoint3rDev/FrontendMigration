@@ -10,6 +10,11 @@ import {
 } from '../api/userAccountApi';
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { api } from '../services/api';
+import {
+    groupUnitsByOrganization,
+    findUnitInForest,
+    flattenUnitNamesFromForest,
+} from '../utils/organizationUnitFilterGroups';
 
 const USERS_PAGE_STATE_KEY = 'usersPageState';
 
@@ -54,6 +59,8 @@ function EmployeesPage() {
         organizations: true,
     });
     const [expandedOrganizationUnits, setExpandedOrganizationUnits] = useState({});
+    const [expandedOrgInFilter, setExpandedOrgInFilter] = useState({});
+    const [organizationsList, setOrganizationsList] = useState([]);
     const [selectedUsers, setSelectedUsers] = useState([]);
     const [currentUserOrgId, setCurrentUserOrgId] = useState(null);
     const [isEnterpriseScopedRole, setIsEnterpriseScopedRole] = useState(false);
@@ -62,9 +69,20 @@ function EmployeesPage() {
     useEffect(() => {
         loadUsers();
         loadOrganizationUnits();
+        loadOrganizations();
         loadRoles();
         loadCurrentUserScope();
     }, []);
+
+    const loadOrganizations = async () => {
+        try {
+            const data = await api.getOrganizations();
+            setOrganizationsList(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Ошибка загрузки организаций:', err);
+            setOrganizationsList([]);
+        }
+    };
 
     const loadCurrentUserScope = async () => {
         try {
@@ -133,6 +151,11 @@ function EmployeesPage() {
     const visibleUnitIdSet = useMemo(
         () => new Set(visibleOrganizationUnits.map((u) => String(u.id))),
         [visibleOrganizationUnits]
+    );
+
+    const organizationsForFilter = useMemo(
+        () => groupUnitsByOrganization(visibleOrganizationUnits, organizationsList),
+        [visibleOrganizationUnits, organizationsList]
     );
 
     const visibleUsers = useMemo(() => {
@@ -337,30 +360,6 @@ function EmployeesPage() {
         return applySort ? getSorted(filtered) : filtered;
     };
 
-    const buildOrganizationHierarchy = () => {
-        if (!visibleOrganizationUnits || visibleOrganizationUnits.length === 0) return [];
-        const unitMap = new Map();
-        const rootUnits = [];
-        const normalizeId = (id) => (id == null ? null : typeof id === 'string' ? parseInt(id, 10) : id);
-        visibleOrganizationUnits.forEach((unit) => {
-            const nid = normalizeId(unit.id);
-            unitMap.set(nid, { ...unit, id: nid, name: unit.name, children: [] });
-        });
-        visibleOrganizationUnits.forEach((unit) => {
-            const nid = normalizeId(unit.id);
-            const node = unitMap.get(nid);
-            const parentId = unit.parentId ?? unit.parent_id ?? unit.parentDepartment?.id ?? null;
-            if (parentId != null && unitMap.has(normalizeId(parentId))) {
-                unitMap.get(normalizeId(parentId)).children.push(node);
-            } else {
-                rootUnits.push(node);
-            }
-        });
-        return rootUnits;
-    };
-
-    const organizationHierarchy = buildOrganizationHierarchy();
-
     const getAllChildUnits = (unit) => {
         const all = [unit];
         (unit.children || []).forEach((child) => all.push(...getAllChildUnits(child)));
@@ -372,16 +371,8 @@ function EmployeesPage() {
     };
 
     const toggleOrganizationUnit = (unitId) => {
-        const hierarchy = buildOrganizationHierarchy();
-        const findUnit = (list) => {
-            for (const u of list) {
-                if (u.id === unitId) return u;
-                const inChild = findUnit(u.children || []);
-                if (inChild) return inChild;
-            }
-            return null;
-        };
-        const unit = findUnit(hierarchy);
+        const allRoots = organizationsForFilter.flatMap((o) => o.hierarchy);
+        const unit = findUnitInForest(allRoots, unitId);
         if (!unit) return;
         const allChildUnits = getAllChildUnits(unit);
         const allNames = allChildUnits.map((u) => u.name);
@@ -398,6 +389,31 @@ function EmployeesPage() {
                 return next.length === 0 ? ['__NONE__'] : next;
             }
         });
+    };
+
+    const toggleOrganizationOrg = (orgKey) => {
+        const entry = organizationsForFilter.find((e) => e.orgKey === orgKey);
+        if (!entry) return;
+        const names = flattenUnitNamesFromForest(entry.hierarchy);
+        if (names.length === 0) return;
+        setOrganizationUnitFilter((prev) => {
+            const isNone = prev.length === 1 && prev[0] === '__NONE__';
+            const allChecked = !isNone && names.every((n) => prev.includes(n));
+            if (!allChecked) {
+                if (isNone) return names;
+                const next = [...prev];
+                names.forEach((n) => {
+                    if (!next.includes(n)) next.push(n);
+                });
+                return next;
+            }
+            const next = prev.filter((n) => !names.includes(n));
+            return next.length === 0 ? ['__NONE__'] : next;
+        });
+    };
+
+    const toggleOrgExpandInFilter = (orgKey) => {
+        setExpandedOrgInFilter((prev) => ({ ...prev, [orgKey]: !prev[orgKey] }));
     };
 
     const filteredUsers = getFilteredUsers();
@@ -477,15 +493,9 @@ function EmployeesPage() {
                             <span className="filter-arrow">{expandedFilters.organizations ? '▾' : '▸'}</span>
                         </button>
                         {expandedFilters.organizations && (() => {
-                            const getAllUnitNames = (units) => {
-                                const names = [];
-                                units.forEach((u) => {
-                                    names.push(u.name);
-                                    if (u.children?.length) names.push(...getAllUnitNames(u.children));
-                                });
-                                return names;
-                            };
-                            const allUnitNames = getAllUnitNames(organizationHierarchy);
+                            const allUnitNames = organizationsForFilter.flatMap((o) =>
+                                flattenUnitNamesFromForest(o.hierarchy)
+                            );
                             const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
                             const allSelected = (organizationUnitFilter.length === 0 || organizationUnitFilter.length === allUnitNames.length) && !isNoneSelected;
                             const showAllChecked = organizationUnitFilter.length === 0 && !isNoneSelected;
@@ -551,8 +561,57 @@ function EmployeesPage() {
                                         />
                                         <span>Все</span>
                                     </label>
-                                    {organizationHierarchy.length > 0 ? (
-                                        organizationHierarchy.map((unit) => renderUnit(unit))
+                                    {organizationsForFilter.length > 0 ? (
+                                        organizationsForFilter.map(({ orgKey, orgName, hierarchy }) => {
+                                            const orgNames = flattenUnitNamesFromForest(hierarchy);
+                                            const isOrgExpanded = expandedOrgInFilter[orgKey] === true;
+                                            const isNoneSelectedOrg = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
+                                            const orgShowAllChecked = organizationUnitFilter.length === 0 && !isNoneSelectedOrg;
+                                            const isOrgRowChecked =
+                                                orgShowAllChecked ||
+                                                (!isNoneSelectedOrg &&
+                                                    orgNames.length > 0 &&
+                                                    orgNames.every((n) => organizationUnitFilter.includes(n)));
+
+                                            return (
+                                                <div key={orgKey} className="filter-org-block">
+                                                    <label className="filter-checkbox filter-org-header-row">
+                                                        <button
+                                                            type="button"
+                                                            className="org-unit-expand-btn"
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                toggleOrgExpandInFilter(orgKey);
+                                                            }}
+                                                        >
+                                                            {isOrgExpanded ? (
+                                                                <FaChevronDown className="expand-icon" />
+                                                            ) : (
+                                                                <FaChevronRight className="expand-icon" />
+                                                            )}
+                                                        </button>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isOrgRowChecked}
+                                                            onChange={() => toggleOrganizationOrg(orgKey)}
+                                                        />
+                                                        <span className="filter-org-title">{orgName}</span>
+                                                    </label>
+                                                    {isOrgExpanded &&
+                                                        hierarchy.length > 0 &&
+                                                        hierarchy.map((unit) => renderUnit(unit))}
+                                                    {isOrgExpanded && hierarchy.length === 0 && (
+                                                        <div
+                                                            className="filter-checkbox"
+                                                            style={{ color: '#7B8BA6', fontSize: '12px', padding: '4px 12px 8px 36px' }}
+                                                        >
+                                                            Нет подразделений
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
                                     ) : (
                                         <div className="filter-checkbox" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
                                             Нет доступных организаций

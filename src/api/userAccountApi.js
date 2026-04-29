@@ -60,3 +60,13 @@ export const getRoles = async () => {
         return [];
     }
 };
+
+/** Отправить 6-значный код подтверждения email (редактирование существующего пользователя). */
+export const sendEmailVerificationCode = async (userId) => {
+    await api.post(`${API_URL}/${userId}/email-verification/send`, {});
+};
+
+/** Подтвердить email кодом из письма. */
+export const confirmEmailVerificationCode = async (userId, code) => {
+    return await api.post(`${API_URL}/${userId}/email-verification/confirm`, { code });
+};

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useReportsUnsaved } from '../contexts/ReportsUnsavedContext';
 import { FaBell, FaChevronRight, FaChevronDown } from 'react-icons/fa';
 import { RiRfidFill } from 'react-icons/ri';
 import { FaTrash } from 'react-icons/fa';
@@ -9,6 +10,7 @@ import AddMachineModal from '../components/AddMachineModal';
 import { createWelder, getWelderById, updateWelder, uploadWelderPhoto, getWelderPhoto, getWelderPhotoUrl } from '../api/welderApi';
 import { getWeldingMachineById } from '../api/weldingMachineApi';
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
+import { buildOrganizationHierarchy } from '../utils/organizationUnitTree';
 import { getCertificationsByWelderId } from '../api/certificationApi';
 import machineImage from '../images/Untitled 3 копия.png';
 import '../styles/addWelderPage.css';
@@ -17,7 +19,16 @@ function AddWelderPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const { id } = useParams();
+    const idRef = useRef(id);
+    idRef.current = id;
     const isEditMode = !!id;
+    const reportsUnsaved = useReportsUnsaved();
+    const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
+    const pendingActionRef = useRef(null);
+    const lastSavedSnapshotRef = useRef(null);
+    const getFormSnapshotRef = useRef(() => null);
+    const isFormDirtyRef = useRef(null);
+    const [welderLoadRevision, setWelderLoadRevision] = useState(0);
     const [formData, setFormData] = useState({
         lastName: '',
         firstName: '',
@@ -44,6 +55,117 @@ function AddWelderPage() {
     const [isMachineModalOpen, setIsMachineModalOpen] = useState(false);
     const [deviceStatusesByMac, setDeviceStatusesByMac] = useState({});
     const [deviceStatesByMac, setDeviceStatesByMac] = useState({});
+
+    const canonicalJson = (val) => {
+        if (val === null || typeof val !== 'object') return JSON.stringify(val);
+        if (Array.isArray(val)) return '[' + val.map(canonicalJson).join(',') + ']';
+        const keys = Object.keys(val).sort();
+        return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalJson(val[k])).join(',') + '}';
+    };
+
+    const getFormSnapshot = () => ({
+        formData: { ...formData },
+        rfidCodes: [...rfidPasses].map((p) => String(p.code)).sort(),
+        machineIds: [...relatedMachines].map((m) => m.id).sort((a, b) => a - b),
+        pendingPhoto: !!selectedImageFile,
+        status: currentWelderStatus
+    });
+
+    getFormSnapshotRef.current = getFormSnapshot;
+
+    const commitBaseline = () => {
+        const snap = getFormSnapshotRef.current?.();
+        if (snap != null) {
+            lastSavedSnapshotRef.current = snap;
+        }
+    };
+
+    const isFormDirty = () => {
+        if (lastSavedSnapshotRef.current == null) return false;
+        try {
+            const current = getFormSnapshotRef.current?.();
+            if (current == null) return false;
+            return canonicalJson(current) !== canonicalJson(lastSavedSnapshotRef.current);
+        } catch {
+            return false;
+        }
+    };
+
+    isFormDirtyRef.current = isFormDirty;
+    if (reportsUnsaved?.isDirtyRef) {
+        reportsUnsaved.isDirtyRef.current = isFormDirty;
+    }
+
+    const executePendingAction = () => {
+        const action = pendingActionRef.current;
+        pendingActionRef.current = null;
+        if (!action) return;
+        if (action.type === 'leave' && action.path) {
+            reportsUnsaved?.setPendingLeavePath(null);
+            navigate(action.path);
+        }
+    };
+
+    const goWithUnsavedGuard = (path) => {
+        if (isFormDirty()) {
+            if (reportsUnsaved?.requestLeave) {
+                reportsUnsaved.requestLeave(path);
+            } else {
+                navigate(path);
+            }
+        } else {
+            navigate(path);
+        }
+    };
+
+    useEffect(() => {
+        setWelderLoadRevision(0);
+    }, [id]);
+
+    useLayoutEffect(() => {
+        if (!isEditMode || !id) return;
+        if (welderLoadRevision === 0) return;
+        commitBaseline();
+    }, [welderLoadRevision, isEditMode, id]);
+
+    useEffect(() => {
+        return () => {
+            if (reportsUnsaved?.isDirtyRef) {
+                reportsUnsaved.isDirtyRef.current = () => false;
+            }
+        };
+    }, [reportsUnsaved]);
+
+    useEffect(() => {
+        if (!reportsUnsaved?.pendingLeavePath) return;
+        if (isFormDirty()) {
+            const path = reportsUnsaved.pendingLeavePath;
+            reportsUnsaved.setPendingLeavePath(null);
+            pendingActionRef.current = { type: 'leave', path };
+            setShowUnsavedConfirm(true);
+        } else {
+            reportsUnsaved.setPendingLeavePath(null);
+        }
+    }, [reportsUnsaved?.pendingLeavePath]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if (isFormDirtyRef.current?.()) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, []);
+
+    useEffect(() => {
+        if (isEditMode) return;
+        const st = location.state;
+        if (st && (st.prefilledRfidCode != null || st.prefilledMachineId != null)) return;
+        const t = setTimeout(() => commitBaseline(), 0);
+        return () => clearTimeout(t);
+    }, [isEditMode, location.key]);
 
     useEffect(() => {
         const initialize = async () => {
@@ -88,6 +210,9 @@ function AddWelderPage() {
                 } catch (e) {
                     console.error('Не удалось подставить аппарат:', e);
                 }
+            }
+            if (!cancelled) {
+                setTimeout(() => commitBaseline(), 0);
             }
         })();
         return () => {
@@ -147,63 +272,6 @@ function AddWelderPage() {
             setOrganizationUnits([]);
             setOrganizationUnitHierarchy([]);
         }
-    };
-
-    // Построение иерархии подразделений
-    const buildOrganizationHierarchy = (units) => {
-        if (!units || units.length === 0) return [];
-
-        const unitMap = new Map();
-        const rootUnits = [];
-
-        // Нормализуем ID для единообразия
-        const normalizeId = (id) => {
-            if (id == null) return null;
-            return typeof id === 'string' ? parseInt(id) : id;
-        };
-
-        // Создаем карту всех подразделений с пустыми массивами children
-        units.forEach(unit => {
-            const normalizedId = normalizeId(unit.id);
-            unitMap.set(normalizedId, {
-                ...unit,
-                id: normalizedId,
-                children: []
-            });
-        });
-
-        // Строим дерево
-        units.forEach(unit => {
-            const normalizedId = normalizeId(unit.id);
-            const unitNode = unitMap.get(normalizedId);
-
-            // Проверяем все возможные варианты: parentId, parent_id, parentDepartment (объект)
-            let parentIdValue = null;
-            if (unit.parentId != null) {
-                parentIdValue = unit.parentId;
-            } else if (unit.parent_id != null) {
-                parentIdValue = unit.parent_id;
-            } else if (unit.parentDepartment != null && unit.parentDepartment.id != null) {
-                parentIdValue = unit.parentDepartment.id;
-            }
-
-            // Если есть parentId и родитель существует в карте, добавляем к родителю
-            if (parentIdValue != null) {
-                const normalizedParentId = normalizeId(parentIdValue);
-                if (unitMap.has(normalizedParentId)) {
-                    const parent = unitMap.get(normalizedParentId);
-                    parent.children.push(unitNode);
-                } else {
-                    // Родитель не найден - считаем корневым
-                    rootUnits.push(unitNode);
-                }
-            } else {
-                // Если нет parentId - это корневой элемент
-                rootUnits.push(unitNode);
-            }
-        });
-
-        return rootUnits;
     };
 
     const toggleUnitExpand = (unitId) => {
@@ -276,6 +344,7 @@ function AddWelderPage() {
     };
 
     const loadWelderData = async (welderId) => {
+        lastSavedSnapshotRef.current = null;
         try {
             const welder = await getWelderById(welderId);
             console.log('Загруженные данные сварщика:', welder);
@@ -366,6 +435,10 @@ function AddWelderPage() {
 
             // Загружаем аттестации
             await loadCertifications(welderId);
+            if (String(welderId) !== String(idRef.current)) {
+                return;
+            }
+            setWelderLoadRevision((r) => r + 1);
         } catch (error) {
             console.error('Ошибка загрузки данных сварщика:', error);
             alert('Ошибка загрузки данных сварщика');
@@ -509,13 +582,13 @@ function AddWelderPage() {
         // Сохраняем ID сварщика в localStorage для использования на странице аттестации
         if (id) {
             localStorage.setItem('currentWelderId', id);
-            navigate(`/welders/${id}/certification`);
+            goWithUnsavedGuard(`/welders/${id}/certification`);
         } else {
             // Если это новый сварщик, сохраняем временный ID или используем null
             // В этом случае нужно сначала сохранить сварщика
             const tempId = localStorage.getItem('currentWelderId');
             if (tempId) {
-                navigate('/welders/add/certification');
+                goWithUnsavedGuard('/welders/add/certification');
             } else {
                 alert('Сначала сохраните данные сварщика');
             }
@@ -633,11 +706,9 @@ function AddWelderPage() {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSave = async (e) => {
-        e.preventDefault();
-
+    const saveWelder = async () => {
         if (!validateForm()) {
-            return;
+            return false;
         }
 
         try {
@@ -654,7 +725,7 @@ function AddWelderPage() {
 
             if (!fullName) {
                 alert('Пожалуйста, заполните хотя бы фамилию и имя');
-                return;
+                return false;
             }
 
             // Получаем все RFID коды из списка пропусков
@@ -724,6 +795,8 @@ function AddWelderPage() {
                 await loadCertifications(welderId);
             }
 
+            setTimeout(() => commitBaseline(), 0);
+
             // Не переходим на страницу списка, остаемся на странице редактирования
             if (!isEditMode) {
                 // Если это был новый сварщик, переходим в режим редактирования
@@ -733,6 +806,7 @@ function AddWelderPage() {
                     navigate(`/welders/add/${welderId}`, { replace: true });
                 }, 100);
             }
+            return true;
         } catch (error) {
             console.error('Ошибка создания сварщика:', error);
             console.error('Детали ошибки:', {
@@ -757,7 +831,13 @@ function AddWelderPage() {
             }
 
             alert(`Ошибка при создании сварщика: ${errorMessage}`);
+            return false;
         }
+    };
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        await saveWelder();
     };
 
     const positions = [
@@ -772,7 +852,7 @@ function AddWelderPage() {
             {/* Header */}
             <div className="add-welder-header">
                 <div className="header-left">
-                    <button className="back-btn" onClick={() => navigate('/welders')}>
+                    <button className="back-btn" onClick={() => goWithUnsavedGuard('/welders')}>
                         ←
                     </button>
                     <h1 className="page-title">{isEditMode ? 'Редактирование сварщика' : 'Сварщик'}</h1>
@@ -780,7 +860,7 @@ function AddWelderPage() {
                 <div className="header-right">
                     <button
                         className="control-btn notifications-btn"
-                        onClick={() => navigate('/notifications')}
+                        onClick={() => goWithUnsavedGuard('/notifications')}
                     >
                         <FaBell className="notifications-icon" />
                         <span className="notifications-badge"></span>
@@ -1015,11 +1095,11 @@ function AddWelderPage() {
                                         onClick={() => {
                                             // Переходим на страницу редактирования аттестации
                                             if (id) {
-                                                navigate(`/welders/${id}/certification/${cert.id}`);
+                                                goWithUnsavedGuard(`/welders/${id}/certification/${cert.id}`);
                                             } else {
                                                 const welderId = localStorage.getItem('currentWelderId');
                                                 if (welderId) {
-                                                    navigate(`/welders/${welderId}/certification/${cert.id}`);
+                                                    goWithUnsavedGuard(`/welders/${welderId}/certification/${cert.id}`);
                                                 }
                                             }
                                         }}
@@ -1145,6 +1225,57 @@ function AddWelderPage() {
                     </div>
                 </div>
             </div>
+
+            {showUnsavedConfirm && (
+                <div className="modal-overlay modal-overlay-no-close-on-backdrop">
+                    <div className="resave-confirm-modal">
+                        <button
+                            type="button"
+                            className="resave-confirm-close-btn"
+                            onClick={() => {
+                                pendingActionRef.current = null;
+                                reportsUnsaved?.setPendingLeavePath(null);
+                                setShowUnsavedConfirm(false);
+                            }}
+                            aria-label="Отмена"
+                        >
+                            ×
+                        </button>
+                        <div className="resave-confirm-icon">⚠</div>
+                        <div className="resave-confirm-question">Вы внесли изменения в карточку сварщика. Сохранить их?</div>
+                        <div className="resave-confirm-buttons">
+                            <button
+                                type="button"
+                                className="resave-confirm-btn resave-confirm-btn-no"
+                                onClick={() => {
+                                    setShowUnsavedConfirm(false);
+                                    executePendingAction();
+                                }}
+                            >
+                                <span className="resave-confirm-icon-x">×</span>
+                                <span>Нет</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="resave-confirm-btn resave-confirm-btn-yes"
+                                onClick={() => {
+                                    saveWelder()
+                                        .then((ok) => {
+                                            if (ok) {
+                                                setShowUnsavedConfirm(false);
+                                                executePendingAction();
+                                            }
+                                        })
+                                        .catch(() => {});
+                                }}
+                            >
+                                <span className="resave-confirm-icon-check">✓</span>
+                                <span>Да</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Add RFID Pass Modal */}
             <AddRfidPassModal

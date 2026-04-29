@@ -77,6 +77,56 @@
     overflow: auto;
 }
 
+.add-user-email-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.add-user-email-row > input[type='email'] {
+    flex: 1 1 200px;
+    min-width: 0;
+}
+
+.add-user-email-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.add-user-email-badge {
+    font-size: 12px;
+    color: #7dd3a0;
+    white-space: nowrap;
+}
+
+.add-user-verify-email-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid rgba(120, 150, 200, 0.45);
+    background: linear-gradient(180deg, #3d5578 0%, #2c4058 100%);
+    color: #e8ecf5;
+}
+
+.add-user-verify-email-btn:hover:not(:disabled) {
+    filter: brightness(1.08);
+}
+
+.add-user-verify-email-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.add-user-email-hint {
+    margin: 6px 0 0 0;
+    font-size: 12px;
+    color: #c9b28a;
+}
+
 .add-user-form-section {
     flex: 0 1 500px;
     display: flex;
@@ -587,4 +637,129 @@
 .add-user-department-option.selected {
     background: rgba(246, 178, 67, 0.15);
     color: #F6B243;
+}
+
+/* Древовидный выбор подразделения (как на странице сварщика) */
+.add-user-page .unit-select-container {
+    position: relative;
+    width: 100%;
+}
+
+.add-user-page .unit-select-dropdown {
+    position: relative;
+    width: 100%;
+    padding: 8px 12px;
+    background: #1B1622;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+    min-height: 38px;
+}
+
+.add-user-page .unit-select-dropdown:hover:not(.disabled) {
+    border-color: rgba(123, 139, 166, 0.8);
+}
+
+.add-user-page .unit-select-dropdown.disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.add-user-page .unit-select-dropdown.disabled .unit-select-label {
+    color: #6C7386;
+}
+
+.add-user-page .unit-select-label {
+    font-size: 13px;
+    flex: 1;
+    text-align: left;
+    color: #6C7386;
+}
+
+.add-user-page .unit-select-dropdown.has-value .unit-select-label {
+    color: #f0f4ff;
+}
+
+.add-user-page .unit-select-arrow {
+    color: #7B8BA6;
+    font-size: 10px;
+    margin-right: -9px;
+    transition: transform 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.add-user-page .unit-select-arrow.open {
+    transform: rotate(180deg);
+}
+
+.add-user-page .unit-select-options {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: #1B1622;
+    border: none;
+    border-radius: 3px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.add-user-page .unit-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    padding-right: 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    color: #f0f4ff;
+    font-size: 13px;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.add-user-page .unit-option:hover {
+    background: #484A5D;
+}
+
+.add-user-page .unit-option.selected {
+    background: rgba(246, 178, 67, 0.1);
+    color: #F6B243;
+}
+
+.add-user-page .unit-option-name {
+    flex: 1;
+}
+
+.add-user-page .unit-select-container .org-unit-expand-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: #6C7386;
+    transition: color 0.2s ease;
+}
+
+.add-user-page .unit-select-container .org-unit-expand-btn:hover {
+    color: #9CA3B8;
+}
+
+.add-user-page .unit-select-container .org-unit-expand-btn .expand-icon {
+    font-size: 12px;
 }

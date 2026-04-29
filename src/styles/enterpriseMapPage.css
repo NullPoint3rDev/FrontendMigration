@@ -11,6 +11,15 @@
     box-sizing: border-box;
 }
 
+/* Плейсхолдер пока грузится тело страницы (lazy-чанк) */
+.enterprise-map-page-body-skeleton {
+    flex: 1;
+    min-height: 200px;
+    min-width: 0;
+    background: rgba(45, 37, 54, 0.28);
+    border-radius: 6px;
+}
+
 /* Page Title and Controls - Same line */
 .enterprise-map-header-row {
     display: flex;
