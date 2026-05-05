@@ -1335,7 +1335,6 @@
     overflow: hidden;
     flex: 1;
     min-height: 0;
-    height: 60%;
     min-width: 0;
     width: 100%;
     max-width: 100%;
@@ -1366,8 +1365,10 @@
     flex-direction: column;
     flex: 1 1 auto;
     min-width: 0;
+    height: 90%;
     max-width: calc(100% - 48px);
     gap: 0;
+    overflow: visible;
 }
 
 .chart-card.large::before,
@@ -1395,7 +1396,7 @@
 .chart-canvas {
     position: relative;
     flex: 1;
-    min-height: 140px;
+    min-height: 96px;
     border-radius: 14px;
     overflow: hidden;
     background: linear-gradient(180deg, rgba(30, 25, 37, 0.95), rgba(26, 21, 32, 0.96));
@@ -1426,6 +1427,136 @@
     inset: 0;
     background: radial-gradient(circle at 10% 20%, rgba(246, 214, 141, 0.14), transparent 60%);
     pointer-events: none;
+}
+
+.monitor-overlay-ruler {
+    position: relative;
+    height: 40px;
+    margin: 0 0 12px 0;
+    padding-top: 2px;
+    user-select: none;
+    background: #132539;
+    z-index: 3;
+}
+
+.monitor-overlay-ruler-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 22px;
+    height: 1px;
+    background: rgba(110, 144, 191, 0.75);
+}
+
+.monitor-overlay-ruler-tick {
+    position: absolute;
+    top: 7px;
+    transform: translateX(-50%);
+    color: rgba(168, 191, 223, 0.92);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(3, 8, 18, 0.8);
+    white-space: nowrap;
+}
+
+.monitor-overlay-ruler-tick::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 12px;
+    width: 1px;
+    height: 8px;
+    background: rgba(116, 147, 189, 0.45);
+}
+
+.monitor-time-pin {
+    position: absolute;
+    top: 16px;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 12px;
+    border: none;
+    border-radius: 50%;
+    background: #f3cb5d;
+    box-shadow: 0 0 0 3px rgba(243, 203, 93, 0.22);
+    cursor: ew-resize;
+    z-index: 2;
+}
+
+.monitor-time-pin::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 11px;
+    width: 2px;
+    height: 9px;
+    background: rgba(243, 203, 93, 0.95);
+}
+
+.monitor-lanes {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.monitor-lane-row {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    align-items: center;
+    gap: 10px;
+}
+
+.monitor-lane-label {
+    color: rgba(196, 189, 206, 0.9);
+    font-size: 14px;
+    line-height: 1;
+}
+
+.monitor-lane-track {
+    position: relative;
+    height: 25px;
+    border-radius: 3px;
+    background: rgba(44, 36, 53, 0.95);
+    border: 1px solid rgba(80, 69, 93, 0.46);
+    overflow: hidden;
+}
+
+.monitor-lane-segment {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.monitor-lane-segment-online {
+    background: linear-gradient(90deg, rgba(134, 201, 87, 0.9), rgba(183, 227, 93, 0.95));
+}
+
+.monitor-lane-segment-welding {
+    background: linear-gradient(90deg, rgba(248, 176, 77, 0.9), rgba(255, 209, 96, 0.95));
+}
+
+.monitor-lane-segment-error {
+    background: linear-gradient(90deg, rgba(239, 86, 92, 0.95), rgba(210, 37, 59, 0.95));
+    padding: 0 4px;
+}
+
+.monitor-lane-segment-welder {
+    background: linear-gradient(90deg, rgba(100, 122, 255, 0.9), rgba(212, 84, 200, 0.95));
 }
 
 .chart-axis {

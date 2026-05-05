@@ -302,6 +302,25 @@ function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, 
     return next;
 }
 
+function parseErrorCodeForTimeline(state) {
+    const data = flattenPanelState(state);
+    const direct = data.errorCode || data.ErrorCode || data['error_code'] || data['State.Error'] || data['Ошибка'] || data['Ошибки'];
+    if (direct === undefined || direct === null) return null;
+    const raw = String(direct).trim();
+    if (!raw || raw.toLowerCase() === 'null' || raw === '0') return null;
+    const firstPart = raw.split(/[;,]/).map(s => s.trim()).find(Boolean) || raw;
+    const numeric = parseInt(firstPart, 10);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+    return null;
+}
+
+function formatErrorCodeLabel(errorCode) {
+    if (errorCode === undefined || errorCode === null) return '';
+    const n = Number(errorCode);
+    if (!Number.isFinite(n)) return `ERR ${String(errorCode)}`;
+    return `ERR ${String(Math.round(n)).padStart(2, '0')}`;
+}
+
 function extractRfidFromDeviceData(deviceData, machineMac, hasData) {
     if (Object.keys(deviceData).length === 0 || !hasData) return null;
     const data = deviceData[machineMac];
@@ -364,7 +383,8 @@ const DeviceMonitorPage = () => {
     const [hasData, setHasData] = useState(false);
 
     // Для задержки показа "отключен" при кратковременных паузах
-    const [disconnectTimeout, setDisconnectTimeout] = useState(null);
+    // Важно: ref вместо state, чтобы не ловить stale closure в polling callbacks
+    const disconnectTimeoutRef = useRef(null);
 
     // Состояние для отображения списка телеметрии
     const [isTelemetryListExpanded, setIsTelemetryListExpanded] = useState(true);
@@ -413,6 +433,10 @@ const DeviceMonitorPage = () => {
     });
     /** Масштаб по оси X: 1 — весь диапазон; больше — «приближение» к последним точкам (окно справа). */
     const [telemetryChartZoom, setTelemetryChartZoom] = useState({ top: 1, bottom: 1 });
+    const [timelineSamples, setTimelineSamples] = useState([]);
+    const [timeWindow, setTimeWindow] = useState({ start: null, end: null, touched: false });
+    const [draggingPin, setDraggingPin] = useState(null);
+    const timelineRulerRef = useRef(null);
     /** Как в archive WeldingMachinePanel: при >200 точек оставляем последние 100 */
     const trimChartSeries = (prev, point) => {
         const next = [...prev, point];
@@ -562,14 +586,15 @@ const DeviceMonitorPage = () => {
             if (updateTimeoutRef.current) {
                 clearTimeout(updateTimeoutRef.current);
             }
-            if (disconnectTimeout) {
-                clearTimeout(disconnectTimeout);
+            if (disconnectTimeoutRef.current) {
+                clearTimeout(disconnectTimeoutRef.current);
+                disconnectTimeoutRef.current = null;
             }
             if (saveTimeoutRef.current) {
                 clearTimeout(saveTimeoutRef.current);
             }
         };
-    }, [disconnectTimeout]);
+    }, []);
 
     // Рефы для экземпляров Chart.js
     const currentChartInstanceRef = useRef(null);
@@ -582,6 +607,8 @@ const DeviceMonitorPage = () => {
         lastWeldingVoltageChartRef.current = 0;
         setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
         setTelemetryChartZoom({ top: 1, bottom: 1 });
+        setTimelineSamples([]);
+        setTimeWindow({ start: null, end: null, touched: false });
     }, [machineMac]);
 
     // Очистка серий при потере связи (не завязываем на deviceData — он обновляется с дебаунсом и мог бы сбрасывать график после poll)
@@ -592,6 +619,8 @@ const DeviceMonitorPage = () => {
             lastWeldingVoltageChartRef.current = 0;
             setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
             setTelemetryChartZoom({ top: 1, bottom: 1 });
+            setTimelineSamples([]);
+            setTimeWindow({ start: null, end: null, touched: false });
         }
     }, [hasData]);
 
@@ -656,9 +685,9 @@ const DeviceMonitorPage = () => {
         // Если устройство подключено - сразу обновляем состояние
         if (connected && hasStateData) {
             // Очищаем таймаут отключения если он есть
-            if (disconnectTimeout) {
-                clearTimeout(disconnectTimeout);
-                setDisconnectTimeout(null);
+            if (disconnectTimeoutRef.current) {
+                clearTimeout(disconnectTimeoutRef.current);
+                disconnectTimeoutRef.current = null;
             }
 
             setIsConnected(true);
@@ -666,8 +695,9 @@ const DeviceMonitorPage = () => {
         } else {
             // Если устройство отключено - добавляем небольшую задержку (2 секунды)
             // чтобы избежать мигания при кратковременных паузах
-            if (disconnectTimeout) {
-                clearTimeout(disconnectTimeout);
+            if (disconnectTimeoutRef.current) {
+                clearTimeout(disconnectTimeoutRef.current);
+                disconnectTimeoutRef.current = null;
             }
 
             const timeout = setTimeout(() => {
@@ -679,10 +709,12 @@ const DeviceMonitorPage = () => {
                 lastWeldingVoltageChartRef.current = 0;
                 setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
                 setTelemetryChartZoom({ top: 1, bottom: 1 });
-                setDisconnectTimeout(null);
+                setTimelineSamples([]);
+                setTimeWindow({ start: null, end: null, touched: false });
+                disconnectTimeoutRef.current = null;
             }, 3000); // 3 секунды задержки
 
-            setDisconnectTimeout(timeout);
+            disconnectTimeoutRef.current = timeout;
         }
     };
 
@@ -772,6 +804,26 @@ const DeviceMonitorPage = () => {
                         }
                     });
                     return next;
+                });
+                const flatState = flattenPanelState(response);
+                const stateRfid = flatState['RFID.Hex'] ||
+                    flatState.RFID ||
+                    flatState.Rfid ||
+                    flatState.rfid ||
+                    null;
+                const errorCode = parseErrorCodeForTimeline(response);
+                setTimelineSamples(prev => {
+                    const next = [
+                        ...prev,
+                        {
+                            x: xPoll,
+                            isOnline: true,
+                            isWelding: wNow,
+                            errorCode,
+                            rfid: stateRfid ? String(stateRfid).trim() : null
+                        }
+                    ];
+                    return next.length > 1500 ? next.slice(-1200) : next;
                 });
                 prevWeldingForChartRef.current = wNow;
 
@@ -2017,37 +2069,266 @@ const DeviceMonitorPage = () => {
         });
     };
 
-    const topChartData = getCurrentChartData();
-    const bottomChartData = getVoltageChartData();
-    const telemetryChartXs = (chartData) => {
-        const ds = chartData.datasets || [];
-        return ds.flatMap((d) => (d.data || []).map((p) => (typeof p.x === 'number' ? p.x : 0)));
-    };
-    const getTimeBounds = (xs) => {
-        const finite = xs.filter((x) => Number.isFinite(x));
-        if (!finite.length) {
-            const now = Date.now();
-            return { minX: now - 60_000, maxX: now };
-        }
-        return { minX: Math.min(...finite), maxX: Math.max(...finite) };
-    };
-    const topTimeBounds = getTimeBounds(telemetryChartXs(topChartData));
-    const bottomTimeBounds = getTimeBounds(telemetryChartXs(bottomChartData));
-
-    const handleTelemetryChartZoom = (panel, direction) => {
-        setTelemetryChartZoom((prev) => {
-            const key = panel === 'top' ? 'top' : 'bottom';
-            let z = prev[key];
-            if (direction === 'in') {
-                z = Math.min(z * 1.25, 100);
-            } else if (direction === 'out') {
-                z = Math.max(1, z / 1.25);
-            } else {
-                z = 1;
-            }
-            return { ...prev, [key]: z };
+    const timelineXs = useMemo(() => {
+        const xs = [];
+        (telemetrySeries.weldingCurrent || []).forEach((p) => {
+            if (typeof p.x === 'number' && Number.isFinite(p.x)) xs.push(p.x);
         });
+        (telemetrySeries.weldingVoltage || []).forEach((p) => {
+            if (typeof p.x === 'number' && Number.isFinite(p.x)) xs.push(p.x);
+        });
+        return xs.sort((a, b) => a - b);
+    }, [telemetrySeries.weldingCurrent, telemetrySeries.weldingVoltage]);
+
+    const chartBounds = useMemo(() => {
+        const maxX = timelineXs.length ? timelineXs[timelineXs.length - 1] : Date.now();
+        const day = new Date(maxX);
+        day.setHours(0, 0, 0, 0);
+        const dayStart = day.getTime() + 6 * 60 * 60 * 1000;
+        const dayEnd = day.getTime() + 22 * 60 * 60 * 1000;
+        return { dayStart, dayEnd, dataMax: maxX };
+    }, [timelineXs]);
+
+    useEffect(() => {
+        if (timeWindow.touched) return;
+        const end = Math.min(chartBounds.dataMax, chartBounds.dayEnd);
+        const start = Math.max(chartBounds.dayStart, end - 60 * 60 * 1000);
+        setTimeWindow({ start, end, touched: false });
+    }, [chartBounds, timeWindow.touched]);
+
+    const activeWindow = useMemo(() => {
+        const minGap = 60 * 1000;
+        const fallbackEnd = Math.min(chartBounds.dataMax, chartBounds.dayEnd);
+        const fallbackStart = Math.max(chartBounds.dayStart, fallbackEnd - 60 * 60 * 1000);
+        let start = Number.isFinite(timeWindow.start) ? timeWindow.start : fallbackStart;
+        let end = Number.isFinite(timeWindow.end) ? timeWindow.end : fallbackEnd;
+        start = Math.max(chartBounds.dayStart, Math.min(start, chartBounds.dayEnd - minGap));
+        end = Math.min(chartBounds.dayEnd, Math.max(end, chartBounds.dayStart + minGap));
+        if (end - start < minGap) end = Math.min(chartBounds.dayEnd, start + minGap);
+        return { start, end, minGap };
+    }, [chartBounds, timeWindow.start, timeWindow.end]);
+
+    const getTelemetryOverlayChartOptions = (windowStart, windowEnd) => {
+        const range = Math.max(windowEnd - windowStart, 1);
+        const xStep = range / 8;
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#FFFFFF',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
+                    displayColors: true,
+                    callbacks: {
+                        title: () => '',
+                        beforeBody: () => '',
+                        afterBody: () => '',
+                        footer: () => '',
+                        label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    min: windowStart,
+                    max: windowEnd,
+                    grid: {
+                        display: true,
+                        color: 'rgba(255, 255, 255, 0.15)',
+                        lineWidth: 1,
+                        borderDash: [4, 4]
+                    },
+                    ticks: {
+                        stepSize: xStep,
+                        maxTicksLimit: 9,
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        font: { size: 10 },
+                        padding: 6,
+                        callback: function(val) {
+                            return new Date(val).toLocaleTimeString('ru-RU', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+                        }
+                    },
+                    border: { display: false },
+                    afterBuildTicks: (axis) => {
+                        const step = range / 8;
+                        axis.ticks = Array.from({ length: 9 }, (_, i) => ({ value: windowStart + i * step }));
+                    }
+                },
+                y: {
+                    min: 0,
+                    max: 500,
+                    position: 'left',
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.15)',
+                        lineWidth: 1,
+                        borderDash: [4, 4],
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        font: { size: 11 },
+                        padding: 8,
+                        callback: (v) => (LEFT_Y_TICKS.includes(v) ? v : '')
+                    },
+                    border: { display: false },
+                    afterBuildTicks: (axis) => {
+                        axis.ticks = LEFT_Y_TICKS.map((v) => ({ value: v }));
+                    }
+                },
+                yRight: {
+                    min: 0,
+                    max: 50,
+                    position: 'right',
+                    grid: { display: false },
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        font: { size: 11 },
+                        padding: 8,
+                        callback: (v) => (RIGHT_Y_TICKS.includes(v) ? v : '')
+                    },
+                    border: { display: false },
+                    afterBuildTicks: (axis) => {
+                        axis.ticks = RIGHT_Y_TICKS.map((v) => ({ value: v }));
+                    }
+                }
+            },
+            animation: { duration: 0 },
+            elements: { point: { radius: 0, hoverRadius: 4 }, line: { tension: 0, borderWidth: 2 } },
+            interaction: { intersect: false, mode: 'index' },
+            layout: { padding: { top: 8, bottom: 8, left: 8, right: 8 } }
+        };
     };
+
+    const topChartData = useMemo(() => ({
+        datasets: [
+            {
+                label: 'Сварочный ток',
+                data: (telemetrySeries.weldingCurrent || []).map((d) => ({ x: d.x, y: Number(d.y) || 0 })),
+                borderColor: '#3ec7ff',
+                backgroundColor: (context) => {
+                    const chart = context.chart;
+                    const { ctx, chartArea } = chart;
+                    if (!chartArea) return 'rgba(62,199,255,0.2)';
+                    return createGradient(ctx, chartArea, 'rgba(62,199,255,0.55)', 'rgba(62,199,255,0.02)');
+                },
+                fill: true,
+                yAxisID: 'y'
+            },
+            {
+                label: 'Сварочное напряжение',
+                data: (telemetrySeries.weldingVoltage || []).map((d) => ({ x: d.x, y: Number(d.y) || 0 })),
+                borderColor: '#ff61c8',
+                backgroundColor: (context) => {
+                    const chart = context.chart;
+                    const { ctx, chartArea } = chart;
+                    if (!chartArea) return 'rgba(255,97,200,0.2)';
+                    return createGradient(ctx, chartArea, 'rgba(255,97,200,0.48)', 'rgba(255,97,200,0.02)');
+                },
+                fill: true,
+                yAxisID: 'yRight'
+            }
+        ]
+    }), [telemetrySeries.weldingCurrent, telemetrySeries.weldingVoltage]);
+
+    const timelineInWindow = useMemo(
+        () => timelineSamples.filter((s) => s.x >= activeWindow.start && s.x <= activeWindow.end),
+        [timelineSamples, activeWindow.start, activeWindow.end]
+    );
+
+    const buildSegments = (samples, predicate, valueGetter) => {
+        const segments = [];
+        if (!samples.length) return segments;
+        let current = null;
+        samples.forEach((s, idx) => {
+            const v = valueGetter ? valueGetter(s) : null;
+            const active = predicate(s);
+            if (active) {
+                if (!current || (valueGetter && current.value !== v)) {
+                    if (current) segments.push(current);
+                    current = { start: s.x, end: s.x, value: v };
+                } else {
+                    current.end = s.x;
+                }
+            } else if (current) {
+                segments.push(current);
+                current = null;
+            }
+            if (idx === samples.length - 1 && current) segments.push(current);
+        });
+        return segments;
+    };
+
+    const timelineRows = useMemo(() => {
+        const online = buildSegments(timelineInWindow, (s) => Boolean(s.isOnline));
+        const welding = buildSegments(timelineInWindow, (s) => Boolean(s.isWelding));
+        const errors = buildSegments(
+            timelineInWindow,
+            (s) => Number.isFinite(Number(s.errorCode)) && Number(s.errorCode) > 0,
+            (s) => Number(s.errorCode)
+        ).map((seg) => ({ ...seg, label: formatErrorCodeLabel(seg.value) }));
+        const welder = buildSegments(
+            timelineInWindow,
+            (s) => Boolean(s.rfid),
+            (s) => String(s.rfid)
+        );
+        return { online, welding, errors, welder };
+    }, [timelineInWindow]);
+
+    const toPercent = useCallback((x) => {
+        const range = Math.max(activeWindow.end - activeWindow.start, 1);
+        return ((x - activeWindow.start) / range) * 100;
+    }, [activeWindow.end, activeWindow.start]);
+    const toDayPercent = useCallback((x) => {
+        const range = Math.max(chartBounds.dayEnd - chartBounds.dayStart, 1);
+        return ((x - chartBounds.dayStart) / range) * 100;
+    }, [chartBounds.dayEnd, chartBounds.dayStart]);
+
+    const handleTimelinePinMouseDown = (pin) => {
+        setDraggingPin(pin);
+        setTimeWindow((prev) => ({ ...prev, touched: true }));
+    };
+
+    useEffect(() => {
+        if (!draggingPin) return undefined;
+        const onMove = (event) => {
+            if (!timelineRulerRef.current) return;
+            const rect = timelineRulerRef.current.getBoundingClientRect();
+            if (!rect.width) return;
+            const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+            const rawTs = chartBounds.dayStart + ratio * (chartBounds.dayEnd - chartBounds.dayStart);
+            const snapped = Math.round(rawTs / 60_000) * 60_000;
+            setTimeWindow((prev) => {
+                const minGap = 60 * 1000;
+                let nextStart = Number.isFinite(prev.start) ? prev.start : activeWindow.start;
+                let nextEnd = Number.isFinite(prev.end) ? prev.end : activeWindow.end;
+                if (draggingPin === 'start') {
+                    nextStart = Math.max(chartBounds.dayStart, Math.min(snapped, nextEnd - minGap));
+                } else {
+                    nextEnd = Math.min(chartBounds.dayEnd, Math.max(snapped, nextStart + minGap));
+                }
+                return { ...prev, start: nextStart, end: nextEnd, touched: true };
+            });
+        };
+        const onUp = () => setDraggingPin(null);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        return () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+        };
+    }, [draggingPin, chartBounds.dayStart, chartBounds.dayEnd, activeWindow.start, activeWindow.end]);
 
     return (
         <main className="main-panel">
@@ -2527,15 +2808,41 @@ const DeviceMonitorPage = () => {
                     {activeTab === 'graphs' && (
                         <div className="chart-stack">
                             <div className="chart-card large">
-                                <div className="chart-card__header">
-                                    <div>
-                                    </div>
-                                </div>
                                 <div className="chart-wrapper">
+                                    <div className="monitor-overlay-ruler" ref={timelineRulerRef}>
+                                        <div className="monitor-overlay-ruler-scale">
+                                            {Array.from({ length: 9 }, (_, idx) => {
+                                                const ratio = idx / 8;
+                                                const stamp = chartBounds.dayStart + ratio * (chartBounds.dayEnd - chartBounds.dayStart);
+                                                return (
+                                                    <span key={`tick-${idx}`} className="monitor-overlay-ruler-tick-static">
+                                                        {new Date(stamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                        <div className="monitor-overlay-ruler-track">
+                                            <div className="monitor-overlay-ruler-line" />
+                                            <button
+                                                type="button"
+                                                className="monitor-time-pin"
+                                                style={{ left: `${Math.max(0, Math.min(100, toDayPercent(activeWindow.start)))}%` }}
+                                                onMouseDown={() => handleTimelinePinMouseDown('start')}
+                                                title="Начало интервала"
+                                            />
+                                            <button
+                                                type="button"
+                                                className="monitor-time-pin"
+                                                style={{ left: `${Math.max(0, Math.min(100, toDayPercent(activeWindow.end)))}%` }}
+                                                onMouseDown={() => handleTimelinePinMouseDown('end')}
+                                                title="Конец интервала"
+                                            />
+                                        </div>
+                                    </div>
                                     <div className="chart-canvas">
                                         <Line
                                             data={topChartData}
-                                            options={getTelemetryLineChartOptions(topTimeBounds, telemetryChartZoom.top)}
+                                            options={getTelemetryOverlayChartOptions(activeWindow.start, activeWindow.end)}
                                             ref={(chart) => {
                                                 if (chart && chart.canvas) {
                                                     chart.canvas.id = 'current-chart';
@@ -2544,41 +2851,72 @@ const DeviceMonitorPage = () => {
                                             }}
                                         />
                                     </div>
-                                </div>
-                                <div className="chart-controls">
-                                    <button
-                                        type="button"
-                                        className="chart-control-btn"
-                                        title="Увеличить масштаб"
-                                        onClick={() => handleTelemetryChartZoom('top', 'in')}
-                                    >
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                                            <circle cx="7" cy="7" r="5"/>
-                                            <path d="M7 4v6M4 7h6"/>
-                                        </svg>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="chart-control-btn"
-                                        title="Уменьшить масштаб"
-                                        onClick={() => handleTelemetryChartZoom('top', 'out')}
-                                    >
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                                            <circle cx="7" cy="7" r="5"/>
-                                            <path d="M4 7h6"/>
-                                        </svg>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="chart-control-btn"
-                                        title="Сбросить масштаб"
-                                        onClick={() => handleTelemetryChartZoom('top', 'reset')}
-                                    >
-                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                                            <path d="M7 1v2.5M7 10.5V13M1 7h2.5M10.5 7H13M2.5 2.5l1.8 1.8M9.7 9.7l1.8 1.8M2.5 11.5l1.8-1.8M9.7 4.3l1.8-1.8"/>
-                                            <circle cx="7" cy="7" r="4"/>
-                                        </svg>
-                                    </button>
+                                    <div className="monitor-lanes">
+                                        <div className="monitor-lane-row">
+                                            <span className="monitor-lane-label">Включен</span>
+                                            <div className="monitor-lane-track">
+                                                {timelineRows.online.map((seg, idx) => (
+                                                    <span
+                                                        key={`online-${idx}`}
+                                                        className="monitor-lane-segment monitor-lane-segment-online"
+                                                        style={{
+                                                            left: `${toPercent(seg.start)}%`,
+                                                            width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
+                                                        }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="monitor-lane-row">
+                                            <span className="monitor-lane-label">Сварка</span>
+                                            <div className="monitor-lane-track">
+                                                {timelineRows.welding.map((seg, idx) => (
+                                                    <span
+                                                        key={`welding-${idx}`}
+                                                        className="monitor-lane-segment monitor-lane-segment-welding"
+                                                        style={{
+                                                            left: `${toPercent(seg.start)}%`,
+                                                            width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
+                                                        }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="monitor-lane-row">
+                                            <span className="monitor-lane-label">Ошибки</span>
+                                            <div className="monitor-lane-track">
+                                                {timelineRows.errors.map((seg, idx) => {
+                                                    const width = Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8);
+                                                    return (
+                                                        <span
+                                                            key={`error-${idx}`}
+                                                            className="monitor-lane-segment monitor-lane-segment-error"
+                                                            style={{ left: `${toPercent(seg.start)}%`, width: `${width}%` }}
+                                                            title={seg.label}
+                                                        >
+                                                            {width > 6 ? seg.label : ''}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                        <div className="monitor-lane-row">
+                                            <span className="monitor-lane-label">Сварщик</span>
+                                            <div className="monitor-lane-track">
+                                                {timelineRows.welder.map((seg, idx) => (
+                                                    <span
+                                                        key={`welder-${idx}`}
+                                                        className="monitor-lane-segment monitor-lane-segment-welder"
+                                                        style={{
+                                                            left: `${toPercent(seg.start)}%`,
+                                                            width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
+                                                        }}
+                                                        title={seg.value}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
