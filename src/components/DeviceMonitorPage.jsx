@@ -2490,6 +2490,35 @@ const DeviceMonitorPage = () => {
 
     return (
         <main className="main-panel">
+            <div className="monitor-page-header-row">
+                <div className="monitor-page-brand">
+                    <button
+                        type="button"
+                        className="monitor-page-close-btn"
+                        onClick={handleBackToEquipment}
+                        title="Вернуться к списку оборудования"
+                    >
+                        ×
+                    </button>
+                    <div className="monitor-page-brand-title">
+                        <span className="monitor-page-brand-main">CORE</span>
+                        <span className="monitor-page-brand-accent">PRO500</span>
+                    </div>
+                </div>
+                <div className="monitor-page-header-controls">
+                    <button
+                        type="button"
+                        className="monitor-page-notifications-btn"
+                        onClick={() => navigate('/notifications')}
+                        title="Уведомления"
+                    >
+                        <FaBell className="monitor-page-notifications-icon" />
+                        <span className="monitor-page-notifications-badge">271</span>
+                    </button>
+                    <UserProfile />
+                </div>
+            </div>
+
             <div className="top-grid">
                 <section className="machine-section" aria-label="Сварочный аппарат">
                     <div className="machine-header">

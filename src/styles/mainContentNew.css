@@ -17,6 +17,114 @@
     max-width: 100%;
 }
 
+.monitor-page-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 28px;
+    flex-shrink: 0;
+    width: 100%;
+    margin-bottom: 2px;
+}
+
+.monitor-page-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.monitor-page-close-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid rgba(112, 128, 156, 0.35);
+    background: rgba(25, 36, 61, 0.9);
+    color: rgba(201, 211, 230, 0.9);
+    font-size: 16px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+.monitor-page-close-btn:hover {
+    background: rgba(34, 48, 79, 0.95);
+    border-color: rgba(138, 157, 190, 0.55);
+    color: #f3f6ff;
+}
+
+.monitor-page-brand-title {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.monitor-page-brand-main {
+    color: #f1f5ff;
+    font-size: 38px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1;
+}
+
+.monitor-page-brand-accent {
+    color: #f29f5d;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+}
+
+.monitor-page-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.monitor-page-notifications-btn {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid rgba(116, 133, 161, 0.35);
+    background: rgba(20, 31, 55, 0.85);
+    color: rgba(206, 216, 235, 0.95);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+.monitor-page-notifications-btn:hover {
+    background: rgba(31, 45, 76, 0.95);
+    border-color: rgba(140, 159, 192, 0.5);
+}
+
+.monitor-page-notifications-icon {
+    font-size: 14px;
+}
+
+.monitor-page-notifications-badge {
+    position: absolute;
+    right: -9px;
+    top: -8px;
+    min-width: 20px;
+    height: 15px;
+    border-radius: 999px;
+    background: #e5404f;
+    color: #ffffff;
+    font-size: 9px;
+    line-height: 15px;
+    font-weight: 700;
+    text-align: center;
+    padding: 0 4px;
+}
+
 .numeric {
     font-family: 'Rajdhani', 'Inter', sans-serif;
     letter-spacing: 0.08em;
