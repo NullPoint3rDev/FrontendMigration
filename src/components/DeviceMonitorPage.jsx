@@ -62,6 +62,34 @@ const DEFAULT_TELEMETRY_SERIES = TELEMETRY_CHANNELS_CONFIG.reduce((acc, channel)
     return acc;
 }, { mainsVoltageA: [], mainsVoltageB: [], mainsVoltageC: [] });
 
+const DAILY_WIRE_LINEAR_DENSITY_KG_PER_METER = 0.000089;
+const DAILY_ACTIVITY_INITIAL = {
+    offMs: 0,
+    standbyMs: 0,
+    onMs: 0,
+    weldingMs: 0,
+};
+
+const getDayStartTimestamp = (ts = Date.now()) => {
+    const dayStart = new Date(ts);
+    dayStart.setHours(0, 0, 0, 0);
+    return dayStart.getTime();
+};
+
+const formatMsToClock = (ms) => {
+    const safeMs = Math.max(0, Number(ms) || 0);
+    const totalSeconds = Math.floor(safeMs / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+};
+
+const formatKgValue = (kg) => {
+    const value = Math.max(0, Number(kg) || 0);
+    return Number(value.toFixed(3)).toString();
+};
+
 const parseNumberOrNull = (value) => {
     if (value === undefined || value === null || value === '') return null;
     const raw = String(value).trim();
@@ -277,6 +305,32 @@ function isWeldingFromPanelState(state) {
     return false;
 }
 
+function getMachineActivityModeFromPanelState(state) {
+    if (!state) return 'off';
+    if (isWeldingFromPanelState(state)) return 'welding';
+
+    const data = flattenPanelState(state);
+    const weldingMachineState = data['Состояние аппарата'] ||
+        data['WeldingMachineState'] ||
+        data.weldingMachineState ||
+        data['State.WeldingMachineState'] ||
+        null;
+    const status = data.status || data.Status || null;
+    const stateLower = String(weldingMachineState || status || '').toLowerCase().trim();
+
+    if (stateLower.includes('дежур') || stateLower.includes('standby') || stateLower.includes('waiting') || stateLower.includes('ожидан')) {
+        return 'standby';
+    }
+    if (stateLower.includes('выключ') || stateLower === 'off' || stateLower.includes('offline') || stateLower.includes('не в сети')) {
+        return 'off';
+    }
+    if (stateLower.includes('включ') || stateLower === 'on' || stateLower.includes('idle') || stateLower.includes('ready')) {
+        return 'on';
+    }
+
+    return 'on';
+}
+
 /** Вертикальные фронты на старт/стоп сварки: две точки с одним x (дубликат x = вертикаль в Chart.js). */
 function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, xPoll) {
     const y = Math.round(Number(yRaw) * 10) / 10;
@@ -437,6 +491,13 @@ const DeviceMonitorPage = () => {
     const [timeWindow, setTimeWindow] = useState({ start: null, end: null, touched: false });
     const [draggingPin, setDraggingPin] = useState(null);
     const timelineRulerRef = useRef(null);
+    const [dailyActivity, setDailyActivity] = useState(DAILY_ACTIVITY_INITIAL);
+    const [dailyWireConsumptionKg, setDailyWireConsumptionKg] = useState(0);
+    const dailyActivityRef = useRef(DAILY_ACTIVITY_INITIAL);
+    const dailyWireConsumptionRef = useRef(0);
+    const dailyStatsDayStartRef = useRef(getDayStartTimestamp(Date.now()));
+    const lastDailySampleRef = useRef({ timestamp: null, mode: 'off', wireFeedMpm: 0 });
+
     /** Как в archive WeldingMachinePanel: при >200 точек оставляем последние 100 */
     const trimChartSeries = (prev, point) => {
         const next = [...prev, point];
@@ -506,6 +567,10 @@ const DeviceMonitorPage = () => {
         startPolling();
         return () => stopPolling();
         // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [machineMac]);
+
+    useEffect(() => {
+        resetDailyStats(Date.now());
     }, [machineMac]);
 
     // Получаем ID аппарата по MAC адресу при загрузке страницы
@@ -718,6 +783,59 @@ const DeviceMonitorPage = () => {
         }
     };
 
+    function resetDailyStats(timestamp = Date.now()) {
+        dailyActivityRef.current = { ...DAILY_ACTIVITY_INITIAL };
+        dailyWireConsumptionRef.current = 0;
+        dailyStatsDayStartRef.current = getDayStartTimestamp(timestamp);
+        lastDailySampleRef.current = { timestamp: timestamp, mode: 'off', wireFeedMpm: 0 };
+        setDailyActivity({ ...DAILY_ACTIVITY_INITIAL });
+        setDailyWireConsumptionKg(0);
+    }
+
+    function updateDailyStatsFromTelemetry(panelState, timestamp = Date.now()) {
+        const dayStart = getDayStartTimestamp(timestamp);
+        if (dailyStatsDayStartRef.current !== dayStart) {
+            resetDailyStats(timestamp);
+        }
+
+        const mode = getMachineActivityModeFromPanelState(panelState);
+        const wrappedState = {
+            ...panelState,
+            properties: flattenPanelState(panelState),
+        };
+        const wireFeedMpm = getStateNumberByKeys(wrappedState, [
+            'WireFeedSpeed',
+            'wireFeedSpeed',
+            'State.WireFeedSpeed',
+            'Скорость подачи проволоки',
+            'Подача проволоки',
+            'WireFeed',
+            'wireFeed'
+        ]) ?? 0;
+
+        const prevSample = lastDailySampleRef.current;
+        if (prevSample.timestamp != null) {
+            const deltaMs = Math.max(0, timestamp - prevSample.timestamp);
+            const nextActivity = { ...dailyActivityRef.current };
+            if (prevSample.mode === 'welding') nextActivity.weldingMs += deltaMs;
+            else if (prevSample.mode === 'standby') nextActivity.standbyMs += deltaMs;
+            else if (prevSample.mode === 'on') nextActivity.onMs += deltaMs;
+            else nextActivity.offMs += deltaMs;
+            dailyActivityRef.current = nextActivity;
+            setDailyActivity(nextActivity);
+
+            if (prevSample.mode === 'welding' && prevSample.wireFeedMpm > 0) {
+                const minutes = deltaMs / 60000;
+                const kgDelta = prevSample.wireFeedMpm * DAILY_WIRE_LINEAR_DENSITY_KG_PER_METER * minutes;
+                const nextWire = dailyWireConsumptionRef.current + kgDelta;
+                dailyWireConsumptionRef.current = nextWire;
+                setDailyWireConsumptionKg(nextWire);
+            }
+        }
+
+        lastDailySampleRef.current = { timestamp, mode, wireFeedMpm };
+    }
+
     // Функция для опроса состояния устройства (как в archive проекте)
     const startPolling = () => {
         // Останавливаем предыдущий polling если он есть
@@ -756,6 +874,8 @@ const DeviceMonitorPage = () => {
             const response = await archiveDeviceApi.getArchivePanelState(machineMac);
 
             if (response && response !== null) {
+                const sampleTs = Date.now();
+                updateDailyStatsFromTelemetry(response, sampleTs);
                 // Обрабатываем данные
                 processStructuredData({
                     mac: machineMac,
@@ -836,19 +956,21 @@ const DeviceMonitorPage = () => {
                 // Добавляем в историю сообщений
                 setMessageHistory(prev => [
                     {
-                        timestamp: new Date(),
+                        timestamp: new Date(sampleTs),
                         data: JSON.stringify(response),
                         type: 'received'
                     },
                     ...prev.slice(0, 9)
                 ]);
             } else {
+                updateDailyStatsFromTelemetry(null, Date.now());
                 // Нет данных - просто обновляем состояние
                 updateConnectionStatus(false, false);
                 setError('Устройство не найдено');
             }
         } catch (err) {
             console.error('Ошибка получения состояния устройства:', err);
+            updateDailyStatsFromTelemetry(null, Date.now());
             // При ошибке - нет данных
             updateConnectionStatus(false, false);
             setError('Ошибка подключения: ' + err.message);
@@ -2038,7 +2160,6 @@ const DeviceMonitorPage = () => {
         tile2: telemetrySelection.slot2 === channel.key,
     }));
 
-    const systemParameters = getSystemParameters();
     const incidentLog = getErrors();
     const currentValue = getCurrentValue();
     const voltageValue = getVoltageValue();
@@ -2048,6 +2169,43 @@ const DeviceMonitorPage = () => {
     const currentProgress = getCurrentProgress();
     const voltageProgress = getVoltageProgress();
     const isWeldingActive = isWelding();
+    const currentStatusData = deviceData[machineMac] || {};
+    const statusPhaseA = parseNumberOrNull(
+        currentStatusData['Напряжение фазы А'] ??
+        currentStatusData['VoltagePhaseA'] ??
+        currentStatusData['voltagePhaseA']
+    ) ?? 0;
+    const statusPhaseB = parseNumberOrNull(
+        currentStatusData['Напряжение фазы B'] ??
+        currentStatusData['Напряжение фазы В'] ??
+        currentStatusData['VoltagePhaseB'] ??
+        currentStatusData['voltagePhaseB']
+    ) ?? 0;
+    const statusPhaseC = parseNumberOrNull(
+        currentStatusData['Напряжение фазы С'] ??
+        currentStatusData['VoltagePhaseC'] ??
+        currentStatusData['voltagePhaseC']
+    ) ?? 0;
+    const statusChillerIn = parseNumberOrNull(
+        currentStatusData['Температура охлаждающей жидкости на входе'] ??
+        currentStatusData['ChillerTemperature1'] ??
+        currentStatusData['chillerTemperature1']
+    ) ?? 0;
+    const statusChillerOut = parseNumberOrNull(
+        currentStatusData['Температура охлаждающей жидкости на выходе'] ??
+        currentStatusData['ChillerTemperature2'] ??
+        currentStatusData['chillerTemperature2']
+    ) ?? 0;
+    const statusPrimaryCoilTemp = parseNumberOrNull(
+        currentStatusData['Температура первичной обмотки'] ??
+        currentStatusData['PrimaryCoilTemperature'] ??
+        currentStatusData['primaryCoilTemperature']
+    ) ?? 0;
+    const statusSecondaryCoilTemp = parseNumberOrNull(
+        currentStatusData['Температура вторичной обмотки'] ??
+        currentStatusData['SecondaryCoilTemperature'] ??
+        currentStatusData['secondaryCoilTemperature']
+    ) ?? 0;
 
     // Определяем, нужно ли показывать таймер желтым (сварка идет или только что закончилась)
     const isTimerActive = isWeldingActive || (weldingEndTime && (currentTime - weldingEndTime < 2000));
@@ -2476,56 +2634,64 @@ const DeviceMonitorPage = () => {
                     </section>
                 </div>
 
-                <section className="card status-card" aria-label="Параметры системы">
-                    <div className="status-list">
-                        {systemParameters.length > 0 ? (
-                            systemParameters.map((row) => (
-                                <div key={row.label} className="status-row">
-                                    <span className="status-label">{row.label}</span>
-                                    <span
-                                        className={`status-value ${row.muted ? 'muted' : ''} numeric`}
-                                        style={row.stateColor ? { color: row.stateColor } : {}}
-                                    >
-                                        {row.value}
-                                    </span>
-                                </div>
-                            ))
-                        ) : (
-                            <>
-                                <div className="status-row">
-                                    <span className="status-label">Управление</span>
-                                    <span className="status-value muted numeric">Руч.</span>
-                                </div>
-                                <div className="status-row">
-                                    <span className="status-label">Напряжение зав. кратера</span>
-                                    <span className="status-value numeric">42 В</span>
-                                </div>
-                                <div className="status-row">
-                                    <span className="status-label">Входящая темп. охл. жидкости</span>
-                                    <span className="status-value numeric">40 °C</span>
-                                </div>
-                                <div className="status-row">
-                                    <span className="status-label">Исходящая темп. охл. жидкости</span>
-                                    <span className="status-value numeric">51 °C</span>
-                                </div>
-                                <div className="status-row">
-                                    <span className="status-label">Индуктивность</span>
-                                    <span className="status-value numeric">4</span>
-                                </div>
-                                <div className="status-row">
-                                    <span className="status-label">Напряжение фазы А</span>
-                                    <span className="status-value numeric">120 В</span>
-                                </div>
-                                <div className="status-row">
-                                    <span className="status-label">Напряжение фазы B</span>
-                                    <span className="status-value numeric">56 В</span>
-                                </div>
-                                <div className="status-row">
-                                    <span className="status-label">Напряжение фазы C</span>
-                                    <span className="status-value numeric">11 В</span>
-                                </div>
-                            </>
-                        )}
+                <section className="status-panel" aria-label="Параметры системы">
+                    <div className="status-tiles-grid">
+                        <div className="status-tile-block">
+                            <div className="status-tile-title">Активность за сутки:</div>
+                            <div className="status-row">
+                                <span className="status-label">Выкл. состояние:</span>
+                                <span className="status-value numeric status-value-danger">{formatMsToClock(dailyActivity.offMs)}</span>
+                            </div>
+                            <div className="status-row">
+                                <span className="status-label">Деж. режим:</span>
+                                <span className="status-value numeric status-value-warning">{formatMsToClock(dailyActivity.standbyMs)}</span>
+                            </div>
+                            <div className="status-row">
+                                <span className="status-label">Вкл. состояние:</span>
+                                <span className="status-value numeric status-value-success">{formatMsToClock(dailyActivity.onMs)}</span>
+                            </div>
+                            <div className="status-row">
+                                <span className="status-label">Сварка:</span>
+                                <span className="status-value numeric status-value-accent">{formatMsToClock(dailyActivity.weldingMs)}</span>
+                            </div>
+                        </div>
+
+                        <div className="status-tile-block">
+                            <div className="status-tile-title">Расход за сутки</div>
+                            <div className="status-subtitle">Газ:</div>
+                            <div className="status-row status-row--boxed">
+                                <span className="status-label">Ar92</span>
+                                <span className="status-value numeric">0 л.</span>
+                            </div>
+                            <div className="status-row status-row--boxed">
+                                <span className="status-label">Ar100</span>
+                                <span className="status-value numeric">0 л.</span>
+                            </div>
+                            <div className="status-subtitle status-subtitle--spaced">Проволока:</div>
+                            <div className="status-row status-row--boxed">
+                                <span className="status-label">ER304</span>
+                                <span className="status-value numeric">{formatKgValue(dailyWireConsumptionKg)} кг.</span>
+                            </div>
+                            <div className="status-row status-row--boxed">
+                                <span className="status-label">Сталь</span>
+                                <span className="status-value numeric">{formatKgValue(dailyWireConsumptionKg)} кг.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="status-tile-block status-tile-block--wide">
+                        <div className="status-row status-row--compact">
+                            <span className="status-label">Напряжение фазы A/B/C</span>
+                            <span className="status-value numeric">{`${Math.round(statusPhaseA)}/${Math.round(statusPhaseB)}/${Math.round(statusPhaseC)} В`}</span>
+                        </div>
+                        <div className="status-row status-row--compact">
+                            <span className="status-label">Темп. охл. жидкости Вход./Исх.</span>
+                            <span className="status-value numeric">{`${Math.round(statusChillerIn)}/${Math.round(statusChillerOut)} °C`}</span>
+                        </div>
+                        <div className="status-row status-row--compact">
+                            <span className="status-label">Тем. обмотки Первич./Вторич.</span>
+                            <span className="status-value numeric">{`${Math.round(statusPrimaryCoilTemp)}/${Math.round(statusSecondaryCoilTemp)} °C`}</span>
+                        </div>
                     </div>
                 </section>
 
