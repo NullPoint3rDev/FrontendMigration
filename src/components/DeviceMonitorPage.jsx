@@ -352,7 +352,6 @@ function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, 
         lastYRef.current = 0;
     }
 
-    if (next.length > 200) next = next.slice(-100);
     return next;
 }
 
@@ -389,6 +388,24 @@ function extractRfidFromDeviceData(deviceData, machineMac, hasData) {
         return String(rfidCode).trim();
     }
     return null;
+}
+
+/** Одинаковые индексы для двух рядов — ось X не разъезжается после прореживания. */
+function decimateAlignedXYPairs(currentPts, voltagePts, maxPoints) {
+    const n = Math.min(currentPts?.length || 0, voltagePts?.length || 0);
+    if (n <= maxPoints) {
+        return { weldingCurrent: currentPts || [], weldingVoltage: voltagePts || [] };
+    }
+    const idxs = new Set();
+    const target = Math.min(maxPoints, n);
+    for (let k = 0; k < target; k += 1) {
+        idxs.add(Math.round((k * (n - 1)) / Math.max(target - 1, 1)));
+    }
+    const sortedIdx = [...idxs].sort((a, b) => a - b);
+    return {
+        weldingCurrent: sortedIdx.map((j) => currentPts[j]),
+        weldingVoltage: sortedIdx.map((j) => voltagePts[j]),
+    };
 }
 
 // Плагин пороговой линии отключён (белую линию на графике убрали по запросу)
@@ -444,7 +461,7 @@ const DeviceMonitorPage = () => {
     const [isTelemetryListExpanded, setIsTelemetryListExpanded] = useState(true);
 
     // Состояние для активной вкладки (Графики/Информация)
-    const [activeTab, setActiveTab] = useState('graphs');
+    const [activeTab, setActiveTab] = useState('info');
 
     // Состояние для хранения ID аппарата (для удаления)
     const [machineId, setMachineId] = useState(null);
@@ -474,9 +491,16 @@ const DeviceMonitorPage = () => {
 
     // Состояние для графиков (серии — только telemetrySeries; импульс тока/напряжения по фронту сварки)
     const [telemetrySeries, setTelemetrySeries] = useState(DEFAULT_TELEMETRY_SERIES);
+    const LIVE_WINDOW_MS = 5 * 60 * 1000;
+    const HISTORY_MAX_MS = 24 * 60 * 60 * 1000;
+    const HISTORY_DECIMATION_STEP_MS = 10 * 1000;
+    /** Верхний предел точек на линию в режиме истории (рендер Canvas без десятков тысяч сегментов). */
+    const HISTORY_CHART_MAX_POINTS = 1200;
     const prevWeldingForChartRef = useRef(null);
     const lastWeldingCurrentChartRef = useRef(0);
     const lastWeldingVoltageChartRef = useRef(0);
+    /** Последние ток/напряжение в простое — для колонки «Уст.» на время сварки (заморозка перед дугой). */
+    const idleControlMetricsRef = useRef({ current: '0', voltage: '0' });
     const [telemetrySelection, setTelemetrySelection] = useState({
         slot1: 'weldingCurrent',
         slot2: 'weldingVoltage',
@@ -487,10 +511,16 @@ const DeviceMonitorPage = () => {
     });
     /** Масштаб по оси X: 1 — весь диапазон; больше — «приближение» к последним точкам (окно справа). */
     const [telemetryChartZoom, setTelemetryChartZoom] = useState({ top: 1, bottom: 1 });
+    const [telemetryYZoom, setTelemetryYZoom] = useState(1);
     const [timelineSamples, setTimelineSamples] = useState([]);
     const [timeWindow, setTimeWindow] = useState({ start: null, end: null, touched: false });
     const [draggingPin, setDraggingPin] = useState(null);
     const timelineRulerRef = useRef(null);
+    const activeTabRef = useRef(activeTab);
+    const historyModeRef = useRef(false);
+    useEffect(() => {
+        activeTabRef.current = activeTab;
+    }, [activeTab]);
     const [dailyActivity, setDailyActivity] = useState(DAILY_ACTIVITY_INITIAL);
     const [dailyWireConsumptionKg, setDailyWireConsumptionKg] = useState(0);
     const dailyActivityRef = useRef(DAILY_ACTIVITY_INITIAL);
@@ -498,10 +528,230 @@ const DeviceMonitorPage = () => {
     const dailyStatsDayStartRef = useRef(getDayStartTimestamp(Date.now()));
     const lastDailySampleRef = useRef({ timestamp: null, mode: 'off', wireFeedMpm: 0 });
 
+    const [historyError, setHistoryError] = useState(null);
+    const [isHistoryMode, setIsHistoryMode] = useState(false);
+    /** Сегодня: пользователь тронул пины — суточная шкала, данные с сервера, без авто‑live окна. */
+    const [todayPinExplore, setTodayPinExplore] = useState(false);
+    const todayPinExploreRef = useRef(false);
+    /** Синхронные границы суток при первом касании пина «сегодня» (до ререндера chartBounds). */
+    const todayDayBoundsRef = useRef(null);
+    const [historySeriesSnapshot, setHistorySeriesSnapshot] = useState(DEFAULT_TELEMETRY_SERIES);
+    const [historyTimelineSnapshot, setHistoryTimelineSnapshot] = useState([]);
+    const [historyDayBounds, setHistoryDayBounds] = useState({ start: null, end: null });
+    const [selectedGraphDate, setSelectedGraphDate] = useState('');
+    const [hoverCursor, setHoverCursor] = useState({ active: false, ts: null, percent: 0, xPx: 0, flip: false });
+    const [plotArea, setPlotArea] = useState({ leftPx: 0, rightPx: 0, widthPx: 0 });
+    const [welderNameByRfid, setWelderNameByRfid] = useState({});
+    const welderNameFetchInFlightRef = useRef(new Set());
+    const telemetryHistoryStoreRef = useRef({ series: DEFAULT_TELEMETRY_SERIES, timeline: [], lastStoredTs: 0 });
+    const historyCacheRef = useRef({ date: null, dayStart: null, dayEnd: null, pointsByTs: new Map() });
+    /** В режиме истории: превью интервала во время перетаскивания пина (committed окно — timeWindow). */
+    const [pinDragPreview, setPinDragPreview] = useState(null);
+    const pinDragPreviewRef = useRef(null);
+    useEffect(() => {
+        historyModeRef.current = isHistoryMode;
+    }, [isHistoryMode]);
+    useEffect(() => {
+        todayPinExploreRef.current = todayPinExplore;
+    }, [todayPinExplore]);
+
+    const graphUsesServerData = isHistoryMode || todayPinExplore;
+
+    const toLocalDateInput = (d) => {
+        const pad = (n) => String(n).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        const mm = pad(d.getMonth() + 1);
+        const dd = pad(d.getDate());
+        return `${yyyy}-${mm}-${dd}`;
+    };
+
+    const isTodayDateStr = useCallback((dateStr) => {
+        if (!dateStr) return false;
+        return dateStr === toLocalDateInput(new Date());
+    }, []);
+
+    useEffect(() => {
+        if (!selectedGraphDate) {
+            setSelectedGraphDate(toLocalDateInput(new Date()));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const buildHistorySeriesForWindow = useCallback((windowStart, windowEnd) => {
+        const cache = historyCacheRef.current;
+        const points = [];
+        cache.pointsByTs.forEach((p, ts) => {
+            if (ts >= windowStart && ts <= windowEnd) points.push(p);
+        });
+        points.sort((a, b) => a.ts - b.ts);
+        return {
+            ...DEFAULT_TELEMETRY_SERIES,
+            weldingCurrent: points.map((p) => ({
+                x: p.ts,
+                y: p.current === null || p.current === undefined ? null : Number(p.current),
+            })),
+            // Voltage из истории: в десятых долях → делим на 10
+            weldingVoltage: points.map((p) => ({
+                x: p.ts,
+                y: p.voltage === null || p.voltage === undefined ? null : (Number(p.voltage) || 0) / 10,
+            })),
+        };
+    }, []);
+
+    const buildHistoryTimelineForWindow = useCallback((windowStart, windowEnd) => {
+        const cache = historyCacheRef.current;
+        const points = [];
+        cache.pointsByTs.forEach((p, ts) => {
+            if (ts >= windowStart && ts <= windowEnd) points.push(p);
+        });
+        points.sort((a, b) => a.ts - b.ts);
+        return points.map((p) => {
+            const st = String(p.status || '').toLowerCase();
+            return {
+                x: p.ts,
+                isOnline: st !== 'offline',
+                isWelding: st === 'welding',
+                errorCode: p.errorCode,
+                rfid: p.rfid,
+            };
+        });
+    }, []);
+
+    /** Один запрос на весь интервал [fromMs, toMs]: перезаписываем точки в этом диапазоне (без дозагрузки «кусками»). */
+    const ensureHistoryIntervalLoaded = useCallback(async (dateStr, fromMs, toMs) => {
+        if (!dateStr || !Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs <= fromMs) return { points: 0 };
+
+        const [yyyy, mm, dd] = String(dateStr).split('-').map((x) => parseInt(x, 10));
+        const dayStart = new Date(yyyy, mm - 1, dd, 0, 0, 0, 0).getTime();
+        const dayEnd = dayStart + HISTORY_MAX_MS;
+
+        if (historyCacheRef.current.date !== dateStr) {
+            historyCacheRef.current = { date: dateStr, dayStart, dayEnd, pointsByTs: new Map() };
+        }
+
+        const cache = historyCacheRef.current;
+        for (const ts of Array.from(cache.pointsByTs.keys())) {
+            if (ts >= fromMs && ts <= toMs) cache.pointsByTs.delete(ts);
+        }
+
+        const pts = await archiveDeviceApi.getArchiveTelemetryHistory(machineMac, fromMs, toMs);
+        let added = 0;
+        (pts || []).forEach((p) => {
+            const ts = Number(p.ts);
+            if (!Number.isFinite(ts)) return;
+            cache.pointsByTs.set(ts, p);
+            added += 1;
+        });
+        return { points: added };
+    }, [machineMac, HISTORY_MAX_MS]);
+
+    const pickDefaultHourWithData = useCallback(async (dateStr) => {
+        const [yyyy, mm, dd] = String(dateStr).split('-').map((x) => parseInt(x, 10));
+        const dayStart = new Date(yyyy, mm - 1, dd, 0, 0, 0, 0).getTime();
+        const ten = dayStart + 10 * 60 * 60 * 1000;
+        const eleven = dayStart + 11 * 60 * 60 * 1000;
+        // Сначала пробуем 10–11
+        await ensureHistoryIntervalLoaded(dateStr, ten, eleven);
+        const hasTen = Array.from(historyCacheRef.current.pointsByTs.keys()).some((t) => t >= ten && t <= eleven);
+        if (hasTen) return { start: ten, end: eleven };
+        // Иначе ищем любой час с данными
+        for (let h = 0; h < 24; h += 1) {
+            const start = dayStart + h * 60 * 60 * 1000;
+            const end = start + 60 * 60 * 1000;
+            await ensureHistoryIntervalLoaded(dateStr, start, end);
+            const has = Array.from(historyCacheRef.current.pointsByTs.keys()).some((t) => t >= start && t <= end);
+            if (has) return { start, end };
+        }
+        // fallback 10–11 (даже если пусто)
+        return { start: ten, end: eleven };
+    }, [ensureHistoryIntervalLoaded]);
+
+    useEffect(() => {
+        if (!selectedGraphDate) return;
+        if (isTodayDateStr(selectedGraphDate)) {
+            // Live режим по умолчанию (пятиминутка); суточный просмотр — только через пины (todayPinExplore).
+            setIsHistoryMode(false);
+            setTodayPinExplore(false);
+            todayPinExploreRef.current = false;
+            todayDayBoundsRef.current = null;
+            setHistoryDayBounds({ start: null, end: null });
+            historyCacheRef.current = { date: null, dayStart: null, dayEnd: null, pointsByTs: new Map() };
+            pinDragPreviewRef.current = null;
+            setPinDragPreview(null);
+            setDraggingPin(null);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            setIsHistoryMode(true);
+            setTodayPinExplore(false);
+            todayPinExploreRef.current = false;
+            todayDayBoundsRef.current = null;
+            setHistoryError(null);
+            const [yyyy, mm, dd] = String(selectedGraphDate).split('-').map((x) => parseInt(x, 10));
+            const dayStart = new Date(yyyy, mm - 1, dd, 0, 0, 0, 0).getTime();
+            const dayEnd = dayStart + HISTORY_MAX_MS;
+            setHistoryDayBounds({ start: dayStart, end: dayEnd });
+
+            const window = await pickDefaultHourWithData(selectedGraphDate);
+            if (cancelled) return;
+            setTimeWindow({ start: window.start, end: window.end, touched: true });
+            setHistorySeriesSnapshot(buildHistorySeriesForWindow(window.start, window.end));
+            setHistoryTimelineSnapshot(buildHistoryTimelineForWindow(window.start, window.end));
+        })().catch(() => {
+            if (!cancelled) setHistoryError('Не удалось загрузить историю с сервера.');
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedGraphDate, isTodayDateStr, HISTORY_MAX_MS, pickDefaultHourWithData, buildHistorySeriesForWindow, buildHistoryTimelineForWindow]);
+
+    const getDayBoundsForDateStr = useCallback((dateStr) => {
+        const [yyyy, mm, dd] = String(dateStr).split('-').map((x) => parseInt(x, 10));
+        const dayStart = new Date(yyyy, mm - 1, dd, 0, 0, 0, 0).getTime();
+        return { dayStart, dayEnd: dayStart + HISTORY_MAX_MS };
+    }, [HISTORY_MAX_MS]);
+
+    const historyFetchDebounceRef = useRef(null);
+    useEffect(() => {
+        if (!graphUsesServerData) return;
+        if (draggingPin) return;
+        const start = timeWindow.start;
+        const end = timeWindow.end;
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return;
+        if (historyFetchDebounceRef.current) clearTimeout(historyFetchDebounceRef.current);
+        historyFetchDebounceRef.current = setTimeout(() => {
+            ensureHistoryIntervalLoaded(selectedGraphDate, start, end)
+                .then(() => {
+                    setHistorySeriesSnapshot(buildHistorySeriesForWindow(start, end));
+                    setHistoryTimelineSnapshot(buildHistoryTimelineForWindow(start, end));
+                })
+                .catch(() => setHistoryError('Не удалось загрузить историю с сервера.'));
+        }, 250);
+        return () => {
+            if (historyFetchDebounceRef.current) clearTimeout(historyFetchDebounceRef.current);
+        };
+    }, [graphUsesServerData, draggingPin, timeWindow.start, timeWindow.end, ensureHistoryIntervalLoaded, selectedGraphDate, buildHistorySeriesForWindow, buildHistoryTimelineForWindow]);
+
     /** Как в archive WeldingMachinePanel: при >200 точек оставляем последние 100 */
     const trimChartSeries = (prev, point) => {
         const next = [...prev, point];
         return next.length > 200 ? next.slice(-100) : next;
+    };
+
+    const trimSeriesByTime = (prev, point, windowMs) => {
+        const cutoff = point.x - windowMs;
+        const next = [...prev, point].filter((p) => (typeof p?.x === 'number' ? p.x >= cutoff : true));
+        return next.length > 5000 ? next.slice(-5000) : next;
+    };
+
+    const appendDecimatedHistory = (prev, point, nowTs) => {
+        const cutoff = nowTs - HISTORY_MAX_MS;
+        const last = prev.length ? prev[prev.length - 1] : null;
+        const canAppend = !last || (typeof last.x === 'number' && point.x - last.x >= HISTORY_DECIMATION_STEP_MS);
+        if (!canAppend) return prev.filter((p) => (typeof p?.x === 'number' ? p.x >= cutoff : true));
+        const next = [...prev, point].filter((p) => (typeof p?.x === 'number' ? p.x >= cutoff : true));
+        return next.length > 9000 ? next.slice(-9000) : next;
     };
 
     // Состояние для таймера сварки
@@ -897,11 +1147,11 @@ const DeviceMonitorPage = () => {
                             const yA = Math.round(Number(telemetrySample.mainsVoltageA ?? 0) * 10) / 10;
                             const yB = Math.round(Number(telemetrySample.mainsVoltageB ?? 0) * 10) / 10;
                             const yC = Math.round(Number(telemetrySample.mainsVoltageC ?? 0) * 10) / 10;
-                            next.mainsVoltageA = trimChartSeries(prev.mainsVoltageA || [], { x: xPoll, y: yA });
-                            next.mainsVoltageB = trimChartSeries(prev.mainsVoltageB || [], { x: xPoll, y: yB });
-                            next.mainsVoltageC = trimChartSeries(prev.mainsVoltageC || [], { x: xPoll, y: yC });
+                            next.mainsVoltageA = trimSeriesByTime(prev.mainsVoltageA || [], { x: xPoll, y: yA }, LIVE_WINDOW_MS);
+                            next.mainsVoltageB = trimSeriesByTime(prev.mainsVoltageB || [], { x: xPoll, y: yB }, LIVE_WINDOW_MS);
+                            next.mainsVoltageC = trimSeriesByTime(prev.mainsVoltageC || [], { x: xPoll, y: yC }, LIVE_WINDOW_MS);
                         } else if (channel.key === 'weldingCurrent') {
-                            next.weldingCurrent = appendWeldingPulseSeries(
+                            const series = appendWeldingPulseSeries(
                                 prev.weldingCurrent || [],
                                 yi,
                                 wasWelding,
@@ -909,8 +1159,9 @@ const DeviceMonitorPage = () => {
                                 lastWeldingCurrentChartRef,
                                 xPoll
                             );
+                            next.weldingCurrent = (series || []).filter((p) => typeof p?.x === 'number' && p.x >= xPoll - LIVE_WINDOW_MS);
                         } else if (channel.key === 'weldingVoltage') {
-                            next.weldingVoltage = appendWeldingPulseSeries(
+                            const series = appendWeldingPulseSeries(
                                 prev.weldingVoltage || [],
                                 yu,
                                 wasWelding,
@@ -918,9 +1169,10 @@ const DeviceMonitorPage = () => {
                                 lastWeldingVoltageChartRef,
                                 xPoll
                             );
+                            next.weldingVoltage = (series || []).filter((p) => typeof p?.x === 'number' && p.x >= xPoll - LIVE_WINDOW_MS);
                         } else {
                             const y = Math.round(Number(telemetrySample[channel.key] ?? 0) * 10) / 10;
-                            next[channel.key] = trimChartSeries(prev[channel.key] || [], { x: xPoll, y });
+                            next[channel.key] = trimSeriesByTime(prev[channel.key] || [], { x: xPoll, y }, LIVE_WINDOW_MS);
                         }
                     });
                     return next;
@@ -943,9 +1195,40 @@ const DeviceMonitorPage = () => {
                             rfid: stateRfid ? String(stateRfid).trim() : null
                         }
                     ];
-                    return next.length > 1500 ? next.slice(-1200) : next;
+                    const cutoff = xPoll - LIVE_WINDOW_MS;
+                    const clipped = next.filter((s) => (typeof s?.x === 'number' ? s.x >= cutoff : true));
+                    return clipped.length > 6000 ? clipped.slice(-6000) : clipped;
                 });
                 prevWeldingForChartRef.current = wNow;
+
+                if (!historyModeRef.current && !todayPinExploreRef.current && activeTabRef.current === 'graphs') {
+                    setTimeWindow({ start: xPoll - LIVE_WINDOW_MS, end: xPoll, touched: true });
+                }
+
+                const store = telemetryHistoryStoreRef.current;
+                const seriesNext = { ...store.series };
+                seriesNext.weldingCurrent = appendDecimatedHistory(store.series.weldingCurrent || [], { x: xPoll, y: yi }, xPoll);
+                seriesNext.weldingVoltage = appendDecimatedHistory(store.series.weldingVoltage || [], { x: xPoll, y: yu }, xPoll);
+                seriesNext.mainsVoltageA = appendDecimatedHistory(store.series.mainsVoltageA || [], { x: xPoll, y: telemetrySample.mainsVoltageA ?? 0 }, xPoll);
+                seriesNext.mainsVoltageB = appendDecimatedHistory(store.series.mainsVoltageB || [], { x: xPoll, y: telemetrySample.mainsVoltageB ?? 0 }, xPoll);
+                seriesNext.mainsVoltageC = appendDecimatedHistory(store.series.mainsVoltageC || [], { x: xPoll, y: telemetrySample.mainsVoltageC ?? 0 }, xPoll);
+                telemetryHistoryStoreRef.current = {
+                    ...store,
+                    series: seriesNext,
+                    timeline: appendDecimatedHistory(
+                        store.timeline || [],
+                        {
+                            x: xPoll,
+                            y: 1,
+                            isOnline: true,
+                            isWelding: wNow,
+                            errorCode,
+                            rfid: stateRfid ? String(stateRfid).trim() : null
+                        },
+                        xPoll
+                    ),
+                    lastStoredTs: xPoll,
+                };
 
                 // Просто обновляем состояние - есть данные
                 updateConnectionStatus(true, true);
@@ -1476,28 +1759,53 @@ const DeviceMonitorPage = () => {
 
     // Сохранение из модалки: обновить наименование и подразделение аппарата
     const handleSaveEquipmentEdit = async (payload) => {
-        if (!payload.editMode || !payload.machineId) {
+        let id = payload?.machineId ?? machineId;
+        if (!id && machineMac && machineMac !== 'Неизвестный MAC') {
+            const machines = await getAllWeldingMachines().catch(() => []);
+            const machineByMac = Array.isArray(machines)
+                ? machines.find((m) => (m.mac || '').toLowerCase() === String(machineMac).toLowerCase())
+                : null;
+            if (machineByMac?.id) {
+                id = machineByMac.id;
+                setMachineId(machineByMac.id);
+            }
+        }
+        if (!id) {
             const err = new Error('Не удалось определить аппарат для сохранения.');
             err.errors = { api: err.message };
             throw err;
         }
-        const { machineId: id, name, department } = payload;
+        const { name, department } = payload || {};
         const trimmedName = (name || '').trim();
         if (!trimmedName) {
-            return;
+            const err = new Error('Название не может быть пустым.');
+            err.errors = { name: err.message };
+            throw err;
         }
         try {
             const machine = await getWeldingMachineById(id);
             if (!machine || !machine.id) {
                 throw new Error('Аппарат не найден');
             }
-            const unit = organizationUnits.find((u) => (u.name || '') === (department || ''));
+            const unitsSource = organizationUnits.length > 0
+                ? organizationUnits
+                : (await getAllOrganizationUnits().catch(() => []));
+            const unit = unitsSource.find((u) => (u.name || '') === (department || ''));
             const organizationUnitForApi = unit
                 ? { id: unit.id, name: unit.name || '' }
                 : (machine.organizationUnit || null);
+            // Отправляем только поля WeldingMachineDTO, чтобы не тащить тяжелые вложенные структуры.
             const updateData = {
-                ...machine,
+                id,
                 name: trimmedName,
+                mac: machine.mac || machineMac,
+                deviceModel: machine.deviceModel || 'Core Pulse',
+                serialNumber: machine.serialNumber ?? null,
+                inventoryNumber: machine.inventoryNumber ?? null,
+                commissionDate: machine.commissionDate ?? null,
+                manufactureYear: machine.manufactureYear ?? null,
+                lastService: machine.lastService ?? null,
+                weldingMachineType: machine.weldingMachineType ?? null,
                 organizationUnit: organizationUnitForApi,
             };
             await updateWeldingMachine(id, updateData);
@@ -1758,7 +2066,7 @@ const DeviceMonitorPage = () => {
 
         // Аппарат включен - зеленый
         if (stateLower.includes('включен') || stateLower.includes('on') || stateLower === 'аппарат включен') {
-            return '#0cff00'; // Зеленый
+            return '#65d66f';
         }
 
         // Сварка - желтый
@@ -1769,7 +2077,7 @@ const DeviceMonitorPage = () => {
         // Авария - красный
         if (stateLower.includes('авария') || stateLower.includes('error') || stateLower.includes('ошибка') ||
             stateLower.includes('emergency') || stateLower.includes('failure')) {
-            return '#E42F34'; // Красный
+            return '#f06c7b';
         }
 
         // Дежурный режим - зеленый
@@ -2065,18 +2373,6 @@ const DeviceMonitorPage = () => {
         return '5,6 кВт';
     };
 
-    const getCurrentProgress = () => {
-        const current = parseFloat(getCurrentValue());
-        if (isNaN(current)) return 0;
-        return Math.min((current / 500) * 100, 100);
-    };
-
-    const getVoltageProgress = () => {
-        const voltage = parseFloat(getVoltageValue());
-        if (isNaN(voltage)) return 0;
-        return Math.min((voltage / 50) * 100, 100);
-    };
-
     // Функция для определения, идет ли сварка
     const isWelding = () => {
         if (Object.keys(deviceData).length === 0 || !hasData) return false;
@@ -2161,15 +2457,44 @@ const DeviceMonitorPage = () => {
     }));
 
     const incidentLog = getErrors();
-    const currentValue = getCurrentValue();
-    const voltageValue = getVoltageValue();
-    const weldingTimer = getWeldingTimer();
+    const isWeldingActive = isWelding();
+
+    useEffect(() => {
+        idleControlMetricsRef.current = { current: '0', voltage: '0' };
+    }, [machineMac]);
+
+    useEffect(() => {
+        if (Object.keys(deviceData).length === 0 || !hasData) return;
+        if (!deviceData[machineMac]) return;
+        if (!isWelding()) {
+            idleControlMetricsRef.current = {
+                current: getCurrentValue(),
+                voltage: getVoltageValue(),
+            };
+        }
+    }, [deviceData, machineMac, hasData]);
+
+    const controlFactCurrent = isWeldingActive ? getCurrentValue() : '0';
+    const controlFactVoltage = isWeldingActive ? getVoltageValue() : '0';
+    const controlSetCurrent = isWeldingActive ? idleControlMetricsRef.current.current : getCurrentValue();
+    const controlSetVoltage = isWeldingActive ? idleControlMetricsRef.current.voltage : getVoltageValue();
+    const parseProgress = (rawStr, max) => {
+        const raw = String(rawStr).replace(',', '.');
+        const n = parseFloat(raw);
+        if (Number.isNaN(n)) return 0;
+        return Math.min((n / max) * 100, 100);
+    };
+    const currentProgress = parseProgress(controlFactCurrent, 500);
+    const voltageProgress = parseProgress(controlFactVoltage, 50);
+
     const rfidCode = getRfidCode();
     const hasRfidCode = rfidCode !== null;
-    const currentProgress = getCurrentProgress();
-    const voltageProgress = getVoltageProgress();
-    const isWeldingActive = isWelding();
     const currentStatusData = deviceData[machineMac] || {};
+    const machineStateValue = (!hasData || !currentStatusData)
+        ? 'Не в сети'
+        : (currentStatusData['Состояние аппарата'] || currentStatusData['WeldingMachineState'] || currentStatusData.weldingMachineState || 'Не в сети');
+    const machineStateDisplayValue = machineStateValue === 'Авария' ? 'Ошибка' : machineStateValue;
+    const machineStateColor = getStateColor(machineStateValue) || 'rgba(242, 241, 244, 0.9)';
     const statusPhaseA = parseNumberOrNull(
         currentStatusData['Напряжение фазы А'] ??
         currentStatusData['VoltagePhaseA'] ??
@@ -2207,9 +2532,6 @@ const DeviceMonitorPage = () => {
         currentStatusData['secondaryCoilTemperature']
     ) ?? 0;
 
-    // Определяем, нужно ли показывать таймер желтым (сварка идет или только что закончилась)
-    const isTimerActive = isWeldingActive || (weldingEndTime && (currentTime - weldingEndTime < 2000));
-
     // Форматирование даты
     const formatDate = () => {
         if (lastUpdate) {
@@ -2229,52 +2551,84 @@ const DeviceMonitorPage = () => {
 
     const timelineXs = useMemo(() => {
         const xs = [];
-        (telemetrySeries.weldingCurrent || []).forEach((p) => {
+        const display = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
+        (display.weldingCurrent || []).forEach((p) => {
             if (typeof p.x === 'number' && Number.isFinite(p.x)) xs.push(p.x);
         });
-        (telemetrySeries.weldingVoltage || []).forEach((p) => {
+        (display.weldingVoltage || []).forEach((p) => {
             if (typeof p.x === 'number' && Number.isFinite(p.x)) xs.push(p.x);
         });
         return xs.sort((a, b) => a - b);
-    }, [telemetrySeries.weldingCurrent, telemetrySeries.weldingVoltage]);
+    }, [telemetrySeries.weldingCurrent, telemetrySeries.weldingVoltage, historySeriesSnapshot, graphUsesServerData]);
 
     const chartBounds = useMemo(() => {
-        const maxX = timelineXs.length ? timelineXs[timelineXs.length - 1] : Date.now();
-        const day = new Date(maxX);
-        day.setHours(0, 0, 0, 0);
-        const dayStart = day.getTime() + 6 * 60 * 60 * 1000;
-        const dayEnd = day.getTime() + 22 * 60 * 60 * 1000;
-        return { dayStart, dayEnd, dataMax: maxX };
-    }, [timelineXs]);
+        const fallbackEnd = Date.now();
+        const fallbackStart = fallbackEnd - LIVE_WINDOW_MS;
+        const dataMax = timelineXs.length ? timelineXs[timelineXs.length - 1] : fallbackEnd;
+
+        if (graphUsesServerData && Number.isFinite(historyDayBounds.start) && Number.isFinite(historyDayBounds.end)) {
+            const start = historyDayBounds.start;
+            const end = Math.max(historyDayBounds.end, start + 1);
+            return { dayStart: start, dayEnd: end, dataMax: end };
+        }
+
+        const start = Number.isFinite(timeWindow.start) ? timeWindow.start : fallbackStart;
+        const end = Number.isFinite(timeWindow.end) ? timeWindow.end : fallbackEnd;
+        return { dayStart: start, dayEnd: Math.max(end, start + 1), dataMax };
+    }, [timelineXs, timeWindow.start, timeWindow.end, LIVE_WINDOW_MS, graphUsesServerData, historyDayBounds.start, historyDayBounds.end]);
 
     useEffect(() => {
         if (timeWindow.touched) return;
         const end = Math.min(chartBounds.dataMax, chartBounds.dayEnd);
-        const start = Math.max(chartBounds.dayStart, end - 60 * 60 * 1000);
+        const start = Math.max(chartBounds.dayStart, end - LIVE_WINDOW_MS);
         setTimeWindow({ start, end, touched: false });
-    }, [chartBounds, timeWindow.touched]);
+    }, [chartBounds, timeWindow.touched, LIVE_WINDOW_MS]);
 
     const activeWindow = useMemo(() => {
         const minGap = 60 * 1000;
         const fallbackEnd = Math.min(chartBounds.dataMax, chartBounds.dayEnd);
-        const fallbackStart = Math.max(chartBounds.dayStart, fallbackEnd - 60 * 60 * 1000);
+        const fallbackSpan = graphUsesServerData ? Math.max(chartBounds.dayEnd - chartBounds.dayStart, minGap) : LIVE_WINDOW_MS;
+        const fallbackStart = Math.max(chartBounds.dayStart, fallbackEnd - fallbackSpan);
         let start = Number.isFinite(timeWindow.start) ? timeWindow.start : fallbackStart;
         let end = Number.isFinite(timeWindow.end) ? timeWindow.end : fallbackEnd;
         start = Math.max(chartBounds.dayStart, Math.min(start, chartBounds.dayEnd - minGap));
         end = Math.min(chartBounds.dayEnd, Math.max(end, chartBounds.dayStart + minGap));
         if (end - start < minGap) end = Math.min(chartBounds.dayEnd, start + minGap);
         return { start, end, minGap };
-    }, [chartBounds, timeWindow.start, timeWindow.end]);
+    }, [chartBounds, timeWindow.start, timeWindow.end, graphUsesServerData, LIVE_WINDOW_MS]);
 
-    const getTelemetryOverlayChartOptions = (windowStart, windowEnd) => {
+    const rulerPinBounds = useMemo(() => {
+        if (graphUsesServerData && draggingPin && pinDragPreview && Number.isFinite(pinDragPreview.start) && Number.isFinite(pinDragPreview.end)) {
+            return { start: pinDragPreview.start, end: pinDragPreview.end };
+        }
+        return { start: activeWindow.start, end: activeWindow.end };
+    }, [graphUsesServerData, draggingPin, pinDragPreview, activeWindow.start, activeWindow.end]);
+
+    const formatHistoryPinHintTime = useCallback((ts) => {
+        if (!Number.isFinite(ts)) return '';
+        const step = 5 * 60 * 1000;
+        const snapped = Math.round(ts / step) * step;
+        return new Date(snapped).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    }, []);
+
+    const telemetryOverlayChartOptions = useMemo(() => {
+        const windowStart = activeWindow.start;
+        const windowEnd = activeWindow.end;
         const range = Math.max(windowEnd - windowStart, 1);
         const xStep = range / 8;
+        const z = Math.max(1, Math.min(telemetryYZoom || 1, 10));
+        const yMax = 500 / z;
+        const leftTicks = LEFT_Y_TICKS.filter((v) => v <= yMax + 1e-9);
         return {
             responsive: true,
             maintainAspectRatio: false,
+            /** Уже отдаём {x,y} и сортировку по времени — меньше работы парсеру и масштабу. */
+            parsing: false,
+            normalized: graphUsesServerData,
             plugins: {
                 legend: { display: false },
                 tooltip: {
+                    enabled: false,
                     mode: 'index',
                     intersect: false,
                     backgroundColor: 'rgba(0, 0, 0, 0.85)',
@@ -2311,7 +2665,7 @@ const DeviceMonitorPage = () => {
                         color: 'rgba(255, 255, 255, 0.6)',
                         font: { size: 10 },
                         padding: 6,
-                        callback: function(val) {
+                        callback(val) {
                             return new Date(val).toLocaleTimeString('ru-RU', {
                                 hour: '2-digit',
                                 minute: '2-digit'
@@ -2326,7 +2680,7 @@ const DeviceMonitorPage = () => {
                 },
                 y: {
                     min: 0,
-                    max: 500,
+                    max: yMax,
                     position: 'left',
                     grid: {
                         color: 'rgba(255, 255, 255, 0.15)',
@@ -2342,67 +2696,73 @@ const DeviceMonitorPage = () => {
                     },
                     border: { display: false },
                     afterBuildTicks: (axis) => {
-                        axis.ticks = LEFT_Y_TICKS.map((v) => ({ value: v }));
-                    }
-                },
-                yRight: {
-                    min: 0,
-                    max: 50,
-                    position: 'right',
-                    grid: { display: false },
-                    ticks: {
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        font: { size: 11 },
-                        padding: 8,
-                        callback: (v) => (RIGHT_Y_TICKS.includes(v) ? v : '')
-                    },
-                    border: { display: false },
-                    afterBuildTicks: (axis) => {
-                        axis.ticks = RIGHT_Y_TICKS.map((v) => ({ value: v }));
+                        axis.ticks = leftTicks.map((v) => ({ value: v }));
                     }
                 }
             },
             animation: { duration: 0 },
-            elements: { point: { radius: 0, hoverRadius: 4 }, line: { tension: 0, borderWidth: 2 } },
+            elements: { point: { radius: 0, hoverRadius: 4 }, line: { tension: 0, borderWidth: graphUsesServerData ? 1.5 : 2 } },
             interaction: { intersect: false, mode: 'index' },
             layout: { padding: { top: 8, bottom: 8, left: 8, right: 8 } }
         };
-    };
+    }, [activeWindow.start, activeWindow.end, graphUsesServerData, telemetryYZoom]);
 
-    const topChartData = useMemo(() => ({
-        datasets: [
-            {
-                label: 'Сварочный ток',
-                data: (telemetrySeries.weldingCurrent || []).map((d) => ({ x: d.x, y: Number(d.y) || 0 })),
-                borderColor: '#3ec7ff',
-                backgroundColor: (context) => {
-                    const chart = context.chart;
-                    const { ctx, chartArea } = chart;
-                    if (!chartArea) return 'rgba(62,199,255,0.2)';
-                    return createGradient(ctx, chartArea, 'rgba(62,199,255,0.55)', 'rgba(62,199,255,0.02)');
+    const topChartData = useMemo(() => {
+        const src = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
+        let wcRaw = src.weldingCurrent || [];
+        let wvRaw = src.weldingVoltage || [];
+        if (graphUsesServerData) {
+            const dec = decimateAlignedXYPairs(wcRaw, wvRaw, HISTORY_CHART_MAX_POINTS);
+            wcRaw = dec.weldingCurrent;
+            wvRaw = dec.weldingVoltage;
+        }
+        const mapPt = (d) => {
+            const y = d?.y;
+            const ny = y === null || y === undefined || Number.isNaN(Number(y)) ? null : Number(y);
+            return { x: d.x, y: ny };
+        };
+        const wc = wcRaw.map(mapPt);
+        const wv = wvRaw.map(mapPt);
+
+        return {
+            datasets: [
+                {
+                    label: 'Сварочный ток',
+                    data: wc,
+                    borderColor: '#3ec7ff',
+                    backgroundColor: graphUsesServerData
+                        ? 'rgba(62,199,255,0.12)'
+                        : (context) => {
+                            const chart = context.chart;
+                            const { ctx, chartArea } = chart;
+                            if (!chartArea) return 'rgba(62,199,255,0.2)';
+                            return createGradient(ctx, chartArea, 'rgba(62,199,255,0.55)', 'rgba(62,199,255,0.02)');
+                        },
+                    fill: graphUsesServerData ? 'origin' : true,
+                    yAxisID: 'y'
                 },
-                fill: true,
-                yAxisID: 'y'
-            },
-            {
-                label: 'Сварочное напряжение',
-                data: (telemetrySeries.weldingVoltage || []).map((d) => ({ x: d.x, y: Number(d.y) || 0 })),
-                borderColor: '#ff61c8',
-                backgroundColor: (context) => {
-                    const chart = context.chart;
-                    const { ctx, chartArea } = chart;
-                    if (!chartArea) return 'rgba(255,97,200,0.2)';
-                    return createGradient(ctx, chartArea, 'rgba(255,97,200,0.48)', 'rgba(255,97,200,0.02)');
-                },
-                fill: true,
-                yAxisID: 'yRight'
-            }
-        ]
-    }), [telemetrySeries.weldingCurrent, telemetrySeries.weldingVoltage]);
+                {
+                    label: 'Сварочное напряжение',
+                    data: wv,
+                    borderColor: '#ff61c8',
+                    backgroundColor: graphUsesServerData
+                        ? 'rgba(255,97,200,0.10)'
+                        : (context) => {
+                            const chart = context.chart;
+                            const { ctx, chartArea } = chart;
+                            if (!chartArea) return 'rgba(255,97,200,0.2)';
+                            return createGradient(ctx, chartArea, 'rgba(255,97,200,0.48)', 'rgba(255,97,200,0.02)');
+                        },
+                    fill: graphUsesServerData ? 'origin' : true,
+                    yAxisID: 'y'
+                }
+            ]
+        };
+    }, [telemetrySeries.weldingCurrent, telemetrySeries.weldingVoltage, historySeriesSnapshot, graphUsesServerData]);
 
     const timelineInWindow = useMemo(
-        () => timelineSamples.filter((s) => s.x >= activeWindow.start && s.x <= activeWindow.end),
-        [timelineSamples, activeWindow.start, activeWindow.end]
+        () => (graphUsesServerData ? historyTimelineSnapshot : timelineSamples).filter((s) => s.x >= activeWindow.start && s.x <= activeWindow.end),
+        [timelineSamples, historyTimelineSnapshot, graphUsesServerData, activeWindow.start, activeWindow.end]
     );
 
     const buildSegments = (samples, predicate, valueGetter) => {
@@ -2453,9 +2813,129 @@ const DeviceMonitorPage = () => {
         return ((x - chartBounds.dayStart) / range) * 100;
     }, [chartBounds.dayEnd, chartBounds.dayStart]);
 
+    const findSegmentAtTs = useCallback((segments, ts) => {
+        if (!Array.isArray(segments) || !Number.isFinite(ts)) return null;
+        return segments.find((seg) => ts >= seg.start && ts <= seg.end) || null;
+    }, []);
+
+    const findNearestPointValue = useCallback((series, ts) => {
+        if (!Array.isArray(series) || series.length === 0 || !Number.isFinite(ts)) return null;
+        let nearest = null;
+        let nearestDiff = Number.POSITIVE_INFINITY;
+        for (const p of series) {
+            if (!p || !Number.isFinite(p.x)) continue;
+            if (p.y === null || p.y === undefined || Number.isNaN(Number(p.y))) continue;
+            const diff = Math.abs(p.x - ts);
+            if (diff < nearestDiff) {
+                nearest = p;
+                nearestDiff = diff;
+            }
+        }
+        if (!nearest) return null;
+        const val = Number(nearest.y);
+        return Number.isFinite(val) ? val : null;
+    }, []);
+
+    const hoverInfo = useMemo(() => {
+        if (!hoverCursor.active || !Number.isFinite(hoverCursor.ts)) return null;
+        const displaySeries = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
+        const current = findNearestPointValue(displaySeries.weldingCurrent || [], hoverCursor.ts);
+        const voltage = findNearestPointValue(displaySeries.weldingVoltage || [], hoverCursor.ts);
+        const errorSeg = findSegmentAtTs(timelineRows.errors, hoverCursor.ts);
+        const welderSeg = findSegmentAtTs(timelineRows.welder, hoverCursor.ts);
+
+        const welderLabel = welderSeg?.value ? welderNameByRfid[welderSeg.value] || null : null;
+
+        return {
+            current,
+            voltage,
+            errorLabel: errorSeg?.label || null,
+            welderLabel,
+            welderRfid: welderSeg?.value || null,
+        };
+    }, [hoverCursor, graphUsesServerData, historySeriesSnapshot, telemetrySeries, findNearestPointValue, timelineRows, findSegmentAtTs, welderNameByRfid]);
+
+    useEffect(() => {
+        const rfid = hoverInfo?.welderRfid;
+        if (!rfid || welderNameByRfid[rfid] || welderNameFetchInFlightRef.current.has(rfid)) return;
+        welderNameFetchInFlightRef.current.add(rfid);
+        fetchWelderByRfidVariants(rfid)
+            .then((welder) => {
+                if (welder?.name) {
+                    setWelderNameByRfid((prev) => ({ ...prev, [rfid]: formatWelderShortName(welder) }));
+                } else {
+                    setWelderNameByRfid((prev) => ({ ...prev, [rfid]: null }));
+                }
+            })
+            .finally(() => {
+                welderNameFetchInFlightRef.current.delete(rfid);
+            });
+    }, [hoverInfo?.welderRfid, welderNameByRfid]);
+
+    const chartWrapperRef = useRef(null);
+    const syncPlotAreaFromChart = useCallback(() => {
+        const chart = currentChartInstanceRef.current;
+        if (!chart || !chart.chartArea || !Number.isFinite(chart.width)) return;
+        const leftPx = Math.max(0, chart.chartArea.left || 0);
+        const rightPx = Math.max(0, chart.width - (chart.chartArea.right || chart.width));
+        const widthPx = Math.max((chart.chartArea.right || 0) - (chart.chartArea.left || 0), 1);
+        setPlotArea({ leftPx, rightPx, widthPx });
+    }, []);
+
+    useEffect(() => {
+        if (activeTab !== 'graphs') return undefined;
+        syncPlotAreaFromChart();
+        const onResize = () => syncPlotAreaFromChart();
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, [activeTab, syncPlotAreaFromChart, topChartData, activeWindow.start, activeWindow.end]);
+
+    const handleSharedHoverMove = useCallback((event) => {
+        if (!chartWrapperRef.current) return;
+        const rect = chartWrapperRef.current.getBoundingClientRect();
+        if (!rect.width) return;
+        const left = Number.isFinite(plotArea.leftPx) ? plotArea.leftPx : 0;
+        const width = Number.isFinite(plotArea.widthPx) && plotArea.widthPx > 0 ? plotArea.widthPx : rect.width;
+        const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left - left) / width));
+        const xPx = left + ratio * width;
+        const ts = activeWindow.start + ratio * (activeWindow.end - activeWindow.start);
+        const tooltipW = 240;
+        const flip = xPx > (left + width - tooltipW);
+        setHoverCursor({
+            active: true,
+            ts,
+            percent: ratio * 100,
+            xPx,
+            flip,
+        });
+    }, [activeWindow.start, activeWindow.end, plotArea.leftPx, plotArea.widthPx]);
+
+    const handleSharedHoverLeave = useCallback(() => {
+        setHoverCursor({ active: false, ts: null, percent: 0, xPx: 0 });
+    }, []);
+
     const handleTimelinePinMouseDown = (pin) => {
+        if (selectedGraphDate && isTodayDateStr(selectedGraphDate) && !todayPinExploreRef.current) {
+            const db = getDayBoundsForDateStr(selectedGraphDate);
+            todayPinExploreRef.current = true;
+            todayDayBoundsRef.current = db;
+            setTodayPinExplore(true);
+            setHistoryDayBounds({ start: db.dayStart, end: db.dayEnd });
+        }
+        if (!selectedGraphDate || !isTodayDateStr(selectedGraphDate)) {
+            todayDayBoundsRef.current = null;
+        }
         setDraggingPin(pin);
         setTimeWindow((prev) => ({ ...prev, touched: true }));
+        const useDayPinDrag = historyModeRef.current || todayPinExploreRef.current;
+        if (useDayPinDrag) {
+            const b = { start: activeWindow.start, end: activeWindow.end };
+            pinDragPreviewRef.current = b;
+            setPinDragPreview(b);
+        } else {
+            pinDragPreviewRef.current = null;
+            setPinDragPreview(null);
+        }
     };
 
     useEffect(() => {
@@ -2465,21 +2945,49 @@ const DeviceMonitorPage = () => {
             const rect = timelineRulerRef.current.getBoundingClientRect();
             if (!rect.width) return;
             const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-            const rawTs = chartBounds.dayStart + ratio * (chartBounds.dayEnd - chartBounds.dayStart);
+            const dayStart = todayPinExploreRef.current && todayDayBoundsRef.current
+                ? todayDayBoundsRef.current.dayStart
+                : chartBounds.dayStart;
+            const dayEnd = todayPinExploreRef.current && todayDayBoundsRef.current
+                ? todayDayBoundsRef.current.dayEnd
+                : chartBounds.dayEnd;
+            const rawTs = dayStart + ratio * (dayEnd - dayStart);
             const snapped = Math.round(rawTs / 60_000) * 60_000;
-            setTimeWindow((prev) => {
-                const minGap = 60 * 1000;
-                let nextStart = Number.isFinite(prev.start) ? prev.start : activeWindow.start;
-                let nextEnd = Number.isFinite(prev.end) ? prev.end : activeWindow.end;
+            const minGap = 60 * 1000;
+            if (historyModeRef.current || todayPinExploreRef.current) {
+                const prev = pinDragPreviewRef.current;
+                let nextStart = Number.isFinite(prev?.start) ? prev.start : activeWindow.start;
+                let nextEnd = Number.isFinite(prev?.end) ? prev.end : activeWindow.end;
                 if (draggingPin === 'start') {
-                    nextStart = Math.max(chartBounds.dayStart, Math.min(snapped, nextEnd - minGap));
+                    nextStart = Math.max(dayStart, Math.min(snapped, nextEnd - minGap));
                 } else {
-                    nextEnd = Math.min(chartBounds.dayEnd, Math.max(snapped, nextStart + minGap));
+                    nextEnd = Math.min(dayEnd, Math.max(snapped, nextStart + minGap));
                 }
-                return { ...prev, start: nextStart, end: nextEnd, touched: true };
-            });
+                const next = { start: nextStart, end: nextEnd };
+                pinDragPreviewRef.current = next;
+                setPinDragPreview(next);
+            } else {
+                setTimeWindow((prev) => {
+                    let nextStart = Number.isFinite(prev.start) ? prev.start : activeWindow.start;
+                    let nextEnd = Number.isFinite(prev.end) ? prev.end : activeWindow.end;
+                    if (draggingPin === 'start') {
+                        nextStart = Math.max(dayStart, Math.min(snapped, nextEnd - minGap));
+                    } else {
+                        nextEnd = Math.min(dayEnd, Math.max(snapped, nextStart + minGap));
+                    }
+                    return { ...prev, start: nextStart, end: nextEnd, touched: true };
+                });
+            }
         };
-        const onUp = () => setDraggingPin(null);
+        const onUp = () => {
+            if ((historyModeRef.current || todayPinExploreRef.current) && pinDragPreviewRef.current) {
+                const p = pinDragPreviewRef.current;
+                setTimeWindow((prev) => ({ ...prev, start: p.start, end: p.end, touched: true }));
+            }
+            pinDragPreviewRef.current = null;
+            setPinDragPreview(null);
+            setDraggingPin(null);
+        };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
         return () => {
@@ -2487,6 +2995,26 @@ const DeviceMonitorPage = () => {
             window.removeEventListener('mouseup', onUp);
         };
     }, [draggingPin, chartBounds.dayStart, chartBounds.dayEnd, activeWindow.start, activeWindow.end]);
+
+    const datePickerInputRef = useRef(null);
+    const shiftDateByDays = useCallback((dateStr, deltaDays) => {
+        if (!dateStr) return toLocalDateInput(new Date());
+        const [yyyy, mm, dd] = String(dateStr).split('-').map((x) => parseInt(x, 10));
+        const base = new Date(yyyy, (mm || 1) - 1, dd || 1);
+        base.setDate(base.getDate() + deltaDays);
+        return toLocalDateInput(base);
+    }, []);
+
+    const todayDateStr = toLocalDateInput(new Date());
+    const currentDateStr = selectedGraphDate || todayDateStr;
+    const isNextDayDisabled = currentDateStr >= todayDateStr;
+
+    const handlePrevDay = () => setSelectedGraphDate((d) => shiftDateByDays(d || toLocalDateInput(new Date()), -1));
+    const handleNextDay = () => {
+        if (isNextDayDisabled) return;
+        setSelectedGraphDate((d) => shiftDateByDays(d || toLocalDateInput(new Date()), 1));
+    };
+    const handleOpenCalendar = () => datePickerInputRef.current?.showPicker?.() || datePickerInputRef.current?.click?.();
 
     return (
         <main className="main-panel">
@@ -2500,9 +3028,41 @@ const DeviceMonitorPage = () => {
                     >
                         ×
                     </button>
-                    <div className="monitor-page-brand-title">
-                        <span className="monitor-page-brand-main">CORE</span>
-                        <span className="monitor-page-brand-accent">PRO500</span>
+                    <div className="monitor-page-brand-stack">
+                        <div className="monitor-page-brand-title">
+                            <span className="monitor-page-brand-main">CORE</span>
+                            <span className="monitor-page-brand-accent">PULSE</span>
+                        </div>
+                        <div className="monitor-page-top-tabs" aria-label="Разделы мониторинга">
+                            <button
+                                type="button"
+                                className={`monitor-page-top-tab ${activeTab === 'info' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('info')}
+                            >
+                                Информация
+                            </button>
+                            <button
+                                type="button"
+                                className={`monitor-page-top-tab ${activeTab === 'graphs' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('graphs')}
+                            >
+                                Графики
+                            </button>
+                            <button
+                                type="button"
+                                className="monitor-page-top-tab monitor-page-top-tab--placeholder"
+                                disabled
+                            >
+                                Сварщики
+                            </button>
+                            <button
+                                type="button"
+                                className="monitor-page-top-tab monitor-page-top-tab--placeholder"
+                                disabled
+                            >
+                                Ограничения
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div className="monitor-page-header-controls">
@@ -2521,62 +3081,6 @@ const DeviceMonitorPage = () => {
 
             <div className="top-grid">
                 <section className="machine-section" aria-label="Сварочный аппарат">
-                    <div className="machine-header">
-                        <button
-                            type="button"
-                            className="machine-info-back-tile"
-                            onClick={handleBackToEquipment}
-                            title="Вернуться к списку оборудования"
-                        >
-                            <span className="machine-info-icon">←</span>
-                        </button>
-                        {machineId && (
-                            <button
-                                type="button"
-                                className="machine-info-back-tile"
-                                onClick={handleDeleteMachine}
-                                title="Удалить аппарат"
-                                style={{ marginLeft: '8px' }}
-                            >
-                                <span className="machine-info-icon">✕</span>
-                            </button>
-                        )}
-
-                    </div>
-                    <div className="machine-title">
-                        <span className="machine-title-main">CORE</span>
-                        <span className="machine-title-accent">PULSE</span>
-                    </div>
-                    <div className="machine-info-tiles">
-                        <div className="machine-info-row">
-                            <button
-                                type="button"
-                                className="machine-info-icon-tile"
-                                onClick={handleOpenEditModal}
-                                title="Редактировать наименование и подразделение"
-                                style={{
-                                    cursor: 'pointer',
-                                    border: 'none',
-                                    background: 'transparent',
-                                    padding: 0,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}
-                            >
-                                <span className="machine-info-icon">✎</span>
-                            </button>
-                            <span className="machine-info-text">{displayName}</span>
-                        </div>
-                        {organizationUnit && (
-                            <div className="machine-info-row">
-                                <div className="machine-info-icon-tile">
-                                    <span className="machine-info-icon">📍</span>
-                                </div>
-                                <span className="machine-info-text">{organizationUnit}</span>
-                            </div>
-                        )}
-                    </div>
                     <div className="machine-visual-container">
                         <div className="machine-visual">
                             <img
@@ -2586,15 +3090,36 @@ const DeviceMonitorPage = () => {
                             />
                         </div>
                     </div>
+                    <div className="machine-state-block">
+                        <div className="machine-state-label">Состояние аппарата:</div>
+                        <div className="machine-state-value" style={{ color: machineStateColor }}>
+                            {machineStateDisplayValue}
+                        </div>
+                    </div>
                     <div className="welding-timer">
-                        {isTimerActive && (
-                            <div className="welding-timer-label">Сварка</div>
-                        )}
-                        <div className="welding-timer-display">
-                            <span className="welding-timer-icon">⚡</span>
-                            <span className={`welding-timer-time ${isTimerActive ? 'welding-active' : 'welding-inactive'}`}>
-                                {weldingTimer}
-                            </span>
+                        <div className="machine-info-row">
+                            <span className="machine-info-label">Имя:</span>
+                            <span className="machine-info-text">{displayName || '—'}</span>
+                            <button
+                                type="button"
+                                className="machine-info-icon-tile"
+                                onClick={handleOpenEditModal}
+                                title="Редактировать наименование и подразделение"
+                            >
+                                <span className="machine-info-icon">✎</span>
+                            </button>
+                        </div>
+                        <div className="machine-info-row">
+                            <span className="machine-info-label">Подразделение:</span>
+                            <span className="machine-info-text">{organizationUnit || '—'}</span>
+                            <button
+                                type="button"
+                                className="machine-info-icon-tile"
+                                onClick={handleOpenEditModal}
+                                title="Редактировать наименование и подразделение"
+                            >
+                                <span className="machine-info-icon">✎</span>
+                            </button>
                         </div>
                     </div>
                 </section>
@@ -2612,9 +3137,22 @@ const DeviceMonitorPage = () => {
                                     <div className="metric-header">
                                         <span>Ток сварки</span>
                                     </div>
-                                    <div className={`metric-value primary numeric ${isWeldingActive ? 'welding-active' : 'welding-inactive'}`}>
-                                        <span className="value">{currentValue}</span>
-                                        <span className="metric-system primary">A</span>
+                                    <div className="metric-dual-row">
+                                        <div className="metric-dual-col">
+                                            <span className="metric-sub-label">Факт.</span>
+                                            <div className="metric-value-dual metric-actual primary numeric">
+                                                <span className="value">{controlFactCurrent}</span>
+                                                <span className="metric-system-dual primary">A</span>
+                                            </div>
+                                        </div>
+                                        <div className="metric-dual-sep" aria-hidden="true" />
+                                        <div className="metric-dual-col">
+                                            <span className="metric-sub-label">Уст.</span>
+                                            <div className="metric-value-dual primary numeric welding-inactive">
+                                                <span className="value">{controlSetCurrent}</span>
+                                                <span className="metric-system-dual primary">A</span>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="metric-scale">
                                         <span className="scale-range-min">5</span>
@@ -2633,9 +3171,22 @@ const DeviceMonitorPage = () => {
                                     <div className="metric-header">
                                         <span>Напряжение сварки</span>
                                     </div>
-                                    <div className={`metric-value secondary numeric ${isWeldingActive ? 'welding-active' : 'welding-inactive'}`}>
-                                        <span className="value">{voltageValue}</span>
-                                        <span className="metric-system secondary">B</span>
+                                    <div className="metric-dual-row">
+                                        <div className="metric-dual-col">
+                                            <span className="metric-sub-label">Факт.</span>
+                                            <div className="metric-value-dual metric-actual secondary numeric">
+                                                <span className="value">{controlFactVoltage}</span>
+                                                <span className="metric-system-dual secondary">B</span>
+                                            </div>
+                                        </div>
+                                        <div className="metric-dual-sep" aria-hidden="true" />
+                                        <div className="metric-dual-col">
+                                            <span className="metric-sub-label">Уст.</span>
+                                            <div className="metric-value-dual secondary numeric welding-inactive">
+                                                <span className="value">{controlSetVoltage}</span>
+                                                <span className="metric-system-dual secondary">B</span>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="metric-scale">
                                         <span className="scale-range-min">5</span>
@@ -2689,21 +3240,13 @@ const DeviceMonitorPage = () => {
                             <div className="status-tile-title">Расход за сутки</div>
                             <div className="status-subtitle">Газ:</div>
                             <div className="status-row status-row--boxed">
-                                <span className="status-label">Ar92</span>
-                                <span className="status-value numeric">0 л.</span>
-                            </div>
-                            <div className="status-row status-row--boxed">
-                                <span className="status-label">Ar100</span>
-                                <span className="status-value numeric">0 л.</span>
+                                <span className="status-label">Ar92/CO2</span>
+                                <span className="status-value numeric">0 л</span>
                             </div>
                             <div className="status-subtitle status-subtitle--spaced">Проволока:</div>
                             <div className="status-row status-row--boxed">
-                                <span className="status-label">ER304</span>
-                                <span className="status-value numeric">{formatKgValue(dailyWireConsumptionKg)} кг.</span>
-                            </div>
-                            <div className="status-row status-row--boxed">
-                                <span className="status-label">Сталь</span>
-                                <span className="status-value numeric">{formatKgValue(dailyWireConsumptionKg)} кг.</span>
+                                <span className="status-label">Сталь 1.2</span>
+                                <span className="status-value numeric">{formatKgValue(dailyWireConsumptionKg)} кг</span>
                             </div>
                         </div>
                     </div>
@@ -2715,10 +3258,10 @@ const DeviceMonitorPage = () => {
                         </div>
                         <div className="status-row status-row--compact">
                             <span className="status-label">Темп. охл. жидкости Вход./Исх.</span>
-                            <span className="status-value numeric">{`${Math.round(statusChillerIn)}/${Math.round(statusChillerOut)} °C`}</span>
+                            <span className="status-value numeric">{`${Math.round(statusChillerOut)}/${Math.round(statusChillerIn)} °C`}</span>
                         </div>
                         <div className="status-row status-row--compact">
-                            <span className="status-label">Тем. обмотки Первич./Вторич.</span>
+                            <span className="status-label">Тем. Первич./Вторич.</span>
                             <span className="status-value numeric">{`${Math.round(statusPrimaryCoilTemp)}/${Math.round(statusSecondaryCoilTemp)} °C`}</span>
                         </div>
                     </div>
@@ -2791,36 +3334,43 @@ const DeviceMonitorPage = () => {
             <section className="bottom-panel">
                 <div className="bottom-panel__body">
                     <div className="telemetry-controls">
-                        <div className="telemetry-header">
-                            <button
-                                type="button"
-                                className="back-button"
-                                onClick={toggleTelemetryList}
-                                title={isTelemetryListExpanded ? "Скрыть список телеметрии" : "Показать список телеметрии"}
-                            >
-                                <span className="back-arrow">{isTelemetryListExpanded ? '←' : '→'}</span>
-                            </button>
-                            {isTelemetryListExpanded && (
-                                <div className="date-box">
-                                    <span className="date-text">{formatDate()}</span>
-                                </div>
-                            )}
-                        </div>
+
                         {isTelemetryListExpanded && (
                             <>
-                                <div className="tabs tabs-fixed">
-                                    <button
-                                        className={`tab ${activeTab === 'graphs' ? 'active' : ''}`}
-                                        onClick={() => setActiveTab('graphs')}
-                                    >
-                                        Графики
-                                    </button>
-                                    <button
-                                        className={`tab ${activeTab === 'info' ? 'active' : ''}`}
-                                        onClick={() => setActiveTab('info')}
-                                    >
-                                        Информация
-                                    </button>
+                                <div className="machine-info-row" style={{ marginBottom: 10, justifyContent: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <button type="button" className="machine-info-icon-tile" onClick={handlePrevDay} title="Предыдущий день">
+                                            <span className="machine-info-icon">‹</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="machine-info-text"
+                                            onClick={handleOpenCalendar}
+                                            style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                                            title="Выбрать дату"
+                                        >
+                                            {selectedGraphDate || toLocalDateInput(new Date())}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="machine-info-icon-tile"
+                                            onClick={handleNextDay}
+                                            title={isNextDayDisabled ? 'Будущие даты недоступны' : 'Следующий день'}
+                                            disabled={isNextDayDisabled}
+                                            style={isNextDayDisabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+                                        >
+                                            <span className="machine-info-icon">›</span>
+                                        </button>
+                                        <input
+                                            ref={datePickerInputRef}
+                                            type="date"
+                                            value={selectedGraphDate || ''}
+                                            onChange={(e) => setSelectedGraphDate(e.target.value)}
+                                            style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 1, height: 1 }}
+                                            aria-hidden
+                                            tabIndex={-1}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
                                     {activeTab === 'graphs' && telemetryChannels.map((channel) => (
@@ -3003,7 +3553,18 @@ const DeviceMonitorPage = () => {
                     {activeTab === 'graphs' && (
                         <div className="chart-stack">
                             <div className="chart-card large">
-                                <div className="chart-wrapper">
+                                <div
+                                    className="chart-wrapper"
+                                    ref={chartWrapperRef}
+                                    onMouseMove={handleSharedHoverMove}
+                                    onMouseLeave={handleSharedHoverLeave}
+                                >
+                                    {hoverCursor.active && (
+                                        <div
+                                            className="monitor-hover-crosshair monitor-hover-crosshair--full"
+                                            style={{ left: `${hoverCursor.xPx}px` }}
+                                        />
+                                    )}
                                     <div className="monitor-overlay-ruler" ref={timelineRulerRef}>
                                         <div className="monitor-overlay-ruler-scale">
                                             {Array.from({ length: 9 }, (_, idx) => {
@@ -3018,17 +3579,33 @@ const DeviceMonitorPage = () => {
                                         </div>
                                         <div className="monitor-overlay-ruler-track">
                                             <div className="monitor-overlay-ruler-line" />
+                                            {graphUsesServerData && draggingPin === 'start' && pinDragPreview && (
+                                                <span
+                                                    className="monitor-time-pin-hint"
+                                                    style={{ left: `${Math.max(0, Math.min(100, toDayPercent(rulerPinBounds.start)))}%` }}
+                                                >
+                                                    {formatHistoryPinHintTime(rulerPinBounds.start)}
+                                                </span>
+                                            )}
+                                            {graphUsesServerData && draggingPin === 'end' && pinDragPreview && (
+                                                <span
+                                                    className="monitor-time-pin-hint"
+                                                    style={{ left: `${Math.max(0, Math.min(100, toDayPercent(rulerPinBounds.end)))}%` }}
+                                                >
+                                                    {formatHistoryPinHintTime(rulerPinBounds.end)}
+                                                </span>
+                                            )}
                                             <button
                                                 type="button"
                                                 className="monitor-time-pin"
-                                                style={{ left: `${Math.max(0, Math.min(100, toDayPercent(activeWindow.start)))}%` }}
+                                                style={{ left: `${Math.max(0, Math.min(100, toDayPercent(rulerPinBounds.start)))}%` }}
                                                 onMouseDown={() => handleTimelinePinMouseDown('start')}
                                                 title="Начало интервала"
                                             />
                                             <button
                                                 type="button"
                                                 className="monitor-time-pin"
-                                                style={{ left: `${Math.max(0, Math.min(100, toDayPercent(activeWindow.end)))}%` }}
+                                                style={{ left: `${Math.max(0, Math.min(100, toDayPercent(rulerPinBounds.end)))}%` }}
                                                 onMouseDown={() => handleTimelinePinMouseDown('end')}
                                                 title="Конец интервала"
                                             />
@@ -3037,22 +3614,41 @@ const DeviceMonitorPage = () => {
                                     <div className="chart-canvas">
                                         <Line
                                             data={topChartData}
-                                            options={getTelemetryOverlayChartOptions(activeWindow.start, activeWindow.end)}
+                                            options={telemetryOverlayChartOptions}
                                             ref={(chart) => {
                                                 if (chart && chart.canvas) {
                                                     chart.canvas.id = 'current-chart';
                                                     currentChartInstanceRef.current = chart;
+                                                    syncPlotAreaFromChart();
                                                 }
                                             }}
                                         />
+                                        {hoverCursor.active && hoverInfo && (
+                                            <div
+                                                className="monitor-hover-tooltip"
+                                                style={{
+                                                    left: `${hoverCursor.xPx}px`,
+                                                    transform: hoverCursor.flip ? 'translateX(calc(-100% - 10px))' : 'translateX(10px)'
+                                                }}
+                                            >
+                                                {hoverInfo.current != null && <div><span className="monitor-hover-current">Сварочный ток: {hoverInfo.current.toFixed(1)}</span></div>}
+                                                {hoverInfo.voltage != null && <div><span className="monitor-hover-voltage">Сварочное напряжение: {hoverInfo.voltage.toFixed(1)}</span></div>}
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="monitor-lanes">
+                                    <div
+                                        className="monitor-lanes"
+                                        style={{
+                                            paddingLeft: `${plotArea.leftPx}px`,
+                                            paddingRight: `${plotArea.rightPx}px`,
+                                        }}
+                                    >
                                         <div className="monitor-lane-row">
-                                            <span className="monitor-lane-label">Включен</span>
-                                            <div className="monitor-lane-track">
+                                            <span className="monitor-lane-label">Состояние</span>
+                                            <div className="monitor-lane-track monitor-lane-track--state">
                                                 {timelineRows.online.map((seg, idx) => (
                                                     <span
-                                                        key={`online-${idx}`}
+                                                        key={`state-online-${idx}`}
                                                         className="monitor-lane-segment monitor-lane-segment-online"
                                                         style={{
                                                             left: `${toPercent(seg.start)}%`,
@@ -3060,14 +3656,9 @@ const DeviceMonitorPage = () => {
                                                         }}
                                                     />
                                                 ))}
-                                            </div>
-                                        </div>
-                                        <div className="monitor-lane-row">
-                                            <span className="monitor-lane-label">Сварка</span>
-                                            <div className="monitor-lane-track">
                                                 {timelineRows.welding.map((seg, idx) => (
                                                     <span
-                                                        key={`welding-${idx}`}
+                                                        key={`state-weld-${idx}`}
                                                         className="monitor-lane-segment monitor-lane-segment-welding"
                                                         style={{
                                                             left: `${toPercent(seg.start)}%`,
@@ -3093,6 +3684,11 @@ const DeviceMonitorPage = () => {
                                                         </span>
                                                     );
                                                 })}
+                                                {hoverCursor.active && hoverInfo?.errorLabel && (
+                                                    <div className="monitor-lane-hover-badge monitor-lane-hover-badge-error" style={{ left: `${hoverCursor.percent}%` }}>
+                                                        {hoverInfo.errorLabel}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="monitor-lane-row">
@@ -3109,9 +3705,55 @@ const DeviceMonitorPage = () => {
                                                         title={seg.value}
                                                     />
                                                 ))}
+                                                {hoverCursor.active && hoverInfo?.welderLabel && (
+                                                    <div className="monitor-lane-hover-badge monitor-lane-hover-badge-welder" style={{ left: `${hoverCursor.percent}%` }}>
+                                                        {hoverInfo.welderLabel}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                                <div className="chart-controls" aria-label="Управление графиком">
+                                    <button
+                                        type="button"
+                                        className="chart-control-btn"
+                                        onClick={() => setTelemetryYZoom((z) => Math.min(10, Math.round((Math.max(1, z) * 1.25) * 100) / 100))}
+                                        title="Увеличить (Y)"
+                                    >
+                                        <span aria-hidden>＋</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="chart-control-btn"
+                                        onClick={() => setTelemetryYZoom((z) => Math.max(1, Math.round((Math.max(1, z) / 1.25) * 100) / 100))}
+                                        title="Уменьшить (Y)"
+                                    >
+                                        <span aria-hidden>－</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="chart-control-btn"
+                                        onClick={() => {
+                                            setTelemetryYZoom(1);
+                                            if (selectedGraphDate && isTodayDateStr(selectedGraphDate)) {
+                                                setTodayPinExplore(false);
+                                                todayPinExploreRef.current = false;
+                                                todayDayBoundsRef.current = null;
+                                                setHistoryDayBounds({ start: null, end: null });
+                                                historyCacheRef.current = { date: null, dayStart: null, dayEnd: null, pointsByTs: new Map() };
+                                                setHistorySeriesSnapshot(DEFAULT_TELEMETRY_SERIES);
+                                                setHistoryTimelineSnapshot([]);
+                                                setPinDragPreview(null);
+                                                pinDragPreviewRef.current = null;
+                                                setDraggingPin(null);
+                                                setTimeWindow({ start: null, end: null, touched: false });
+                                            }
+                                        }}
+                                        title="Сброс зума (Y) и интервала за сегодня (пятиминутный live)"
+                                    >
+                                        <span aria-hidden>⟲</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -3128,6 +3770,12 @@ const DeviceMonitorPage = () => {
                 editMode={true}
                 initialData={editModalOpen ? { machineId, name: displayName, department: organizationUnit } : null}
             />
+
+            {historyError && (
+                <div style={{ position: 'fixed', bottom: 12, left: 12, zIndex: 11000, color: '#ff8a96', fontSize: 12 }}>
+                    {historyError}
+                </div>
+            )}
         </main>
     );
 };

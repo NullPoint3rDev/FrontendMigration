@@ -140,3 +140,19 @@ export async function getArchivePanelState(mac) {
         return null;
     }
 }
+
+// История телеметрии (epoch millis): ток/напряжение/статус/ошибка/RFID за период (<= 24ч)
+export async function getArchiveTelemetryHistory(mac, fromMs, toMs) {
+    const params = new URLSearchParams();
+    params.append('mac', mac);
+    params.append('fromMs', String(fromMs));
+    params.append('toMs', String(toMs));
+    const res = await fetch(`${API_URL}/telemetry-history?${params.toString()}`, {
+        headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `HTTP ${res.status}`);
+    }
+    return res.json();
+}

@@ -20,6 +20,7 @@ const defaultFormData = () => ({
 const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organizationUnits = [], editMode = false, initialData = null }) => {
     const [selectedModel, setSelectedModel] = useState('Core')
     const [formData, setFormData] = useState(defaultFormData())
+    const [isSaving, setIsSaving] = useState(false)
 
     const [selectedOptions, setSelectedOptions] = useState({
         rfid: false,
@@ -259,6 +260,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
     }
 
     const handleSave = async () => {
+        if (isSaving) return
         setErrors({})
         setApiError('')
 
@@ -275,6 +277,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         }
 
         if (onSave) {
+            setIsSaving(true)
             try {
                 if (editMode && initialData) {
                     await onSave({
@@ -343,6 +346,8 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                     setApiError('Произошла ошибка при сохранении оборудования');
                 }
                 // Не закрываем модальное окно при ошибке
+            } finally {
+                setIsSaving(false)
             }
         }
     }
@@ -649,8 +654,17 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                             </div>
                         )}
 
-                        <button className="save-button" onClick={handleSave}>
-                            {editMode ? 'Сохранить изменения' : 'Добавить оборудование'}
+                        <button
+                            type="button"
+                            className="save-button"
+                            disabled={isSaving}
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleSave()
+                            }}
+                        >
+                            {isSaving ? 'Сохранение...' : (editMode ? 'Сохранить изменения' : 'Добавить оборудование')}
                         </button>
                     </div>
                 </div>

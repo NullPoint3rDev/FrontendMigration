@@ -366,6 +366,11 @@
     transform: translateY(0);
 }
 
+.save-button:disabled {
+    opacity: 0.75;
+    cursor: wait !important;
+}
+
 /* Scrollbar for modal */
 .modal-content::-webkit-scrollbar {
     width: 8px;
