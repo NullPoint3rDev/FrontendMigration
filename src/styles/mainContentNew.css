@@ -1804,6 +1804,23 @@
     cursor: none;
 }
 
+.chart-pan-surface {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+}
+
+.chart-pan-surface--enabled {
+    cursor: grab;
+}
+
+.chart-pan-surface--grabbing,
+.chart-pan-surface--grabbing .chart-canvas {
+    cursor: grabbing !important;
+}
+
 .monitor-hover-crosshair {
     position: absolute;
     top: 0;
@@ -1822,10 +1839,8 @@
     bottom: auto;
 }
 
-.monitor-hover-crosshair-dot {
+.monitor-plot-cursor-dot {
     position: absolute;
-    left: 50%;
-    top: 50%;
     width: 10px;
     height: 10px;
     margin: 0;
@@ -1835,7 +1850,7 @@
     background: #fff;
     transform: translate(-50%, -50%);
     pointer-events: none;
-    z-index: 1;
+    z-index: 8;
 }
 
 .monitor-hover-crosshair--in-lanes {

@@ -577,6 +577,7 @@ const DeviceMonitorPage = () => {
     const [yAxisLeftMax, setYAxisLeftMax] = useState(Y_AXIS_LEFT.MAX);
     const [yAxisRightMax, setYAxisRightMax] = useState(Y_AXIS_RIGHT.MAX);
     const [chartPlotCursorHidden, setChartPlotCursorHidden] = useState(false);
+    const [chartPanActive, setChartPanActive] = useState(false);
     const [timelineSamples, setTimelineSamples] = useState([]);
     const [timeWindow, setTimeWindow] = useState({ start: null, end: null, touched: false });
     const latestTimeWindowRef = useRef(timeWindow);
@@ -610,8 +611,19 @@ const DeviceMonitorPage = () => {
     selectedGraphDateRef.current = selectedGraphDate;
     /** Дата сессии перетаскивания пина (mousedown) — для записи интервала в mouseup при батчинге React. */
     const pinDragSessionDateRef = useRef(null);
-    const [hoverCursor, setHoverCursor] = useState({ active: false, ts: null, percent: 0, xPx: 0, flip: false });
-    const [plotArea, setPlotArea] = useState({ leftPx: 0, rightPx: 0, widthPx: 0, topPx: 0, heightPx: 0 });
+    const [hoverCursor, setHoverCursor] = useState({
+        active: false,
+        ts: null,
+        percent: 0,
+        xPx: 0,
+        flip: false,
+    });
+    /** Белая точка-курсор в plot: отдельно от crosshair (свой pointermove на .chart-canvas). */
+    const [plotDot, setPlotDot] = useState({ visible: false, leftPx: 0, topPx: 0 });
+    const [plotArea, setPlotArea] = useState({ leftPx: 0, rightPx: 0, widthPx: 0, topPx: 0, heightPx: 0, chartLeftPx: 0 });
+    const chartCanvasRef = useRef(null);
+    const plotAreaRef = useRef(plotArea);
+    plotAreaRef.current = plotArea;
     const [welderNameByRfid, setWelderNameByRfid] = useState({});
     const welderNameFetchInFlightRef = useRef(new Set());
     const telemetryHistoryStoreRef = useRef({ series: DEFAULT_TELEMETRY_SERIES, timeline: [], lastStoredTs: 0 });
@@ -633,6 +645,10 @@ const DeviceMonitorPage = () => {
     }, [todayPinExplore]);
 
     const graphUsesServerData = isHistoryMode || todayPinExplore;
+    const graphUsesServerDataRef = useRef(graphUsesServerData);
+    useEffect(() => {
+        graphUsesServerDataRef.current = graphUsesServerData;
+    }, [graphUsesServerData]);
 
     const toLocalDateInput = (d) => {
         const pad = (n) => String(n).padStart(2, '0');
@@ -1425,7 +1441,6 @@ const DeviceMonitorPage = () => {
                 if (
                     !historyModeRef.current &&
                     !todayPinExploreRef.current &&
-                    !liveGraphTimelineLockRef.current &&
                     activeTabRef.current === 'graphs'
                 ) {
                     setTimeWindow({ start: xPoll - LIVE_WINDOW_MS, end: xPoll, touched: true });
@@ -3040,8 +3055,9 @@ const DeviceMonitorPage = () => {
                 }
             },
             animation: { duration: 0 },
-            elements: { point: { radius: 0, hoverRadius: 4 }, line: { tension: 0, borderWidth: graphUsesServerData ? 1.5 : 2 } },
-            interaction: { intersect: false, mode: 'index' },
+            elements: { point: { radius: 0, hoverRadius: 0, hitRadius: 0 }, line: { tension: 0, borderWidth: graphUsesServerData ? 1.5 : 2 } },
+            /** Без mousemove — Chart.js не рисует hover-точки по index (их путают с курсором). */
+            events: ['mousedown', 'mouseup', 'click', 'touchstart', 'touchend'],
             layout: { padding: { top: 8, bottom: 8, left: 8, right: 8 } }
         };
     }, [activeWindow.start, activeWindow.end, graphUsesServerData, yAxisLeftMax, yAxisRightMax]);
@@ -3281,22 +3297,10 @@ const DeviceMonitorPage = () => {
     const chartWrapperRef = useRef(null);
     /** Дорожка «Ошибки» — hit-test и колесо без влияния на фон. */
     const errorsLaneTrackRef = useRef(null);
-    /** Live: после зума по красному сегменту не двигаем окно за последними N минутами (см. опрос). */
-    const liveGraphTimelineLockRef = useRef(false);
-    /** Цепочка зума по сегменту: snap → 0.88; после zoom-out снова snap. */
-    const errorZoomWheelRef = useRef({ segKey: null, lastDir: null, focal: null });
-    useEffect(() => {
-        if (graphUsesServerData) {
-            liveGraphTimelineLockRef.current = false;
-            errorZoomWheelRef.current = { segKey: null, lastDir: null, focal: null };
-        }
-    }, [graphUsesServerData]);
-    useEffect(() => {
-        if (activeTab !== 'graphs') {
-            liveGraphTimelineLockRef.current = false;
-            errorZoomWheelRef.current = { segKey: null, lastDir: null, focal: null };
-        }
-    }, [activeTab]);
+    const chartPanSessionRef = useRef(null);
+    const chartPanSuppressWheelRef = useRef(false);
+    const chartPanMoveHandlerRef = useRef(null);
+    const chartPanUpHandlerRef = useRef(null);
     const syncPlotAreaFromChart = useCallback(() => {
         const chart = currentChartInstanceRef.current;
         const wrapper = chartWrapperRef.current;
@@ -3325,7 +3329,157 @@ const DeviceMonitorPage = () => {
         return () => window.removeEventListener('resize', onResize);
     }, [activeTab, syncPlotAreaFromChart, topChartData, activeWindow.start, activeWindow.end]);
 
+    const isEventOnChartAxis = useCallback((event) => {
+        const chart = currentChartInstanceRef.current;
+        if (!chart?.chartArea || !chart.canvas) return false;
+        const ca = chart.chartArea;
+        const canvasRect = chart.canvas.getBoundingClientRect();
+        const axisPad = 30;
+        const scaleX = chart.width > 0 ? canvasRect.width / chart.width : 1;
+        const scaleY = chart.height > 0 ? canvasRect.height / chart.height : 1;
+        const plotLeft = canvasRect.left + ca.left * scaleX;
+        const plotRight = canvasRect.left + ca.right * scaleX;
+        const plotTop = canvasRect.top + ca.top * scaleY;
+        const plotBottom = canvasRect.top + ca.bottom * scaleY;
+        const isOnYAxisLeft =
+            event.clientX >= plotLeft - axisPad &&
+            event.clientX <= plotLeft &&
+            event.clientY >= plotTop &&
+            event.clientY <= plotBottom;
+        const isOnYAxisRight =
+            event.clientX >= plotRight &&
+            event.clientX <= plotRight + axisPad &&
+            event.clientY >= plotTop &&
+            event.clientY <= plotBottom;
+        const isOnXAxis =
+            event.clientX >= plotLeft &&
+            event.clientX <= plotRight &&
+            event.clientY >= plotBottom &&
+            event.clientY <= plotBottom + axisPad;
+        return isOnYAxisLeft || isOnYAxisRight || isOnXAxis;
+    }, []);
+
+    const pickPanYAxisSideAtEvent = useCallback((event) => {
+        const chart = currentChartInstanceRef.current;
+        if (!chart?.canvas) return 'left';
+        try {
+            const hits = chart.getElementsAtEventForMode(event, 'nearest', { intersect: false }, true);
+            if (!hits?.length) return 'left';
+            const ds = chart.data.datasets[hits[0].datasetIndex];
+            return ds?.yAxisID === 'yRight' ? 'right' : 'left';
+        } catch {
+            return 'left';
+        }
+    }, []);
+
+    const endChartPanSession = useCallback(() => {
+        if (chartPanMoveHandlerRef.current) {
+            window.removeEventListener('mousemove', chartPanMoveHandlerRef.current);
+            chartPanMoveHandlerRef.current = null;
+        }
+        if (chartPanUpHandlerRef.current) {
+            window.removeEventListener('mouseup', chartPanUpHandlerRef.current);
+            chartPanUpHandlerRef.current = null;
+        }
+        chartPanSessionRef.current = null;
+        chartPanSuppressWheelRef.current = false;
+        setChartPanActive(false);
+    }, []);
+
+    const handleChartPanMove = useCallback((event) => {
+        const session = chartPanSessionRef.current;
+        if (!session) return;
+        const dx = event.clientX - session.startClientX;
+        const dy = event.clientY - session.startClientY;
+        if (!session.active) {
+            if (Math.hypot(dx, dy) < 3) return;
+            session.active = true;
+            chartPanSuppressWheelRef.current = true;
+            setChartPanActive(true);
+            setHoverCursor({ active: false, ts: null, percent: 0, xPx: 0, flip: false });
+            setPlotDot({ visible: false, leftPx: 0, topPx: 0 });
+        }
+        event.preventDefault();
+
+        const span = Math.max(session.originEnd - session.originStart, session.minGap);
+        const plotW = session.plotWidth || 1;
+        const plotH = session.plotHeight || 1;
+        const deltaT = -(dx / plotW) * span;
+        let nextStart = session.originStart + deltaT;
+        let nextEnd = session.originEnd + deltaT;
+        if (nextStart < session.dayStart) {
+            nextStart = session.dayStart;
+            nextEnd = nextStart + span;
+        }
+        if (nextEnd > session.dayEnd) {
+            nextEnd = session.dayEnd;
+            nextStart = nextEnd - span;
+        }
+        setTimeWindow({ start: nextStart, end: nextEnd, touched: true });
+
+        if (session.axisSide === 'right') {
+            const yMin = Y_AXIS_RIGHT.MIN;
+            const yRange = session.originRightMax - yMin;
+            setYAxisRightMax(clampRightYMax(session.originRightMax + (dy / plotH) * yRange));
+        } else {
+            const yMin = Y_AXIS_LEFT.AXIS_MIN;
+            const yRange = session.originLeftMax - yMin;
+            setYAxisLeftMax(clampLeftYMax(session.originLeftMax + (dy / plotH) * yRange));
+        }
+    }, []);
+
+    const handleChartPanUp = useCallback(() => {
+        endChartPanSession();
+    }, [endChartPanSession]);
+
+    const handleChartPanMouseDown = useCallback((event) => {
+        if (!graphUsesServerDataRef.current) return;
+        if (event.button !== 0) return;
+        if (isEventOnChartAxis(event)) return;
+        if (chartPanSessionRef.current) return;
+        event.preventDefault();
+
+        const plotWidth = Number.isFinite(plotArea.widthPx) && plotArea.widthPx > 0 ? plotArea.widthPx : 1;
+        const plotHeight = Number.isFinite(plotArea.heightPx) && plotArea.heightPx > 0 ? plotArea.heightPx : 1;
+        chartPanSessionRef.current = {
+            active: false,
+            axisSide: pickPanYAxisSideAtEvent(event),
+            startClientX: event.clientX,
+            startClientY: event.clientY,
+            originStart: activeWindow.start,
+            originEnd: activeWindow.end,
+            originLeftMax: yAxisLeftMax,
+            originRightMax: yAxisRightMax,
+            dayStart: chartBounds.dayStart,
+            dayEnd: chartBounds.dayEnd,
+            minGap: activeWindow.minGap,
+            plotWidth,
+            plotHeight,
+        };
+        window.addEventListener('mousemove', handleChartPanMove);
+        window.addEventListener('mouseup', handleChartPanUp);
+        chartPanMoveHandlerRef.current = handleChartPanMove;
+        chartPanUpHandlerRef.current = handleChartPanUp;
+    }, [
+        isEventOnChartAxis,
+        pickPanYAxisSideAtEvent,
+        handleChartPanMove,
+        handleChartPanUp,
+        plotArea.widthPx,
+        plotArea.heightPx,
+        activeWindow.start,
+        activeWindow.end,
+        activeWindow.minGap,
+        chartBounds.dayStart,
+        chartBounds.dayEnd,
+        yAxisLeftMax,
+        yAxisRightMax,
+    ]);
+
+    useEffect(() => () => endChartPanSession(), [endChartPanSession]);
+
     const handleSharedHoverMove = useCallback((event) => {
+        if (chartPanActive || chartPanSessionRef.current?.active) return;
         if (!chartWrapperRef.current) return;
         const rect = chartWrapperRef.current.getBoundingClientRect();
         if (!rect.width) return;
@@ -3338,35 +3492,7 @@ const DeviceMonitorPage = () => {
         const tooltipW = 240;
         const flip = plotCursorX > (rect.width - tooltipW);
 
-        const chart = currentChartInstanceRef.current;
-        const axisPad = 30;
-        let onAxis = false;
-        if (chart?.chartArea && chart.canvas) {
-            const ca = chart.chartArea;
-            const canvasRect = chart.canvas.getBoundingClientRect();
-            const scaleX = chart.width > 0 ? canvasRect.width / chart.width : 1;
-            const scaleY = chart.height > 0 ? canvasRect.height / chart.height : 1;
-            const plotLeft = canvasRect.left + ca.left * scaleX;
-            const plotRight = canvasRect.left + ca.right * scaleX;
-            const plotTop = canvasRect.top + ca.top * scaleY;
-            const plotBottom = canvasRect.top + ca.bottom * scaleY;
-            const isOnYAxisLeft =
-                event.clientX >= plotLeft - axisPad &&
-                event.clientX <= plotLeft &&
-                event.clientY >= plotTop &&
-                event.clientY <= plotBottom;
-            const isOnYAxisRight =
-                event.clientX >= plotRight &&
-                event.clientX <= plotRight + axisPad &&
-                event.clientY >= plotTop &&
-                event.clientY <= plotBottom;
-            const isOnXAxis =
-                event.clientX >= plotLeft &&
-                event.clientX <= plotRight &&
-                event.clientY >= plotBottom &&
-                event.clientY <= plotBottom + axisPad;
-            onAxis = isOnYAxisLeft || isOnYAxisRight || isOnXAxis;
-        }
+        const onAxis = isEventOnChartAxis(event);
         setChartPlotCursorHidden(!onAxis);
 
         setHoverCursor({
@@ -3376,44 +3502,106 @@ const DeviceMonitorPage = () => {
             xPx: plotCursorX,
             flip,
         });
-    }, [activeWindow.start, activeWindow.end, plotArea.leftPx, plotArea.widthPx]);
+    }, [
+        activeWindow.start,
+        activeWindow.end,
+        plotArea.leftPx,
+        plotArea.widthPx,
+        isEventOnChartAxis,
+        chartPanActive,
+    ]);
 
     const handleSharedHoverLeave = useCallback(() => {
-        setChartPlotCursorHidden(false);
-        setHoverCursor({ active: false, ts: null, percent: 0, xPx: 0 });
+        if (!chartPanSessionRef.current?.active) {
+            setChartPlotCursorHidden(false);
+            setHoverCursor({ active: false, ts: null, percent: 0, xPx: 0, flip: false });
+        }
     }, []);
 
-    const handleChartWheel = useCallback((event) => {
-        const ERROR_LANE_HIT_PAD_PX = 3;
-        const ERROR_SNAP_PAD_FRAC = 0.1;
+    useEffect(() => {
+        if (activeTab !== 'graphs') return undefined;
+        const el = chartCanvasRef.current;
+        if (!el) return undefined;
 
-        const minSpan = activeWindow.minGap;
-        const span0 = Math.max(activeWindow.end - activeWindow.start, minSpan);
-        const maxSpan = graphUsesServerData
-            ? Math.max(chartBounds.dayEnd - chartBounds.dayStart, minSpan)
-            : Math.max(LIVE_WINDOW_MS, minSpan);
-
-        const tryClearLiveTimelineLock = (nextStart, nextEnd) => {
-            if (graphUsesServerData || !liveGraphTimelineLockRef.current) return;
-            const sp = nextEnd - nextStart;
-            if (sp >= maxSpan - 2) {
-                liveGraphTimelineLockRef.current = false;
-                errorZoomWheelRef.current = { segKey: null, lastDir: null, focal: null };
+        const updatePlotDot = (event) => {
+            if (chartPanActive || chartPanSessionRef.current?.active) {
+                setPlotDot((prev) => (prev.visible ? { visible: false, leftPx: 0, topPx: 0 } : prev));
+                return;
             }
+            if (isEventOnChartAxis(event)) {
+                setPlotDot((prev) => (prev.visible ? { visible: false, leftPx: 0, topPx: 0 } : prev));
+                return;
+            }
+            const pa = plotAreaRef.current;
+            const plotLeft = Number.isFinite(pa.chartLeftPx) ? pa.chartLeftPx : pa.leftPx;
+            const plotWidth = Number.isFinite(pa.widthPx) && pa.widthPx > 0 ? pa.widthPx : 0;
+            const plotHeight = Number.isFinite(pa.heightPx) && pa.heightPx > 0 ? pa.heightPx : 0;
+            if (plotWidth <= 0 || plotHeight <= 0) {
+                setPlotDot((prev) => (prev.visible ? { visible: false, leftPx: 0, topPx: 0 } : prev));
+                return;
+            }
+            const rect = el.getBoundingClientRect();
+            const xLocal = event.clientX - rect.left;
+            const yLocal = event.clientY - rect.top;
+            const plotRight = plotLeft + plotWidth;
+            const plotBottom = pa.topPx + plotHeight;
+            const inPlot =
+                xLocal >= plotLeft &&
+                xLocal <= plotRight &&
+                yLocal >= pa.topPx &&
+                yLocal <= plotBottom;
+            if (!inPlot) {
+                setPlotDot((prev) => (prev.visible ? { visible: false, leftPx: 0, topPx: 0 } : prev));
+                return;
+            }
+            setPlotDot({
+                visible: true,
+                leftPx: xLocal,
+                topPx: yLocal,
+            });
         };
 
-        const clampTimeWindow = (nextStart, nextEnd, nextSpan) => {
-            let ns = nextStart;
-            let ne = nextEnd;
-            if (ns < chartBounds.dayStart) {
-                ns = chartBounds.dayStart;
-                ne = ns + nextSpan;
+        const hidePlotDot = () => setPlotDot({ visible: false, leftPx: 0, topPx: 0 });
+
+        el.addEventListener('pointermove', updatePlotDot);
+        el.addEventListener('pointerleave', hidePlotDot);
+        el.addEventListener('pointercancel', hidePlotDot);
+        return () => {
+            el.removeEventListener('pointermove', updatePlotDot);
+            el.removeEventListener('pointerleave', hidePlotDot);
+            el.removeEventListener('pointercancel', hidePlotDot);
+        };
+    }, [activeTab, chartPanActive, isEventOnChartAxis]);
+
+    const handleChartWheel = useCallback((event) => {
+        if (chartPanSuppressWheelRef.current || chartPanSessionRef.current?.active) return;
+        const ERROR_LANE_HIT_PAD_PX = 3;
+
+        const applyPlotTimeZoomAtRatio = (ratio, zoomIn) => {
+            const span = Math.max(activeWindow.end - activeWindow.start, activeWindow.minGap);
+            const minSpanX = activeWindow.minGap;
+            const maxSpanX = graphUsesServerData
+                ? Math.max(chartBounds.dayEnd - chartBounds.dayStart, minSpanX)
+                : Math.max(LIVE_WINDOW_MS, minSpanX);
+
+            const factor = zoomIn ? 0.88 : 1.12;
+            let nextSpan = span * factor;
+            nextSpan = Math.max(minSpanX, Math.min(maxSpanX, nextSpan));
+
+            const tsAtCursor = activeWindow.start + ratio * span;
+            let nextStart = tsAtCursor - ratio * nextSpan;
+            let nextEnd = nextStart + nextSpan;
+
+            if (nextStart < chartBounds.dayStart) {
+                nextStart = chartBounds.dayStart;
+                nextEnd = nextStart + nextSpan;
             }
-            if (ne > chartBounds.dayEnd) {
-                ne = chartBounds.dayEnd;
-                ns = ne - nextSpan;
+            if (nextEnd > chartBounds.dayEnd) {
+                nextEnd = chartBounds.dayEnd;
+                nextStart = nextEnd - nextSpan;
             }
-            return { start: ns, end: ne };
+
+            setTimeWindow({ start: nextStart, end: nextEnd, touched: true });
         };
 
         const pickErrorSegmentUnderPointer = (clientX, clientY, trackRect, errorsSegments, winStart, winEnd) => {
@@ -3467,68 +3655,11 @@ const DeviceMonitorPage = () => {
                 activeWindow.start,
                 activeWindow.end
             );
-            if (!hitSeg) return;
+            if (!hitSeg || !graphUsesServerData) return;
 
             event.preventDefault();
-            if (!graphUsesServerData) {
-                liveGraphTimelineLockRef.current = true;
-            }
-
-            const zoomIn = event.deltaY < 0;
             const ratioTrack = Math.max(0, Math.min(1, (event.clientX - trackRect.left) / trackRect.width));
-            const tsAtCursor = activeWindow.start + ratioTrack * span0;
-            const segKey = `${hitSeg.start}:${hitSeg.end}:${hitSeg.value ?? ''}`;
-            const st = errorZoomWheelRef.current;
-
-            if (zoomIn) {
-                const doSnap = st.lastDir !== 'in' || st.segKey !== segKey;
-                let nextStart;
-                let nextEnd;
-                let nextSpan;
-
-                if (doSnap) {
-                    const rawLen = hitSeg.end - hitSeg.start;
-                    const center = (hitSeg.start + hitSeg.end) / 2;
-                    if (rawLen <= 0) {
-                        nextSpan = minSpan;
-                        nextStart = center - nextSpan / 2;
-                        nextEnd = center + nextSpan / 2;
-                    } else {
-                        const halfPad = ERROR_SNAP_PAD_FRAC * rawLen;
-                        nextSpan = rawLen + 2 * halfPad;
-                        nextSpan = Math.max(minSpan, Math.min(maxSpan, nextSpan));
-                        nextStart = center - nextSpan / 2;
-                        nextEnd = center + nextSpan / 2;
-                    }
-                    errorZoomWheelRef.current = {
-                        segKey,
-                        lastDir: 'in',
-                        focal: { start: hitSeg.start, end: hitSeg.end },
-                    };
-                } else {
-                    const focal = st.focal || { start: hitSeg.start, end: hitSeg.end };
-                    const focalCenter = (focal.start + focal.end) / 2;
-                    nextSpan = span0 * 0.88;
-                    nextSpan = Math.max(minSpan, Math.min(maxSpan, nextSpan));
-                    nextStart = focalCenter - nextSpan / 2;
-                    nextEnd = focalCenter + nextSpan / 2;
-                    errorZoomWheelRef.current = { ...st, segKey, lastDir: 'in', focal: st.focal };
-                }
-
-                const clamped = clampTimeWindow(nextStart, nextEnd, nextEnd - nextStart);
-                setTimeWindow({ start: clamped.start, end: clamped.end, touched: true });
-                tryClearLiveTimelineLock(clamped.start, clamped.end);
-                return;
-            }
-
-            let nextSpan = span0 * 1.12;
-            nextSpan = Math.max(minSpan, Math.min(maxSpan, nextSpan));
-            let nextStart = tsAtCursor - ratioTrack * nextSpan;
-            let nextEnd = nextStart + nextSpan;
-            const clamped = clampTimeWindow(nextStart, nextEnd, nextSpan);
-            setTimeWindow({ start: clamped.start, end: clamped.end, touched: true });
-            errorZoomWheelRef.current = { ...st, lastDir: 'out' };
-            tryClearLiveTimelineLock(clamped.start, clamped.end);
+            applyPlotTimeZoomAtRatio(ratioTrack, event.deltaY < 0);
             return;
         }
 
@@ -3573,32 +3704,8 @@ const DeviceMonitorPage = () => {
 
         if (isOnXAxis) {
             event.preventDefault();
-            const span = Math.max(activeWindow.end - activeWindow.start, activeWindow.minGap);
-            const minSpanX = activeWindow.minGap;
-            const maxSpanX = graphUsesServerData
-                ? Math.max(chartBounds.dayEnd - chartBounds.dayStart, minSpanX)
-                : Math.max(LIVE_WINDOW_MS, minSpanX);
-
-            const factor = zoomIn ? 0.88 : 1.12;
-            let nextSpan = span * factor;
-            nextSpan = Math.max(minSpanX, Math.min(maxSpanX, nextSpan));
-
             const ratio = Math.max(0, Math.min(1, (event.clientX - (canvasRect.left + ca.left)) / Math.max(ca.right - ca.left, 1)));
-            const tsAtCursor = activeWindow.start + ratio * span;
-            let nextStart = tsAtCursor - ratio * nextSpan;
-            let nextEnd = nextStart + nextSpan;
-
-            if (nextStart < chartBounds.dayStart) {
-                nextStart = chartBounds.dayStart;
-                nextEnd = nextStart + nextSpan;
-            }
-            if (nextEnd > chartBounds.dayEnd) {
-                nextEnd = chartBounds.dayEnd;
-                nextStart = nextEnd - nextSpan;
-            }
-
-            setTimeWindow({ start: nextStart, end: nextEnd, touched: true });
-            tryClearLiveTimelineLock(nextStart, nextEnd);
+            applyPlotTimeZoomAtRatio(ratio, zoomIn);
         }
     }, [
         activeWindow.start,
@@ -4372,159 +4479,173 @@ const DeviceMonitorPage = () => {
                                             />
                                         </div>
                                     </div>
-                                    <div className="chart-monitor-stack">
-                                        <div className={`chart-canvas${chartPlotCursorHidden ? ' chart-canvas--plot-cursor-none' : ''}`}>
-                                            <Line
-                                                data={topChartData}
-                                                options={telemetryOverlayChartOptions}
-                                                ref={(chart) => {
-                                                    if (chart && chart.canvas) {
-                                                        chart.canvas.id = 'current-chart';
-                                                        currentChartInstanceRef.current = chart;
-                                                        syncPlotAreaFromChart();
-                                                    }
-                                                }}
-                                            />
-                                            {hoverCursor.active && plotArea.heightPx > 0 && (
-                                                <div
-                                                    className="monitor-hover-crosshair monitor-hover-crosshair--in-chart"
-                                                    style={{
-                                                        left: `${(plotArea.chartLeftPx ?? plotArea.leftPx) + (hoverCursor.percent / 100) * plotArea.widthPx}px`,
-                                                        top: `${plotArea.topPx}px`,
-                                                        height: `${plotArea.heightPx}px`,
-                                                        bottom: 'auto',
+                                    <div
+                                        className={`chart-pan-surface${graphUsesServerData ? ' chart-pan-surface--enabled' : ''}${chartPanActive ? ' chart-pan-surface--grabbing' : ''}`}
+                                        onMouseDown={handleChartPanMouseDown}
+                                    >
+                                        <div className="chart-monitor-stack">
+                                            <div
+                                                ref={chartCanvasRef}
+                                                className={`chart-canvas${chartPlotCursorHidden ? ' chart-canvas--plot-cursor-none' : ''}`}
+                                            >
+                                                <Line
+                                                    data={topChartData}
+                                                    options={telemetryOverlayChartOptions}
+                                                    ref={(chart) => {
+                                                        if (chart && chart.canvas) {
+                                                            chart.canvas.id = 'current-chart';
+                                                            currentChartInstanceRef.current = chart;
+                                                            syncPlotAreaFromChart();
+                                                        }
                                                     }}
-                                                >
-                                                    {chartPlotCursorHidden && (
-                                                        <span className="monitor-hover-crosshair-dot" aria-hidden />
-                                                    )}
-                                                </div>
-                                            )}
-                                            {hoverCursor.active && (hoverCursorTimeLabel || hoverInfo) && (
-                                                <div
-                                                    className="monitor-hover-tooltip"
-                                                    style={{
-                                                        left: `${hoverCursor.xPx}px`,
-                                                        transform: hoverCursor.flip ? 'translateX(calc(-100% - 2px))' : 'translateX(2px)'
-                                                    }}
-                                                >
-                                                    {hoverCursorTimeLabel && (
-                                                        <div className="monitor-hover-tooltip-time">{hoverCursorTimeLabel}</div>
-                                                    )}
-                                                    {hoverInfo?.selectedRows?.map((row) => (
-                                                        <div key={row.key}>
-                                                            <span style={{ color: row.color }}>{row.label}: {row.value.toFixed(1)}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div
-                                            className="monitor-lanes"
-                                            style={{
-                                                position: 'relative',
-                                                paddingLeft: `${plotArea.leftPx}px`,
-                                                paddingRight: `${plotArea.rightPx}px`,
-                                            }}
-                                        >
-                                            <div className="monitor-lane-row">
-                                                <span className="monitor-lane-label">Состояние</span>
-                                                <div className="monitor-lane-track monitor-lane-track--state">
-                                                    {timelineRows.offline.map((seg, idx) => (
-                                                        <span
-                                                            key={`state-offline-${idx}`}
-                                                            className="monitor-lane-segment monitor-lane-segment-offline"
-                                                            style={{
-                                                                left: `${toPercent(seg.start)}%`,
-                                                                width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
-                                                            }}
-                                                        />
-                                                    ))}
-                                                    {timelineRows.online.map((seg, idx) => (
-                                                        <span
-                                                            key={`state-online-${idx}`}
-                                                            className="monitor-lane-segment monitor-lane-segment-online"
-                                                            style={{
-                                                                left: `${toPercent(seg.start)}%`,
-                                                                width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
-                                                            }}
-                                                        />
-                                                    ))}
-                                                    {timelineRows.welding.map((seg, idx) => (
-                                                        <span
-                                                            key={`state-weld-${idx}`}
-                                                            className="monitor-lane-segment monitor-lane-segment-welding"
-                                                            style={{
-                                                                left: `${toPercent(seg.start)}%`,
-                                                                width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
-                                                            }}
-                                                        />
-                                                    ))}
-                                                </div>
+                                                />
+                                                {plotDot.visible && !chartPanActive && (
+                                                    <span
+                                                        className="monitor-plot-cursor-dot"
+                                                        style={{
+                                                            left: `${plotDot.leftPx}px`,
+                                                            top: `${plotDot.topPx}px`,
+                                                        }}
+                                                        aria-hidden
+                                                    />
+                                                )}
+                                                {hoverCursor.active && !chartPanActive && plotArea.heightPx > 0 && (
+                                                    <div
+                                                        className="monitor-hover-crosshair monitor-hover-crosshair--in-chart"
+                                                        style={{
+                                                            left: `${(plotArea.chartLeftPx ?? plotArea.leftPx) + (hoverCursor.percent / 100) * plotArea.widthPx}px`,
+                                                            top: `${plotArea.topPx}px`,
+                                                            height: `${plotArea.heightPx}px`,
+                                                            bottom: 'auto',
+                                                        }}
+                                                    />
+                                                )}
+                                                {hoverCursor.active && !chartPanActive && (hoverCursorTimeLabel || hoverInfo) && (
+                                                    <div
+                                                        className="monitor-hover-tooltip"
+                                                        style={{
+                                                            left: `${hoverCursor.xPx}px`,
+                                                            transform: hoverCursor.flip ? 'translateX(calc(-100% - 2px))' : 'translateX(2px)'
+                                                        }}
+                                                    >
+                                                        {hoverCursorTimeLabel && (
+                                                            <div className="monitor-hover-tooltip-time">{hoverCursorTimeLabel}</div>
+                                                        )}
+                                                        {hoverInfo?.selectedRows?.map((row) => (
+                                                            <div key={row.key}>
+                                                                <span style={{ color: row.color }}>{row.label}: {row.value.toFixed(1)}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className="monitor-lane-row">
-                                                <span className="monitor-lane-label">Ошибки</span>
-                                                <div className="monitor-lane-track" ref={errorsLaneTrackRef}>
-                                                    {timelineRows.errors.map((seg, idx) => {
-                                                        const width = Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8);
-                                                        return (
+                                            <div
+                                                className="monitor-lanes"
+                                                style={{
+                                                    position: 'relative',
+                                                    paddingLeft: `${plotArea.leftPx}px`,
+                                                    paddingRight: `${plotArea.rightPx}px`,
+                                                }}
+                                            >
+                                                <div className="monitor-lane-row">
+                                                    <span className="monitor-lane-label">Состояние</span>
+                                                    <div className="monitor-lane-track monitor-lane-track--state">
+                                                        {timelineRows.offline.map((seg, idx) => (
                                                             <span
-                                                                key={`error-${idx}`}
-                                                                className="monitor-lane-segment monitor-lane-segment-error"
-                                                                style={{ left: `${toPercent(seg.start)}%`, width: `${width}%` }}
-                                                                title={seg.label}
-                                                            >
+                                                                key={`state-offline-${idx}`}
+                                                                className="monitor-lane-segment monitor-lane-segment-offline"
+                                                                style={{
+                                                                    left: `${toPercent(seg.start)}%`,
+                                                                    width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
+                                                                }}
+                                                            />
+                                                        ))}
+                                                        {timelineRows.online.map((seg, idx) => (
+                                                            <span
+                                                                key={`state-online-${idx}`}
+                                                                className="monitor-lane-segment monitor-lane-segment-online"
+                                                                style={{
+                                                                    left: `${toPercent(seg.start)}%`,
+                                                                    width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
+                                                                }}
+                                                            />
+                                                        ))}
+                                                        {timelineRows.welding.map((seg, idx) => (
+                                                            <span
+                                                                key={`state-weld-${idx}`}
+                                                                className="monitor-lane-segment monitor-lane-segment-welding"
+                                                                style={{
+                                                                    left: `${toPercent(seg.start)}%`,
+                                                                    width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
+                                                                }}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div className="monitor-lane-row">
+                                                    <span className="monitor-lane-label">Ошибки</span>
+                                                    <div className="monitor-lane-track" ref={errorsLaneTrackRef}>
+                                                        {timelineRows.errors.map((seg, idx) => {
+                                                            const width = Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8);
+                                                            return (
+                                                                <span
+                                                                    key={`error-${idx}`}
+                                                                    className="monitor-lane-segment monitor-lane-segment-error"
+                                                                    style={{ left: `${toPercent(seg.start)}%`, width: `${width}%` }}
+                                                                    title={seg.label}
+                                                                >
                                                             {width > 6 ? seg.label : ''}
                                                         </span>
-                                                        );
-                                                    })}
-                                                    {hoverCursor.active && hoverInfo?.errorLabel && (
-                                                        <div className="monitor-lane-hover-badge monitor-lane-hover-badge-error" style={{ left: `${hoverCursor.percent}%` }}>
-                                                            {hoverInfo.errorLabel}
-                                                        </div>
-                                                    )}
+                                                            );
+                                                        })}
+                                                        {hoverCursor.active && hoverInfo?.errorLabel && (
+                                                            <div className="monitor-lane-hover-badge monitor-lane-hover-badge-error" style={{ left: `${hoverCursor.percent}%` }}>
+                                                                {hoverInfo.errorLabel}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="monitor-lane-row">
-                                                <span className="monitor-lane-label">Сварщик</span>
-                                                <div className="monitor-lane-track">
-                                                    {timelineRows.welder.map((seg, idx) => (
-                                                        <span
-                                                            key={`welder-${idx}`}
-                                                            className="monitor-lane-segment monitor-lane-segment-welder"
-                                                            style={{
-                                                                left: `${toPercent(seg.start)}%`,
-                                                                width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
-                                                            }}
-                                                            title={seg.value}
-                                                        />
-                                                    ))}
-                                                    {hoverCursor.active && hoverInfo?.welderLabel && (
-                                                        <div className="monitor-lane-hover-badge monitor-lane-hover-badge-welder" style={{ left: `${hoverCursor.percent}%` }}>
-                                                            {hoverInfo.welderLabel}
-                                                        </div>
-                                                    )}
+                                                <div className="monitor-lane-row">
+                                                    <span className="monitor-lane-label">Сварщик</span>
+                                                    <div className="monitor-lane-track">
+                                                        {timelineRows.welder.map((seg, idx) => (
+                                                            <span
+                                                                key={`welder-${idx}`}
+                                                                className="monitor-lane-segment monitor-lane-segment-welder"
+                                                                style={{
+                                                                    left: `${toPercent(seg.start)}%`,
+                                                                    width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
+                                                                }}
+                                                                title={seg.value}
+                                                            />
+                                                        ))}
+                                                        {hoverCursor.active && hoverInfo?.welderLabel && (
+                                                            <div className="monitor-lane-hover-badge monitor-lane-hover-badge-welder" style={{ left: `${hoverCursor.percent}%` }}>
+                                                                {hoverInfo.welderLabel}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            {hoverCursor.active && (
-                                                <div
-                                                    className="monitor-lanes-crosshair-shell"
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: 0,
-                                                        bottom: 0,
-                                                        left: `${plotArea.leftPx}px`,
-                                                        right: `${plotArea.rightPx}px`,
-                                                        pointerEvents: 'none',
-                                                        zIndex: 4,
-                                                    }}
-                                                >
+                                                {hoverCursor.active && !chartPanActive && (
                                                     <div
-                                                        className="monitor-hover-crosshair monitor-hover-crosshair--in-lanes"
-                                                        style={{ left: `${hoverCursor.percent}%` }}
-                                                    />
-                                                </div>
-                                            )}
+                                                        className="monitor-lanes-crosshair-shell"
+                                                        style={{
+                                                            position: 'absolute',
+                                                            top: 0,
+                                                            bottom: 0,
+                                                            left: `${plotArea.leftPx}px`,
+                                                            right: `${plotArea.rightPx}px`,
+                                                            pointerEvents: 'none',
+                                                            zIndex: 4,
+                                                        }}
+                                                    >
+                                                        <div
+                                                            className="monitor-hover-crosshair monitor-hover-crosshair--in-lanes"
+                                                            style={{ left: `${hoverCursor.percent}%` }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
