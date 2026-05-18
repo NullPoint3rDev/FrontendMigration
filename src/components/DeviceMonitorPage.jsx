@@ -545,6 +545,7 @@ const DeviceMonitorPage = () => {
     // Модальное окно редактирования аппарата (наименование и подразделение)
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [organizationUnits, setOrganizationUnits] = useState([]);
+    const [machineOrganizationUnitId, setMachineOrganizationUnitId] = useState(null);
 
     // Реф для предотвращения конфликта между кликом на карандаш и onBlur
     const saveTimeoutRef = useRef(null);
@@ -569,8 +570,8 @@ const DeviceMonitorPage = () => {
         slot1: 'A',
         slot2: 'B',
     });
-    /** Выбранные фазы сети (до 3) — отдельные линии на графике. */
-    const [mainsVoltagePhases, setMainsVoltagePhases] = useState(['A', 'B']);
+    /** Выбранные фазы сети (до 3) — по умолчанию ни одна, пока пользователь не включит A/B/C. */
+    const [mainsVoltagePhases, setMainsVoltagePhases] = useState([]);
     /** Масштаб по оси X: 1 — весь диапазон; больше — «приближение» к последним точкам (окно справа). */
     const [telemetryChartZoom, setTelemetryChartZoom] = useState({ top: 1, bottom: 1 });
     const [yAxisLeftMax, setYAxisLeftMax] = useState(Y_AXIS_LEFT.MAX);
@@ -1024,11 +1025,14 @@ const DeviceMonitorPage = () => {
             if (!machineMac || machineMac === 'Неизвестный MAC') return;
             try {
                 const machines = await getAllWeldingMachines();
+                const macNorm = String(machineMac).trim().toLowerCase();
                 const machine = Array.isArray(machines)
-                    ? machines.find(m => m.mac === machineMac)
+                    ? machines.find((m) => String(m.mac || '').trim().toLowerCase() === macNorm)
                     : null;
                 if (machine && machine.id) {
                     setMachineId(machine.id);
+                    const unitId = machine.organizationUnit?.id ?? machine.organizationUnitId ?? null;
+                    setMachineOrganizationUnitId(unitId);
                 }
             } catch (err) {
                 console.error('Ошибка получения ID аппарата:', err);
@@ -1942,7 +1946,7 @@ const DeviceMonitorPage = () => {
     }, [editModalOpen, organizationUnits.length]);
 
     // Открыть модалку редактирования (наименование и подразделение)
-    const handleOpenEditModal = (e) => {
+    const handleOpenEditModal = async (e) => {
         if (e) {
             e.preventDefault();
             e.stopPropagation();
@@ -1952,64 +1956,119 @@ const DeviceMonitorPage = () => {
             saveTimeoutRef.current = null;
         }
         setEditModalOpen(true);
+
+        let id = machineId;
+        if (!id && machineMac && machineMac !== 'Неизвестный MAC') {
+            try {
+                const machines = await getAllWeldingMachines();
+                const macNorm = String(machineMac).trim().toLowerCase();
+                const found = Array.isArray(machines)
+                    ? machines.find((m) => String(m.mac || '').trim().toLowerCase() === macNorm)
+                    : null;
+                if (found?.id) {
+                    id = found.id;
+                    setMachineId(found.id);
+                    const uid = found.organizationUnit?.id ?? found.organizationUnitId ?? null;
+                    if (uid != null) setMachineOrganizationUnitId(uid);
+                }
+            } catch {
+                /* ignore */
+            }
+        }
+        if (id) {
+            try {
+                const m = await getWeldingMachineById(id);
+                const uid = m?.organizationUnit?.id ?? m?.organizationUnitId ?? null;
+                if (uid != null) setMachineOrganizationUnitId(uid);
+            } catch {
+                /* ignore */
+            }
+        }
+    };
+
+    const resolveMachineIdForEdit = async (payloadMachineId) => {
+        let id = payloadMachineId ?? machineId;
+        if (id) return id;
+        if (!machineMac || machineMac === 'Неизвестный MAC') return null;
+        const machines = await getAllWeldingMachines().catch(() => []);
+        const macNorm = String(machineMac).trim().toLowerCase();
+        const machineByMac = Array.isArray(machines)
+            ? machines.find((m) => String(m.mac || '').trim().toLowerCase() === macNorm)
+            : null;
+        if (machineByMac?.id) {
+            setMachineId(machineByMac.id);
+            setMachineOrganizationUnitId(
+                machineByMac.organizationUnit?.id ?? machineByMac.organizationUnitId ?? null
+            );
+            return machineByMac.id;
+        }
+        return null;
+    };
+
+    const resolveOrganizationUnitForApi = async (payload) => {
+        const unitsSource = organizationUnits.length > 0
+            ? organizationUnits
+            : (await getAllOrganizationUnits().catch(() => []));
+        const { organizationUnitId, department } = payload || {};
+        if (organizationUnitId != null && organizationUnitId !== '') {
+            const byId = unitsSource.find((u) => String(u.id) === String(organizationUnitId));
+            if (byId) return { id: byId.id, name: byId.name || '' };
+        }
+        const deptTrim = (department || '').trim();
+        if (deptTrim) {
+            const byName = unitsSource.find(
+                (u) => (u.name || '').trim().toLowerCase() === deptTrim.toLowerCase()
+            );
+            if (byName) return { id: byName.id, name: byName.name || '' };
+        }
+        return null;
     };
 
     // Сохранение из модалки: обновить наименование и подразделение аппарата
     const handleSaveEquipmentEdit = async (payload) => {
-        let id = payload?.machineId ?? machineId;
-        if (!id && machineMac && machineMac !== 'Неизвестный MAC') {
-            const machines = await getAllWeldingMachines().catch(() => []);
-            const machineByMac = Array.isArray(machines)
-                ? machines.find((m) => (m.mac || '').toLowerCase() === String(machineMac).toLowerCase())
-                : null;
-            if (machineByMac?.id) {
-                id = machineByMac.id;
-                setMachineId(machineByMac.id);
-            }
-        }
+        const id = await resolveMachineIdForEdit(payload?.machineId);
         if (!id) {
             const err = new Error('Не удалось определить аппарат для сохранения.');
             err.errors = { api: err.message };
             throw err;
         }
-        const { name, department } = payload || {};
-        const trimmedName = (name || '').trim();
+        const trimmedName = (payload?.name || '').trim();
         if (!trimmedName) {
             const err = new Error('Название не может быть пустым.');
             err.errors = { name: err.message };
             throw err;
         }
+        const organizationUnitForApi = await resolveOrganizationUnitForApi(payload);
+        if (!organizationUnitForApi) {
+            const err = new Error('Выберите подразделение из списка.');
+            err.errors = { department: err.message };
+            throw err;
+        }
         try {
             const machine = await getWeldingMachineById(id);
-            if (!machine || !machine.id) {
+            if (!machine?.id) {
                 throw new Error('Аппарат не найден');
             }
-            const unitsSource = organizationUnits.length > 0
-                ? organizationUnits
-                : (await getAllOrganizationUnits().catch(() => []));
-            const unit = unitsSource.find((u) => (u.name || '') === (department || ''));
-            const organizationUnitForApi = unit
-                ? { id: unit.id, name: unit.name || '' }
-                : (machine.organizationUnit || null);
-            // Отправляем только поля WeldingMachineDTO, чтобы не тащить тяжелые вложенные структуры.
             const updateData = {
-                id,
+                id: machine.id,
                 name: trimmedName,
-                mac: machine.mac || machineMac,
-                deviceModel: machine.deviceModel || 'Core Pulse',
+                mac: machine.mac,
+                deviceModel: machine.deviceModel,
                 serialNumber: machine.serialNumber ?? null,
                 inventoryNumber: machine.inventoryNumber ?? null,
                 commissionDate: machine.commissionDate ?? null,
                 manufactureYear: machine.manufactureYear ?? null,
                 lastService: machine.lastService ?? null,
                 weldingMachineType: machine.weldingMachineType ?? null,
+                status: machine.status ?? null,
                 organizationUnit: organizationUnitForApi,
             };
             await updateWeldingMachine(id, updateData);
             setDisplayName(trimmedName);
+            setMachineOrganizationUnitId(organizationUnitForApi.id);
             const newParams = new URLSearchParams(searchParams);
             newParams.set('name', trimmedName);
-            newParams.set('organizationUnit', department || '');
+            newParams.set('organizationUnit', organizationUnitForApi.name || '');
             navigate(`?${newParams.toString()}`, { replace: true });
             setEditModalOpen(false);
         } catch (err) {
@@ -3600,29 +3659,33 @@ const DeviceMonitorPage = () => {
                         </div>
                     </div>
                     <div className="welding-timer">
-                        <div className="machine-info-row">
+                        <div className="machine-info-row machine-info-row--multiline">
                             <span className="machine-info-label">Имя:</span>
-                            <span className="machine-info-text">{displayName || '—'}</span>
-                            <button
-                                type="button"
-                                className="machine-info-icon-tile"
-                                onClick={handleOpenEditModal}
-                                title="Редактировать наименование и подразделение"
-                            >
-                                <span className="machine-info-icon">✎</span>
-                            </button>
+                            <div className="machine-info-value-slot">
+                                <span className="machine-info-text">{displayName || '—'}</span>
+                                <button
+                                    type="button"
+                                    className="machine-info-icon-tile"
+                                    onClick={handleOpenEditModal}
+                                    title="Редактировать наименование и подразделение"
+                                >
+                                    <span className="machine-info-icon">✎</span>
+                                </button>
+                            </div>
                         </div>
-                        <div className="machine-info-row">
+                        <div className="machine-info-row machine-info-row--multiline">
                             <span className="machine-info-label">Подразделение:</span>
-                            <span className="machine-info-text">{organizationUnit || '—'}</span>
-                            <button
-                                type="button"
-                                className="machine-info-icon-tile"
-                                onClick={handleOpenEditModal}
-                                title="Редактировать наименование и подразделение"
-                            >
-                                <span className="machine-info-icon">✎</span>
-                            </button>
+                            <div className="machine-info-value-slot">
+                                <span className="machine-info-text">{organizationUnit || '—'}</span>
+                                <button
+                                    type="button"
+                                    className="machine-info-icon-tile"
+                                    onClick={handleOpenEditModal}
+                                    title="Редактировать наименование и подразделение"
+                                >
+                                    <span className="machine-info-icon">✎</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -4285,7 +4348,12 @@ const DeviceMonitorPage = () => {
                 welders={[]}
                 organizationUnits={organizationUnits}
                 editMode={true}
-                initialData={editModalOpen ? { machineId, name: displayName, department: organizationUnit } : null}
+                initialData={editModalOpen ? {
+                    machineId,
+                    name: displayName,
+                    department: organizationUnit,
+                    organizationUnitId: machineOrganizationUnitId,
+                } : null}
             />
 
             {historyError && (

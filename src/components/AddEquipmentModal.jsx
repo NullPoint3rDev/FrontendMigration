@@ -5,6 +5,7 @@ import machineImage from '../images/2 копия.png'
 const defaultFormData = () => ({
     name: '',
     department: '',
+    organizationUnitId: '',
     commissioningDate: '',
     macAddress: '',
     serialNumber: '',
@@ -37,16 +38,37 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         'Core Pulse'            // TODO: RENAME MODEL TO Core Pulse
     ]
 
-    // При открытии в режиме редактирования подставляем initialData
+    // Режим редактирования: подставляем имя и подразделение (по id и/или по имени после загрузки списка подразделений).
     useEffect(() => {
-        if (isOpen && editMode && initialData) {
-            setFormData(prev => ({
-                ...prev,
-                name: initialData.name ?? '',
-                department: initialData.department ?? ''
-            }))
+        if (!isOpen || !editMode || !initialData) return;
+
+        const deptTrim = (initialData.department || '').trim();
+        const idRaw = initialData.organizationUnitId;
+
+        let unit = null;
+        if (idRaw != null && idRaw !== '') {
+            unit = organizationUnits.find((u) => String(u.id) === String(idRaw));
         }
-    }, [isOpen, editMode, initialData?.name, initialData?.department])
+        if (!unit && deptTrim) {
+            const lower = deptTrim.toLowerCase();
+            unit = organizationUnits.find((u) => (u.name || '').trim().toLowerCase() === lower);
+        }
+
+        setFormData((prev) => ({
+            ...prev,
+            name: initialData.name ?? '',
+            department: unit?.name ?? deptTrim,
+            organizationUnitId: unit?.id != null ? String(unit.id) : '',
+        }));
+    }, [
+        isOpen,
+        editMode,
+        initialData?.machineId,
+        initialData?.name,
+        initialData?.department,
+        initialData?.organizationUnitId,
+        organizationUnits,
+    ]);
 
     if (!isOpen) return null
 
@@ -269,7 +291,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
             const department = formData.department ?? ''
             const editErrors = {}
             if (!name) editErrors.name = 'Это поле обязательно'
-            if (!department) editErrors.department = 'Выберите подразделение'
+            if (!formData.organizationUnitId && !department) editErrors.department = 'Выберите подразделение'
             if (Object.keys(editErrors).length > 0) {
                 setErrors(editErrors)
                 return
@@ -284,7 +306,8 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                         editMode: true,
                         machineId: initialData.machineId,
                         name: formData.name?.trim() ?? '',
-                        department: formData.department ?? ''
+                        department: formData.department ?? '',
+                        organizationUnitId: formData.organizationUnitId || null,
                     });
                 } else {
                     console.log('🔵 AddEquipmentModal: Вызываем onSave с данными:', {
@@ -413,13 +436,22 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                 <div className="form-field">
                                     <label>Подразделение*</label>
                                     <select
-                                        value={formData.department}
-                                        onChange={(e) => handleInputChange('department', e.target.value)}
+                                        value={editMode ? (formData.organizationUnitId || '') : formData.department}
+                                        onChange={(e) => {
+                                            if (editMode) {
+                                                const unitId = e.target.value;
+                                                const unit = organizationUnits.find((u) => String(u.id) === String(unitId));
+                                                handleInputChange('organizationUnitId', unitId);
+                                                handleInputChange('department', unit?.name || '');
+                                            } else {
+                                                handleInputChange('department', e.target.value);
+                                            }
+                                        }}
                                         className={errors.department ? 'error' : ''}
                                     >
                                         <option value="">Выберите подразделение</option>
                                         {organizationUnits.map(unit => (
-                                            <option key={unit.id} value={unit.name}>
+                                            <option key={unit.id} value={editMode ? String(unit.id) : unit.name}>
                                                 {unit.name}
                                             </option>
                                         ))}

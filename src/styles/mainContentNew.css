@@ -307,6 +307,36 @@
     border-radius: 4px;
 }
 
+.machine-info-row--multiline {
+    align-items: flex-start;
+}
+
+.machine-info-value-slot {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 6px;
+}
+
+.machine-info-value-slot .machine-info-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+}
+
+.machine-info-value-slot .machine-info-icon-tile {
+    margin-left: 0;
+    align-self: flex-start;
+}
+
 .machine-info-icon-tile {
     display: flex;
     align-items: center;

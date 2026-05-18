@@ -38,6 +38,17 @@ export async function getWeldingMachineById(id) {
         { headers: getAuthHeaders() },
         60000
     );
+    if (!res.ok) {
+        let errorData;
+        try {
+            errorData = await res.json();
+        } catch {
+            errorData = { message: `HTTP ${res.status}: ${res.statusText}` };
+        }
+        const error = new Error(errorData.message || errorData.error || `HTTP ${res.status}`);
+        if (errorData.errors) error.errors = errorData.errors;
+        throw error;
+    }
     return res.json();
 }
 
