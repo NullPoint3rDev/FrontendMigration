@@ -741,12 +741,13 @@ const DeviceMonitorPage = () => {
             historyCacheRef.current = { date: dateStr, dayStart, dayEnd, pointsByTs: new Map() };
         }
 
+        const pts = await archiveDeviceApi.getArchiveTelemetryHistory(machineMac, fromMs, toMs);
+
         const cache = historyCacheRef.current;
+        /** Только после успешного ответа: иначе при ошибке/узком окне зума терялись уже загруженные точки и показывалась ложная ошибка. */
         for (const ts of Array.from(cache.pointsByTs.keys())) {
             if (ts >= fromMs && ts <= toMs) cache.pointsByTs.delete(ts);
         }
-
-        const pts = await archiveDeviceApi.getArchiveTelemetryHistory(machineMac, fromMs, toMs);
         let added = 0;
         (pts || []).forEach((p) => {
             const ts = Number(p.ts);
@@ -921,8 +922,27 @@ const DeviceMonitorPage = () => {
                 .then(() => {
                     setHistorySeriesSnapshot(buildHistorySeriesForWindow(start, end));
                     setHistoryTimelineSnapshot(buildHistoryTimelineForWindow(start, end));
+                    setHistoryError(null);
                 })
-                .catch(() => setHistoryError('Не удалось загрузить историю с сервера.'));
+                .catch(() => {
+                    const cache = historyCacheRef.current;
+                    let hasInRange = false;
+                    if (cache?.pointsByTs?.size) {
+                        for (const ts of cache.pointsByTs.keys()) {
+                            if (ts >= start && ts <= end) {
+                                hasInRange = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (hasInRange) {
+                        setHistorySeriesSnapshot(buildHistorySeriesForWindow(start, end));
+                        setHistoryTimelineSnapshot(buildHistoryTimelineForWindow(start, end));
+                        setHistoryError(null);
+                    } else {
+                        setHistoryError('Не удалось загрузить историю с сервера.');
+                    }
+                });
         }, 250);
         return () => {
             if (historyFetchDebounceRef.current) clearTimeout(historyFetchDebounceRef.current);
@@ -1402,7 +1422,12 @@ const DeviceMonitorPage = () => {
                 });
                 prevWeldingForChartRef.current = wNow;
 
-                if (!historyModeRef.current && !todayPinExploreRef.current && activeTabRef.current === 'graphs') {
+                if (
+                    !historyModeRef.current &&
+                    !todayPinExploreRef.current &&
+                    !liveGraphTimelineLockRef.current &&
+                    activeTabRef.current === 'graphs'
+                ) {
                     setTimeWindow({ start: xPoll - LIVE_WINDOW_MS, end: xPoll, touched: true });
                 }
 
@@ -3254,6 +3279,24 @@ const DeviceMonitorPage = () => {
     }, [hoverInfo?.welderRfid, welderNameByRfid]);
 
     const chartWrapperRef = useRef(null);
+    /** Дорожка «Ошибки» — hit-test и колесо без влияния на фон. */
+    const errorsLaneTrackRef = useRef(null);
+    /** Live: после зума по красному сегменту не двигаем окно за последними N минутами (см. опрос). */
+    const liveGraphTimelineLockRef = useRef(false);
+    /** Цепочка зума по сегменту: snap → 0.88; после zoom-out снова snap. */
+    const errorZoomWheelRef = useRef({ segKey: null, lastDir: null, focal: null });
+    useEffect(() => {
+        if (graphUsesServerData) {
+            liveGraphTimelineLockRef.current = false;
+            errorZoomWheelRef.current = { segKey: null, lastDir: null, focal: null };
+        }
+    }, [graphUsesServerData]);
+    useEffect(() => {
+        if (activeTab !== 'graphs') {
+            liveGraphTimelineLockRef.current = false;
+            errorZoomWheelRef.current = { segKey: null, lastDir: null, focal: null };
+        }
+    }, [activeTab]);
     const syncPlotAreaFromChart = useCallback(() => {
         const chart = currentChartInstanceRef.current;
         const wrapper = chartWrapperRef.current;
@@ -3341,6 +3384,154 @@ const DeviceMonitorPage = () => {
     }, []);
 
     const handleChartWheel = useCallback((event) => {
+        const ERROR_LANE_HIT_PAD_PX = 3;
+        const ERROR_SNAP_PAD_FRAC = 0.1;
+
+        const minSpan = activeWindow.minGap;
+        const span0 = Math.max(activeWindow.end - activeWindow.start, minSpan);
+        const maxSpan = graphUsesServerData
+            ? Math.max(chartBounds.dayEnd - chartBounds.dayStart, minSpan)
+            : Math.max(LIVE_WINDOW_MS, minSpan);
+
+        const tryClearLiveTimelineLock = (nextStart, nextEnd) => {
+            if (graphUsesServerData || !liveGraphTimelineLockRef.current) return;
+            const sp = nextEnd - nextStart;
+            if (sp >= maxSpan - 2) {
+                liveGraphTimelineLockRef.current = false;
+                errorZoomWheelRef.current = { segKey: null, lastDir: null, focal: null };
+            }
+        };
+
+        const clampTimeWindow = (nextStart, nextEnd, nextSpan) => {
+            let ns = nextStart;
+            let ne = nextEnd;
+            if (ns < chartBounds.dayStart) {
+                ns = chartBounds.dayStart;
+                ne = ns + nextSpan;
+            }
+            if (ne > chartBounds.dayEnd) {
+                ne = chartBounds.dayEnd;
+                ns = ne - nextSpan;
+            }
+            return { start: ns, end: ne };
+        };
+
+        const pickErrorSegmentUnderPointer = (clientX, clientY, trackRect, errorsSegments, winStart, winEnd) => {
+            if (!trackRect || trackRect.width < 1 || !Array.isArray(errorsSegments) || !errorsSegments.length) return null;
+            if (clientY < trackRect.top || clientY > trackRect.bottom) return null;
+            if (clientX < trackRect.left || clientX > trackRect.right) return null;
+            const ratio = (clientX - trackRect.left) / trackRect.width;
+            const range = Math.max(winEnd - winStart, 1);
+            const ts = winStart + Math.max(0, Math.min(1, ratio)) * range;
+            const padMs = (ERROR_LANE_HIT_PAD_PX / trackRect.width) * range;
+            const candidates = [];
+            for (let i = errorsSegments.length - 1; i >= 0; i -= 1) {
+                const seg = errorsSegments[i];
+                const lo = seg.start - padMs;
+                const hi = seg.end + padMs;
+                if (ts >= lo && ts <= hi) {
+                    const rawLen = Math.max(0, seg.end - seg.start);
+                    const center = (seg.start + seg.end) / 2;
+                    const dist =
+                        rawLen > 0
+                            ? ts < seg.start
+                                ? seg.start - ts
+                                : ts > seg.end
+                                    ? ts - seg.end
+                                    : 0
+                            : Math.abs(ts - center);
+                    candidates.push({ seg, dist, idx: i });
+                }
+            }
+            if (!candidates.length) return null;
+            candidates.sort((a, b) => a.dist - b.dist || b.idx - a.idx);
+            return candidates[0].seg;
+        };
+
+        const trackEl = errorsLaneTrackRef.current;
+        const trackRect = trackEl?.getBoundingClientRect?.();
+        const overErrorTrack =
+            trackRect &&
+            trackRect.width > 0 &&
+            event.clientY >= trackRect.top &&
+            event.clientY <= trackRect.bottom &&
+            event.clientX >= trackRect.left &&
+            event.clientX <= trackRect.right;
+
+        if (overErrorTrack) {
+            const hitSeg = pickErrorSegmentUnderPointer(
+                event.clientX,
+                event.clientY,
+                trackRect,
+                timelineRows.errors,
+                activeWindow.start,
+                activeWindow.end
+            );
+            if (!hitSeg) return;
+
+            event.preventDefault();
+            if (!graphUsesServerData) {
+                liveGraphTimelineLockRef.current = true;
+            }
+
+            const zoomIn = event.deltaY < 0;
+            const ratioTrack = Math.max(0, Math.min(1, (event.clientX - trackRect.left) / trackRect.width));
+            const tsAtCursor = activeWindow.start + ratioTrack * span0;
+            const segKey = `${hitSeg.start}:${hitSeg.end}:${hitSeg.value ?? ''}`;
+            const st = errorZoomWheelRef.current;
+
+            if (zoomIn) {
+                const doSnap = st.lastDir !== 'in' || st.segKey !== segKey;
+                let nextStart;
+                let nextEnd;
+                let nextSpan;
+
+                if (doSnap) {
+                    const rawLen = hitSeg.end - hitSeg.start;
+                    const center = (hitSeg.start + hitSeg.end) / 2;
+                    if (rawLen <= 0) {
+                        nextSpan = minSpan;
+                        nextStart = center - nextSpan / 2;
+                        nextEnd = center + nextSpan / 2;
+                    } else {
+                        const halfPad = ERROR_SNAP_PAD_FRAC * rawLen;
+                        nextSpan = rawLen + 2 * halfPad;
+                        nextSpan = Math.max(minSpan, Math.min(maxSpan, nextSpan));
+                        nextStart = center - nextSpan / 2;
+                        nextEnd = center + nextSpan / 2;
+                    }
+                    errorZoomWheelRef.current = {
+                        segKey,
+                        lastDir: 'in',
+                        focal: { start: hitSeg.start, end: hitSeg.end },
+                    };
+                } else {
+                    const focal = st.focal || { start: hitSeg.start, end: hitSeg.end };
+                    const focalCenter = (focal.start + focal.end) / 2;
+                    nextSpan = span0 * 0.88;
+                    nextSpan = Math.max(minSpan, Math.min(maxSpan, nextSpan));
+                    nextStart = focalCenter - nextSpan / 2;
+                    nextEnd = focalCenter + nextSpan / 2;
+                    errorZoomWheelRef.current = { ...st, segKey, lastDir: 'in', focal: st.focal };
+                }
+
+                const clamped = clampTimeWindow(nextStart, nextEnd, nextEnd - nextStart);
+                setTimeWindow({ start: clamped.start, end: clamped.end, touched: true });
+                tryClearLiveTimelineLock(clamped.start, clamped.end);
+                return;
+            }
+
+            let nextSpan = span0 * 1.12;
+            nextSpan = Math.max(minSpan, Math.min(maxSpan, nextSpan));
+            let nextStart = tsAtCursor - ratioTrack * nextSpan;
+            let nextEnd = nextStart + nextSpan;
+            const clamped = clampTimeWindow(nextStart, nextEnd, nextSpan);
+            setTimeWindow({ start: clamped.start, end: clamped.end, touched: true });
+            errorZoomWheelRef.current = { ...st, lastDir: 'out' };
+            tryClearLiveTimelineLock(clamped.start, clamped.end);
+            return;
+        }
+
         const chart = currentChartInstanceRef.current;
         if (!chart?.chartArea || !chart.canvas) return;
 
@@ -3383,14 +3574,14 @@ const DeviceMonitorPage = () => {
         if (isOnXAxis) {
             event.preventDefault();
             const span = Math.max(activeWindow.end - activeWindow.start, activeWindow.minGap);
-            const minSpan = activeWindow.minGap;
-            const maxSpan = graphUsesServerData
-                ? Math.max(chartBounds.dayEnd - chartBounds.dayStart, minSpan)
-                : Math.max(LIVE_WINDOW_MS, minSpan);
+            const minSpanX = activeWindow.minGap;
+            const maxSpanX = graphUsesServerData
+                ? Math.max(chartBounds.dayEnd - chartBounds.dayStart, minSpanX)
+                : Math.max(LIVE_WINDOW_MS, minSpanX);
 
             const factor = zoomIn ? 0.88 : 1.12;
             let nextSpan = span * factor;
-            nextSpan = Math.max(minSpan, Math.min(maxSpan, nextSpan));
+            nextSpan = Math.max(minSpanX, Math.min(maxSpanX, nextSpan));
 
             const ratio = Math.max(0, Math.min(1, (event.clientX - (canvasRect.left + ca.left)) / Math.max(ca.right - ca.left, 1)));
             const tsAtCursor = activeWindow.start + ratio * span;
@@ -3407,6 +3598,7 @@ const DeviceMonitorPage = () => {
             }
 
             setTimeWindow({ start: nextStart, end: nextEnd, touched: true });
+            tryClearLiveTimelineLock(nextStart, nextEnd);
         }
     }, [
         activeWindow.start,
@@ -3415,8 +3607,18 @@ const DeviceMonitorPage = () => {
         graphUsesServerData,
         chartBounds.dayStart,
         chartBounds.dayEnd,
-        LIVE_WINDOW_MS
+        LIVE_WINDOW_MS,
+        timelineRows.errors,
     ]);
+
+    /** React вешает onWheel как passive — preventDefault для зума не срабатывает; нужен нативный listener. */
+    useLayoutEffect(() => {
+        if (activeTab !== 'graphs') return undefined;
+        const el = chartWrapperRef.current;
+        if (!el) return undefined;
+        el.addEventListener('wheel', handleChartWheel, { passive: false });
+        return () => el.removeEventListener('wheel', handleChartWheel);
+    }, [activeTab, handleChartWheel]);
 
     const handleTimelinePinMouseDown = (pin) => {
         pinDragSessionDateRef.current = selectedGraphDateRef.current;
@@ -3514,6 +3716,19 @@ const DeviceMonitorPage = () => {
     const todayDateStr = toLocalDateInput(new Date());
     const currentDateStr = selectedGraphDate || todayDateStr;
     const isNextDayDisabled = currentDateStr >= todayDateStr;
+
+    /** Две буквы дня недели (пн…вс) для строки даты календаря графика — локальная дата YYYY-MM-DD. */
+    const graphCalendarLabelParts = useMemo(() => {
+        const ds = selectedGraphDate || todayDateStr;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) return { dateStr: ds, weekday: '' };
+        const [y, m, d] = ds.split('-').map((x) => parseInt(x, 10));
+        const dt = new Date(y, (m || 1) - 1, d || 1);
+        if (dt.getFullYear() !== y || dt.getMonth() !== (m || 1) - 1 || dt.getDate() !== (d || 1)) {
+            return { dateStr: ds, weekday: '' };
+        }
+        const ruShort = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+        return { dateStr: ds, weekday: ruShort[dt.getDay()] || '' };
+    }, [selectedGraphDate, todayDateStr]);
 
     const handlePrevDay = () => setSelectedGraphDate((d) => shiftDateByDays(d || toLocalDateInput(new Date()), -1));
     const handleNextDay = () => {
@@ -3912,10 +4127,19 @@ const DeviceMonitorPage = () => {
                                             type="button"
                                             className="machine-info-text"
                                             onClick={handleOpenCalendar}
-                                            style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                                            style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                padding: 0,
+                                                cursor: 'pointer',
+                                                textDecoration: 'none',
+                                            }}
                                             title="Выбрать дату"
                                         >
-                                            {selectedGraphDate || toLocalDateInput(new Date())}
+                                            <span style={{ textDecoration: 'underline' }}>{graphCalendarLabelParts.dateStr}</span>
+                                            {graphCalendarLabelParts.weekday ? (
+                                                <span style={{ marginLeft: '0.35em', opacity: 0.92 }}>{graphCalendarLabelParts.weekday}</span>
+                                            ) : null}
                                         </button>
                                         <button
                                             type="button"
@@ -4101,7 +4325,6 @@ const DeviceMonitorPage = () => {
                                     ref={chartWrapperRef}
                                     onMouseMove={handleSharedHoverMove}
                                     onMouseLeave={handleSharedHoverLeave}
-                                    onWheel={handleChartWheel}
                                 >
                                     <div className="monitor-overlay-ruler" ref={timelineRulerRef}>
                                         <div className="monitor-overlay-ruler-scale">
@@ -4171,7 +4394,11 @@ const DeviceMonitorPage = () => {
                                                         height: `${plotArea.heightPx}px`,
                                                         bottom: 'auto',
                                                     }}
-                                                />
+                                                >
+                                                    {chartPlotCursorHidden && (
+                                                        <span className="monitor-hover-crosshair-dot" aria-hidden />
+                                                    )}
+                                                </div>
                                             )}
                                             {hoverCursor.active && (hoverCursorTimeLabel || hoverInfo) && (
                                                 <div
@@ -4237,7 +4464,7 @@ const DeviceMonitorPage = () => {
                                             </div>
                                             <div className="monitor-lane-row">
                                                 <span className="monitor-lane-label">Ошибки</span>
-                                                <div className="monitor-lane-track">
+                                                <div className="monitor-lane-track" ref={errorsLaneTrackRef}>
                                                     {timelineRows.errors.map((seg, idx) => {
                                                         const width = Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8);
                                                         return (

@@ -1822,6 +1822,22 @@
     bottom: auto;
 }
 
+.monitor-hover-crosshair-dot {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: #fff;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 1;
+}
+
 .monitor-hover-crosshair--in-lanes {
     top: 0;
     bottom: 0;

@@ -143,10 +143,19 @@ export async function getArchivePanelState(mac) {
 
 // История телеметрии (epoch millis): ток/напряжение/статус/ошибка/RFID за период (<= 24ч)
 export async function getArchiveTelemetryHistory(mac, fromMs, toMs) {
+    /** API и Instant.ofEpochMilli ожидают целые ms; из JS после деления часто приходят float (.021 и т.д.) → 500 на сервере. */
+    let from = Math.floor(Number(fromMs));
+    let to = Math.ceil(Number(toMs));
+    if (!Number.isFinite(from) || !Number.isFinite(to)) {
+        throw new Error('Invalid fromMs/toMs');
+    }
+    if (to <= from) {
+        to = from + 1;
+    }
     const params = new URLSearchParams();
     params.append('mac', mac);
-    params.append('fromMs', String(fromMs));
-    params.append('toMs', String(toMs));
+    params.append('fromMs', String(from));
+    params.append('toMs', String(to));
     const res = await fetch(`${API_URL}/telemetry-history?${params.toString()}`, {
         headers: getAuthHeaders()
     });
