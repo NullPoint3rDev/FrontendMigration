@@ -1644,6 +1644,15 @@
     background: rgba(28, 22, 34, 0.95);
 }
 
+/* На графике заняты все слоты — строки без выбора визуально приглушены */
+.telemetry-item.telemetry-item--graph-pool-full:not(.active) {
+    opacity: 0.42;
+}
+
+.telemetry-item.telemetry-item--graph-pool-full:not(.active) .telemetry-label {
+    color: rgba(120, 115, 128, 0.85);
+}
+
 .telemetry-label {
     flex: 1;
     text-align: left;
@@ -1695,10 +1704,17 @@
     color: currentColor;
 }
 
-.wave-icon {
-    font-size: 12px;
-    font-weight: 600;
+.telemetry-tile:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.telemetry-tile-check {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
     line-height: 1;
+    transform: translateY(-0.5px);
 }
 
 .tile-number {
@@ -1871,14 +1887,15 @@
     transform: translateX(10px);
     min-width: 170px;
     max-width: 240px;
-    background: rgba(9, 13, 24, 0.95);
-    border: 1px solid rgba(118, 138, 176, 0.45);
+    background: rgba(9, 13, 24, 0.08);
+    border: 1px solid rgba(118, 138, 176, 0.32);
     border-radius: 6px;
     padding: 6px 8px;
     pointer-events: none;
     z-index: 8;
     font-size: 12px;
     line-height: 1.35;
+
 }
 
 .monitor-hover-tooltip-time {
@@ -1888,7 +1905,7 @@
     color: rgba(200, 218, 255, 0.96);
     margin-bottom: 4px;
     padding-bottom: 4px;
-    border-bottom: 1px solid rgba(118, 138, 176, 0.35);
+    border-bottom: 1px solid rgba(118, 138, 176, 0.22);
 }
 
 .monitor-hover-current {

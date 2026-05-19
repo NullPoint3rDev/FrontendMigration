@@ -58,6 +58,9 @@ const TELEMETRY_CHANNELS_CONFIG = [
 
 const TELEMETRY_NO_DRAW_KEYS = new Set(['gasFlow', 'wireConsumption']);
 
+/** Сколько каналов (кроме сети по фазам) одновременно на основном графике — при заполнении остальные в списке тусклые, переключение только после снятия выбора. */
+const TELEMETRY_GRAPH_SLOT_COUNT = 2;
+
 /** Каналы, привязанные к правой оси Y (0–50). */
 const RIGHT_Y_AXIS_CHANNEL_KEYS = new Set([
     'weldingVoltage',
@@ -2742,7 +2745,7 @@ const DeviceMonitorPage = () => {
             }
             if (!prev.slot1) return { ...prev, slot1: channelKey };
             if (!prev.slot2) return { ...prev, slot2: channelKey };
-            return { slot1: prev.slot1, slot2: channelKey };
+            return prev;
         });
     };
 
@@ -2758,14 +2761,24 @@ const DeviceMonitorPage = () => {
         setTelemetryPhaseSelection((prev) => ({ ...prev, [slotName]: phase }));
     };
 
-    const telemetryChannels = TELEMETRY_CHANNELS_CONFIG.map(channel => ({
-        ...channel,
-        active: channel.key === 'mainsVoltage'
-            ? mainsVoltagePhases.length > 0
-            : (telemetrySelection.slot1 === channel.key || telemetrySelection.slot2 === channel.key),
-        tile1: telemetrySelection.slot1 === channel.key,
-        tile2: telemetrySelection.slot2 === channel.key,
-    }));
+    const graphTelemetrySlotsFull =
+        [telemetrySelection.slot1, telemetrySelection.slot2].filter(Boolean).length >= TELEMETRY_GRAPH_SLOT_COUNT;
+
+    const telemetryChannels = TELEMETRY_CHANNELS_CONFIG.map((channel) => {
+        const onGraph =
+            channel.key === 'mainsVoltage'
+                ? mainsVoltagePhases.length > 0
+                : telemetrySelection.slot1 === channel.key || telemetrySelection.slot2 === channel.key;
+        const graphPickBlocked =
+            channel.key !== 'mainsVoltage' && graphTelemetrySlotsFull && !onGraph;
+        return {
+            ...channel,
+            active: onGraph,
+            tile1: telemetrySelection.slot1 === channel.key,
+            tile2: telemetrySelection.slot2 === channel.key,
+            graphPickBlocked,
+        };
+    });
 
     const incidentLog = getErrors();
     const isWeldingActive = isWelding();
@@ -4273,7 +4286,7 @@ const DeviceMonitorPage = () => {
                                     {activeTab === 'graphs' && telemetryChannels.map((channel) => (
                                         <div
                                             key={channel.key}
-                                            className={`telemetry-item ${channel.active ? 'active' : ''}${channel.key === 'mainsVoltage' ? ' telemetry-item--mains' : ''}`}
+                                            className={`telemetry-item ${channel.active ? 'active' : ''}${channel.key === 'mainsVoltage' ? ' telemetry-item--mains' : ''}${channel.graphPickBlocked ? ' telemetry-item--graph-pool-full' : ''}`}
                                         >
                                             <span className="telemetry-label">{channel.label}</span>
                                             <div className="telemetry-tiles">
@@ -4294,9 +4307,19 @@ const DeviceMonitorPage = () => {
                                                         type="button"
                                                         className={`telemetry-tile ${channel.active ? 'active' : ''}`}
                                                         style={{ color: channel.active ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                                        disabled={channel.graphPickBlocked}
+                                                        title={
+                                                            channel.graphPickBlocked
+                                                                ? 'На графике уже два параметра. Снимите выбор с одного, чтобы добавить этот.'
+                                                                : channel.active
+                                                                    ? 'Снять с графика'
+                                                                    : 'Показать на графике'
+                                                        }
                                                         onClick={() => handleTelemetryTileClick(channel.key)}
                                                     >
-                                                        <span className="wave-icon">~</span>
+                                                        <span className="telemetry-tile-check" aria-hidden>
+                                                            ✓
+                                                        </span>
                                                     </button>
                                                 )}
                                             </div>
