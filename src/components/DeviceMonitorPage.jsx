@@ -137,6 +137,9 @@ const formatMsToClock = (ms) => {
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
+/** Счётчики Core.WorkTimeSincePowerOn / Core.WeldingTimeSincePowerOn с аппарата: uint32, на фронте считаем секундами (×1000 → formatMsToClock). Если прошивка шлёт миллисекунды — замените на 1. */
+const CORE_PACKET_UPTIME_RAW_TO_MS = 1000;
+
 const formatKgValue = (kg) => {
     const value = Math.max(0, Number(kg) || 0);
     return Number(value.toFixed(3)).toString();
@@ -471,6 +474,40 @@ function decimateWeldingPulseSeries(points, maxPoints) {
     }
 
     return [...idxs].sort((a, b) => a - b).map((j) => points[j]);
+}
+
+/**
+ * В истории иногда попадает короткий Offline между Welding/Idle и следующим Online — на дорожке «Состояние»
+ * серый зазор при включённом аппарате. Такие всплески до maxOfflineMs между двумя онлайн-участками убираем.
+ */
+function sanitizeBriefOfflineBetweenOnline(samples, windowEnd, maxOfflineMs) {
+    if (!Array.isArray(samples) || samples.length < 2 || !Number.isFinite(maxOfflineMs) || maxOfflineMs <= 0) {
+        return samples;
+    }
+    const n = samples.length;
+    const out = samples.map((s) => ({ ...s }));
+    let changed = false;
+    let i = 0;
+    while (i < n) {
+        if (out[i].isOnline) {
+            i += 1;
+            continue;
+        }
+        const runStart = i;
+        while (i < n && !out[i].isOnline) i += 1;
+        const runEnd = i;
+        const beforeOnline = runStart > 0 && out[runStart - 1].isOnline === true;
+        const afterOnline = runEnd < n && out[runEnd].isOnline === true;
+        if (!beforeOnline || !afterOnline) continue;
+        const span = out[runEnd].x - out[runStart].x;
+        if (span <= maxOfflineMs) {
+            for (let k = runStart; k < runEnd; k += 1) {
+                out[k].isOnline = true;
+            }
+            changed = true;
+        }
+    }
+    return changed ? out : samples;
 }
 
 function parseErrorCodeForTimeline(state) {
@@ -2923,6 +2960,24 @@ const DeviceMonitorPage = () => {
         currentStatusData['secondaryCoilTemperature']
     ) ?? 0;
 
+    const wrappedForCoreUptime = { properties: currentStatusData };
+    const coreWorkTimeSincePowerOn = getStateNumberByKeys(wrappedForCoreUptime, [
+        'Core.WorkTimeSincePowerOn',
+        'Время работы с включения',
+    ]);
+    const coreWeldingTimeSincePowerOn = getStateNumberByKeys(wrappedForCoreUptime, [
+        'Core.WeldingTimeSincePowerOn',
+        'Время сварки с включения',
+    ]);
+    const statusOnActiveClock =
+        coreWorkTimeSincePowerOn != null
+            ? formatMsToClock(coreWorkTimeSincePowerOn * CORE_PACKET_UPTIME_RAW_TO_MS)
+            : formatMsToClock(dailyActivity.onMs);
+    const statusWeldingClock =
+        coreWeldingTimeSincePowerOn != null
+            ? formatMsToClock(coreWeldingTimeSincePowerOn * CORE_PACKET_UPTIME_RAW_TO_MS)
+            : formatMsToClock(dailyActivity.weldingMs);
+
     // Форматирование даты
     const formatDate = () => {
         if (lastUpdate) {
@@ -3224,45 +3279,67 @@ const DeviceMonitorPage = () => {
         [timelineSamples, historyTimelineSnapshot, graphUsesServerData, activeWindow.start, activeWindow.end]
     );
 
-    const buildSegments = (samples, predicate, valueGetter) => {
+    /** Дорожка «Состояние»: убрать ложные короткие Offline из истории (см. sanitizeBriefOfflineBetweenOnline). */
+    const timelineForStateLane = useMemo(
+        () => sanitizeBriefOfflineBetweenOnline(timelineInWindow, activeWindow.end, 5000),
+        [timelineInWindow, activeWindow.end]
+    );
+
+    /**
+     * Сегмент дорожки держит состояние до следующей точки опроса (как stepped: 'after' на графике),
+     * иначе «сварка» обрывается на предыдущем ts — под ней виден зелёный online и кажется рассинхрон.
+     */
+    const buildSegments = (samples, predicate, valueGetter, windowEnd) => {
         const segments = [];
         if (!samples.length) return segments;
         let current = null;
-        samples.forEach((s, idx) => {
+        samples.forEach((s) => {
             const v = valueGetter ? valueGetter(s) : null;
             const active = predicate(s);
             if (active) {
-                if (!current || (valueGetter && current.value !== v)) {
-                    if (current) segments.push(current);
+                const needNew = !current || (valueGetter && current.value !== v);
+                if (needNew) {
+                    if (current) {
+                        current.end = s.x;
+                        segments.push(current);
+                    }
                     current = { start: s.x, end: s.x, value: v };
                 } else {
                     current.end = s.x;
                 }
             } else if (current) {
+                current.end = s.x;
                 segments.push(current);
                 current = null;
             }
-            if (idx === samples.length - 1 && current) segments.push(current);
         });
+        if (current) {
+            const endCap = Number.isFinite(windowEnd) ? Math.max(current.end, windowEnd) : current.end;
+            current.end = endCap;
+            segments.push(current);
+        }
         return segments;
     };
 
     const timelineRows = useMemo(() => {
-        const offline = buildSegments(timelineInWindow, (s) => !s.isOnline);
-        const online = buildSegments(timelineInWindow, (s) => Boolean(s.isOnline));
-        const welding = buildSegments(timelineInWindow, (s) => Boolean(s.isWelding));
+        const wEnd = activeWindow.end;
+        const offline = buildSegments(timelineForStateLane, (s) => !s.isOnline, null, wEnd);
+        const online = buildSegments(timelineForStateLane, (s) => Boolean(s.isOnline), null, wEnd);
+        const welding = buildSegments(timelineForStateLane, (s) => Boolean(s.isWelding), null, wEnd);
         const errors = buildSegments(
             timelineInWindow,
             (s) => Number.isFinite(Number(s.errorCode)) && Number(s.errorCode) > 0,
-            (s) => Number(s.errorCode)
+            (s) => Number(s.errorCode),
+            wEnd
         ).map((seg) => ({ ...seg, label: formatErrorCodeLabel(seg.value) }));
         const welder = buildSegments(
             timelineInWindow,
             (s) => Boolean(s.rfid),
-            (s) => String(s.rfid)
+            (s) => String(s.rfid),
+            wEnd
         );
         return { offline, online, welding, errors, welder };
-    }, [timelineInWindow]);
+    }, [timelineInWindow, timelineForStateLane, activeWindow.end]);
 
     const toPercent = useCallback((x) => {
         const range = Math.max(activeWindow.end - activeWindow.start, 1);
@@ -4235,11 +4312,11 @@ const DeviceMonitorPage = () => {
                             </div>
                             <div className="status-row">
                                 <span className="status-label">Вкл. состояние:</span>
-                                <span className="status-value numeric status-value-success">{formatMsToClock(dailyActivity.onMs)}</span>
+                                <span className="status-value numeric status-value-success">{statusOnActiveClock}</span>
                             </div>
                             <div className="status-row">
                                 <span className="status-label">Сварка:</span>
-                                <span className="status-value numeric status-value-accent">{formatMsToClock(dailyActivity.weldingMs)}</span>
+                                <span className="status-value numeric status-value-accent">{statusWeldingClock}</span>
                             </div>
                         </div>
 

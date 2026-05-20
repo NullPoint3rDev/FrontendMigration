@@ -2136,6 +2136,7 @@
     background: rgba(44, 36, 53, 0.95);
     border: 1px solid rgba(80, 69, 93, 0.46);
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 .monitor-lane-hover-badge {
@@ -2184,8 +2185,10 @@
     text-overflow: ellipsis;
 }
 
-.monitor-lane-track--state {
+.monitor-lane-track.monitor-lane-track--state {
     background: rgba(165, 158, 187, 0.36);
+    /* Один тон с фоном — без «второго» фиолетово-серого от стандартной рамки дорожки */
+    border-color: rgba(165, 158, 187, 0.55);
 }
 
 .monitor-lane-track--state .monitor-lane-segment-offline {
@@ -2199,6 +2202,12 @@
 
 .monitor-lane-track--state .monitor-lane-segment-welding {
     z-index: 2;
+}
+
+/* Без вертикального зазора 1px — иначе просвечивает другой оттенок */
+.monitor-lane-track--state .monitor-lane-segment {
+    top: 0;
+    bottom: 0;
 }
 
 .monitor-lane-segment-offline {
