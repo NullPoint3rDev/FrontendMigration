@@ -3197,7 +3197,8 @@ const DeviceMonitorPage = () => {
                         }
                         : 'rgba(255,255,255,0.04)',
                 fill: isCurrent || isVoltage ? (graphUsesServerData ? 'origin' : true) : false,
-                yAxisID: resolveChannelYAxisId(channelKey)
+                yAxisID: resolveChannelYAxisId(channelKey),
+                ...(isCurrent || isVoltage ? { stepped: 'after' } : {}),
             };
         };
 
@@ -3305,6 +3306,24 @@ const DeviceMonitorPage = () => {
         return Number.isFinite(val) ? val : null;
     }, []);
 
+    /** Совпадает с Chart.js stepped: 'after' — без «наклонных» участков между дискретными точками. */
+    const valueAtTsSteppedAfter = useCallback((series, ts) => {
+        if (!Array.isArray(series) || !Number.isFinite(ts)) return null;
+        const pts = series
+            .filter((p) => p && Number.isFinite(p.x) && p.y !== null && p.y !== undefined && !Number.isNaN(Number(p.y)))
+            .map((p) => ({ x: p.x, y: Number(p.y) }))
+            .sort((a, b) => a.x - b.x || a.y - b.y);
+        if (!pts.length) return null;
+        if (ts < pts[0].x) return pts[0].y;
+        let value = pts[0].y;
+        for (let i = 0; i < pts.length; i += 1) {
+            const p = pts[i];
+            if (p.x > ts) break;
+            value = p.y;
+        }
+        return Number.isFinite(value) ? value : null;
+    }, []);
+
     const hoverInfo = useMemo(() => {
         if (!hoverCursor.active || !Number.isFinite(hoverCursor.ts)) return null;
         const displaySeries = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
@@ -3323,7 +3342,11 @@ const DeviceMonitorPage = () => {
         });
         const addSelectedRow = (channelKey, slotName) => {
             if (!channelKey || channelKey === 'mainsVoltage') return;
-            const value = findNearestPointValue(displaySeries[channelKey] || [], hoverCursor.ts);
+            const raw = displaySeries[channelKey] || [];
+            const value =
+                channelKey === 'weldingCurrent' || channelKey === 'weldingVoltage'
+                    ? valueAtTsSteppedAfter(raw, hoverCursor.ts)
+                    : findNearestPointValue(raw, hoverCursor.ts);
             if (value == null) return;
             const channel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === channelKey);
             if (!channel) return;
@@ -3356,6 +3379,7 @@ const DeviceMonitorPage = () => {
         telemetrySelection.slot2,
         mainsVoltagePhases,
         findNearestPointValue,
+        valueAtTsSteppedAfter,
         timelineRows,
         findSegmentAtTs,
         welderNameByRfid
