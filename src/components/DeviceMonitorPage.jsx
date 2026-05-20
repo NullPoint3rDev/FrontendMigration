@@ -191,6 +191,25 @@ function getEquipmentErrorName(errorCode) {
     return s;
 }
 
+/** Коды 1–23 из корня state (как EquipmentErrorMessages на бэке); несколько — через запятую, ; или пробел. */
+function parseEquipmentErrorCodes(raw) {
+    if (raw === undefined || raw === null) return [];
+    const s = String(raw).trim();
+    if (!s || s.toLowerCase() === 'null' || s === '0') return [];
+    const out = [];
+    const seen = new Set();
+    for (const part of s.split(/[,;\s]+/)) {
+        const t = part.trim();
+        if (!t) continue;
+        const n = parseInt(t, 10);
+        if (!Number.isFinite(n) || n < 1 || n > EQUIPMENT_ERROR_MESSAGES.length) continue;
+        if (seen.has(n)) continue;
+        seen.add(n);
+        out.push(n);
+    }
+    return out;
+}
+
 function formatWelderShortName(welder) {
     const full = (welder?.name || '').trim();
     if (!full) return '—';
@@ -1708,10 +1727,12 @@ const DeviceMonitorPage = () => {
                     params.status = data.state.status;
                 }
 
-                // Сохраняем errorCode из корня state, если он есть
-                if (data.state.errorCode !== undefined && data.state.errorCode !== null) {
-                    params.errorCode = data.state.errorCode;
-                }
+                // error_code из корня: всегда кладём в params (пустая строка = нет кода), иначе merge в updateDeviceData
+                // оставляет старый errorCode после сброса ошибки на аппарате.
+                const rawErrorCode = data.state.errorCode;
+                const ecTrim = rawErrorCode === undefined || rawErrorCode === null ? '' : String(rawErrorCode).trim();
+                const normalizedErrorCode =
+                    ecTrim !== '' && ecTrim.toLowerCase() !== 'null' && ecTrim !== '0' ? ecTrim : '';
 
                 // Извлекаем ВСЕ параметры из структурированных данных
                 Object.entries(data.state.properties).forEach(([key, prop]) => {
@@ -1776,6 +1797,13 @@ const DeviceMonitorPage = () => {
                         }
                     }
                 });
+
+                params.errorCode = normalizedErrorCode;
+
+                // Если в ответе нет свойства «Ошибки», а код ошибки пуст — явно «Нет ошибок», иначе merge оставит старый текст.
+                if (!params['Ошибки'] && normalizedErrorCode === '') {
+                    params['Ошибки'] = 'Нет ошибок';
+                }
 
                 // Убеждаемся, что status сохраняется (приоритет params.status, если он был установлен выше)
                 const finalStatus = params.status || data.state.status || null;
@@ -2727,9 +2755,10 @@ const DeviceMonitorPage = () => {
         const timeStr = errorDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
         const dateStr = errorDate.toLocaleDateString('ru-RU');
 
-        // Ошибки: приоритет у свойства "Ошибки" — там полный список от парсера (несколько через запятую/точку с запятой).
-        // Если "Ошибки" нет — показываем одну по errorCode (первый код от аппарата).
-        const errorCode = data['errorCode'] || data.errorCode;
+        // Ошибки: при наличии числового error_code в корне state — только подписи из EQUIPMENT_ERROR_MESSAGES
+        // (как EquipmentErrorMessages на бэке), без текста свойства «Ошибки» из другого словаря парсера — иначе
+        // формулировки расходятся (напр. код 18). Если кодов нет — fallback на текст «Ошибки».
+        const errorCodeRaw = data['errorCode'] || data.errorCode;
         const errorsProperty = data['Ошибки'] || data['Errors'] || data.errors;
         const hasErrorsText = errorsProperty &&
             errorsProperty !== 'Нет ошибок' &&
@@ -2737,19 +2766,32 @@ const DeviceMonitorPage = () => {
             String(errorsProperty).trim() !== '' &&
             String(errorsProperty).toLowerCase() !== 'null';
 
-        if (hasErrorsText) {
-            // Парсер отдаёт несколько ошибок через ", " или "; " — показываем каждую отдельной карточкой
-            const parts = String(errorsProperty).split(/,|;/).map(s => s.trim()).filter(Boolean);
-            parts.forEach((message) => {
-                errors.push({ code: 'ERR', time: timeStr, date: dateStr, severity: 'error', message });
+        const codesFromRoot = parseEquipmentErrorCodes(errorCodeRaw);
+
+        if (codesFromRoot.length > 0) {
+            codesFromRoot.forEach((num) => {
+                const message = getEquipmentErrorName(String(num));
+                if (message) {
+                    errors.push({
+                        code: `ERR ${num}`,
+                        time: timeStr,
+                        date: dateStr,
+                        severity: 'error',
+                        message,
+                    });
+                }
             });
-        } else {
-            const resolvedFromCode = (errorCode !== undefined && errorCode !== null && errorCode !== 'null' && String(errorCode).trim() !== '' && String(errorCode) !== '0')
-                ? getEquipmentErrorName(errorCode)
-                : null;
-            if (resolvedFromCode) {
-                errors.push({ code: 'ERR', time: timeStr, date: dateStr, severity: 'error', message: resolvedFromCode });
-            }
+        } else if (hasErrorsText) {
+            const parts = String(errorsProperty).split(/,|;/).map(s => s.trim()).filter(Boolean);
+            parts.forEach((message, idx) => {
+                errors.push({
+                    code: `ERR-${idx}`,
+                    time: timeStr,
+                    date: dateStr,
+                    severity: 'error',
+                    message,
+                });
+            });
         }
 
         // Предупреждения: добавляем отдельные карточки (если парсер прислал "Предупреждения")
