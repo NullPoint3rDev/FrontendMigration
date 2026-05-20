@@ -2184,8 +2184,13 @@
     text-overflow: ellipsis;
 }
 
+.monitor-lane-track--state {
+    background: rgba(165, 158, 187, 0.36);
+}
+
 .monitor-lane-track--state .monitor-lane-segment-offline {
     z-index: 0;
+    background: rgba(165, 158, 187, 0.36);
 }
 
 .monitor-lane-track--state .monitor-lane-segment-online {
@@ -2197,7 +2202,7 @@
 }
 
 .monitor-lane-segment-offline {
-    background: linear-gradient(90deg, rgba(72, 76, 88, 0.92), rgba(110, 115, 128, 0.88));
+    background: rgba(165, 158, 187, 0.36);
 }
 
 .monitor-lane-segment-online {

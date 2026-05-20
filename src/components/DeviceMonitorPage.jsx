@@ -382,6 +382,8 @@ function getMachineActivityModeFromPanelState(state) {
     return 'on';
 }
 
+const isHistoryPointWelding = (p) => String(p?.status || '').toLowerCase() === 'welding';
+
 /** Вертикальные фронты на старт/стоп сварки: две точки с одним x (дубликат x = вертикаль в Chart.js). */
 function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, xPoll) {
     const y = Math.round(Number(yRaw) * 10) / 10;
@@ -394,7 +396,13 @@ function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, 
         next.push({ x: xPoll, y: y });
         lastYRef.current = y;
     } else if (wasWelding && nowWelding) {
-        next.push({ x: xPoll, y: y });
+        const prevY = lastYRef.current ?? 0;
+        if (prevY === 0 && y > 0) {
+            next.push({ x: xPoll, y: 0 });
+            next.push({ x: xPoll, y: y });
+        } else {
+            next.push({ x: xPoll, y: y });
+        }
         lastYRef.current = y;
     } else if (wasWelding && !nowWelding) {
         const last = lastYRef.current ?? y;
@@ -404,6 +412,65 @@ function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, 
     }
 
     return next;
+}
+
+/** История: те же вертикальные фронты по смене status Welding / не-Welding. */
+function buildWeldingPulseSeriesFromHistoryPoints(points, mapY) {
+    const series = [];
+    if (!points?.length) return series;
+    let wasWelding = false;
+    let lastY = 0;
+
+    points.forEach((p) => {
+        const x = p.ts;
+        const nowWelding = isHistoryPointWelding(p);
+        const y = Math.round(Number(mapY(p)) * 10) / 10;
+
+        if (!wasWelding && !nowWelding) {
+            series.push({ x, y: 0 });
+        } else if (!wasWelding && nowWelding) {
+            series.push({ x, y: 0 });
+            series.push({ x, y });
+            lastY = y;
+        } else if (wasWelding && nowWelding) {
+            if (lastY === 0 && y > 0) {
+                series.push({ x, y: 0 });
+                series.push({ x, y });
+            } else {
+                series.push({ x, y });
+            }
+            lastY = y;
+        } else if (wasWelding && !nowWelding) {
+            series.push({ x, y: lastY });
+            series.push({ x, y: 0 });
+            lastY = 0;
+        }
+        wasWelding = nowWelding;
+    });
+
+    return series;
+}
+
+/** Прореживание без разрушения пар (x, y1)-(x, y2) — иначе фронт снова становится наклонным. */
+function decimateWeldingPulseSeries(points, maxPoints) {
+    const n = points?.length || 0;
+    if (n <= maxPoints) return points || [];
+
+    const mustKeep = new Set([0, n - 1]);
+    for (let i = 0; i < n - 1; i += 1) {
+        if (points[i].x === points[i + 1].x) {
+            mustKeep.add(i);
+            mustKeep.add(i + 1);
+        }
+    }
+
+    const idxs = new Set(mustKeep);
+    const target = Math.min(maxPoints, n);
+    for (let k = 0; k < target && idxs.size < maxPoints; k += 1) {
+        idxs.add(Math.round((k * (n - 1)) / Math.max(target - 1, 1)));
+    }
+
+    return [...idxs].sort((a, b) => a - b).map((j) => points[j]);
 }
 
 function parseErrorCodeForTimeline(state) {
@@ -691,19 +758,13 @@ const DeviceMonitorPage = () => {
             const n = Number(value);
             return Number.isFinite(n) ? n : null;
         };
+        const mapCurrentY = (p) => (p.current === null || p.current === undefined ? 0 : Number(p.current));
+        const mapVoltageY = (p) => (p.voltage === null || p.voltage === undefined ? 0 : (Number(p.voltage) || 0) / 10);
+
         return {
             ...DEFAULT_TELEMETRY_SERIES,
-            weldingCurrent: points.map((p) => ({
-                x: p.ts,
-                // В истории между швами рисуем ноль, как в live-режиме (без разрывов линии).
-                y: p.current === null || p.current === undefined ? 0 : Number(p.current),
-            })),
-            // Voltage из истории: в десятых долях → делим на 10
-            weldingVoltage: points.map((p) => ({
-                x: p.ts,
-                // Аналогично току: между сварками значение 0 для цельной линии.
-                y: p.voltage === null || p.voltage === undefined ? 0 : (Number(p.voltage) || 0) / 10,
-            })),
+            weldingCurrent: buildWeldingPulseSeriesFromHistoryPoints(points, mapCurrentY),
+            weldingVoltage: buildWeldingPulseSeriesFromHistoryPoints(points, mapVoltageY),
             mainsVoltageA: points.map((p) => ({
                 x: p.ts,
                 y: toNumericOrNull(p.mainsVoltageA),
@@ -2389,9 +2450,9 @@ const DeviceMonitorPage = () => {
             return '#f06c7b';
         }
 
-        // Дежурный режим - зеленый
+        // Дежурный режим - серый
         if (stateLower.includes('дежурн') || stateLower.includes('standby') || stateLower === 'дежурный режим') {
-            return '#65d66f'; // Зеленый
+            return 'rgba(188, 183, 197, 0.5)'; // Серый
         }
 
         // Аппарат заблокирован - серый
@@ -3110,10 +3171,14 @@ const DeviceMonitorPage = () => {
             const channel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === channelKey);
             if (!channel) return null;
             let raw = src[channelKey] || [];
-            if (graphUsesServerData) raw = decimateSeriesPoints(raw, HISTORY_CHART_MAX_POINTS);
-            const data = raw.map(mapPt);
             const isCurrent = channelKey === 'weldingCurrent';
             const isVoltage = channelKey === 'weldingVoltage';
+            if (graphUsesServerData) {
+                raw = isCurrent || isVoltage
+                    ? decimateWeldingPulseSeries(raw, HISTORY_CHART_MAX_POINTS)
+                    : decimateSeriesPoints(raw, HISTORY_CHART_MAX_POINTS);
+            }
+            const data = raw.map(mapPt);
 
             return {
                 label: channel.label,
@@ -4736,7 +4801,7 @@ const DeviceMonitorPage = () => {
                                         ) : (
                                             <>
                                                 <FaExpand aria-hidden style={{ width: 11, height: 11, flexShrink: 0 }} />
-                                                <span className="chart-control-btn-label"></span>
+                                                <span className="chart-control-btn-label">На весь экран</span>
                                             </>
                                         )}
                                     </button>
