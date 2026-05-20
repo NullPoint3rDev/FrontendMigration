@@ -548,6 +548,39 @@ function formatErrorCodeLabel(errorCode) {
     return `ERR ${String(Math.round(n)).padStart(2, '0')}`;
 }
 
+/** Центр сегмента ошибки в ms. */
+function errorSegmentCenterTs(seg) {
+    return (seg.start + seg.end) / 2;
+}
+
+/** Ближайшая по горизонтали ошибка к позиции курсора (ts под мышью). */
+function pickNearestErrorSegmentByPointerTs(errorsSegments, pointerTs) {
+    if (!Array.isArray(errorsSegments) || !errorsSegments.length || !Number.isFinite(pointerTs)) {
+        return null;
+    }
+    let best = null;
+    let bestDist = Number.POSITIVE_INFINITY;
+    errorsSegments.forEach((seg) => {
+        const center = errorSegmentCenterTs(seg);
+        const dist = Math.abs(center - pointerTs);
+        if (dist < bestDist) {
+            bestDist = dist;
+            best = seg;
+        }
+    });
+    return best;
+}
+
+function isClientOverRect(clientX, clientY, rect) {
+    if (!rect || rect.width < 1) return false;
+    return (
+        clientY >= rect.top &&
+        clientY <= rect.bottom &&
+        clientX >= rect.left &&
+        clientX <= rect.right
+    );
+}
+
 function extractRfidFromDeviceData(deviceData, machineMac, hasData) {
     if (Object.keys(deviceData).length === 0 || !hasData) return null;
     const data = deviceData[machineMac];
@@ -3522,8 +3555,64 @@ const DeviceMonitorPage = () => {
     }, [hoverInfo?.welderRfid, welderNameByRfid]);
 
     const chartWrapperRef = useRef(null);
-    /** Дорожка «Ошибки» — hit-test и колесо без влияния на фон. */
+    /** Дорожка «Ошибки» — hit-test, snap crosshair и зум. */
     const errorsLaneTrackRef = useRef(null);
+
+    /** Белая точка на линии графика в момент ts (для snap на дорожке «Ошибки»). */
+    const setPlotDotAtTimelineTs = useCallback((ts) => {
+        const el = chartCanvasRef.current;
+        const chart = currentChartInstanceRef.current;
+        if (!el || !chart?.chartArea || !chart.canvas || !Number.isFinite(ts)) {
+            setPlotDot({ visible: false, leftPx: 0, topPx: 0 });
+            return;
+        }
+        const displaySeries = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
+        const slots = [telemetrySelection.slot1, telemetrySelection.slot2];
+        let yVal = null;
+        let yAxisId = 'y';
+        for (const key of slots) {
+            if (!key || key === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(key)) continue;
+            const raw = displaySeries[key] || [];
+            const val =
+                key === 'weldingCurrent' || key === 'weldingVoltage'
+                    ? valueAtTsSteppedAfter(raw, ts)
+                    : findNearestPointValue(raw, ts);
+            if (val != null && Number.isFinite(val)) {
+                yVal = val;
+                yAxisId = resolveChannelYAxisId(key);
+                break;
+            }
+        }
+        if (yVal == null) {
+            setPlotDot({ visible: false, leftPx: 0, topPx: 0 });
+            return;
+        }
+        const yScale = chart.scales[yAxisId];
+        const xScale = chart.scales.x;
+        if (!yScale || !xScale) {
+            setPlotDot({ visible: false, leftPx: 0, topPx: 0 });
+            return;
+        }
+        const canvasRect = chart.canvas.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const scaleX = chart.width > 0 ? canvasRect.width / chart.width : 1;
+        const scaleY = chart.height > 0 ? canvasRect.height / chart.height : 1;
+        const xPixel = xScale.getPixelForValue(ts);
+        const yPixel = yScale.getPixelForValue(yVal);
+        setPlotDot({
+            visible: true,
+            leftPx: canvasRect.left - elRect.left + xPixel * scaleX,
+            topPx: canvasRect.top - elRect.top + yPixel * scaleY,
+        });
+    }, [
+        graphUsesServerData,
+        historySeriesSnapshot,
+        telemetrySeries,
+        telemetrySelection.slot1,
+        telemetrySelection.slot2,
+        valueAtTsSteppedAfter,
+        findNearestPointValue,
+    ]);
     const chartPanSessionRef = useRef(null);
     const chartPanSuppressWheelRef = useRef(false);
     const chartPanMoveHandlerRef = useRef(null);
@@ -3724,9 +3813,43 @@ const DeviceMonitorPage = () => {
         const left = Number.isFinite(plotArea.leftPx) ? plotArea.leftPx : 0;
         const width = Number.isFinite(plotArea.widthPx) && plotArea.widthPx > 0 ? plotArea.widthPx : rect.width;
         const xPxRaw = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-        const plotCursorX = Math.max(left, Math.min(left + width, xPxRaw));
-        const ratio = Math.max(0, Math.min(1, (plotCursorX - left) / width));
-        const ts = activeWindow.start + ratio * (activeWindow.end - activeWindow.start);
+        let plotCursorX = Math.max(left, Math.min(left + width, xPxRaw));
+        let ratio = Math.max(0, Math.min(1, (plotCursorX - left) / width));
+        let ts = activeWindow.start + ratio * (activeWindow.end - activeWindow.start);
+
+        const errorsTrackRect = errorsLaneTrackRef.current?.getBoundingClientRect?.();
+        const overErrorsLane = isClientOverRect(event.clientX, event.clientY, errorsTrackRect);
+        const errorsInView = timelineRows.errors;
+        if (overErrorsLane && errorsInView?.length) {
+            const snapSeg = pickNearestErrorSegmentByPointerTs(errorsInView, ts);
+            if (snapSeg) {
+                ts = errorSegmentCenterTs(snapSeg);
+                ratio = Math.max(0, Math.min(1, (ts - activeWindow.start) / Math.max(activeWindow.end - activeWindow.start, 1)));
+                plotCursorX = left + ratio * width;
+                setPlotDotAtTimelineTs(ts);
+            }
+        } else {
+            const chartEl = chartCanvasRef.current;
+            const pa = plotAreaRef.current;
+            const plotLeft = Number.isFinite(pa.chartLeftPx) ? pa.chartLeftPx : pa.leftPx;
+            const plotWidth = Number.isFinite(pa.widthPx) && pa.widthPx > 0 ? pa.widthPx : 0;
+            const plotHeight = Number.isFinite(pa.heightPx) && pa.heightPx > 0 ? pa.heightPx : 0;
+            let inChartPlot = false;
+            if (chartEl && plotWidth > 0 && plotHeight > 0) {
+                const elRect = chartEl.getBoundingClientRect();
+                const xLocal = event.clientX - elRect.left;
+                const yLocal = event.clientY - elRect.top;
+                inChartPlot =
+                    xLocal >= plotLeft &&
+                    xLocal <= plotLeft + plotWidth &&
+                    yLocal >= pa.topPx &&
+                    yLocal <= pa.topPx + plotHeight;
+            }
+            if (!inChartPlot) {
+                setPlotDot((prev) => (prev.visible ? { visible: false, leftPx: 0, topPx: 0 } : prev));
+            }
+        }
+
         const tooltipW = 240;
         const flip = plotCursorX > (rect.width - tooltipW);
 
@@ -3747,6 +3870,8 @@ const DeviceMonitorPage = () => {
         plotArea.widthPx,
         isEventOnChartAxis,
         chartPanActive,
+        timelineRows.errors,
+        setPlotDotAtTimelineTs,
     ]);
 
     const handleSharedHoverLeave = useCallback(() => {
@@ -3813,7 +3938,6 @@ const DeviceMonitorPage = () => {
 
     const handleChartWheel = useCallback((event) => {
         if (chartPanSuppressWheelRef.current || chartPanSessionRef.current?.active) return;
-        const ERROR_LANE_HIT_PAD_PX = 3;
 
         const applyPlotTimeZoomAtRatio = (ratio, zoomIn) => {
             const span = Math.max(activeWindow.end - activeWindow.start, activeWindow.minGap);
@@ -3842,62 +3966,24 @@ const DeviceMonitorPage = () => {
             setTimeWindow({ start: nextStart, end: nextEnd, touched: true });
         };
 
-        const pickErrorSegmentUnderPointer = (clientX, clientY, trackRect, errorsSegments, winStart, winEnd) => {
-            if (!trackRect || trackRect.width < 1 || !Array.isArray(errorsSegments) || !errorsSegments.length) return null;
-            if (clientY < trackRect.top || clientY > trackRect.bottom) return null;
-            if (clientX < trackRect.left || clientX > trackRect.right) return null;
-            const ratio = (clientX - trackRect.left) / trackRect.width;
-            const range = Math.max(winEnd - winStart, 1);
-            const ts = winStart + Math.max(0, Math.min(1, ratio)) * range;
-            const padMs = (ERROR_LANE_HIT_PAD_PX / trackRect.width) * range;
-            const candidates = [];
-            for (let i = errorsSegments.length - 1; i >= 0; i -= 1) {
-                const seg = errorsSegments[i];
-                const lo = seg.start - padMs;
-                const hi = seg.end + padMs;
-                if (ts >= lo && ts <= hi) {
-                    const rawLen = Math.max(0, seg.end - seg.start);
-                    const center = (seg.start + seg.end) / 2;
-                    const dist =
-                        rawLen > 0
-                            ? ts < seg.start
-                                ? seg.start - ts
-                                : ts > seg.end
-                                    ? ts - seg.end
-                                    : 0
-                            : Math.abs(ts - center);
-                    candidates.push({ seg, dist, idx: i });
-                }
-            }
-            if (!candidates.length) return null;
-            candidates.sort((a, b) => a.dist - b.dist || b.idx - a.idx);
-            return candidates[0].seg;
-        };
-
         const trackEl = errorsLaneTrackRef.current;
         const trackRect = trackEl?.getBoundingClientRect?.();
-        const overErrorTrack =
-            trackRect &&
-            trackRect.width > 0 &&
-            event.clientY >= trackRect.top &&
-            event.clientY <= trackRect.bottom &&
-            event.clientX >= trackRect.left &&
-            event.clientX <= trackRect.right;
+        const overErrorTrack = isClientOverRect(event.clientX, event.clientY, trackRect);
 
         if (overErrorTrack) {
-            const hitSeg = pickErrorSegmentUnderPointer(
-                event.clientX,
-                event.clientY,
-                trackRect,
-                timelineRows.errors,
-                activeWindow.start,
-                activeWindow.end
-            );
-            if (!hitSeg || !graphUsesServerData) return;
+            const errorsInView = timelineRows.errors;
+            if (!errorsInView?.length || !graphUsesServerData) return;
+
+            const range = Math.max(activeWindow.end - activeWindow.start, 1);
+            const ratioMouse = Math.max(0, Math.min(1, (event.clientX - trackRect.left) / trackRect.width));
+            const mouseTs = activeWindow.start + ratioMouse * range;
+            const snapSeg = pickNearestErrorSegmentByPointerTs(errorsInView, mouseTs);
+            if (!snapSeg) return;
 
             event.preventDefault();
-            const ratioTrack = Math.max(0, Math.min(1, (event.clientX - trackRect.left) / trackRect.width));
-            applyPlotTimeZoomAtRatio(ratioTrack, event.deltaY < 0);
+            const centerTs = errorSegmentCenterTs(snapSeg);
+            const ratioCenter = Math.max(0, Math.min(1, (centerTs - activeWindow.start) / range));
+            applyPlotTimeZoomAtRatio(ratioCenter, event.deltaY < 0);
             return;
         }
 
