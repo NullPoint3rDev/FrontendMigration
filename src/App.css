@@ -9,6 +9,15 @@
     overflow-x: hidden;
 }
 
+/* Контент справа от сайдбара (MUI ScopedCssBaseline): цепочка flex до 100vh, иначе main height:100% не сжимает колонку с графиком */
+.app > .MuiScopedCssBaseline-root {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
 /* Для других страниц, которые не используют .app */
 .App {
     min-height: 100vh;

@@ -993,11 +993,11 @@
 }
 
 .status-value-danger {
-    color: #f06c7b;
+    color: rgba(165, 158, 187, 0.36);
 }
 
 .status-value-warning {
-    color: #f0a65d;
+    color: rgba(165, 158, 187, 0.36);
 }
 
 .status-value-success {
@@ -1895,7 +1895,6 @@
     z-index: 8;
     font-size: 12px;
     line-height: 1.35;
-
 }
 
 .monitor-hover-tooltip-time {
@@ -2053,6 +2052,34 @@
     width: 2px;
     height: 9px;
     background: rgba(243, 203, 93, 0.95);
+}
+
+/* Обычный режим (не «график на весь экран»): чуть поднимаем линейку и блок графика+дорожек — нижний трек «Сварщик» не обрезается */
+.main-panel:not(.main-panel--graph-expanded-layout) .monitor-overlay-ruler {
+    height: 36px;
+    margin: 0 0 6px 0;
+    padding-top: 0;
+}
+
+.main-panel:not(.main-panel--graph-expanded-layout) .monitor-overlay-ruler-line {
+    top: 19px;
+}
+
+.main-panel:not(.main-panel--graph-expanded-layout) .monitor-time-pin {
+    top: 14px;
+}
+
+.main-panel:not(.main-panel--graph-expanded-layout) .monitor-graph-layout {
+    row-gap: 5px;
+}
+
+.main-panel:not(.main-panel--graph-expanded-layout) .chart-pan-surface {
+    padding-bottom: 10px;
+    box-sizing: border-box;
+}
+
+.main-panel:not(.main-panel--graph-expanded-layout) .chart-card.large {
+    padding: 19px 19px 11px 19px;
 }
 
 /* Руль + график + полосы: колонка подписей слева (76px), область графика совпадает по ширине с chartArea */
@@ -2313,6 +2340,78 @@
 .chart-control-btn--history-active {
     border-color: rgba(126, 195, 255, 0.65);
     background: rgba(52, 88, 130, 0.35);
+}
+
+.chart-control-btn--graph-expand {
+    flex-direction: column;
+    height: auto;
+    min-height: 48px;
+    padding: 5px 2px 6px;
+    gap: 3px;
+}
+
+.chart-control-btn--graph-expand .chart-control-btn-label {
+    font-size: 7px;
+    line-height: 1.08;
+    white-space: normal;
+    text-align: center;
+    max-width: 100%;
+    letter-spacing: 0;
+}
+
+.chart-control-btn--graph-expand-active {
+    border-color: rgba(200, 210, 255, 0.55);
+    background: rgba(55, 62, 88, 0.45);
+}
+
+/* Режим «график на весь экран колонки»: скрыта вся верхняя сетка (аппарат + параметры + статус + сварщик) — иначе высота строки не падает */
+.main-panel--graph-expanded-layout {
+    overflow: hidden;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.main-panel--graph-expanded-layout .top-grid {
+    display: none !important;
+}
+
+.main-panel--graph-expanded-layout .bottom-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.main-panel--graph-expanded-layout .bottom-panel__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: stretch;
+}
+
+.main-panel--graph-expanded-layout .bottom-panel__body > .chart-stack {
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.main-panel--graph-expanded-layout .chart-card.large {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.main-panel--graph-expanded-layout .chart-wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+}
+
+.main-panel--graph-expanded-layout .chart-monitor-stack {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.main-panel--graph-expanded-layout .chart-canvas {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: stretch;
+    justify-content: stretch;
 }
 
 .monitor-history-modal {

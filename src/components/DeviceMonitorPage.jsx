@@ -20,7 +20,7 @@ import machineImage from '../images/Untitled 3 копия.png';
 import WelderIcon from '../images/WelderIcon.png';
 import AddEquipmentModal from './AddEquipmentModal';
 import { RiRfidFill } from 'react-icons/ri';
-import {FaBell} from "react-icons/fa";
+import { FaBell, FaCompress, FaExpand } from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
 
 // Названия ошибок по коду 1–23 (синхронно с EquipmentErrorMessages и протоколом аппарата: 1–10, 17–21)
@@ -525,6 +525,8 @@ const DeviceMonitorPage = () => {
 
     // Состояние для активной вкладки (Графики/Информация)
     const [activeTab, setActiveTab] = useState('info');
+    /** Развернуть область графика на место верхней сетки (только вкладка «Графики»; при «Инфо» сбрасывается). */
+    const [graphExpandedLayout, setGraphExpandedLayout] = useState(false);
 
     // Состояние для хранения ID аппарата (для удаления)
     const [machineId, setMachineId] = useState(null);
@@ -591,6 +593,10 @@ const DeviceMonitorPage = () => {
     const historyModeRef = useRef(false);
     useEffect(() => {
         activeTabRef.current = activeTab;
+    }, [activeTab]);
+
+    useEffect(() => {
+        if (activeTab !== 'graphs') setGraphExpandedLayout(false);
     }, [activeTab]);
     const [dailyActivity, setDailyActivity] = useState(DAILY_ACTIVITY_INITIAL);
     const [dailyWireConsumptionKg, setDailyWireConsumptionKg] = useState(0);
@@ -3339,8 +3345,19 @@ const DeviceMonitorPage = () => {
         syncPlotAreaFromChart();
         const onResize = () => syncPlotAreaFromChart();
         window.addEventListener('resize', onResize);
-        return () => window.removeEventListener('resize', onResize);
-    }, [activeTab, syncPlotAreaFromChart, topChartData, activeWindow.start, activeWindow.end]);
+        const t = window.setTimeout(() => {
+            syncPlotAreaFromChart();
+            try {
+                currentChartInstanceRef.current?.resize?.();
+            } catch {
+                /* noop */
+            }
+        }, 60);
+        return () => {
+            window.removeEventListener('resize', onResize);
+            window.clearTimeout(t);
+        };
+    }, [activeTab, syncPlotAreaFromChart, topChartData, activeWindow.start, activeWindow.end, graphExpandedLayout]);
 
     const isEventOnChartAxis = useCallback((event) => {
         const chart = currentChartInstanceRef.current;
@@ -3914,7 +3931,7 @@ const DeviceMonitorPage = () => {
     ]);
 
     return (
-        <main className="main-panel">
+        <main className={`main-panel${activeTab === 'graphs' && graphExpandedLayout ? ' main-panel--graph-expanded-layout' : ''}`}>
             <div className="monitor-page-header-row">
                 <div className="monitor-page-brand">
                     <button
@@ -4704,6 +4721,24 @@ const DeviceMonitorPage = () => {
                                         title={todayPinExplore ? 'Вернуться в live-режим' : 'История за сегодня (последний час)'}
                                     >
                                         <span className="chart-control-btn-label">{todayPinExplore ? 'Live' : 'История'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`chart-control-btn chart-control-btn--graph-expand${graphExpandedLayout ? ' chart-control-btn--graph-expand-active' : ''}`}
+                                        onClick={() => setGraphExpandedLayout((v) => !v)}
+                                        title={graphExpandedLayout ? 'Свернуть' : 'На весь экран'}
+                                    >
+                                        {graphExpandedLayout ? (
+                                            <>
+                                                <FaCompress aria-hidden style={{ width: 11, height: 11, flexShrink: 0 }} />
+                                                <span className="chart-control-btn-label">Свернуть</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <FaExpand aria-hidden style={{ width: 11, height: 11, flexShrink: 0 }} />
+                                                <span className="chart-control-btn-label"></span>
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             </div>
