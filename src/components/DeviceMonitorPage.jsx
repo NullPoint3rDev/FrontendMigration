@@ -548,6 +548,18 @@ function formatErrorCodeLabel(errorCode) {
     return `ERR ${String(Math.round(n)).padStart(2, '0')}`;
 }
 
+/** Строка в тултипе графика: ERR 05: Ошибка драйвера… */
+function formatErrorTooltipLine(errorCode) {
+    if (errorCode === undefined || errorCode === null) return null;
+    const codeLabel = formatErrorCodeLabel(errorCode);
+    if (!codeLabel) return null;
+    const num = Number(errorCode);
+    const isKnown = Number.isFinite(num) && num >= 1 && num <= EQUIPMENT_ERROR_MESSAGES.length;
+    const name = getEquipmentErrorName(errorCode);
+    if (isKnown && name) return `${codeLabel}: ${name}`;
+    return `${codeLabel}: Неизвестная ошибка`;
+}
+
 /** Центр сегмента ошибки в ms. */
 function errorSegmentCenterTs(seg) {
     return (seg.start + seg.end) / 2;
@@ -3515,10 +3527,15 @@ const DeviceMonitorPage = () => {
         const welderSeg = findSegmentAtTs(timelineRows.welder, hoverCursor.ts);
 
         const welderLabel = welderSeg?.value ? welderNameByRfid[welderSeg.value] || null : null;
+        const errorTooltipLine =
+            errorSeg?.value !== undefined && errorSeg?.value !== null
+                ? formatErrorTooltipLine(errorSeg.value)
+                : null;
 
         return {
             selectedRows,
             errorLabel: errorSeg?.label || null,
+            errorTooltipLine,
             welderLabel,
             welderRfid: welderSeg?.value || null,
         };
@@ -4870,6 +4887,11 @@ const DeviceMonitorPage = () => {
                                                                 <span style={{ color: row.color }}>{row.label}: {row.value.toFixed(1)}</span>
                                                             </div>
                                                         ))}
+                                                        {hoverInfo?.errorTooltipLine && (
+                                                            <div className="monitor-hover-tooltip-error">
+                                                                {hoverInfo.errorTooltipLine}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>

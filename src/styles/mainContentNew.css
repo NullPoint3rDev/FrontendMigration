@@ -1907,6 +1907,14 @@
     border-bottom: 1px solid rgba(118, 138, 176, 0.22);
 }
 
+.monitor-hover-tooltip-error {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(118, 138, 176, 0.22);
+    color: rgba(255, 111, 122, 0.95);
+    font-weight: 600;
+}
+
 .monitor-hover-current {
     color: #3ec7ff;
 }
