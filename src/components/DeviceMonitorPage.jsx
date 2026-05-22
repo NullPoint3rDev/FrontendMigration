@@ -114,9 +114,6 @@ const DEFAULT_TELEMETRY_SERIES = TELEMETRY_CHANNELS_CONFIG.reduce((acc, channel)
     return acc;
 }, { mainsVoltageA: [], mainsVoltageB: [], mainsVoltageC: [] });
 
-/** кг на 1 м проволоки (мониторинг: счётчик «Расход проволоки» с момента включения). */
-const DAILY_WIRE_LINEAR_DENSITY_KG_PER_METER = 0.000089;
-const DAILY_WIRE_STORAGE_PREFIX = 'wt2-monitor-daily-wire:';
 const DAILY_ACTIVITY_INITIAL = {
     offMs: 0,
     standbyMs: 0,
@@ -124,66 +121,19 @@ const DAILY_ACTIVITY_INITIAL = {
     weldingMs: 0,
 };
 
-const getDayStartTimestamp = (ts = Date.now()) => {
-    const dayStart = new Date(ts);
-    dayStart.setHours(0, 0, 0, 0);
-    return dayStart.getTime();
-};
+/** Суточные плитки (проволока кг, таймеры): опрос API раз в минуту, без привязки к poll panel-state (~1 с). */
+const DAILY_STATS_REFRESH_MS = 60000;
 
-function dailyWireStorageKey(mac) {
-    const macNorm = String(mac || '').trim().toLowerCase();
-    if (!macNorm || macNorm === 'неизвестный mac') return null;
-    return `${DAILY_WIRE_STORAGE_PREFIX}${macNorm}`;
-}
-
-function loadDailyWireConsumption(mac) {
-    const key = dailyWireStorageKey(mac);
-    if (!key) return null;
-    try {
-        const raw = localStorage.getItem(key);
-        if (!raw) return null;
-        const data = JSON.parse(raw);
-        if (data.dayStart !== getDayStartTimestamp()) return null;
-        return {
-            kg: Math.max(0, Number(data.kg) || 0),
-            lastWireMeters:
-                data.lastWireMeters != null && Number.isFinite(Number(data.lastWireMeters))
-                    ? Number(data.lastWireMeters)
-                    : null,
-        };
-    } catch {
-        return null;
-    }
-}
-
-function persistDailyWireConsumption(mac, dayStart, kg, lastWireMeters) {
-    const key = dailyWireStorageKey(mac);
-    if (!key) return;
-    try {
-        localStorage.setItem(
-            key,
-            JSON.stringify({
-                dayStart,
-                kg: Math.max(0, Number(kg) || 0),
-                lastWireMeters:
-                    lastWireMeters != null && Number.isFinite(lastWireMeters) ? lastWireMeters : null,
-            })
-        );
-    } catch {
-        /* ignore quota / private mode */
-    }
-}
-
-/** Метры проволоки с момента включения (panel-state «Расход проволоки»). */
-function getWireMetersFromPanelState(panelState) {
-    if (!panelState) return null;
-    const wrapped = {
-        ...panelState,
-        properties: flattenPanelState(panelState),
-    };
-    const v = getStateNumberByKeys(wrapped, ['Расход проволоки', 'WireConsumption', 'wireConsumption']);
-    if (v == null || !Number.isFinite(v) || v < 0) return null;
-    return v;
+function applyDailyStatsDto(setDailyActivity, setDailyWireConsumptionKg, dto) {
+    if (!dto) return;
+    setDailyActivity({
+        offMs: Math.max(0, Number(dto.offMs) || 0),
+        standbyMs: Math.max(0, Number(dto.standbyMs) || 0),
+        onMs: Math.max(0, Number(dto.onMs) || 0),
+        weldingMs: Math.max(0, Number(dto.weldingMs) || 0),
+    });
+    const kg = dto.wireConsumptionKg != null ? Number(dto.wireConsumptionKg) : 0;
+    setDailyWireConsumptionKg(Math.max(0, Number.isFinite(kg) ? kg : 0));
 }
 
 const formatMsToClock = (ms) => {
@@ -826,10 +776,7 @@ const DeviceMonitorPage = () => {
     }, [activeTab]);
     const [dailyActivity, setDailyActivity] = useState(DAILY_ACTIVITY_INITIAL);
     const [dailyWireConsumptionKg, setDailyWireConsumptionKg] = useState(0);
-    const dailyActivityRef = useRef(DAILY_ACTIVITY_INITIAL);
-    const dailyWireConsumptionRef = useRef(0);
-    const dailyStatsDayStartRef = useRef(getDayStartTimestamp(Date.now()));
-    const lastDailySampleRef = useRef({ timestamp: null, mode: 'off', wireMeters: null });
+    const dailyStatsIntervalRef = useRef(null);
 
     const [historyError, setHistoryError] = useState(null);
     const [isHistoryMode, setIsHistoryMode] = useState(false);
@@ -1280,10 +1227,29 @@ const DeviceMonitorPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [machineMac]);
 
-    useEffect(() => {
-        initDailyStatsForMachine(Date.now());
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+    const refreshDailyStatsFromServer = useCallback(async () => {
+        if (!machineMac || machineMac === 'Неизвестный MAC') return;
+        try {
+            const dto = await archiveDeviceApi.getArchiveDailyStats(machineMac);
+            applyDailyStatsDto(setDailyActivity, setDailyWireConsumptionKg, dto);
+        } catch (err) {
+            console.warn('[DeviceMonitor] daily-stats:', err?.message || err);
+        }
     }, [machineMac]);
+
+    useEffect(() => {
+        refreshDailyStatsFromServer();
+        if (dailyStatsIntervalRef.current) {
+            clearInterval(dailyStatsIntervalRef.current);
+        }
+        dailyStatsIntervalRef.current = setInterval(refreshDailyStatsFromServer, DAILY_STATS_REFRESH_MS);
+        return () => {
+            if (dailyStatsIntervalRef.current) {
+                clearInterval(dailyStatsIntervalRef.current);
+                dailyStatsIntervalRef.current = null;
+            }
+        };
+    }, [refreshDailyStatsFromServer]);
 
     // Получаем ID аппарата по MAC адресу при загрузке страницы
     useEffect(() => {
@@ -1500,85 +1466,6 @@ const DeviceMonitorPage = () => {
         }
     };
 
-    function resetDailyStats(timestamp = Date.now()) {
-        const dayStart = getDayStartTimestamp(timestamp);
-        dailyActivityRef.current = { ...DAILY_ACTIVITY_INITIAL };
-        dailyWireConsumptionRef.current = 0;
-        dailyStatsDayStartRef.current = dayStart;
-        lastDailySampleRef.current = { timestamp: null, mode: 'off', wireMeters: null };
-        setDailyActivity({ ...DAILY_ACTIVITY_INITIAL });
-        setDailyWireConsumptionKg(0);
-        persistDailyWireConsumption(machineMac, dayStart, 0, null);
-    }
-
-    function initDailyStatsForMachine(timestamp = Date.now()) {
-        const dayStart = getDayStartTimestamp(timestamp);
-        dailyStatsDayStartRef.current = dayStart;
-        dailyActivityRef.current = { ...DAILY_ACTIVITY_INITIAL };
-        setDailyActivity({ ...DAILY_ACTIVITY_INITIAL });
-
-        const stored = loadDailyWireConsumption(machineMac);
-        const kg = stored?.kg ?? 0;
-        dailyWireConsumptionRef.current = kg;
-        setDailyWireConsumptionKg(kg);
-        lastDailySampleRef.current = {
-            timestamp: null,
-            mode: 'off',
-            wireMeters: stored?.lastWireMeters ?? null,
-        };
-        if (!stored) {
-            persistDailyWireConsumption(machineMac, dayStart, 0, null);
-        }
-    }
-
-    function updateDailyStatsFromTelemetry(panelState, timestamp = Date.now()) {
-        const dayStart = getDayStartTimestamp(timestamp);
-        if (dailyStatsDayStartRef.current !== dayStart) {
-            resetDailyStats(timestamp);
-        }
-
-        const mode = panelState ? getMachineActivityModeFromPanelState(panelState) : 'off';
-        const wireMeters = mode === 'welding' ? getWireMetersFromPanelState(panelState) : null;
-
-        const prevSample = lastDailySampleRef.current;
-        if (prevSample.timestamp != null) {
-            const deltaMs = Math.max(0, timestamp - prevSample.timestamp);
-            const nextActivity = { ...dailyActivityRef.current };
-            if (prevSample.mode === 'welding') nextActivity.weldingMs += deltaMs;
-            else if (prevSample.mode === 'standby') nextActivity.standbyMs += deltaMs;
-            else if (prevSample.mode === 'on') nextActivity.onMs += deltaMs;
-            else nextActivity.offMs += deltaMs;
-            dailyActivityRef.current = nextActivity;
-            setDailyActivity(nextActivity);
-
-            if (
-                prevSample.mode === 'welding' &&
-                mode === 'welding' &&
-                prevSample.wireMeters != null &&
-                wireMeters != null
-            ) {
-                let deltaM = wireMeters - prevSample.wireMeters;
-                if (deltaM < 0) {
-                    deltaM = 0;
-                }
-                if (deltaM > 0) {
-                    const nextWire =
-                        dailyWireConsumptionRef.current + deltaM * DAILY_WIRE_LINEAR_DENSITY_KG_PER_METER;
-                    dailyWireConsumptionRef.current = nextWire;
-                    setDailyWireConsumptionKg(nextWire);
-                }
-            }
-        }
-
-        lastDailySampleRef.current = { timestamp, mode, wireMeters };
-        persistDailyWireConsumption(
-            machineMac,
-            dayStart,
-            dailyWireConsumptionRef.current,
-            mode === 'welding' ? wireMeters : prevSample.wireMeters
-        );
-    }
-
     // Функция для опроса состояния устройства (как в archive проекте)
     const startPolling = () => {
         // Останавливаем предыдущий polling если он есть
@@ -1618,7 +1505,6 @@ const DeviceMonitorPage = () => {
 
             if (response && response !== null) {
                 const sampleTs = Date.now();
-                updateDailyStatsFromTelemetry(response, sampleTs);
                 // Обрабатываем данные
                 processStructuredData({
                     mac: machineMac,
@@ -1743,14 +1629,12 @@ const DeviceMonitorPage = () => {
                     ...prev.slice(0, 9)
                 ]);
             } else {
-                updateDailyStatsFromTelemetry(null, Date.now());
                 // Нет данных - просто обновляем состояние
                 updateConnectionStatus(false, false);
                 setError('Устройство не найдено');
             }
         } catch (err) {
             console.error('Ошибка получения состояния устройства:', err);
-            updateDailyStatsFromTelemetry(null, Date.now());
             // При ошибке - нет данных
             updateConnectionStatus(false, false);
             setError('Ошибка подключения: ' + err.message);

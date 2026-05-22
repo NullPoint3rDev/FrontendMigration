@@ -141,6 +141,23 @@ export async function getArchivePanelState(mac) {
     }
 }
 
+/** Суточная статистика мониторинга из БД: проволока (кг), таймеры off/standby/on/welding. */
+export async function getArchiveDailyStats(mac, date) {
+    const params = new URLSearchParams();
+    params.append('mac', mac);
+    if (date) {
+        params.append('date', date);
+    }
+    const res = await fetch(`${API_URL}/daily-stats?${params.toString()}`, {
+        headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `HTTP ${res.status}`);
+    }
+    return res.json();
+}
+
 // История телеметрии (epoch millis): ток/напряжение/статус/ошибка/RFID за период (<= 24ч)
 export async function getArchiveTelemetryHistory(mac, fromMs, toMs) {
     /** API и Instant.ofEpochMilli ожидают целые ms; из JS после деления часто приходят float (.021 и т.д.) → 500 на сервере. */
