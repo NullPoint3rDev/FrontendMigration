@@ -1,0 +1,96 @@
+.bottom-panel--welders {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.monitor-welders-tab {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    gap: 6px;
+    width: 100%;
+}
+
+.monitor-welders-tab__header {
+    flex-shrink: 0;
+    padding: 0 2px;
+}
+
+.monitor-welders-tab__header .welders-stats-tile {
+    margin-left: auto;
+}
+
+.monitor-welders-tab__delete-btn {
+    margin-left: 0 !important;
+}
+
+.monitor-welders-btn-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.monitor-welders-tab__table-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid rgba(72, 75, 94, 0.45);
+    border-radius: 3px;
+    background: rgba(18, 37, 54, 0.35);
+}
+
+.monitor-welders-tab__loading,
+.monitor-welders-tab__empty {
+    padding: 16px;
+    text-align: center;
+    color: rgba(188, 183, 197, 0.65);
+    font-size: 13px;
+}
+
+.monitor-welders-tab__error {
+    color: #ff8a96;
+    font-size: 12px;
+    padding: 0 4px;
+}
+
+.monitor-welders-tab .welders-table tbody tr.selected td,
+.monitor-welders-tab .welders-table tbody tr.selected .welder-name-cell,
+.monitor-welders-tab .welders-table tbody tr.selected .status-badge {
+    color: #0d0d0d !important;
+}
+
+.monitor-welders-tab .welders-table td.welding-methods-cell {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    line-height: 1.35 !important;
+    max-width: 180px;
+}
+
+.monitor-welders-tab .delete-btn {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 6px 42px !important;
+    background: #122536 !important;
+    border: none !important;
+    border-radius: 3px !important;
+    color: #ffffff !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+}
+
+.monitor-welders-tab .delete-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.monitor-welders-tab .delete-btn span:first-child {
+    font-size: 18px;
+    font-weight: 300;
+}

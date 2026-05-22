@@ -22,6 +22,8 @@ import AddEquipmentModal from './AddEquipmentModal';
 import { RiRfidFill } from 'react-icons/ri';
 import { FaBell, FaCompress, FaExpand } from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
+import MonitorWeldersTab from './MonitorWeldersTab';
+import '../styles/monitorWeldersTab.css';
 
 // Названия ошибок по коду 1–23 (синхронно с EquipmentErrorMessages и протоколом аппарата: 1–10, 17–21)
 const EQUIPMENT_ERROR_MESSAGES = [
@@ -4244,8 +4246,8 @@ const DeviceMonitorPage = () => {
                             </button>
                             <button
                                 type="button"
-                                className="monitor-page-top-tab monitor-page-top-tab--placeholder"
-                                disabled
+                                className={`monitor-page-top-tab ${activeTab === 'welders' ? 'active' : ''}`}
+                                onClick={() => setActiveTab('welders')}
                             >
                                 Сварщики
                             </button>
@@ -4529,507 +4531,519 @@ const DeviceMonitorPage = () => {
                 </div>
             </div>
 
-            <section className="bottom-panel">
-                <div className="bottom-panel__body">
-                    <div className="telemetry-controls">
+            <section className={`bottom-panel${activeTab === 'welders' ? ' bottom-panel--welders' : ''}`}>
+                {activeTab === 'welders' ? (
+                    <MonitorWeldersTab
+                        machineId={machineId}
+                        organizationUnit={organizationUnit}
+                        onlineWelderId={
+                            rfidLookup.status === 'known' && rfidLookup.welder?.id != null
+                                ? rfidLookup.welder.id
+                                : null
+                        }
+                    />
+                ) : (
+                    <div className="bottom-panel__body">
+                        <div className="telemetry-controls">
 
-                        {isTelemetryListExpanded && (
-                            <>
-                                <div className="machine-info-row" style={{ marginBottom: 10, justifyContent: 'center' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <button type="button" className="machine-info-icon-tile" onClick={handlePrevDay} title="Предыдущий день">
-                                            <span className="machine-info-icon">‹</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="machine-info-text"
-                                            onClick={handleOpenCalendar}
-                                            style={{
-                                                background: 'transparent',
-                                                border: 'none',
-                                                padding: 0,
-                                                cursor: 'pointer',
-                                                textDecoration: 'none',
-                                            }}
-                                            title="Выбрать дату"
-                                        >
-                                            <span style={{ textDecoration: 'underline' }}>{graphCalendarLabelParts.dateStr}</span>
-                                            {graphCalendarLabelParts.weekday ? (
-                                                <span style={{ marginLeft: '0.35em', opacity: 0.92 }}>{graphCalendarLabelParts.weekday}</span>
-                                            ) : null}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="machine-info-icon-tile"
-                                            onClick={handleNextDay}
-                                            title={isNextDayDisabled ? 'Будущие даты недоступны' : 'Следующий день'}
-                                            disabled={isNextDayDisabled}
-                                            style={isNextDayDisabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
-                                        >
-                                            <span className="machine-info-icon">›</span>
-                                        </button>
-                                        <input
-                                            ref={datePickerInputRef}
-                                            type="date"
-                                            value={selectedGraphDate || ''}
-                                            onChange={(e) => setSelectedGraphDate(e.target.value)}
-                                            style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 1, height: 1 }}
-                                            aria-hidden
-                                            tabIndex={-1}
-                                        />
+                            {isTelemetryListExpanded && (
+                                <>
+                                    <div className="machine-info-row" style={{ marginBottom: 10, justifyContent: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <button type="button" className="machine-info-icon-tile" onClick={handlePrevDay} title="Предыдущий день">
+                                                <span className="machine-info-icon">‹</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="machine-info-text"
+                                                onClick={handleOpenCalendar}
+                                                style={{
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    padding: 0,
+                                                    cursor: 'pointer',
+                                                    textDecoration: 'none',
+                                                }}
+                                                title="Выбрать дату"
+                                            >
+                                                <span style={{ textDecoration: 'underline' }}>{graphCalendarLabelParts.dateStr}</span>
+                                                {graphCalendarLabelParts.weekday ? (
+                                                    <span style={{ marginLeft: '0.35em', opacity: 0.92 }}>{graphCalendarLabelParts.weekday}</span>
+                                                ) : null}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="machine-info-icon-tile"
+                                                onClick={handleNextDay}
+                                                title={isNextDayDisabled ? 'Будущие даты недоступны' : 'Следующий день'}
+                                                disabled={isNextDayDisabled}
+                                                style={isNextDayDisabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+                                            >
+                                                <span className="machine-info-icon">›</span>
+                                            </button>
+                                            <input
+                                                ref={datePickerInputRef}
+                                                type="date"
+                                                value={selectedGraphDate || ''}
+                                                onChange={(e) => setSelectedGraphDate(e.target.value)}
+                                                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 1, height: 1 }}
+                                                aria-hidden
+                                                tabIndex={-1}
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
-                                    {activeTab === 'graphs' && telemetryChannels.map((channel) => (
-                                        <div
-                                            key={channel.key}
-                                            className={`telemetry-item ${channel.active ? 'active' : ''}${channel.key === 'mainsVoltage' ? ' telemetry-item--mains' : ''}${channel.graphPickBlocked ? ' telemetry-item--graph-pool-full' : ''}`}
-                                        >
-                                            <span className="telemetry-label">{channel.label}</span>
-                                            <div className="telemetry-tiles">
-                                                {channel.key === 'mainsVoltage' ? (
-                                                    MAINS_VOLTAGE_PHASES.map((phase) => (
+                                    <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
+                                        {activeTab === 'graphs' && telemetryChannels.map((channel) => (
+                                            <div
+                                                key={channel.key}
+                                                className={`telemetry-item ${channel.active ? 'active' : ''}${channel.key === 'mainsVoltage' ? ' telemetry-item--mains' : ''}${channel.graphPickBlocked ? ' telemetry-item--graph-pool-full' : ''}`}
+                                            >
+                                                <span className="telemetry-label">{channel.label}</span>
+                                                <div className="telemetry-tiles">
+                                                    {channel.key === 'mainsVoltage' ? (
+                                                        MAINS_VOLTAGE_PHASES.map((phase) => (
+                                                            <button
+                                                                key={`mains_phase_${phase}`}
+                                                                type="button"
+                                                                className={`telemetry-tile ${mainsVoltagePhases.includes(phase) ? 'active' : ''}`}
+                                                                style={{ color: mainsVoltagePhases.includes(phase) ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                                                onClick={() => handleMainsVoltagePhaseToggle(phase)}
+                                                            >
+                                                                <span className="tile-number">{phase}</span>
+                                                            </button>
+                                                        ))
+                                                    ) : (
                                                         <button
-                                                            key={`mains_phase_${phase}`}
                                                             type="button"
-                                                            className={`telemetry-tile ${mainsVoltagePhases.includes(phase) ? 'active' : ''}`}
-                                                            style={{ color: mainsVoltagePhases.includes(phase) ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
-                                                            onClick={() => handleMainsVoltagePhaseToggle(phase)}
+                                                            className={`telemetry-tile ${channel.active ? 'active' : ''}`}
+                                                            style={{ color: channel.active ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                                            disabled={channel.graphPickBlocked}
+                                                            title={
+                                                                channel.graphPickBlocked
+                                                                    ? 'На графике уже два параметра. Снимите выбор с одного, чтобы добавить этот.'
+                                                                    : channel.active
+                                                                        ? 'Снять с графика'
+                                                                        : 'Показать на графике'
+                                                            }
+                                                            onClick={() => handleTelemetryTileClick(channel.key)}
                                                         >
-                                                            <span className="tile-number">{phase}</span>
-                                                        </button>
-                                                    ))
-                                                ) : (
-                                                    <button
-                                                        type="button"
-                                                        className={`telemetry-tile ${channel.active ? 'active' : ''}`}
-                                                        style={{ color: channel.active ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
-                                                        disabled={channel.graphPickBlocked}
-                                                        title={
-                                                            channel.graphPickBlocked
-                                                                ? 'На графике уже два параметра. Снимите выбор с одного, чтобы добавить этот.'
-                                                                : channel.active
-                                                                    ? 'Снять с графика'
-                                                                    : 'Показать на графике'
-                                                        }
-                                                        onClick={() => handleTelemetryTileClick(channel.key)}
-                                                    >
                                                         <span className="telemetry-tile-check" aria-hidden>
                                                             ✓
                                                         </span>
-                                                    </button>
-                                                )}
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                    {activeTab === 'info' && (
-                                        <div className="info-content info-content-placeholder">
-                                        </div>
-                                    )}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                    {activeTab === 'info' && (
-                        <div className="info-tiles-container">
-                            <div className="info-tile">
-                                <div className="info-tile-row info-tile-row-editable">
-                                    <span className="info-tile-label">Ответственное лицо</span>
-                                    <span className="info-tile-value"></span>
-                                    <span className="info-tile-edit" aria-hidden>✎</span>
-                                </div>
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">Серийный номер ИП</span>
-                                    <span className="info-tile-value"></span>
-                                </div>
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">Инвентарный номер</span>
-                                    <span className="info-tile-value"></span>
-                                </div>
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">Дата ввода в эксплуатацию</span>
-                                    <span className="info-tile-value"></span>
-                                </div>
-                                <button type="button" className="info-tile-btn">Обновление ПО ИП</button>
-                            </div>
-                            <div className="info-tile">
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">МАС адрес модуля WT</span>
-                                    <span className="info-tile-value">{machineMac || '1223 2323 2356 12'}</span>
-                                </div>
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">Дата выпуска WT</span>
-                                    <span className="info-tile-value"></span>
-                                </div>
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">Серийный номер</span>
-                                    <span className="info-tile-value"></span>
-                                </div>
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">Версия ПО модуля WT</span>
-                                    <span className="info-tile-value"></span>
-                                </div>
-                                <button type="button" className="info-tile-btn">Обновление ПО WT</button>
-                            </div>
-                            <div className="info-tile">
-                                <div className="info-tile-status-row">
-                                    <span className="info-tile-label">Система контроля газа</span>
-                                    <span className="info-tile-badge info-tile-badge-active">Неактивно</span>
-                                </div>
-                                <div className="info-tile-status-row">
-                                    <span className="info-tile-label">RFID</span>
-                                    <span className="info-tile-badge info-tile-badge-inactive">Активно</span>
-                                </div>
-                                <div className="info-tile-status-row">
-                                    <span className="info-tile-label">БВО</span>
-                                    <span className="info-tile-badge info-tile-badge-active">Активно</span>
-                                </div>
-                                <div className="info-tile-row info-tile-row-editable">
-                                    <span className="info-tile-value"></span>
-                                    <span className="info-tile-edit" aria-hidden>✎</span>
-                                </div>
-                            </div>
-                            <div className="info-tile info-tile-software">
-                                <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
-                                <div className="info-tile-row"><span className="info-tile-label">Версия ПО Лицовой платы</span><span className="info-tile-value"></span></div>
-                                <div className="info-tile-row"><span className="info-tile-label">Версия ПО БВО</span><span className="info-tile-value"></span></div>
-                                <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
-                                <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
-                                <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
-                            </div>
-                            <div className="info-tile">
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">Дата последнего ТО</span>
-                                    <span className="info-tile-value"></span>
-                                </div>
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">ФИО проводившего ТО</span>
-                                    <span className="info-tile-value"></span>
-                                </div>
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">Пропуск проводившего ТО</span>
-                                    <span className="info-tile-value"></span>
-                                </div>
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">Время до планового ремонта</span>
-                                    <span className="info-tile-value"></span>
-                                </div>
-                            </div>
-                            <div className="info-tile">
-                                <div className="info-tile-row info-tile-row-editable">
-                                    <span className="info-tile-label">Наработка между ТО</span>
-                                    <span className="info-tile-value"></span>
-                                    <span className="info-tile-edit" aria-hidden>✎</span>
-                                </div>
-                                <div className="info-tile-row info-tile-row-editable">
-                                    <span className="info-tile-label">Время между ТО</span>
-                                    <span className="info-tile-value"></span>
-                                    <span className="info-tile-edit" aria-hidden>✎</span>
-                                </div>
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">Наработка до ТО</span>
-                                    <span className="info-tile-value"></span>
-                                </div>
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">Время до ТО</span>
-                                    <span className="info-tile-value"></span>
-                                </div>
-                                <button type="button" className="info-tile-btn">История ТО ИП</button>
-                            </div>
-                            <div className="info-tile">
-                                <div className="info-tile-row">
-                                    <span className="info-tile-label">RFID код</span>
-                                    <span className="info-tile-value">{getRfidCode() || '—'}</span>
-                                </div>
-                            </div>
+                                        ))}
+                                        {activeTab === 'info' && (
+                                            <div className="info-content info-content-placeholder">
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
                         </div>
-                    )}
-                    {activeTab === 'graphs' && (
-                        <div className="chart-stack">
-                            <div className="chart-card large">
-                                <div
-                                    className="chart-wrapper"
-                                    ref={chartWrapperRef}
-                                    onMouseMove={handleSharedHoverMove}
-                                    onMouseLeave={handleSharedHoverLeave}
-                                >
-                                    <div className="monitor-overlay-ruler" ref={timelineRulerRef}>
-                                        <div className="monitor-overlay-ruler-scale">
-                                            {Array.from({ length: 9 }, (_, idx) => {
-                                                const ratio = idx / 8;
-                                                const stamp = chartBounds.dayStart + ratio * (chartBounds.dayEnd - chartBounds.dayStart);
-                                                return (
-                                                    <span key={`tick-${idx}`} className="monitor-overlay-ruler-tick-static">
+                        {activeTab === 'info' && (
+                            <div className="info-tiles-container">
+                                <div className="info-tile">
+                                    <div className="info-tile-row info-tile-row-editable">
+                                        <span className="info-tile-label">Ответственное лицо</span>
+                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-edit" aria-hidden>✎</span>
+                                    </div>
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">Серийный номер ИП</span>
+                                        <span className="info-tile-value"></span>
+                                    </div>
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">Инвентарный номер</span>
+                                        <span className="info-tile-value"></span>
+                                    </div>
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">Дата ввода в эксплуатацию</span>
+                                        <span className="info-tile-value"></span>
+                                    </div>
+                                    <button type="button" className="info-tile-btn">Обновление ПО ИП</button>
+                                </div>
+                                <div className="info-tile">
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">МАС адрес модуля WT</span>
+                                        <span className="info-tile-value">{machineMac || '1223 2323 2356 12'}</span>
+                                    </div>
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">Дата выпуска WT</span>
+                                        <span className="info-tile-value"></span>
+                                    </div>
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">Серийный номер</span>
+                                        <span className="info-tile-value"></span>
+                                    </div>
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">Версия ПО модуля WT</span>
+                                        <span className="info-tile-value"></span>
+                                    </div>
+                                    <button type="button" className="info-tile-btn">Обновление ПО WT</button>
+                                </div>
+                                <div className="info-tile">
+                                    <div className="info-tile-status-row">
+                                        <span className="info-tile-label">Система контроля газа</span>
+                                        <span className="info-tile-badge info-tile-badge-active">Неактивно</span>
+                                    </div>
+                                    <div className="info-tile-status-row">
+                                        <span className="info-tile-label">RFID</span>
+                                        <span className="info-tile-badge info-tile-badge-inactive">Активно</span>
+                                    </div>
+                                    <div className="info-tile-status-row">
+                                        <span className="info-tile-label">БВО</span>
+                                        <span className="info-tile-badge info-tile-badge-active">Активно</span>
+                                    </div>
+                                    <div className="info-tile-row info-tile-row-editable">
+                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-edit" aria-hidden>✎</span>
+                                    </div>
+                                </div>
+                                <div className="info-tile info-tile-software">
+                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
+                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО Лицовой платы</span><span className="info-tile-value"></span></div>
+                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО БВО</span><span className="info-tile-value"></span></div>
+                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
+                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
+                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
+                                </div>
+                                <div className="info-tile">
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">Дата последнего ТО</span>
+                                        <span className="info-tile-value"></span>
+                                    </div>
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">ФИО проводившего ТО</span>
+                                        <span className="info-tile-value"></span>
+                                    </div>
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">Пропуск проводившего ТО</span>
+                                        <span className="info-tile-value"></span>
+                                    </div>
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">Время до планового ремонта</span>
+                                        <span className="info-tile-value"></span>
+                                    </div>
+                                </div>
+                                <div className="info-tile">
+                                    <div className="info-tile-row info-tile-row-editable">
+                                        <span className="info-tile-label">Наработка между ТО</span>
+                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-edit" aria-hidden>✎</span>
+                                    </div>
+                                    <div className="info-tile-row info-tile-row-editable">
+                                        <span className="info-tile-label">Время между ТО</span>
+                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-edit" aria-hidden>✎</span>
+                                    </div>
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">Наработка до ТО</span>
+                                        <span className="info-tile-value"></span>
+                                    </div>
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">Время до ТО</span>
+                                        <span className="info-tile-value"></span>
+                                    </div>
+                                    <button type="button" className="info-tile-btn">История ТО ИП</button>
+                                </div>
+                                <div className="info-tile">
+                                    <div className="info-tile-row">
+                                        <span className="info-tile-label">RFID код</span>
+                                        <span className="info-tile-value">{getRfidCode() || '—'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {activeTab === 'graphs' && (
+                            <div className="chart-stack">
+                                <div className="chart-card large">
+                                    <div
+                                        className="chart-wrapper"
+                                        ref={chartWrapperRef}
+                                        onMouseMove={handleSharedHoverMove}
+                                        onMouseLeave={handleSharedHoverLeave}
+                                    >
+                                        <div className="monitor-overlay-ruler" ref={timelineRulerRef}>
+                                            <div className="monitor-overlay-ruler-scale">
+                                                {Array.from({ length: 9 }, (_, idx) => {
+                                                    const ratio = idx / 8;
+                                                    const stamp = chartBounds.dayStart + ratio * (chartBounds.dayEnd - chartBounds.dayStart);
+                                                    return (
+                                                        <span key={`tick-${idx}`} className="monitor-overlay-ruler-tick-static">
                                                         {new Date(stamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                                                     </span>
-                                                );
-                                            })}
-                                        </div>
-                                        <div className="monitor-overlay-ruler-track">
-                                            <div className="monitor-overlay-ruler-line" />
-                                            {graphUsesServerData && draggingPin === 'start' && pinDragPreview && (
-                                                <span
-                                                    className="monitor-time-pin-hint"
-                                                    style={{ left: `${Math.max(0, Math.min(100, toDayPercent(rulerPinBounds.start)))}%` }}
-                                                >
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="monitor-overlay-ruler-track">
+                                                <div className="monitor-overlay-ruler-line" />
+                                                {graphUsesServerData && draggingPin === 'start' && pinDragPreview && (
+                                                    <span
+                                                        className="monitor-time-pin-hint"
+                                                        style={{ left: `${Math.max(0, Math.min(100, toDayPercent(rulerPinBounds.start)))}%` }}
+                                                    >
                                                     {formatHistoryPinHintTime(rulerPinBounds.start)}
                                                 </span>
-                                            )}
-                                            {graphUsesServerData && draggingPin === 'end' && pinDragPreview && (
-                                                <span
-                                                    className="monitor-time-pin-hint"
-                                                    style={{ left: `${Math.max(0, Math.min(100, toDayPercent(rulerPinBounds.end)))}%` }}
-                                                >
+                                                )}
+                                                {graphUsesServerData && draggingPin === 'end' && pinDragPreview && (
+                                                    <span
+                                                        className="monitor-time-pin-hint"
+                                                        style={{ left: `${Math.max(0, Math.min(100, toDayPercent(rulerPinBounds.end)))}%` }}
+                                                    >
                                                     {formatHistoryPinHintTime(rulerPinBounds.end)}
                                                 </span>
-                                            )}
-                                            <button
-                                                type="button"
-                                                className="monitor-time-pin"
-                                                style={{ left: `${Math.max(0, Math.min(100, toDayPercent(rulerPinBounds.start)))}%` }}
-                                                onMouseDown={() => handleTimelinePinMouseDown('start')}
-                                                title="Начало интервала"
-                                            />
-                                            <button
-                                                type="button"
-                                                className="monitor-time-pin"
-                                                style={{ left: `${Math.max(0, Math.min(100, toDayPercent(rulerPinBounds.end)))}%` }}
-                                                onMouseDown={() => handleTimelinePinMouseDown('end')}
-                                                title="Конец интервала"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div
-                                        className={`chart-pan-surface${graphUsesServerData ? ' chart-pan-surface--enabled' : ''}${chartPanActive ? ' chart-pan-surface--grabbing' : ''}`}
-                                        onMouseDown={handleChartPanMouseDown}
-                                    >
-                                        <div className="chart-monitor-stack">
-                                            <div
-                                                ref={chartCanvasRef}
-                                                className={`chart-canvas${chartPlotCursorHidden ? ' chart-canvas--plot-cursor-none' : ''}`}
-                                            >
-                                                <Line
-                                                    data={topChartData}
-                                                    options={telemetryOverlayChartOptions}
-                                                    ref={(chart) => {
-                                                        if (chart && chart.canvas) {
-                                                            chart.canvas.id = 'current-chart';
-                                                            currentChartInstanceRef.current = chart;
-                                                            syncPlotAreaFromChart();
-                                                        }
-                                                    }}
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    className="monitor-time-pin"
+                                                    style={{ left: `${Math.max(0, Math.min(100, toDayPercent(rulerPinBounds.start)))}%` }}
+                                                    onMouseDown={() => handleTimelinePinMouseDown('start')}
+                                                    title="Начало интервала"
                                                 />
-                                                {plotDot.visible && !chartPanActive && (
-                                                    <span
-                                                        className="monitor-plot-cursor-dot"
-                                                        style={{
-                                                            left: `${plotDot.leftPx}px`,
-                                                            top: `${plotDot.topPx}px`,
-                                                        }}
-                                                        aria-hidden
-                                                    />
-                                                )}
-                                                {hoverCursor.active && !chartPanActive && plotArea.heightPx > 0 && (
-                                                    <div
-                                                        className="monitor-hover-crosshair monitor-hover-crosshair--in-chart"
-                                                        style={{
-                                                            left: `${(plotArea.chartLeftPx ?? plotArea.leftPx) + (hoverCursor.percent / 100) * plotArea.widthPx}px`,
-                                                            top: `${plotArea.topPx}px`,
-                                                            height: `${plotArea.heightPx}px`,
-                                                            bottom: 'auto',
-                                                        }}
-                                                    />
-                                                )}
-                                                {hoverCursor.active && !chartPanActive && (hoverCursorTimeLabel || hoverInfo) && (
-                                                    <div
-                                                        className="monitor-hover-tooltip"
-                                                        style={{
-                                                            left: `${hoverCursor.xPx}px`,
-                                                            transform: hoverCursor.flip ? 'translateX(calc(-100% - 2px))' : 'translateX(2px)'
-                                                        }}
-                                                    >
-                                                        {hoverCursorTimeLabel && (
-                                                            <div className="monitor-hover-tooltip-time">{hoverCursorTimeLabel}</div>
-                                                        )}
-                                                        {hoverInfo?.selectedRows?.map((row) => (
-                                                            <div key={row.key}>
-                                                                <span style={{ color: row.color }}>{row.label}: {row.value.toFixed(1)}</span>
-                                                            </div>
-                                                        ))}
-                                                        {hoverInfo?.errorTooltipLine && (
-                                                            <div className="monitor-hover-tooltip-error">
-                                                                {hoverInfo.errorTooltipLine}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                <button
+                                                    type="button"
+                                                    className="monitor-time-pin"
+                                                    style={{ left: `${Math.max(0, Math.min(100, toDayPercent(rulerPinBounds.end)))}%` }}
+                                                    onMouseDown={() => handleTimelinePinMouseDown('end')}
+                                                    title="Конец интервала"
+                                                />
                                             </div>
-                                            <div
-                                                className="monitor-lanes"
-                                                style={{
-                                                    position: 'relative',
-                                                    paddingLeft: `${plotArea.leftPx}px`,
-                                                    paddingRight: `${plotArea.rightPx}px`,
-                                                }}
-                                            >
-                                                <div className="monitor-lane-row">
-                                                    <span className="monitor-lane-label">Состояние</span>
-                                                    <div className="monitor-lane-track monitor-lane-track--state">
-                                                        {timelineRows.offline.map((seg, idx) => (
-                                                            <span
-                                                                key={`state-offline-${idx}`}
-                                                                className="monitor-lane-segment monitor-lane-segment-offline"
-                                                                style={{
-                                                                    left: `${toPercent(seg.start)}%`,
-                                                                    width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
-                                                                }}
-                                                            />
-                                                        ))}
-                                                        {timelineRows.online.map((seg, idx) => (
-                                                            <span
-                                                                key={`state-online-${idx}`}
-                                                                className="monitor-lane-segment monitor-lane-segment-online"
-                                                                style={{
-                                                                    left: `${toPercent(seg.start)}%`,
-                                                                    width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
-                                                                }}
-                                                            />
-                                                        ))}
-                                                        {timelineRows.welding.map((seg, idx) => (
-                                                            <span
-                                                                key={`state-weld-${idx}`}
-                                                                className="monitor-lane-segment monitor-lane-segment-welding"
-                                                                style={{
-                                                                    left: `${toPercent(seg.start)}%`,
-                                                                    width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
-                                                                }}
-                                                            />
-                                                        ))}
-                                                    </div>
+                                        </div>
+                                        <div
+                                            className={`chart-pan-surface${graphUsesServerData ? ' chart-pan-surface--enabled' : ''}${chartPanActive ? ' chart-pan-surface--grabbing' : ''}`}
+                                            onMouseDown={handleChartPanMouseDown}
+                                        >
+                                            <div className="chart-monitor-stack">
+                                                <div
+                                                    ref={chartCanvasRef}
+                                                    className={`chart-canvas${chartPlotCursorHidden ? ' chart-canvas--plot-cursor-none' : ''}`}
+                                                >
+                                                    <Line
+                                                        data={topChartData}
+                                                        options={telemetryOverlayChartOptions}
+                                                        ref={(chart) => {
+                                                            if (chart && chart.canvas) {
+                                                                chart.canvas.id = 'current-chart';
+                                                                currentChartInstanceRef.current = chart;
+                                                                syncPlotAreaFromChart();
+                                                            }
+                                                        }}
+                                                    />
+                                                    {plotDot.visible && !chartPanActive && (
+                                                        <span
+                                                            className="monitor-plot-cursor-dot"
+                                                            style={{
+                                                                left: `${plotDot.leftPx}px`,
+                                                                top: `${plotDot.topPx}px`,
+                                                            }}
+                                                            aria-hidden
+                                                        />
+                                                    )}
+                                                    {hoverCursor.active && !chartPanActive && plotArea.heightPx > 0 && (
+                                                        <div
+                                                            className="monitor-hover-crosshair monitor-hover-crosshair--in-chart"
+                                                            style={{
+                                                                left: `${(plotArea.chartLeftPx ?? plotArea.leftPx) + (hoverCursor.percent / 100) * plotArea.widthPx}px`,
+                                                                top: `${plotArea.topPx}px`,
+                                                                height: `${plotArea.heightPx}px`,
+                                                                bottom: 'auto',
+                                                            }}
+                                                        />
+                                                    )}
+                                                    {hoverCursor.active && !chartPanActive && (hoverCursorTimeLabel || hoverInfo) && (
+                                                        <div
+                                                            className="monitor-hover-tooltip"
+                                                            style={{
+                                                                left: `${hoverCursor.xPx}px`,
+                                                                transform: hoverCursor.flip ? 'translateX(calc(-100% - 2px))' : 'translateX(2px)'
+                                                            }}
+                                                        >
+                                                            {hoverCursorTimeLabel && (
+                                                                <div className="monitor-hover-tooltip-time">{hoverCursorTimeLabel}</div>
+                                                            )}
+                                                            {hoverInfo?.selectedRows?.map((row) => (
+                                                                <div key={row.key}>
+                                                                    <span style={{ color: row.color }}>{row.label}: {row.value.toFixed(1)}</span>
+                                                                </div>
+                                                            ))}
+                                                            {hoverInfo?.errorTooltipLine && (
+                                                                <div className="monitor-hover-tooltip-error">
+                                                                    {hoverInfo.errorTooltipLine}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="monitor-lane-row">
-                                                    <span className="monitor-lane-label">Ошибки</span>
-                                                    <div className="monitor-lane-track" ref={errorsLaneTrackRef}>
-                                                        {timelineRows.errors.map((seg, idx) => {
-                                                            const width = Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8);
-                                                            return (
+                                                <div
+                                                    className="monitor-lanes"
+                                                    style={{
+                                                        position: 'relative',
+                                                        paddingLeft: `${plotArea.leftPx}px`,
+                                                        paddingRight: `${plotArea.rightPx}px`,
+                                                    }}
+                                                >
+                                                    <div className="monitor-lane-row">
+                                                        <span className="monitor-lane-label">Состояние</span>
+                                                        <div className="monitor-lane-track monitor-lane-track--state">
+                                                            {timelineRows.offline.map((seg, idx) => (
                                                                 <span
-                                                                    key={`error-${idx}`}
-                                                                    className="monitor-lane-segment monitor-lane-segment-error"
-                                                                    style={{ left: `${toPercent(seg.start)}%`, width: `${width}%` }}
-                                                                    title={seg.label}
-                                                                >
+                                                                    key={`state-offline-${idx}`}
+                                                                    className="monitor-lane-segment monitor-lane-segment-offline"
+                                                                    style={{
+                                                                        left: `${toPercent(seg.start)}%`,
+                                                                        width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
+                                                                    }}
+                                                                />
+                                                            ))}
+                                                            {timelineRows.online.map((seg, idx) => (
+                                                                <span
+                                                                    key={`state-online-${idx}`}
+                                                                    className="monitor-lane-segment monitor-lane-segment-online"
+                                                                    style={{
+                                                                        left: `${toPercent(seg.start)}%`,
+                                                                        width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
+                                                                    }}
+                                                                />
+                                                            ))}
+                                                            {timelineRows.welding.map((seg, idx) => (
+                                                                <span
+                                                                    key={`state-weld-${idx}`}
+                                                                    className="monitor-lane-segment monitor-lane-segment-welding"
+                                                                    style={{
+                                                                        left: `${toPercent(seg.start)}%`,
+                                                                        width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
+                                                                    }}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div className="monitor-lane-row">
+                                                        <span className="monitor-lane-label">Ошибки</span>
+                                                        <div className="monitor-lane-track" ref={errorsLaneTrackRef}>
+                                                            {timelineRows.errors.map((seg, idx) => {
+                                                                const width = Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8);
+                                                                return (
+                                                                    <span
+                                                                        key={`error-${idx}`}
+                                                                        className="monitor-lane-segment monitor-lane-segment-error"
+                                                                        style={{ left: `${toPercent(seg.start)}%`, width: `${width}%` }}
+                                                                        title={seg.label}
+                                                                    >
                                                             {width > 6 ? seg.label : ''}
                                                         </span>
-                                                            );
-                                                        })}
-                                                        {hoverCursor.active && hoverInfo?.errorLabel && (
-                                                            <div className="monitor-lane-hover-badge monitor-lane-hover-badge-error" style={{ left: `${hoverCursor.percent}%` }}>
-                                                                {hoverInfo.errorLabel}
-                                                            </div>
-                                                        )}
+                                                                );
+                                                            })}
+                                                            {hoverCursor.active && hoverInfo?.errorLabel && (
+                                                                <div className="monitor-lane-hover-badge monitor-lane-hover-badge-error" style={{ left: `${hoverCursor.percent}%` }}>
+                                                                    {hoverInfo.errorLabel}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <div className="monitor-lane-row">
-                                                    <span className="monitor-lane-label">Сварщик</span>
-                                                    <div className="monitor-lane-track">
-                                                        {timelineRows.welder.map((seg, idx) => (
-                                                            <span
-                                                                key={`welder-${idx}`}
-                                                                className="monitor-lane-segment monitor-lane-segment-welder"
-                                                                style={{
-                                                                    left: `${toPercent(seg.start)}%`,
-                                                                    width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
-                                                                }}
-                                                                title={seg.value}
-                                                            />
-                                                        ))}
-                                                        {hoverCursor.active && hoverInfo?.welderLabel && (
-                                                            <div className="monitor-lane-hover-badge monitor-lane-hover-badge-welder" style={{ left: `${hoverCursor.percent}%` }}>
-                                                                {hoverInfo.welderLabel}
-                                                            </div>
-                                                        )}
+                                                    <div className="monitor-lane-row">
+                                                        <span className="monitor-lane-label">Сварщик</span>
+                                                        <div className="monitor-lane-track">
+                                                            {timelineRows.welder.map((seg, idx) => (
+                                                                <span
+                                                                    key={`welder-${idx}`}
+                                                                    className="monitor-lane-segment monitor-lane-segment-welder"
+                                                                    style={{
+                                                                        left: `${toPercent(seg.start)}%`,
+                                                                        width: `${Math.max(toPercent(seg.end) - toPercent(seg.start), 0.8)}%`
+                                                                    }}
+                                                                    title={seg.value}
+                                                                />
+                                                            ))}
+                                                            {hoverCursor.active && hoverInfo?.welderLabel && (
+                                                                <div className="monitor-lane-hover-badge monitor-lane-hover-badge-welder" style={{ left: `${hoverCursor.percent}%` }}>
+                                                                    {hoverInfo.welderLabel}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                {hoverCursor.active && !chartPanActive && (
-                                                    <div
-                                                        className="monitor-lanes-crosshair-shell"
-                                                        style={{
-                                                            position: 'absolute',
-                                                            top: 0,
-                                                            bottom: 0,
-                                                            left: `${plotArea.leftPx}px`,
-                                                            right: `${plotArea.rightPx}px`,
-                                                            pointerEvents: 'none',
-                                                            zIndex: 4,
-                                                        }}
-                                                    >
+                                                    {hoverCursor.active && !chartPanActive && (
                                                         <div
-                                                            className="monitor-hover-crosshair monitor-hover-crosshair--in-lanes"
-                                                            style={{ left: `${hoverCursor.percent}%` }}
-                                                        />
-                                                    </div>
-                                                )}
+                                                            className="monitor-lanes-crosshair-shell"
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: 0,
+                                                                bottom: 0,
+                                                                left: `${plotArea.leftPx}px`,
+                                                                right: `${plotArea.rightPx}px`,
+                                                                pointerEvents: 'none',
+                                                                zIndex: 4,
+                                                            }}
+                                                        >
+                                                            <div
+                                                                className="monitor-hover-crosshair monitor-hover-crosshair--in-lanes"
+                                                                style={{ left: `${hoverCursor.percent}%` }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div className="chart-controls" aria-label="Управление графиком">
-                                    <button
-                                        type="button"
-                                        className="chart-control-btn"
-                                        onClick={() => setYAxisLeftMax((prev) => stepLeftYMax(prev, true))}
-                                        title="Приблизить левую ось Y (−50 к max)"
-                                    >
-                                        <span aria-hidden>＋</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="chart-control-btn"
-                                        onClick={() => setYAxisLeftMax((prev) => stepLeftYMax(prev, false))}
-                                        title="Отдалить левую ось Y (+50 к max)"
-                                    >
-                                        <span aria-hidden>－</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="chart-control-btn"
-                                        onClick={handleGraphYZoomReset}
-                                        title="Сброс Y-зума (левая max 750, правая max 100)"
-                                    >
-                                        <span aria-hidden>⟲</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`chart-control-btn chart-control-btn--history${todayPinExplore ? ' chart-control-btn--history-active' : ''}`}
-                                        onClick={handleToggleTodayHistory}
-                                        title={todayPinExplore ? 'Вернуться в live-режим' : 'История за сегодня (последний час)'}
-                                    >
-                                        <span className="chart-control-btn-label">{todayPinExplore ? 'Live' : 'История'}</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`chart-control-btn chart-control-btn--graph-expand${graphExpandedLayout ? ' chart-control-btn--graph-expand-active' : ''}`}
-                                        onClick={() => setGraphExpandedLayout((v) => !v)}
-                                        title={graphExpandedLayout ? 'Свернуть' : 'На весь экран'}
-                                    >
-                                        {graphExpandedLayout ? (
-                                            <>
-                                                <FaCompress aria-hidden style={{ width: 11, height: 11, flexShrink: 0 }} />
-                                                <span className="chart-control-btn-label">Свернуть</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <FaExpand aria-hidden style={{ width: 11, height: 11, flexShrink: 0 }} />
-                                                <span className="chart-control-btn-label">На весь экран</span>
-                                            </>
-                                        )}
-                                    </button>
+                                    <div className="chart-controls" aria-label="Управление графиком">
+                                        <button
+                                            type="button"
+                                            className="chart-control-btn"
+                                            onClick={() => setYAxisLeftMax((prev) => stepLeftYMax(prev, true))}
+                                            title="Приблизить левую ось Y (−50 к max)"
+                                        >
+                                            <span aria-hidden>＋</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="chart-control-btn"
+                                            onClick={() => setYAxisLeftMax((prev) => stepLeftYMax(prev, false))}
+                                            title="Отдалить левую ось Y (+50 к max)"
+                                        >
+                                            <span aria-hidden>－</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="chart-control-btn"
+                                            onClick={handleGraphYZoomReset}
+                                            title="Сброс Y-зума (левая max 750, правая max 100)"
+                                        >
+                                            <span aria-hidden>⟲</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`chart-control-btn chart-control-btn--history${todayPinExplore ? ' chart-control-btn--history-active' : ''}`}
+                                            onClick={handleToggleTodayHistory}
+                                            title={todayPinExplore ? 'Вернуться в live-режим' : 'История за сегодня (последний час)'}
+                                        >
+                                            <span className="chart-control-btn-label">{todayPinExplore ? 'Live' : 'История'}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`chart-control-btn chart-control-btn--graph-expand${graphExpandedLayout ? ' chart-control-btn--graph-expand-active' : ''}`}
+                                            onClick={() => setGraphExpandedLayout((v) => !v)}
+                                            title={graphExpandedLayout ? 'Свернуть' : 'На весь экран'}
+                                        >
+                                            {graphExpandedLayout ? (
+                                                <>
+                                                    <FaCompress aria-hidden style={{ width: 11, height: 11, flexShrink: 0 }} />
+                                                    <span className="chart-control-btn-label">Свернуть</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <FaExpand aria-hidden style={{ width: 11, height: 11, flexShrink: 0 }} />
+                                                    <span className="chart-control-btn-label">На весь экран</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+                    </div>
+                )}
             </section>
 
             <AddEquipmentModal
