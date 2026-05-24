@@ -60,12 +60,17 @@ function EnterpriseListPage() {
                     allowedLower.includes('create_delete_enterprises') ||
                     allowedLower.includes('create_delete_enterprise') ||
                     allowedLower.some((a) => a.includes('create_delete_enterprises'));
+                const hasManageEnterpriseAdmins =
+                    allowedLower.includes('create_edit_enterprise_admins') ||
+                    allowedLower.some((a) => a.includes('create_edit_enterprise_admins'));
                 const hasVisibilityEditEnterprises =
                     allowedLower.includes('visibility_edit_enterprises') ||
                     allowedLower.includes('visibility_edit_enterprise') ||
                     allowedLower.some((a) => a.includes('visibility_edit_enterprises'));
 
-                setCanAddEnterprise(isAdminAlloy || ((isUserAlloy || isAdminDealer) && hasCreateEnterprises));
+                setCanAddEnterprise(
+                    isAdminAlloy || (isUserAlloy && hasCreateEnterprises && hasManageEnterpriseAdmins)
+                );
                 setCanViewEnterprises(isAdminAlloy || hasVisibilityEditEnterprises);
                 setCanViewAlloyEnterprise(isAdminAlloy);
             } catch (_) {

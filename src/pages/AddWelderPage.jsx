@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useReportsUnsaved } from '../contexts/ReportsUnsavedContext';
 import { FaBell, FaChevronRight, FaChevronDown } from 'react-icons/fa';
@@ -12,8 +12,87 @@ import { getWeldingMachineById } from '../api/weldingMachineApi';
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { buildOrganizationHierarchy } from '../utils/organizationUnitTree';
 import { getCertificationsByWelderId } from '../api/certificationApi';
+import { getArchivePanelState } from '../api/archiveDeviceApi';
 import machineImage from '../images/Untitled 3 копия.png';
 import '../styles/addWelderPage.css';
+
+const STATUS_STALE_MS = 10000;
+const STATUS_POLL_INTERVAL_MS = 4000;
+const STATUS_POLL_IDLE_TIMEOUT_MS = 2000;
+const STATUS_POLL_DEFER_FALLBACK_MS = 150;
+const CORE_UPTIME_SEC_TO_MS = 1000;
+const WORK_TIME_SINCE_POWER_ON_KEYS = ['Core.WorkTimeSincePowerOn', 'Время работы с включения'];
+
+function parsePanelNumber(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+    const normalized = raw.replace(',', '.').replace(/[^\d.+-]/g, '');
+    const decimal = parseFloat(normalized);
+    return Number.isFinite(decimal) ? decimal : null;
+}
+
+function getPanelNumberByKeys(stateObj, keys) {
+    if (!stateObj) return null;
+    const props = stateObj.properties || {};
+    for (const key of keys) {
+        const fromPropValue = parsePanelNumber(props?.[key]?.value);
+        if (fromPropValue != null) return fromPropValue;
+        const fromPropDirect = parsePanelNumber(props?.[key]);
+        if (fromPropDirect != null) return fromPropDirect;
+        const fromStateDirect = parsePanelNumber(stateObj?.[key]);
+        if (fromStateDirect != null) return fromStateDirect;
+    }
+    return null;
+}
+
+function computeStatusFromPanelState(machine, stateObj) {
+    try {
+        const props = stateObj?.properties || {};
+        const deviceModel = machine?.deviceModel;
+
+        if (deviceModel === 'CORE') {
+            const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState;
+            if (rawState !== undefined && rawState !== null) {
+                const normalized = String(rawState).toLowerCase();
+                if (normalized.includes('weld') || normalized.includes('свар')) return 'welding';
+                if (normalized.includes('on') || normalized.includes('включ') || normalized.includes('ожидан')) return 'on';
+                if (normalized.includes('off') || normalized.includes('выключ')) return 'off';
+            }
+            return stateObj ? 'on' : 'off';
+        }
+        const currentRaw = props?.Current?.value ?? props?.Current ?? props?.['State.I']?.value ?? props?.['State.I'];
+        const current = currentRaw != null ? parseFloat(currentRaw) : 0;
+        if (!isNaN(current) && current > 1) return 'welding';
+        return stateObj ? 'on' : 'off';
+    } catch {
+        return 'off';
+    }
+}
+
+function computeLastPowerOnFromPanelState(stateObj, nowMs = Date.now()) {
+    const workSec = getPanelNumberByKeys(stateObj, WORK_TIME_SINCE_POWER_ON_KEYS);
+    if (workSec == null) return null;
+    return nowMs - workSec * CORE_UPTIME_SEC_TO_MS;
+}
+
+function formatLastPowerOnDisplay(timestampMs) {
+    if (timestampMs == null || !Number.isFinite(timestampMs)) return null;
+    return new Date(timestampMs).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function parseDbLastPoweredOnMs(item) {
+    const raw = item?.lastPoweredOnAt;
+    if (raw == null || raw === '') return null;
+    const t = new Date(raw).getTime();
+    return Number.isFinite(t) ? t : null;
+}
 
 function AddWelderPage() {
     const navigate = useNavigate();
@@ -55,6 +134,10 @@ function AddWelderPage() {
     const [isMachineModalOpen, setIsMachineModalOpen] = useState(false);
     const [deviceStatusesByMac, setDeviceStatusesByMac] = useState({});
     const [deviceStatesByMac, setDeviceStatesByMac] = useState({});
+    const [lastPowerOnByMac, setLastPowerOnByMac] = useState({});
+    const lastGoodStateByMacRef = useRef({});
+    const lastGoodSeenAtRef = useRef({});
+    const lastPowerOnByMacRef = useRef({});
 
     const canonicalJson = (val) => {
         if (val === null || typeof val !== 'object') return JSON.stringify(val);
@@ -184,6 +267,133 @@ function AddWelderPage() {
             }
         };
     }, [id, isEditMode]);
+
+    const fetchRelatedMachineStatuses = useCallback(async () => {
+        const list = relatedMachines.filter((m) => m.mac);
+        if (list.length === 0) return;
+
+        const now = Date.now();
+        const powerOnUpdates = {};
+
+        const results = await Promise.all(
+            list.map(async (machine) => {
+                const mac = machine.mac;
+                try {
+                    const state = await getArchivePanelState(mac);
+                    if (state) {
+                        lastGoodStateByMacRef.current[mac] = state;
+                        lastGoodSeenAtRef.current[mac] = now;
+                    }
+                    let resolvedState = state;
+                    if (!resolvedState) {
+                        const lastSeen = lastGoodSeenAtRef.current[mac];
+                        if (lastSeen && now - lastSeen <= STATUS_STALE_MS) {
+                            resolvedState = lastGoodStateByMacRef.current[mac] || null;
+                        }
+                    }
+                    const status = computeStatusFromPanelState(machine, resolvedState);
+                    const props = resolvedState?.properties || {};
+                    const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState || null;
+
+                    if (resolvedState) {
+                        const powerOnMs = computeLastPowerOnFromPanelState(resolvedState, now);
+                        if (powerOnMs != null) {
+                            powerOnUpdates[mac] = powerOnMs;
+                            lastPowerOnByMacRef.current[mac] = powerOnMs;
+                        }
+                    }
+
+                    return [mac, status, rawState];
+                } catch {
+                    const lastSeen = lastGoodSeenAtRef.current[mac];
+                    if (lastSeen && now - lastSeen <= STATUS_STALE_MS) {
+                        const cachedState = lastGoodStateByMacRef.current[mac] || null;
+                        const status = computeStatusFromPanelState(machine, cachedState);
+                        const props = cachedState?.properties || {};
+                        const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState || null;
+                        return [mac, status, rawState];
+                    }
+                    return [mac, 'off', null];
+                }
+            })
+        );
+
+        setDeviceStatusesByMac((prev) => {
+            const next = { ...prev };
+            results.forEach(([mac, status]) => {
+                next[mac] = status;
+            });
+            return next;
+        });
+        setDeviceStatesByMac((prev) => {
+            const next = { ...prev };
+            results.forEach(([mac, , rawState]) => {
+                next[mac] = rawState;
+            });
+            return next;
+        });
+        if (Object.keys(powerOnUpdates).length > 0) {
+            setLastPowerOnByMac((prev) => ({ ...prev, ...powerOnUpdates }));
+        }
+    }, [relatedMachines]);
+
+    useEffect(() => {
+        const macs = new Set(relatedMachines.map((m) => m.mac).filter(Boolean));
+        if (macs.size === 0) {
+            setDeviceStatusesByMac({});
+            setDeviceStatesByMac({});
+            return undefined;
+        }
+
+        let cancelled = false;
+        let intervalId = null;
+        let idleCallbackId = null;
+        let deferTimeoutId = null;
+
+        const clearDeferred = () => {
+            if (idleCallbackId != null && typeof cancelIdleCallback !== 'undefined') {
+                cancelIdleCallback(idleCallbackId);
+                idleCallbackId = null;
+            }
+            if (deferTimeoutId != null) {
+                clearTimeout(deferTimeoutId);
+                deferTimeoutId = null;
+            }
+        };
+
+        const startPolling = () => {
+            if (cancelled) return;
+            fetchRelatedMachineStatuses();
+            intervalId = setInterval(() => {
+                if (!cancelled) fetchRelatedMachineStatuses();
+            }, STATUS_POLL_INTERVAL_MS);
+        };
+
+        const schedulePollingStart = () => {
+            if (typeof requestIdleCallback !== 'undefined') {
+                idleCallbackId = requestIdleCallback(
+                    () => {
+                        idleCallbackId = null;
+                        startPolling();
+                    },
+                    { timeout: STATUS_POLL_IDLE_TIMEOUT_MS }
+                );
+            } else {
+                deferTimeoutId = setTimeout(() => {
+                    deferTimeoutId = null;
+                    startPolling();
+                }, STATUS_POLL_DEFER_FALLBACK_MS);
+            }
+        };
+
+        schedulePollingStart();
+
+        return () => {
+            cancelled = true;
+            clearDeferred();
+            if (intervalId != null) clearInterval(intervalId);
+        };
+    }, [relatedMachines, fetchRelatedMachineStatuses]);
 
     useEffect(() => {
         if (isEditMode) return;
@@ -343,6 +553,21 @@ function AddWelderPage() {
         );
     };
 
+    const seedLastPowerOnFromMachines = (machines) => {
+        if (!Array.isArray(machines) || machines.length === 0) return;
+        const updates = {};
+        machines.forEach((m) => {
+            const ts = parseDbLastPoweredOnMs(m);
+            if (ts != null && m.mac) {
+                lastPowerOnByMacRef.current[m.mac] = ts;
+                updates[m.mac] = ts;
+            }
+        });
+        if (Object.keys(updates).length > 0) {
+            setLastPowerOnByMac((prev) => ({ ...prev, ...updates }));
+        }
+    };
+
     const loadWelderData = async (welderId) => {
         lastSavedSnapshotRef.current = null;
         try {
@@ -429,6 +654,7 @@ function AddWelderPage() {
             // Загружаем связанные аппараты, если есть
             if (welder.weldingMachines && Array.isArray(welder.weldingMachines) && welder.weldingMachines.length > 0) {
                 setRelatedMachines(welder.weldingMachines);
+                seedLastPowerOnFromMachines(welder.weldingMachines);
             } else {
                 setRelatedMachines([]);
             }
@@ -600,12 +826,10 @@ function AddWelderPage() {
     };
 
     const handleMachineAdded = (machines) => {
-        // Добавляем только те аппараты, которых еще нет в списке
-        setRelatedMachines(prev => {
-            const existingIds = new Set(prev.map(m => m.id));
-            const newMachines = machines.filter(m => !existingIds.has(m.id));
-            return [...prev, ...newMachines];
-        });
+        const existingIds = new Set(relatedMachines.map((m) => m.id));
+        const newMachines = machines.filter((m) => !existingIds.has(m.id));
+        seedLastPowerOnFromMachines(newMachines);
+        setRelatedMachines((prev) => [...prev, ...newMachines]);
     };
 
     const handleDeleteMachine = () => {
@@ -642,15 +866,39 @@ function AddWelderPage() {
         return { first: modelName || '', second: '' };
     };
 
-    const getWelderDisplay = (item) => {
-        if (item.assignedWelders && Array.isArray(item.assignedWelders) && item.assignedWelders.length > 0) {
-            return item.assignedWelders[0];
+    const resolveMachineOrganizationUnitName = (machine) => {
+        if (!machine) return 'Не указано';
+        if (machine.organizationUnit?.name) return machine.organizationUnit.name;
+        const unitId = machine.organizationUnitId ?? machine.organizationUnit?.id;
+        if (unitId != null && organizationUnits.length > 0) {
+            const unit = organizationUnits.find(
+                (u) => u.id === unitId || String(u.id) === String(unitId)
+            );
+            if (unit?.name) return unit.name;
         }
-        return 'Не назначен';
+        return 'Не указано';
     };
 
     const getLastActivation = (item) => {
-        return '';
+        const mac = item?.mac;
+        let timestampMs = null;
+        if (mac) {
+            timestampMs = lastPowerOnByMac[mac] ?? lastPowerOnByMacRef.current[mac];
+        }
+        if (timestampMs == null) {
+            timestampMs = parseDbLastPoweredOnMs(item);
+        }
+        return formatLastPowerOnDisplay(timestampMs);
+    };
+
+    const navigateToMachine = (machine) => {
+        const params = new URLSearchParams({
+            machine: machine.name || '',
+            mac: machine.mac || '',
+            name: machine.name || '',
+            organizationUnit: resolveMachineOrganizationUnitName(machine),
+        });
+        goWithUnsavedGuard(`/device-monitor?${params.toString()}`);
     };
 
     const getFormattedStatus = (status, rawState) => {
@@ -1055,16 +1303,19 @@ function AddWelderPage() {
 
                 {/* Certifications Section */}
                 <div className="section certifications-section">
-                    <div className="section-actions-only">
-                        <button className="add-btn" onClick={handleAddCertification}>
-                            + Добавить аттестацию
-                        </button>
-                        <button
-                            className="naks-btn"
-                            onClick={() => window.open('https://naks.ru/registry/personal/', '_blank')}
-                        >
-                            Открыть реестр НАКС
-                        </button>
+                    <div className="section-toolbar">
+                        <h2>Аттестации сварщика</h2>
+                        <div className="section-toolbar-actions">
+                            <button className="add-btn" onClick={handleAddCertification}>
+                                + Добавить аттестацию
+                            </button>
+                            <button
+                                className="naks-btn"
+                                onClick={() => window.open('https://naks.ru/registry/personal/', '_blank')}
+                            >
+                                Открыть реестр НАКС
+                            </button>
+                        </div>
                     </div>
                     <div className="certifications-table scrollable-section">
                         <table>
@@ -1134,24 +1385,26 @@ function AddWelderPage() {
 
                 {/* Related Machines Section */}
                 <div className="section machines-section">
-                    <div className="section-actions-only">
-                        <button className="add-btn" onClick={handleAddMachine}>
-                            + Добавить аппарат
-                        </button>
-                        <button className="delete-btn" onClick={handleDeleteMachine}>
-                            Удалить
-                        </button>
+                    <div className="section-toolbar">
+                        <h2>Привязанное оборудование</h2>
+                        <div className="section-toolbar-actions">
+                            <button className="add-btn" onClick={handleAddMachine}>
+                                + Добавить аппарат
+                            </button>
+                            <button className="delete-btn" onClick={handleDeleteMachine}>
+                                Удалить
+                            </button>
+                        </div>
                     </div>
                     <div className="machines-table scrollable-section">
                         <table>
                             <thead>
                             <tr>
                                 <th></th>
-                                <th>Модель</th>
-                                <th>Название</th>
                                 <th>Подразделение</th>
+                                <th>Название</th>
+                                <th>Модель</th>
                                 <th>Инвентарный номер</th>
-                                <th>Сварщик</th>
                                 <th>Последнее включение</th>
                                 <th>Статус</th>
                             </tr>
@@ -1159,7 +1412,7 @@ function AddWelderPage() {
                             <tbody>
                             {relatedMachines.length === 0 ? (
                                 <tr>
-                                    <td colSpan="8" className="empty-state">Нет связанных аппаратов</td>
+                                    <td colSpan="7" className="empty-state">Нет связанных аппаратов</td>
                                 </tr>
                             ) : (
                                 relatedMachines.map((machine, index) => {
@@ -1173,6 +1426,8 @@ function AddWelderPage() {
                                             key={machine.id}
                                             data-machine-id={machine.id}
                                             className={`machine-table-row ${index % 2 === 0 ? 'machine-table-row-even' : 'machine-table-row-odd'}`}
+                                            onClick={() => navigateToMachine(machine)}
+                                            style={{ cursor: 'pointer' }}
                                         >
                                             <td>
                                                 <input
@@ -1181,6 +1436,8 @@ function AddWelderPage() {
                                                     onClick={(e) => e.stopPropagation()}
                                                 />
                                             </td>
+                                            <td>{resolveMachineOrganizationUnitName(machine)}</td>
+                                            <td>{machine.name || 'Не указано'}</td>
                                             <td>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                         <span className={`equipment-status-dot ${status}`} style={{
@@ -1203,10 +1460,7 @@ function AddWelderPage() {
                                                         </span>
                                                 </div>
                                             </td>
-                                            <td>{machine.name || 'Не указано'}</td>
-                                            <td>{machine.organizationUnit?.name || 'Не указано'}</td>
                                             <td>{machine.inventoryNumber || 'Не указан'}</td>
-                                            <td>{getWelderDisplay(machine)}</td>
                                             <td>{getLastActivation(machine) || 'Нет данных'}</td>
                                             <td>
                                                     <span

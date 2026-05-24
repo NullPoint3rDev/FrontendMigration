@@ -1,12 +1,61 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAllUserAccounts, getRoles } from '../api/userAccountApi';
 import '../styles/createEnterpriseModal.css';
 
+const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
+const LOGO_MAX_DIMENSION = 256;
+
+/** Сжимает логотип до разумного размера для хранения в БД (data URL). */
+const compressLogoFile = (file) =>
+    new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            let { width, height } = img;
+            const maxSide = Math.max(width, height);
+            if (maxSide > LOGO_MAX_DIMENSION) {
+                const scale = LOGO_MAX_DIMENSION / maxSide;
+                width = Math.round(width * scale);
+                height = Math.round(height * scale);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error('Не удалось обработать изображение'));
+                return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Не удалось загрузить изображение'));
+        };
+        img.src = url;
+    });
+
+const INITIAL_FORM_DATA = {
+    name: '',
+    fullName: '',
+    email: '',
+    phone: '',
+    website: '',
+    address: '',
+    inn: '',
+    attachedDealerId: 'alloy',
+};
+
 const CreateEnterpriseModal = ({ isOpen, onClose, onNext }) => {
     const navigate = useNavigate();
+    const logoInputRef = useRef(null);
     const [dealerAdmins, setDealerAdmins] = useState([]);
     const [loadingDealerAdmins, setLoadingDealerAdmins] = useState(false);
+    const [logoPreview, setLogoPreview] = useState(null);
+    const [logoData, setLogoData] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
         fullName: '',
@@ -67,6 +116,16 @@ const CreateEnterpriseModal = ({ isOpen, onClose, onNext }) => {
         }
     }, [isOpen, formData.attachedDealerId]);
 
+    useEffect(() => {
+        if (isOpen) return;
+        setFormData({ ...INITIAL_FORM_DATA });
+        setLogoPreview(null);
+        setLogoData(null);
+        if (logoInputRef.current) {
+            logoInputRef.current.value = '';
+        }
+    }, [isOpen]);
+
     const dealerOptions = useMemo(
         () => [{ id: 'alloy', label: 'Alloy', organizationId: null }, ...dealerAdmins],
         [dealerAdmins]
@@ -76,6 +135,29 @@ const CreateEnterpriseModal = ({ isOpen, onClose, onNext }) => {
 
     const handleChange = (field, value) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const handleLogoChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            window.alert('Выберите файл изображения (PNG, JPG и т.д.)');
+            e.target.value = '';
+            return;
+        }
+        if (file.size > MAX_LOGO_SIZE_BYTES) {
+            window.alert('Размер файла не должен превышать 2 МБ');
+            e.target.value = '';
+            return;
+        }
+        try {
+            const dataUrl = await compressLogoFile(file);
+            setLogoPreview(dataUrl);
+            setLogoData(dataUrl);
+        } catch {
+            window.alert('Не удалось обработать изображение');
+            e.target.value = '';
+        }
     };
 
     const handleNext = () => {
@@ -88,6 +170,7 @@ const CreateEnterpriseModal = ({ isOpen, onClose, onNext }) => {
             attachedDealerId: selectedDealer?.id || 'alloy',
             attachedDealerName: selectedDealer?.label || 'Alloy',
             attachedDealerOrganizationId: selectedDealer?.organizationId ?? null,
+            logo: logoData || null,
         };
         if (onNext) {
             onNext(payload);
@@ -120,13 +203,35 @@ const CreateEnterpriseModal = ({ isOpen, onClose, onNext }) => {
                 <div className="create-enterprise-modal-body">
                     <div className="create-enterprise-logo-section">
                         <div className="create-enterprise-logo-box">
+                            {logoPreview ? (
+                                <img
+                                    src={logoPreview}
+                                    alt="Логотип предприятия"
+                                    className="create-enterprise-logo-image"
+                                />
+                            ) : (
+                                <span className="create-enterprise-logo-letter">
+                                    {(formData.name || 'Н').trim().charAt(0).toUpperCase()}
+                                </span>
+                            )}
                         </div>
                         <div className="create-enterprise-logo-info">
                             <div className="create-enterprise-name-preview">
                                 {formData.name || 'Название предприятия'}
                             </div>
-                            <button type="button" className="create-enterprise-change-photo">
-                                Сменить логотип
+                            <input
+                                ref={logoInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="create-enterprise-logo-input"
+                                onChange={handleLogoChange}
+                            />
+                            <button
+                                type="button"
+                                className="create-enterprise-change-photo"
+                                onClick={() => logoInputRef.current?.click()}
+                            >
+                                {logoPreview ? 'Сменить логотип' : 'Загрузить логотип'}
                             </button>
                         </div>
                     </div>

@@ -24,6 +24,9 @@ function AddUserPage() {
     const [accessAllowed, setAccessAllowed] = useState(null);
     const [currentUserIsAdminAlloy, setCurrentUserIsAdminAlloy] = useState(false);
     const [currentUserIsAdminDealer, setCurrentUserIsAdminDealer] = useState(false);
+    const [currentUserIsUserAlloy, setCurrentUserIsUserAlloy] = useState(false);
+    const [currentUserCanCreateEnterprises, setCurrentUserCanCreateEnterprises] = useState(false);
+    const [currentUserCanManageEnterpriseAdmins, setCurrentUserCanManageEnterpriseAdmins] = useState(false);
     const [currentUserOrgId, setCurrentUserOrgId] = useState(null);
     const [isEnterpriseScopedRole, setIsEnterpriseScopedRole] = useState(false);
     const [organizations, setOrganizations] = useState([]);
@@ -86,18 +89,28 @@ function AddUserPage() {
                     (name.includes('админ') && name.includes('дил'));
                 const isAdminEnterprise = name === 'admin_enterprise' || (name.includes('admin') && name.includes('enterprise'));
                 const isUserEnterprise = name === 'user_enterprise' || (name.includes('user') && name.includes('enterprise'));
-                const allowed = currentUser.allowedUserActions || [];
-                const hasCreateEnterprises = Array.isArray(allowed) && allowed.includes('create_delete_enterprises');
+                const allowed = Array.isArray(currentUser.allowedUserActions) ? currentUser.allowedUserActions : [];
+                const allowedLower = allowed.map((a) => String(a || '').toLowerCase());
+                const hasCreateEnterprises =
+                    allowedLower.includes('create_delete_enterprises') ||
+                    allowedLower.some((a) => a.includes('create_delete_enterprises'));
+                const hasManageEnterpriseAdmins =
+                    allowedLower.includes('create_edit_enterprise_admins') ||
+                    allowedLower.some((a) => a.includes('create_edit_enterprise_admins'));
                 const fromCreateEnterprise = location.state?.fromCreateEnterprise === true;
                 const allowFromEnterpriseFlow =
                     fromCreateEnterprise &&
-                    (isAdminAlloy || ((isUserAlloy || isAdminDealer) && hasCreateEnterprises));
-                setAccessAllowed(isAdmin || allowFromEnterpriseFlow);
+                    (isAdminAlloy || (isUserAlloy && hasCreateEnterprises && hasManageEnterpriseAdmins));
+                const allowUserAlloyEnterpriseAdmin = isUserAlloy && hasManageEnterpriseAdmins;
+                setAccessAllowed(isAdmin || allowFromEnterpriseFlow || allowUserAlloyEnterpriseAdmin);
                 setCurrentUserIsAdminAlloy(!!isAdminAlloy);
                 setCurrentUserIsAdminDealer(!!isAdminDealer);
+                setCurrentUserIsUserAlloy(!!isUserAlloy);
+                setCurrentUserCanCreateEnterprises(!!hasCreateEnterprises);
+                setCurrentUserCanManageEnterpriseAdmins(!!hasManageEnterpriseAdmins);
                 setIsEnterpriseScopedRole(!!(isAdminEnterprise || isUserEnterprise));
                 setCurrentUserOrgId(currentUser.organizationId ?? currentUser.organization?.id ?? null);
-                if (!isAdmin && !allowFromEnterpriseFlow) {
+                if (!isAdmin && !allowFromEnterpriseFlow && !allowUserAlloyEnterpriseAdmin) {
                     navigate('/employees', { replace: true });
                     return;
                 }
@@ -139,6 +152,15 @@ function AddUserPage() {
                         const userData = await getUserAccountById(id);
                         if (userData) {
                             const roleObj = loadedRoles.find((r) => r.id === userData.userRoleId);
+                            const targetRoleName = String(roleObj?.name || '').toUpperCase();
+                            if (
+                                currentUserIsAdminDealer &&
+                                (targetRoleName === 'ADMIN_ENTERPRISE' || targetRoleName === 'USER_ENTERPRISE')
+                            ) {
+                                setSubmitError('Администратор дилера не может редактировать пользователей предприятия.');
+                                navigate('/employees', { replace: true });
+                                return;
+                            }
                             setFormData({
                                 userTypeId: roleObj?.name || null,
                                 login: userData.username || '',
@@ -175,7 +197,7 @@ function AddUserPage() {
             }
         };
         load();
-    }, [accessAllowed, isEditMode, id, isEnterpriseScopedRole, currentUserOrgId]);
+    }, [accessAllowed, isEditMode, id, isEnterpriseScopedRole, currentUserOrgId, currentUserIsAdminDealer, navigate]);
 
     useEffect(() => {
         if (accessAllowed && fromCreateEnterprise) {
@@ -215,8 +237,23 @@ function AddUserPage() {
         if (!currentUserIsAdminAlloy) {
             all = all.filter((o) => o.id !== 'ADMIN_ALLOY' && o.id !== 'USER_ALLOY');
         }
-        // Админ предприятия добавляется только при создании предприятия; со страницы «Пользователи» его не показываем
-        const showAdminEnterprise = fromCreateEnterprise || (isEditMode && formData.userTypeId === 'ADMIN_ENTERPRISE');
+        if (currentUserIsUserAlloy && !currentUserIsAdminAlloy) {
+            all = all.filter((o) => o.id === 'ADMIN_ENTERPRISE');
+        }
+        if (currentUserIsAdminDealer) {
+            all = all.filter((o) => o.id !== 'ADMIN_ENTERPRISE' && o.id !== 'USER_ENTERPRISE');
+        }
+        const canManageEnterpriseAdminRole =
+            currentUserIsAdminAlloy || (currentUserIsUserAlloy && currentUserCanManageEnterpriseAdmins);
+        if (!canManageEnterpriseAdminRole) {
+            all = all.filter((o) => o.id !== 'ADMIN_ENTERPRISE');
+        }
+        // Админ предприятия по умолчанию доступен в потоке создания предприятия,
+        // а также при редактировании уже существующего админа предприятия.
+        const showAdminEnterprise =
+            fromCreateEnterprise ||
+            canManageEnterpriseAdminRole ||
+            (isEditMode && formData.userTypeId === 'ADMIN_ENTERPRISE');
         if (!showAdminEnterprise) {
             // Если редактируем существующего пользователя с ролью ADMIN_ENTERPRISE, оставляем роль в списке
             const filtered = all.filter((o) => o.id !== 'ADMIN_ENTERPRISE');
@@ -226,7 +263,15 @@ function AddUserPage() {
             return filtered;
         }
         return all;
-    }, [fromCreateEnterprise, isEditMode, formData.userTypeId, currentUserIsAdminAlloy]);
+    }, [
+        fromCreateEnterprise,
+        isEditMode,
+        formData.userTypeId,
+        currentUserIsAdminAlloy,
+        currentUserIsAdminDealer,
+        currentUserIsUserAlloy,
+        currentUserCanManageEnterpriseAdmins,
+    ]);
 
     const permissionsUserAlloy = useMemo(
         () => [
@@ -426,40 +471,26 @@ function AddUserPage() {
                 title: 'Работа с пользователями',
                 items: [
                     { id: 'recovery_account', label: 'Восстановление аккаунта по номеру тел., эл. почте', defaultChecked: true },
-                    { id: 'create_edit_enterprise_admins', label: 'Создание/редактирование админов предприятий', defaultChecked: true },
                     { id: 'create_edit_enterprise_users', label: 'Создание/редактирование пользователей предприятий', defaultChecked: true },
-                    { id: 'reset_enterprise_admin_passwords', label: 'Сброс паролей админов предприятий', defaultChecked: true },
                     { id: 'reset_enterprise_user_passwords', label: 'Сброс паролей пользователей предприятий', defaultChecked: true },
-                    { id: 'create_edit_dealer_admins', label: 'Создание/редактирование админов диллеров', defaultChecked: false },
-                    { id: 'create_edit_dealer_users', label: 'Создание/редактирование пользователей диллеров', defaultChecked: false },
-                    { id: 'reset_dealer_admin_passwords', label: 'Сброс паролей админов диллера', defaultChecked: false },
-                    { id: 'reset_dealer_user_passwords', label: 'Сброс паролей пользователей диллера', defaultChecked: false },
-                    { id: 'create_alloy_admins', label: 'Создание администраторов Эллой', disabled: true },
-                    { id: 'create_edit_alloy_users', label: 'Создание/редактирование пользователей Эллой', disabled: true },
-                    { id: 'reset_alloy_user_passwords', label: 'Сброс паролей пользователей Эллой', disabled: true },
                 ],
             },
             {
                 title: 'Работа с оборудованием',
                 items: [
-                    { id: 'wifi_modules_wt2', label: 'Внесения/удаления модулей Wi-Fi в базу WT2', defaultChecked: false },
                     { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Pulse)', defaultChecked: true },
                     { id: 'move_equipment_change_info', label: 'Перемещение между подразд., изм. инфор. об оборуд.', defaultChecked: true },
                     { id: 'delete_equipment', label: 'Удаление оборудования', defaultChecked: true },
                     { id: 'view_ip_history', label: 'Доступность просмотра истории работы ИП (графики)', defaultChecked: true },
                     { id: 'ip_management_functions', label: 'Доступность функций управления ИП', defaultChecked: true },
-                    { id: 'fix_maintenance', label: 'Фиксация проведения ТО', defaultChecked: false },
-                    { id: 'assign_welders_to_equipment', label: 'Привязка сварщиков к оборудованию', defaultChecked: false },
+                    { id: 'fix_maintenance', label: 'Фиксация проведения ТО', defaultChecked: true },
+                    { id: 'assign_welders_to_equipment', label: 'Привязка сварщиков к оборудованию', defaultChecked: true },
                 ],
             },
             {
                 title: 'Работа с организациями',
                 items: [
-                    { id: 'visibility_edit_dealers', label: 'Видимость/редактирование диллеров', defaultChecked: false },
-                    { id: 'create_delete_dealers', label: 'Создание/удаление диллеров', defaultChecked: false },
                     { id: 'visibility_edit_enterprises', label: 'Видимость/редактирование предприятий', defaultChecked: true },
-                    { id: 'create_delete_enterprises', label: 'Создание/удаление предприятий', defaultChecked: true },
-                    { id: 'visibility_edit_alloy', label: 'Видимость/редактирование Эллой', disabled: true },
                 ],
             },
             {
@@ -475,8 +506,8 @@ function AddUserPage() {
                 items: [
                     { id: 'work_with_reports', label: 'Работа с отчетами', defaultChecked: true },
                     { id: 'work_with_notifications', label: 'Работа с уведомлениями', defaultChecked: true },
-                    { id: 'welding_materials', label: 'Добавление/удаление/изменения свар. материалов', defaultChecked: false },
-                    { id: 'wps_cards', label: 'Добавление/удаление/изменения WPS карт', defaultChecked: false },
+                    { id: 'welding_materials', label: 'Добавление/удаление/изменения свар. материалов', defaultChecked: true },
+                    { id: 'wps_cards', label: 'Добавление/удаление/изменения WPS карт', defaultChecked: true },
                 ],
             },
         ],
@@ -681,9 +712,18 @@ function AddUserPage() {
             </React.Fragment>
         );
     };
-    // AllowedUserActions are an Alloy-level capability switchboard.
-    // We intentionally show this panel only to Admin Alloy (who is allowed to configure these flags).
-    const canConfigureAllowedActions = currentUserIsAdminAlloy === true || currentUserIsAdminDealer === true;
+    const isEnterpriseRoleTarget = formData.userTypeId === 'ADMIN_ENTERPRISE' || formData.userTypeId === 'USER_ENTERPRISE';
+    const canConfigureAllowedActions =
+        currentUserIsAdminAlloy === true ||
+        (
+            currentUserIsAdminDealer === true &&
+            !isEnterpriseRoleTarget
+        ) ||
+        (
+            currentUserIsUserAlloy === true &&
+            currentUserCanManageEnterpriseAdmins === true &&
+            formData.userTypeId === 'ADMIN_ENTERPRISE'
+        );
     const showPermissionsPanel =
         canConfigureAllowedActions &&
         (formData.userTypeId === 'USER_ALLOY' ||
@@ -798,6 +838,22 @@ function AddUserPage() {
             setSubmitError('Создание/редактирование пользователей Эллой доступно только Админу Эллой.');
             return;
         }
+        if (currentUserIsUserAlloy && !currentUserIsAdminAlloy && formData.userTypeId !== 'ADMIN_ENTERPRISE') {
+            setSubmitError('Пользователь Эллой может создавать или редактировать только администратора предприятия.');
+            return;
+        }
+        if (currentUserIsAdminDealer && (formData.userTypeId === 'ADMIN_ENTERPRISE' || formData.userTypeId === 'USER_ENTERPRISE')) {
+            setSubmitError('Администратор дилера не может создавать или редактировать пользователей предприятия.');
+            return;
+        }
+        if (
+            fromCreateEnterprise &&
+            !currentUserIsAdminAlloy &&
+            !(currentUserIsUserAlloy && currentUserCanCreateEnterprises && currentUserCanManageEnterpriseAdmins)
+        ) {
+            setSubmitError('Недостаточно прав для создания предприятия и его администратора.');
+            return;
+        }
         try {
             setIsSubmitting(true);
             const allPermissionItems = currentPermissionsList.flatMap((section) => section.items);
@@ -829,6 +885,7 @@ function AddUserPage() {
                     phone: (enterpriseData?.phone || '').trim() || null,
                     email: (enterpriseData?.email || '').trim() || null,
                     website: (enterpriseData?.website || '').trim() || null,
+                    logo: enterpriseData?.logo || null,
                     settings: JSON.stringify(settings),
                 };
                 const createdOrg = await api.post('/organizations', orgPayload);

@@ -64,6 +64,7 @@ function EmployeesPage() {
     const [selectedUsers, setSelectedUsers] = useState([]);
     const [currentUserOrgId, setCurrentUserOrgId] = useState(null);
     const [isEnterpriseScopedRole, setIsEnterpriseScopedRole] = useState(false);
+    const [currentUserIsAdminDealer, setCurrentUserIsAdminDealer] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -93,10 +94,13 @@ function EmployeesPage() {
             );
             const roleName = String(role?.name || '').toUpperCase();
             const isEnterpriseRole = roleName === 'ADMIN_ENTERPRISE' || roleName === 'USER_ENTERPRISE';
+            const isAdminDealer = roleName === 'ADMIN_DEALER';
             setIsEnterpriseScopedRole(isEnterpriseRole);
+            setCurrentUserIsAdminDealer(isAdminDealer);
             setCurrentUserOrgId(currentUser?.organizationId ?? currentUser?.organization?.id ?? null);
         } catch (_) {
             setIsEnterpriseScopedRole(false);
+            setCurrentUserIsAdminDealer(false);
             setCurrentUserOrgId(null);
         }
     };
@@ -159,13 +163,24 @@ function EmployeesPage() {
     );
 
     const visibleUsers = useMemo(() => {
-        if (!isEnterpriseScopedRole || currentUserOrgId == null) return users;
-        return users.filter((u) => {
-            const userOrgId = u.organizationId ?? u.organization?.id ?? null;
-            const unitId = u.organizationUnit?.id ?? null;
-            return String(userOrgId) === String(currentUserOrgId) || (unitId != null && visibleUnitIdSet.has(String(unitId)));
-        });
-    }, [users, isEnterpriseScopedRole, currentUserOrgId, visibleUnitIdSet]);
+        let scoped = users;
+        if (isEnterpriseScopedRole && currentUserOrgId != null) {
+            scoped = users.filter((u) => {
+                const userOrgId = u.organizationId ?? u.organization?.id ?? null;
+                const unitId = u.organizationUnit?.id ?? null;
+                return String(userOrgId) === String(currentUserOrgId) || (unitId != null && visibleUnitIdSet.has(String(unitId)));
+            });
+        }
+        if (currentUserIsAdminDealer) {
+            scoped = scoped.filter((u) => {
+                const roleId = u.userRoleId;
+                const role = roles.find((r) => r.id === roleId || r.id === parseInt(roleId, 10));
+                const roleName = String(role?.name || '').toUpperCase();
+                return roleName !== 'ADMIN_ENTERPRISE' && roleName !== 'USER_ENTERPRISE';
+            });
+        }
+        return scoped;
+    }, [users, isEnterpriseScopedRole, currentUserOrgId, visibleUnitIdSet, currentUserIsAdminDealer, roles]);
 
     const getOrganizationUnitName = (user) => {
         const unitName = user.organizationUnit?.name;
@@ -246,7 +261,9 @@ function EmployeesPage() {
             const getVal = (item) => {
                 switch (sortField) {
                     case 'name':
-                        return (item.fullName || item.username || '').toLowerCase();
+                        return (item.fullName || '').toLowerCase();
+                    case 'login':
+                        return (item.username || '').toLowerCase();
                     case 'type':
                         return getRoleName(item);
                     case 'organization':
@@ -664,6 +681,12 @@ function EmployeesPage() {
                                             {sortField === 'name' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
                                         </span>
                                 </th>
+                                <th onClick={() => toggleSort('login')} className={sortField === 'login' ? 'sort-active' : ''}>
+                                    <span>Логин</span>
+                                    <span className={`sort-arrow ${sortField === 'login' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                            {sortField === 'login' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                        </span>
+                                </th>
                                 <th onClick={() => toggleSort('type')} className={sortField === 'type' ? 'sort-active' : ''}>
                                     <span>Тип</span>
                                     <span className={`sort-arrow ${sortField === 'type' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
@@ -726,7 +749,8 @@ function EmployeesPage() {
                                                 onChange={(e) => handleUserSelect(user.id, e.target.checked)}
                                             />
                                         </td>
-                                        <td className="welder-name-cell">{user.fullName || user.username || '—'}</td>
+                                        <td className="welder-name-cell">{user.fullName || '—'}</td>
+                                        <td>{user.username || '—'}</td>
                                         <td>{getRoleName(user)}</td>
                                         <td>{getRootOrganizationName(user)}</td>
                                         <td>{getOrganizationUnitName(user)}</td>

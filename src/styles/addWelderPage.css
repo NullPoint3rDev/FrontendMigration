@@ -415,23 +415,42 @@
     border-left: 1px solid rgba(59, 49, 74, 0.55);
 }
 
-.rfid-header {
+.rfid-header,
+.section-toolbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
+    flex-shrink: 0;
 }
 
-.rfid-header h2 {
+.rfid-header h2,
+.section-toolbar h2 {
     margin: 0;
     font-size: 13px;
     font-weight: 100;
     color: #6C7386;
 }
 
-.rfid-header .add-btn {
+.rfid-header .add-btn,
+.section-toolbar .add-btn {
     background: #1A1420 !important;
     white-space: nowrap;
+}
+
+.section-toolbar-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.certifications-section .section-toolbar .add-btn,
+.certifications-section .section-toolbar .naks-btn,
+.machines-section .section-toolbar .add-btn,
+.machines-section .section-toolbar .delete-btn {
+    background: #122536 !important;
 }
 
 .section {
@@ -465,18 +484,6 @@
     font-size: 16px;
     font-weight: 500;
     color: #F9F3FD;
-}
-
-.section-actions-only {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 16px;
-    flex-shrink: 0;
-}
-
-.machines-section .section-actions-only {
-    justify-content: space-between;
-    align-items: center;
 }
 
 .section-actions {
