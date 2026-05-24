@@ -7,7 +7,7 @@ import { FaTrash } from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
 import AddRfidPassModal from '../components/AddRfidPassModal';
 import AddMachineModal from '../components/AddMachineModal';
-import { createWelder, getWelderById, updateWelder, uploadWelderPhoto, getWelderPhoto, getWelderPhotoUrl } from '../api/welderApi';
+import { createWelder, getWelderById, updateWelder, uploadWelderPhoto, deleteWelderPhoto, getWelderPhoto, getWelderPhotoUrl } from '../api/welderApi';
 import { getWeldingMachineById } from '../api/weldingMachineApi';
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { buildOrganizationHierarchy } from '../utils/organizationUnitTree';
@@ -126,10 +126,12 @@ function AddWelderPage() {
     const [errors, setErrors] = useState({});
     const [profileImage, setProfileImage] = useState(null);
     const [selectedImageFile, setSelectedImageFile] = useState(null);
+    const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
     const [rfidPasses, setRfidPasses] = useState([]);
     const [certifications, setCertifications] = useState([]);
     const [relatedMachines, setRelatedMachines] = useState([]);
     const [currentWelderStatus, setCurrentWelderStatus] = useState('ACTIVE');
+    const statusBeforeBlockRef = useRef('ACTIVE');
     const [isRfidModalOpen, setIsRfidModalOpen] = useState(false);
     const [isMachineModalOpen, setIsMachineModalOpen] = useState(false);
     const [deviceStatusesByMac, setDeviceStatusesByMac] = useState({});
@@ -608,7 +610,10 @@ function AddWelderPage() {
 
             // Сохраняем текущий статус
             if (welder.status) {
-                setCurrentWelderStatus(welder.status);
+                const loadedStatus = String(welder.status).toUpperCase();
+                setCurrentWelderStatus(loadedStatus);
+                statusBeforeBlockRef.current =
+                    loadedStatus === 'BLOCKED' ? 'ACTIVE' : loadedStatus;
             }
 
             // Загружаем фото, если есть
@@ -752,6 +757,47 @@ function AddWelderPage() {
                 setProfileImage(reader.result);
             };
             reader.readAsDataURL(file);
+        }
+        e.target.value = '';
+    };
+
+    const clearProfileImagePreview = () => {
+        if (profileImage && profileImage.startsWith('blob:')) {
+            URL.revokeObjectURL(profileImage);
+        }
+        setProfileImage(null);
+        setSelectedImageFile(null);
+    };
+
+    const isWelderBlocked = String(currentWelderStatus || '').toUpperCase() === 'BLOCKED';
+
+    const handleWelderBlockChange = (checked) => {
+        if (checked) {
+            if (!isWelderBlocked) {
+                statusBeforeBlockRef.current = currentWelderStatus || 'ACTIVE';
+            }
+            setCurrentWelderStatus('BLOCKED');
+        } else {
+            setCurrentWelderStatus(statusBeforeBlockRef.current || 'ACTIVE');
+        }
+    };
+
+    const handleDeletePhoto = async () => {
+        if (!profileImage || isDeletingPhoto) return;
+        if (!window.confirm('Удалить фото сварщика?')) return;
+
+        setIsDeletingPhoto(true);
+        try {
+            if (isEditMode && id) {
+                await deleteWelderPhoto(id);
+            }
+            clearProfileImagePreview();
+            commitBaseline();
+        } catch (error) {
+            console.error('Ошибка удаления фото:', error);
+            alert(error?.message || 'Не удалось удалить фото');
+        } finally {
+            setIsDeletingPhoto(false);
         }
     };
 
@@ -1095,6 +1141,33 @@ function AddWelderPage() {
         'Монтажник'
     ];
 
+    const Tooltip = ({ text, children }) => {
+        const tooltipRef = useRef(null);
+        const wrapperRef = useRef(null);
+        const handleMouseEnter = () => {
+            if (tooltipRef.current && wrapperRef.current) {
+                const rect = wrapperRef.current.getBoundingClientRect();
+                const tooltipWidth = 300;
+                const spacing = 8;
+                let top = rect.top - (tooltipRef.current.offsetHeight || 100) - spacing;
+                let left = rect.left + rect.width / 2;
+                if (top < 0) top = rect.bottom + spacing;
+                if (left - tooltipWidth / 2 < 0) left = tooltipWidth / 2;
+                else if (left + tooltipWidth / 2 > window.innerWidth) {
+                    left = window.innerWidth - tooltipWidth / 2;
+                }
+                tooltipRef.current.style.top = `${top}px`;
+                tooltipRef.current.style.left = `${left}px`;
+            }
+        };
+        return (
+            <div className="tooltip-wrapper" ref={wrapperRef} onMouseEnter={handleMouseEnter}>
+                {children}
+                <span className="tooltip-text" ref={tooltipRef}>{text}</span>
+            </div>
+        );
+    };
+
     return (
         <div className="add-welder-page">
             {/* Header */}
@@ -1133,15 +1206,28 @@ function AddWelderPage() {
                                     </div>
                                 )}
                             </div>
-                            <label className="change-photo-btn">
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageChange}
-                                    style={{ display: 'none' }}
-                                />
-                                Сменить фото
-                            </label>
+                            <div className="profile-photo-actions">
+                                <label className="change-photo-btn">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                        style={{ display: 'none' }}
+                                        disabled={isDeletingPhoto}
+                                    />
+                                    Сменить фото
+                                </label>
+                                {isEditMode && profileImage && (
+                                    <button
+                                        type="button"
+                                        className="delete-photo-btn"
+                                        onClick={handleDeletePhoto}
+                                        disabled={isDeletingPhoto}
+                                    >
+                                        {isDeletingPhoto ? 'Удаление...' : 'Удалить фото'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         <div className="profile-form-columns">
@@ -1179,22 +1265,26 @@ function AddWelderPage() {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <input
-                                        type="date"
-                                        name="birthDate"
-                                        value={formData.birthDate}
-                                        onChange={handleInputChange}
-                                        placeholder="Год рождения:"
-                                    />
+                                    <Tooltip text="Дата рождения">
+                                        <input
+                                            type="date"
+                                            name="birthDate"
+                                            value={formData.birthDate}
+                                            onChange={handleInputChange}
+                                            placeholder="Год рождения:"
+                                        />
+                                    </Tooltip>
                                 </div>
                                 <div className="form-group">
-                                    <input
-                                        type="date"
-                                        name="hireDate"
-                                        value={formData.hireDate}
-                                        onChange={handleInputChange}
-                                        placeholder="Дата приёма:"
-                                    />
+                                    <Tooltip text="Дата приема на работу">
+                                        <input
+                                            type="date"
+                                            name="hireDate"
+                                            value={formData.hireDate}
+                                            onChange={handleInputChange}
+                                            placeholder="Дата приёма:"
+                                        />
+                                    </Tooltip>
                                 </div>
                             </div>
 
@@ -1270,6 +1360,24 @@ function AddWelderPage() {
                                 </div>
                             </div>
                         </div>
+
+                        {isEditMode && (
+                            <div className="add-welder-block-row">
+                                <input
+                                    type="checkbox"
+                                    id="welder-block-checkbox"
+                                    className="block-checkbox"
+                                    checked={isWelderBlocked}
+                                    onChange={(e) => handleWelderBlockChange(e.target.checked)}
+                                />
+                                <label htmlFor="welder-block-checkbox" className="block-checkbox-label">
+                                    Блокировка
+                                </label>
+                                <span className="add-welder-block-status-label">
+                                    {isWelderBlocked ? 'Сварщик заблокирован' : 'Сварщик активен'}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     {/* RFID Passes Section */}

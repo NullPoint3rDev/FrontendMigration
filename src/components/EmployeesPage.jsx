@@ -57,7 +57,7 @@ function EmployeesPage() {
         typeof savedState?.searchTerm === 'string' ? savedState.searchTerm : ''
     );
     const [sortField, setSortField] = useState(
-        typeof savedState?.sortField === 'string' ? savedState.sortField : 'name'
+        typeof savedState?.sortField === 'string' ? savedState.sortField : 'type'
     );
     const [sortDirection, setSortDirection] = useState(
         savedState?.sortDirection === 'desc' ? 'desc' : 'asc'
@@ -197,13 +197,13 @@ function EmployeesPage() {
 
     const getOrganizationUnitName = (user) => {
         const unitName = user.organizationUnit?.name;
-        if (!unitName) return 'Не указано';
+        if (!unitName) return '—';
         const unitExists = visibleOrganizationUnits.some(
             (unit) =>
                 unit.name === unitName ||
                 (user.organizationUnit?.id && unit.id === user.organizationUnit.id)
         );
-        if (!unitExists) return 'Не указано';
+        if (!unitExists) return '—';
         return unitName;
     };
 
@@ -249,9 +249,10 @@ function EmployeesPage() {
     };
 
     const userMatchesTypeFilter = (user, filter) => {
+        if (filter.includes('blocked') && isBlockedUser(user)) return true;
+        if (isBlockedUser(user)) return false;
         if (filter.includes('admin') && isAdminRole(user)) return true;
         if (filter.includes('user') && !isAdminRole(user)) return true;
-        if (filter.includes('blocked') && isBlockedUser(user)) return true;
         return false;
     };
 
@@ -289,6 +290,9 @@ function EmployeesPage() {
     const isUserOnline = (user) => user.online === true || user.isOnline === true;
 
     const getOnlineDisplay = (user) => {
+        if (isBlockedUser(user)) {
+            return { text: 'Не в сети', className: 'offline', color: '#818EA1' };
+        }
         if (isUserOnline(user)) {
             return { text: 'В сети', className: 'online', color: '#0FA626' };
         }
@@ -399,7 +403,7 @@ function EmployeesPage() {
             } else {
                 filtered = filtered.filter((item) => {
                     const name = getOrganizationUnitName(item);
-                    if (name === 'Не указано') return false;
+                    if (name === '—') return false;
                     return organizationUnitFilter.includes(name);
                 });
             }
@@ -815,6 +819,11 @@ function EmployeesPage() {
                                 const isSelected = selectedUsers.includes(user.id);
                                 const isAdmin = isAdminRole(user);
                                 const isBlocked = isBlockedUser(user);
+                                const userNameCellClass = isBlocked
+                                    ? 'welder-name-cell user-name-cell--blocked'
+                                    : isAdmin
+                                        ? 'welder-name-cell user-name-cell--admin'
+                                        : 'welder-name-cell user-name-cell--regular';
                                 return (
                                     <tr
                                         key={user.id}
@@ -828,7 +837,7 @@ function EmployeesPage() {
                                                 onChange={(e) => handleUserSelect(user.id, e.target.checked)}
                                             />
                                         </td>
-                                        <td className="welder-name-cell">{user.fullName || '—'}</td>
+                                        <td className={userNameCellClass}>{user.fullName || '—'}</td>
                                         <td>{user.username || '—'}</td>
                                         <td>{getRoleName(user)}</td>
                                         <td>{getRootOrganizationName(user)}</td>

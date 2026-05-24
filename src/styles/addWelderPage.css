@@ -157,6 +157,13 @@
     font-size: 14px;
 }
 
+.profile-photo-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
 .change-photo-btn {
     padding: 6px 12px;
     background: #1A1420;
@@ -168,10 +175,132 @@
     transition: all 0.2s ease;
 }
 
+.delete-photo-btn {
+    padding: 6px 12px;
+    background: #1A1420;
+    border: 1px solid rgba(236, 43, 60, 0.45);
+    border-radius: 3px;
+    color: #e88a94;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.delete-photo-btn:hover:not(:disabled) {
+    background: rgba(236, 43, 60, 0.12);
+    color: #EC2B3C;
+}
+
+.delete-photo-btn:disabled,
+.change-photo-btn:has(input:disabled) {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .profile-form-columns {
     flex: 1;
     display: flex;
     gap: 20px;
+}
+
+.add-welder-block-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(59, 49, 74, 0.35);
+    width: 100%;
+}
+
+.add-welder-page .block-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #F0B942;
+    flex-shrink: 0;
+    background-color: #1A1420;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border-radius: 2px;
+    border: 1px solid rgba(87, 77, 95, 0.6);
+}
+
+.add-welder-page .block-checkbox:checked {
+    background-color: #1A1420;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23F0B942' d='M10 3L4.5 8.5L2 6' stroke='%23F0B942' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 10px 10px;
+    border-color: #F0B942;
+}
+
+.add-welder-page .block-checkbox-label {
+    color: #d9d6df;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.add-welder-block-status-label {
+    color: #d9d6df;
+    font-size: 13px;
+    margin-left: 4px;
+}
+
+/* Подсказки при наведении (как на «Картах предприятий») */
+.add-welder-page .form-group .tooltip-wrapper {
+    display: block;
+    width: 100%;
+    overflow: visible;
+}
+
+.add-welder-page .form-group .tooltip-wrapper input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.add-welder-page .tooltip-wrapper {
+    position: relative;
+    display: inline-block;
+    overflow: visible;
+}
+
+.add-welder-page .tooltip-text {
+    visibility: hidden;
+    width: max-content;
+    max-width: 300px;
+    background-color: #2a3441;
+    color: #f0f4ff;
+    text-align: left;
+    border-radius: 4px;
+    padding: 8px 12px;
+    position: fixed;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.1s;
+    font-size: 12px;
+    line-height: 1.4;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(59, 49, 74, 0.55);
+    pointer-events: none;
+    transform: translateX(-50%);
+}
+
+.add-welder-page .tooltip-wrapper:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+.add-welder-page .tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #2a3441 transparent transparent transparent;
 }
 
 .form-column {

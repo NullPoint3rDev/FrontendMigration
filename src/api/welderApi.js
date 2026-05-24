@@ -207,6 +207,28 @@ export const getWelderPhotoUrl = (welderId) => {
     return `${API_BASE_URL}${API_URL}/${welderId}/photo`;
 };
 
+export const deleteWelderPhoto = async (welderId) => {
+    try {
+        const token = localStorage.getItem('token');
+        const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://192.168.10.137:8084/api';
+        const response = await fetch(`${API_BASE_URL}${API_URL}/${welderId}/photo`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Accept': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Ошибка удаления фото');
+        }
+    } catch (error) {
+        console.error('Error deleting welder photo:', error);
+        throw error;
+    }
+};
+
 export const getWelderPhoto = async (welderId) => {
     try {
         const token = localStorage.getItem('token');

@@ -39,7 +39,7 @@ function getWelderStatusDisplay(welder, onlineWelderId) {
         return { text: 'В сети', className: 'online', color: '#0FA626' };
     }
     const status = String(welder.status || '').toUpperCase();
-    if (status === 'DISMISSED' || status === 'INACTIVE') {
+    if (status === 'DISMISSED' || status === 'INACTIVE' || status === 'BLOCKED') {
         return { text: 'Заблокирован', className: 'blocked', color: '#445569' };
     }
     switch (welder.uiStatus || welder.status) {

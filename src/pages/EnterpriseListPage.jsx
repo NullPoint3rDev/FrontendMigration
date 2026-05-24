@@ -28,7 +28,10 @@ const isUserExcludedFromStats = (user) => {
     return s === 'deleted' || s === 'blocked' || s === 'заблокирован';
 };
 
-const isWelderDismissed = (welder) => String(welder.status || '').toUpperCase() === 'DISMISSED';
+const isWelderDismissed = (welder) => {
+    const s = String(welder.status || '').toUpperCase();
+    return s === 'DISMISSED' || s === 'BLOCKED';
+};
 
 function EnterpriseListPage() {
     const navigate = useNavigate();

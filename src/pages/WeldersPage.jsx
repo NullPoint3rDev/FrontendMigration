@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { FaChevronRight, FaChevronDown, FaBell, FaArrowRight } from 'react-icons/fa';
 import '../styles/weldersPage.css';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import UserProfile from '../components/UserProfile';
 import MoveWeldersModal from '../components/MoveWeldersModal';
 import WelderIcon from '../images/WelderIcon.png';
@@ -22,6 +22,22 @@ import {
 } from '../utils/organizationUnitFilterGroups';
 
 const WELDERS_PAGE_STATE_KEY = 'weldersPageState';
+const STATUS_FILTER_OPTIONS = ['blocked', 'online', 'offline'];
+
+function getWelderStatusRaw(welder) {
+    const s = welder?.status;
+    if (s == null || s === '') return '';
+    if (typeof s === 'string') return s.trim();
+    if (typeof s === 'object') {
+        return String(s.name || s.value || s.status || '').trim();
+    }
+    return String(s).trim();
+}
+
+function normalizeStatusFilterFromSaved(saved) {
+    if (!Array.isArray(saved)) return [];
+    return saved.filter((k) => k === '__NONE__' || STATUS_FILTER_OPTIONS.includes(k));
+}
 
 function loadWeldersPageState() {
     try {
@@ -55,6 +71,9 @@ function WeldersPage() {
     const [withoutGroupFilter, setWithoutGroupFilter] = useState(
         savedState?.withoutGroupFilter === true
     );
+    const [statusFilter, setStatusFilter] = useState(() =>
+        normalizeStatusFilterFromSaved(savedState?.statusFilter)
+    );
     const [searchTerm, setSearchTerm] = useState(
         typeof savedState?.searchTerm === 'string' ? savedState.searchTerm : ''
     );
@@ -66,7 +85,8 @@ function WeldersPage() {
     );
     const [expandedFilters, setExpandedFilters] = useState({
         department: true,
-        hazardousGroups: true
+        status: true,
+        hazardousGroups: true,
     });
     const [expandedHazardousGroups, setExpandedHazardousGroups] = useState({});
     const [expandedOrganizationUnits, setExpandedOrganizationUnits] = useState({});
@@ -77,15 +97,19 @@ function WeldersPage() {
     const [currentUserOrgId, setCurrentUserOrgId] = useState(null);
     const [isEnterpriseScopedRole, setIsEnterpriseScopedRole] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
 
-
-    // Load welders from API only
     useEffect(() => {
-        loadWelders();
         loadOrganizationUnits();
         loadOrganizations();
         loadCurrentUserScope();
     }, []);
+
+    useEffect(() => {
+        if (location.pathname === '/welders') {
+            loadWelders();
+        }
+    }, [location.pathname]);
 
     const loadOrganizations = async () => {
         try {
@@ -120,11 +144,12 @@ function WeldersPage() {
             organizationUnitFilter,
             hazardousGroupsFilter,
             withoutGroupFilter,
+            statusFilter,
             searchTerm,
             sortField,
             sortDirection,
         });
-    }, [organizationUnitFilter, hazardousGroupsFilter, withoutGroupFilter, searchTerm, sortField, sortDirection]);
+    }, [organizationUnitFilter, hazardousGroupsFilter, withoutGroupFilter, statusFilter, searchTerm, sortField, sortDirection]);
 
 
     const openAddModal = () => {
@@ -277,22 +302,78 @@ function WeldersPage() {
         return unitName;
     };
 
-    // Функция для форматирования статуса сварщика
+    // Функция для форматирования статуса сварщика (столбец «Статус»)
     const getWelderStatusDisplay = (welder) => {
-        const status = welder.status || 'offline';
+        const statusKey = getWelderStatusRaw(welder);
+        const raw = statusKey.toUpperCase();
+        if (
+            raw === 'BLOCKED' ||
+            raw === 'DISMISSED' ||
+            raw === 'INACTIVE' ||
+            statusKey.toLowerCase() === 'blocked' ||
+            statusKey.toLowerCase() === 'заблокирован'
+        ) {
+            return { text: 'Заблокирован', className: 'blocked', color: '#445569' };
+        }
+        const status = statusKey.toLowerCase();
         switch (status) {
             case 'online':
-            case 'В сети':
+            case 'в сети':
                 return { text: 'В сети', className: 'online', color: '#0FA626' };
             case 'offline':
-            case 'Не в сети':
+            case 'не в сети':
                 return { text: 'Не в сети', className: 'offline', color: '#818EA1' };
-            case 'blocked':
-            case 'Заблокирован':
-                return { text: 'Заблокирован', className: 'blocked', color: '#445569' };
             default:
                 return { text: 'Не в сети', className: 'offline', color: '#818EA1' };
         }
+    };
+
+    const isWelderBlockedForFilter = (welder) => {
+        const statusKey = getWelderStatusRaw(welder);
+        const raw = statusKey.toUpperCase();
+        if (raw === 'BLOCKED' || raw === 'DISMISSED' || raw === 'INACTIVE') return true;
+        const s = statusKey.toLowerCase();
+        return s === 'blocked' || s === 'заблокирован';
+    };
+
+    const isWelderOnlineForFilter = (welder) => {
+        if (isWelderBlockedForFilter(welder)) return false;
+        return getWelderStatusDisplay(welder).className === 'online';
+    };
+
+    const isWelderOfflineForFilter = (welder) => {
+        if (isWelderBlockedForFilter(welder)) return false;
+        return getWelderStatusDisplay(welder).className === 'offline';
+    };
+
+    const welderMatchesStatusFilter = (welder, filter) => {
+        if (filter.includes('blocked') && isWelderBlockedForFilter(welder)) return true;
+        if (filter.includes('online') && isWelderOnlineForFilter(welder)) return true;
+        if (filter.includes('offline') && isWelderOfflineForFilter(welder)) return true;
+        return false;
+    };
+
+    const toggleStatusFilterOption = (key) => {
+        setStatusFilter((prev) => {
+            const isNone = prev.length === 1 && prev[0] === '__NONE__';
+            const isAllState =
+                prev.length === 0 || STATUS_FILTER_OPTIONS.every((k) => prev.includes(k));
+            const currentlyChecked = !isNone && (isAllState || prev.includes(key));
+
+            if (!currentlyChecked) {
+                if (isNone) return [key];
+                const next = [...prev];
+                if (!next.includes(key)) next.push(key);
+                if (STATUS_FILTER_OPTIONS.every((k) => next.includes(k))) return [];
+                return next;
+            }
+
+            if (prev.length === 0) {
+                return STATUS_FILTER_OPTIONS.filter((k) => k !== key);
+            }
+            const next = prev.filter((k) => k !== key);
+            return next.length === 0 ? ['__NONE__'] : next;
+        });
     };
 
     const toggleSort = (field) => {
@@ -315,7 +396,7 @@ function WeldersPage() {
                     case 'position': return (item.position || '').toLowerCase();
                     case 'unit': return getOrganizationUnitName(item).toLowerCase();
                     case 'admissionType': return (item.admissionType || '').toLowerCase();
-                    case 'status': return (item.status || '').toLowerCase();
+                    case 'status': return getWelderStatusDisplay(item).text.toLowerCase();
                     default: return '';
                 }
             };
@@ -433,6 +514,14 @@ function WeldersPage() {
                     }
                     return organizationUnitFilter.includes(unitName);
                 });
+            }
+        }
+
+        if (statusFilter.length > 0) {
+            if (statusFilter.length === 1 && statusFilter[0] === '__NONE__') {
+                filtered = [];
+            } else {
+                filtered = filtered.filter((item) => welderMatchesStatusFilter(item, statusFilter));
             }
         }
 
@@ -978,6 +1067,70 @@ function WeldersPage() {
                                             Нет доступных подразделений
                                         </div>
                                     )}
+                                </div>
+                            );
+                        })()}
+                    </div>
+
+                    <div className="filter-tile">
+                        <button
+                            className="filter-tile-header"
+                            onClick={() => toggleFilter('status')}
+                        >
+                            <span>Статус</span>
+                            <span className="filter-arrow">{expandedFilters.status ? '▾' : '▸'}</span>
+                        </button>
+                        {expandedFilters.status && (() => {
+                            const isNoneSelected =
+                                statusFilter.length === 1 && statusFilter[0] === '__NONE__';
+                            const isAllSelected =
+                                (statusFilter.length === 0 ||
+                                    STATUS_FILTER_OPTIONS.every((k) => statusFilter.includes(k))) &&
+                                !isNoneSelected;
+                            const showAllChecked = statusFilter.length === 0 && !isNoneSelected;
+                            const isStatusOptionChecked = (key) =>
+                                showAllChecked || (!isNoneSelected && statusFilter.includes(key));
+
+                            return (
+                                <div className="filter-tile-content">
+                                    <label className="filter-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={isAllSelected}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setStatusFilter([]);
+                                                } else {
+                                                    setStatusFilter(['__NONE__']);
+                                                }
+                                            }}
+                                        />
+                                        <span>Все</span>
+                                    </label>
+                                    <label className="filter-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={isStatusOptionChecked('blocked')}
+                                            onChange={() => toggleStatusFilterOption('blocked')}
+                                        />
+                                        <span>Заблокирован</span>
+                                    </label>
+                                    <label className="filter-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={isStatusOptionChecked('online')}
+                                            onChange={() => toggleStatusFilterOption('online')}
+                                        />
+                                        <span>В сети</span>
+                                    </label>
+                                    <label className="filter-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={isStatusOptionChecked('offline')}
+                                            onChange={() => toggleStatusFilterOption('offline')}
+                                        />
+                                        <span>Не в сети</span>
+                                    </label>
                                 </div>
                             );
                         })()}
