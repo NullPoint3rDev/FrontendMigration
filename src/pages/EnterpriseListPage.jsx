@@ -7,7 +7,7 @@ import OrganizationLogo from '../images/OrganizationLogo.png';
 import ResourcesLogo from '../images/ResourcesLogo.png';
 import WelderIcon from '../images/WelderIcon.png';
 import { api } from '../services/api';
-import { getRoles } from '../api/userAccountApi';
+import { getRoles, getAllUserAccounts } from '../api/userAccountApi';
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { getAllWelders } from '../api/welderApi';
 import { getAllWeldingMachines } from '../api/weldingMachineApi';
@@ -15,12 +15,28 @@ import '../styles/enterpriseMapPage.css';
 import '../styles/organizationUnitsList.css';
 import '../styles/enterpriseListPage.css';
 
+const normId = (id) => {
+    if (id == null) return null;
+    return typeof id === 'string' ? parseInt(id, 10) : id;
+};
+
+const getUnitOrganizationId = (unit) =>
+    normId(unit.organizationId ?? unit.organization_id ?? unit.organization?.id);
+
+const isUserExcludedFromStats = (user) => {
+    const s = String(user.status || '').toLowerCase();
+    return s === 'deleted' || s === 'blocked' || s === 'заблокирован';
+};
+
+const isWelderDismissed = (welder) => String(welder.status || '').toUpperCase() === 'DISMISSED';
+
 function EnterpriseListPage() {
     const navigate = useNavigate();
     const [organizations, setOrganizations] = useState([]);
     const [allUnits, setAllUnits] = useState([]);
     const [welders, setWelders] = useState([]);
     const [weldingMachines, setWeldingMachines] = useState([]);
+    const [userAccounts, setUserAccounts] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedIds, setSelectedIds] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -88,22 +104,25 @@ function EnterpriseListPage() {
         const load = async () => {
             try {
                 setLoading(true);
-                const [orgs, units, w, machines] = await Promise.all([
+                const [orgs, units, w, machines, users] = await Promise.all([
                     api.getOrganizations(),
                     getAllOrganizationUnits(),
                     getAllWelders(),
                     getAllWeldingMachines(),
+                    getAllUserAccounts(),
                 ]);
                 setOrganizations(Array.isArray(orgs) ? orgs : []);
                 setAllUnits(Array.isArray(units) ? units : []);
                 setWelders(Array.isArray(w) ? w : []);
                 setWeldingMachines(Array.isArray(machines) ? machines : []);
+                setUserAccounts(Array.isArray(users) ? users : []);
             } catch (err) {
                 console.error(err);
                 setOrganizations([]);
                 setAllUnits([]);
                 setWelders([]);
                 setWeldingMachines([]);
+                setUserAccounts([]);
             } finally {
                 setLoading(false);
             }
@@ -111,52 +130,59 @@ function EnterpriseListPage() {
         load();
     }, []);
 
-    const getUnitIdsForOrganization = (organizationId) => {
-        const norm = (id) => (id == null ? null : typeof id === 'string' ? parseInt(id, 10) : id);
-        const orgId = norm(organizationId);
-        const units = allUnits.filter((u) => norm(u.organizationId ?? u.organization_id) === orgId);
-        const ids = new Set(units.map((u) => norm(u.id)));
-        const parentMap = new Map();
-        units.forEach((u) => {
-            const pid = u.parentId ?? u.parent_id ?? u.parentDepartment?.id;
-            if (pid != null) parentMap.set(norm(u.id), norm(pid));
-        });
-        units.forEach((u) => {
-            let id = norm(u.id);
-            while (parentMap.has(id)) {
-                id = parentMap.get(id);
-                ids.add(id);
-            }
-        });
-        return Array.from(ids);
-    };
-
     const statsByOrg = useMemo(() => {
         const result = {};
         organizations.forEach((org) => {
-            const unitIds = getUnitIdsForOrganization(org.id);
+            const orgId = normId(org.id);
+            const orgIdKey = String(orgId);
+            const unitsForOrg = allUnits.filter((u) => String(getUnitOrganizationId(u)) === orgIdKey);
+            const unitIdSet = new Set(unitsForOrg.map((u) => normId(u.id)));
+            const unitNames = unitsForOrg.map((u) => u.name).filter(Boolean);
+
+            const usersCount = userAccounts.filter((user) => {
+                if (isUserExcludedFromStats(user)) return false;
+
+                const userUnitId = user.organizationUnitId ?? user.organizationUnit?.id;
+                if (userUnitId != null) {
+                    return unitIdSet.has(normId(userUnitId));
+                }
+
+                const userOrgId = user.organizationId ?? user.organization?.id;
+                if (userOrgId != null && String(normId(userOrgId)) === orgIdKey) {
+                    return true;
+                }
+
+                const userUnitName = user.organizationUnit?.name;
+                return Boolean(userUnitName && unitNames.includes(userUnitName));
+            }).length;
+
             const weldersCount = welders.filter((w) => {
-                const uid = w.organizationUnitId ?? w.organizationUnit?.id;
-                if (uid == null) return false;
-                return unitIds.includes(typeof uid === 'string' ? parseInt(uid, 10) : uid);
+                if (isWelderDismissed(w)) return false;
+
+                const welderUnitId = w.organizationUnitId ?? w.organizationUnit?.id;
+                if (welderUnitId != null) {
+                    return unitIdSet.has(normId(welderUnitId));
+                }
+
+                const department = w.organizationUnit?.name || w.department;
+                return Boolean(department && unitNames.includes(department));
             }).length;
+
             const machinesCount = weldingMachines.filter((m) => {
-                const uid = m.organizationUnitId ?? m.organizationUnit?.id;
-                if (uid == null) return false;
-                return unitIds.includes(typeof uid === 'string' ? parseInt(uid, 10) : uid);
+                const machineUnitId = m.organizationUnitId ?? m.organizationUnit?.id;
+                if (machineUnitId == null) return false;
+                return unitIdSet.has(normId(machineUnitId));
             }).length;
-            const unitsForOrg = allUnits.filter(
-                (u) => (typeof u.organizationId !== 'undefined' ? u.organizationId : u.organization_id) === org.id
-            );
+
             result[org.id] = {
                 subdivisions: unitsForOrg.length,
                 welders: weldersCount,
                 weldingMachines: machinesCount,
-                users: 0,
+                users: usersCount,
             };
         });
         return result;
-    }, [organizations, allUnits, welders, weldingMachines]);
+    }, [organizations, allUnits, welders, weldingMachines, userAccounts]);
 
     const filteredOrganizations = useMemo(() => {
         if (!canViewEnterprises) return [];
@@ -334,7 +360,7 @@ function EnterpriseListPage() {
                                             </div>
                                         </td>
                                         <td>
-                                            <Tooltip text="Количество пользователей в подразделении и во вложенных">
+                                            <Tooltip text="Количество пользователей предприятия (во всех подразделениях)">
                                                 <div className="org-unit-stat-tile">
                                                     <FaUser className="stat-icon" />
                                                     <span className="stat-number">{stats.users}</span>
@@ -342,7 +368,7 @@ function EnterpriseListPage() {
                                             </Tooltip>
                                         </td>
                                         <td>
-                                            <Tooltip text="Количество дочерних подразделений">
+                                            <Tooltip text="Количество подразделений предприятия">
                                                 <div className="org-unit-stat-tile">
                                                     <img src={OrganizationLogo} alt="" className="stat-icon-img" />
                                                     <span className="stat-number">{stats.subdivisions}</span>
@@ -350,7 +376,7 @@ function EnterpriseListPage() {
                                             </Tooltip>
                                         </td>
                                         <td>
-                                            <Tooltip text="Количество сварочных аппаратов в подразделении и во вложенных">
+                                            <Tooltip text="Количество сварочных аппаратов предприятия (с указанным подразделением)">
                                                 <div className="org-unit-stat-tile">
                                                     <img src={ResourcesLogo} alt="" className="stat-icon-img" />
                                                     <span className="stat-number">{stats.weldingMachines}</span>
@@ -358,7 +384,7 @@ function EnterpriseListPage() {
                                             </Tooltip>
                                         </td>
                                         <td>
-                                            <Tooltip text="Количество сварщиков в подразделении и во вложенных">
+                                            <Tooltip text="Количество сварщиков предприятия (кроме уволенных)">
                                                 <div className="org-unit-stat-tile">
                                                     <img src={WelderIcon} alt="" className="stat-icon-img" />
                                                     <span className="stat-number">{stats.welders}</span>

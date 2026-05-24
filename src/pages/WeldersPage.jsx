@@ -235,9 +235,14 @@ function WeldersPage() {
         [visibleOrganizationUnits]
     );
 
+    const visibleOrganizationsList = useMemo(() => {
+        if (!isEnterpriseScopedRole || currentUserOrgId == null) return organizationsList;
+        return organizationsList.filter((o) => String(o.id) === String(currentUserOrgId));
+    }, [organizationsList, isEnterpriseScopedRole, currentUserOrgId]);
+
     const organizationsForFilter = useMemo(
-        () => groupUnitsByOrganization(visibleOrganizationUnits, organizationsList),
-        [visibleOrganizationUnits, organizationsList]
+        () => groupUnitsByOrganization(visibleOrganizationUnits, visibleOrganizationsList),
+        [visibleOrganizationUnits, visibleOrganizationsList]
     );
 
     const visibleWelders = useMemo(() => {

@@ -38,6 +38,21 @@ export function groupUnitsByOrganization(visibleUnits, organizationsList) {
         orgMap.get(key).units.push(u);
     });
 
+    // Предприятия без подразделений тоже показываем в фильтре (как на «Картах предприятий»)
+    (organizationsList || []).forEach((o) => {
+        if (o?.id == null) return;
+        const key = String(o.id);
+        if (restrictToActiveOrgs && !activeOrgIds.has(key)) return;
+        if (!orgMap.has(key)) {
+            orgMap.set(key, {
+                orgKey: key,
+                orgId: o.id,
+                orgName: o.name || `Предприятие #${o.id}`,
+                units: [],
+            });
+        }
+    });
+
     return Array.from(orgMap.values())
         .map((entry) => ({
             orgKey: entry.orgKey,

@@ -508,6 +508,118 @@
     background: #F7A92B !important;
 }
 
+/* Строки пользователей с любой админ-ролью */
+.welders-table tbody tr.table-row-admin {
+    box-shadow: inset 3px 0 0 rgba(246, 178, 67, 0.9);
+}
+
+.welders-table tbody tr.table-row-admin:nth-child(odd) {
+    background: linear-gradient(
+            90deg,
+            rgba(246, 178, 67, 0.16) 0%,
+            rgba(246, 178, 67, 0.07) 28%,
+            #122536 55%
+    ) !important;
+}
+
+.welders-table tbody tr.table-row-admin:nth-child(even) {
+    background: linear-gradient(
+            90deg,
+            rgba(246, 178, 67, 0.14) 0%,
+            rgba(246, 178, 67, 0.06) 28%,
+            #1A1420 55%
+    ) !important;
+}
+
+.welders-table tbody tr.table-row-admin td {
+    color: #9aa8ba;
+}
+
+.welders-table tbody tr.table-row-admin td.welder-name-cell {
+    color: #d4c4a8;
+    font-weight: 500;
+}
+
+.welders-table tbody tr.table-row-admin.selected,
+.welders-table tbody tr.table-row-admin.selected:hover {
+    background: #F7A92B !important;
+    box-shadow: none;
+}
+
+.welders-table tbody tr.table-row-admin.selected td,
+.welders-table tbody tr.table-row-admin.selected td.welder-name-cell {
+    color: #1a1420;
+}
+
+/* Строки заблокированных пользователей */
+.welders-table tbody tr.table-row-blocked {
+    box-shadow: inset 3px 0 0 rgba(129, 142, 161, 0.95);
+}
+
+.welders-table tbody tr.table-row-blocked:nth-child(odd) {
+    background: linear-gradient(
+            90deg,
+            rgba(129, 142, 161, 0.18) 0%,
+            rgba(129, 142, 161, 0.08) 28%,
+            #122536 55%
+    ) !important;
+}
+
+.welders-table tbody tr.table-row-blocked:nth-child(even) {
+    background: linear-gradient(
+            90deg,
+            rgba(129, 142, 161, 0.15) 0%,
+            rgba(129, 142, 161, 0.06) 28%,
+            #1A1420 55%
+    ) !important;
+}
+
+.welders-table tbody tr.table-row-blocked td {
+    color: #6e7d8f;
+}
+
+.welders-table tbody tr.table-row-blocked td.welder-name-cell {
+    color: #9aa5b3;
+    font-weight: 500;
+}
+
+.welders-table tbody tr.table-row-admin.table-row-blocked {
+    box-shadow: inset 3px 0 0 rgba(129, 142, 161, 0.95);
+}
+
+.welders-table tbody tr.table-row-admin.table-row-blocked:nth-child(odd),
+.welders-table tbody tr.table-row-admin.table-row-blocked:nth-child(even) {
+    background: linear-gradient(
+            90deg,
+            rgba(129, 142, 161, 0.18) 0%,
+            rgba(129, 142, 161, 0.08) 28%,
+            #1a1e24 55%
+    ) !important;
+}
+
+.welders-table tbody tr.table-row-admin.table-row-blocked td {
+    color: #6e7d8f;
+}
+
+.welders-table tbody tr.table-row-admin.table-row-blocked td.welder-name-cell {
+    color: #9aa5b3;
+}
+
+.welders-table tbody tr.table-row-blocked.selected,
+.welders-table tbody tr.table-row-blocked.selected:hover,
+.welders-table tbody tr.table-row-admin.table-row-blocked.selected,
+.welders-table tbody tr.table-row-admin.table-row-blocked.selected:hover {
+    background: #F7A92B !important;
+    box-shadow: none;
+}
+
+.welders-table tbody tr.table-row-blocked.selected td,
+.welders-table tbody tr.table-row-blocked.selected td.welder-name-cell,
+.welders-table tbody tr.table-row-admin.table-row-blocked.selected td,
+.welders-table tbody tr.table-row-admin.table-row-blocked.selected td.welder-name-cell {
+    color: #1a1420;
+}
+
 .welders-table td {
     padding: 2px 10px !important;
     height: 28px !important;

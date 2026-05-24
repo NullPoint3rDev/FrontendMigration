@@ -17,6 +17,14 @@ import {
 } from '../utils/organizationUnitFilterGroups';
 
 const USERS_PAGE_STATE_KEY = 'usersPageState';
+const TYPE_FILTER_OPTIONS = ['admin', 'user', 'blocked'];
+
+function normalizeTypeFilterFromSaved(saved) {
+    if (Array.isArray(saved)) return saved;
+    if (saved === 'admin') return ['admin'];
+    if (saved === 'user') return ['user'];
+    return [];
+}
 
 function loadUsersPageState() {
     try {
@@ -42,8 +50,8 @@ function EmployeesPage() {
     const [organizationUnitFilter, setOrganizationUnitFilter] = useState(
         Array.isArray(savedState?.organizationUnitFilter) ? savedState.organizationUnitFilter : []
     );
-    const [typeFilter, setTypeFilter] = useState(
-        savedState?.typeFilter || 'all' // 'all' | 'admin' | 'user'
+    const [typeFilter, setTypeFilter] = useState(() =>
+        normalizeTypeFilterFromSaved(savedState?.typeFilter)
     );
     const [searchTerm, setSearchTerm] = useState(
         typeof savedState?.searchTerm === 'string' ? savedState.searchTerm : ''
@@ -157,9 +165,14 @@ function EmployeesPage() {
         [visibleOrganizationUnits]
     );
 
+    const visibleOrganizationsList = useMemo(() => {
+        if (!isEnterpriseScopedRole || currentUserOrgId == null) return organizationsList;
+        return organizationsList.filter((o) => String(o.id) === String(currentUserOrgId));
+    }, [organizationsList, isEnterpriseScopedRole, currentUserOrgId]);
+
     const organizationsForFilter = useMemo(
-        () => groupUnitsByOrganization(visibleOrganizationUnits, organizationsList),
-        [visibleOrganizationUnits, organizationsList]
+        () => groupUnitsByOrganization(visibleOrganizationUnits, visibleOrganizationsList),
+        [visibleOrganizationUnits, visibleOrganizationsList]
     );
 
     const visibleUsers = useMemo(() => {
@@ -230,6 +243,41 @@ function EmployeesPage() {
         return name.includes('admin') || name.includes('админ');
     };
 
+    const isBlockedUser = (user) => {
+        const s = (user.status || '').toString().toLowerCase();
+        return s === 'blocked' || s === 'заблокирован';
+    };
+
+    const userMatchesTypeFilter = (user, filter) => {
+        if (filter.includes('admin') && isAdminRole(user)) return true;
+        if (filter.includes('user') && !isAdminRole(user)) return true;
+        if (filter.includes('blocked') && isBlockedUser(user)) return true;
+        return false;
+    };
+
+    const toggleTypeFilterOption = (key) => {
+        setTypeFilter((prev) => {
+            const isNone = prev.length === 1 && prev[0] === '__NONE__';
+            const isAllState =
+                prev.length === 0 || TYPE_FILTER_OPTIONS.every((k) => prev.includes(k));
+            const currentlyChecked = !isNone && (isAllState || prev.includes(key));
+
+            if (!currentlyChecked) {
+                if (isNone) return [key];
+                const next = [...prev];
+                if (!next.includes(key)) next.push(key);
+                if (TYPE_FILTER_OPTIONS.every((k) => next.includes(k))) return [];
+                return next;
+            }
+
+            if (prev.length === 0) {
+                return TYPE_FILTER_OPTIONS.filter((k) => k !== key);
+            }
+            const next = prev.filter((k) => k !== key);
+            return next.length === 0 ? ['__NONE__'] : next;
+        });
+    };
+
     const getBlockedDisplay = (user) => {
         const s = (user.status || '').toString().toLowerCase();
         if (s === 'blocked' || s === 'заблокирован') {
@@ -238,9 +286,10 @@ function EmployeesPage() {
         return { text: 'Активен', className: 'active', color: '#5C6D81' };
     };
 
+    const isUserOnline = (user) => user.online === true || user.isOnline === true;
+
     const getOnlineDisplay = (user) => {
-        const s = (user.status || '').toString().toLowerCase();
-        if (s === 'online' || s === 'в сети') {
+        if (isUserOnline(user)) {
             return { text: 'В сети', className: 'online', color: '#0FA626' };
         }
         return { text: 'Не в сети', className: 'offline', color: '#818EA1' };
@@ -356,10 +405,12 @@ function EmployeesPage() {
             }
         }
 
-        if (typeFilter === 'admin') {
-            filtered = filtered.filter((item) => isAdminRole(item));
-        } else if (typeFilter === 'user') {
-            filtered = filtered.filter((item) => !isAdminRole(item));
+        if (typeFilter.length > 0) {
+            if (typeFilter.length === 1 && typeFilter[0] === '__NONE__') {
+                filtered = [];
+            } else {
+                filtered = filtered.filter((item) => userMatchesTypeFilter(item, typeFilter));
+            }
         }
 
         if (searchTerm) {
@@ -471,34 +522,60 @@ function EmployeesPage() {
                             <span>Тип</span>
                             <span className="filter-arrow">{expandedFilters.type ? '▾' : '▸'}</span>
                         </button>
-                        {expandedFilters.type && (
-                            <div className="filter-tile-content">
-                                <label className="filter-checkbox">
-                                    <input
-                                        type="checkbox"
-                                        checked={typeFilter === 'all'}
-                                        onChange={() => setTypeFilter('all')}
-                                    />
-                                    <span>Все</span>
-                                </label>
-                                <label className="filter-checkbox">
-                                    <input
-                                        type="checkbox"
-                                        checked={typeFilter === 'admin'}
-                                        onChange={() => setTypeFilter('admin')}
-                                    />
-                                    <span>Администраторы</span>
-                                </label>
-                                <label className="filter-checkbox">
-                                    <input
-                                        type="checkbox"
-                                        checked={typeFilter === 'user'}
-                                        onChange={() => setTypeFilter('user')}
-                                    />
-                                    <span>Пользователи</span>
-                                </label>
-                            </div>
-                        )}
+                        {expandedFilters.type && (() => {
+                            const isNoneSelected =
+                                typeFilter.length === 1 && typeFilter[0] === '__NONE__';
+                            const isAllSelected =
+                                (typeFilter.length === 0 ||
+                                    TYPE_FILTER_OPTIONS.every((k) => typeFilter.includes(k))) &&
+                                !isNoneSelected;
+                            const showAllChecked = typeFilter.length === 0 && !isNoneSelected;
+                            const isTypeOptionChecked = (key) =>
+                                showAllChecked || (!isNoneSelected && typeFilter.includes(key));
+
+                            return (
+                                <div className="filter-tile-content">
+                                    <label className="filter-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={isAllSelected}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setTypeFilter([]);
+                                                } else {
+                                                    setTypeFilter(['__NONE__']);
+                                                }
+                                            }}
+                                        />
+                                        <span>Все</span>
+                                    </label>
+                                    <label className="filter-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={isTypeOptionChecked('admin')}
+                                            onChange={() => toggleTypeFilterOption('admin')}
+                                        />
+                                        <span>Администраторы</span>
+                                    </label>
+                                    <label className="filter-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={isTypeOptionChecked('user')}
+                                            onChange={() => toggleTypeFilterOption('user')}
+                                        />
+                                        <span>Пользователи</span>
+                                    </label>
+                                    <label className="filter-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            checked={isTypeOptionChecked('blocked')}
+                                            onChange={() => toggleTypeFilterOption('blocked')}
+                                        />
+                                        <span>Заблокированные</span>
+                                    </label>
+                                </div>
+                            );
+                        })()}
                     </div>
 
                     <div className="filter-tile">
@@ -736,10 +813,12 @@ function EmployeesPage() {
                                 const blockedDisplay = getBlockedDisplay(user);
                                 const onlineDisplay = getOnlineDisplay(user);
                                 const isSelected = selectedUsers.includes(user.id);
+                                const isAdmin = isAdminRole(user);
+                                const isBlocked = isBlockedUser(user);
                                 return (
                                     <tr
                                         key={user.id}
-                                        className={`table-row ${isSelected ? 'selected' : ''}`}
+                                        className={`table-row ${isAdmin ? 'table-row-admin' : ''} ${isBlocked ? 'table-row-blocked' : ''} ${isSelected ? 'selected' : ''}`}
                                         onClick={() => navigate(`/employees/add/${user.id}`)}
                                     >
                                         <td onClick={(e) => e.stopPropagation()}>
