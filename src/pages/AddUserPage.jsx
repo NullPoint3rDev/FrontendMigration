@@ -28,6 +28,12 @@ function AddUserPage() {
     const [currentUserCanCreateEnterprises, setCurrentUserCanCreateEnterprises] = useState(false);
     const [currentUserCanManageEnterpriseAdmins, setCurrentUserCanManageEnterpriseAdmins] = useState(false);
     const [currentUserOrgId, setCurrentUserOrgId] = useState(null);
+    const [currentUserId, setCurrentUserId] = useState(null);
+    const [savedUserStatus, setSavedUserStatus] = useState('Active');
+    const isEditingSelf = useMemo(() => {
+        if (!isEditMode || !id || currentUserId == null) return false;
+        return String(id) === String(currentUserId);
+    }, [isEditMode, id, currentUserId]);
     const [isEnterpriseScopedRole, setIsEnterpriseScopedRole] = useState(false);
     const [organizations, setOrganizations] = useState([]);
     const [organizationUnits, setOrganizationUnits] = useState([]);
@@ -110,6 +116,7 @@ function AddUserPage() {
                 setCurrentUserCanManageEnterpriseAdmins(!!hasManageEnterpriseAdmins);
                 setIsEnterpriseScopedRole(!!(isAdminEnterprise || isUserEnterprise));
                 setCurrentUserOrgId(currentUser.organizationId ?? currentUser.organization?.id ?? null);
+                setCurrentUserId(currentUser.id ?? null);
                 if (!isAdmin && !allowFromEnterpriseFlow && !allowUserAlloyEnterpriseAdmin) {
                     navigate('/employees', { replace: true });
                     return;
@@ -161,6 +168,8 @@ function AddUserPage() {
                                 navigate('/employees', { replace: true });
                                 return;
                             }
+                            const loadedStatus = userData.status || 'Active';
+                            setSavedUserStatus(loadedStatus);
                             setFormData({
                                 userTypeId: roleObj?.name || null,
                                 login: userData.username || '',
@@ -173,7 +182,7 @@ function AddUserPage() {
                                 email: userData.email || '',
                                 emailVerified: !!userData.emailVerified,
                                 personnelNumber: userData.personnelNumber || '',
-                                blocked: (userData.status || '').toLowerCase() === 'blocked',
+                                blocked: (loadedStatus || '').toLowerCase() === 'blocked',
                             });
                             setSavedEmailFromServer((userData.email || '').trim());
                             if (userData.rfid) {
@@ -905,7 +914,9 @@ function AddUserPage() {
                 phone: formData.phone?.trim() || null,
                 email: isEditMode ? formData.email?.trim() || null : null,
                 personnelNumber: formData.personnelNumber?.trim() || null,
-                status: formData.blocked ? 'Blocked' : 'Active',
+                status: isEditingSelf
+                    ? savedUserStatus
+                    : (formData.blocked ? 'Blocked' : 'Active'),
                 rfid: rfidString || null,
                 allowedUserActions: allowedUserActions ?? undefined,
             };
@@ -1257,21 +1268,23 @@ function AddUserPage() {
                                 </div>
                             </div>
 
-                            <div className="add-user-block-row">
-                                <input
-                                    type="checkbox"
-                                    id="block-checkbox"
-                                    className="block-checkbox"
-                                    checked={formData.blocked}
-                                    onChange={(e) => handleInput('blocked', e.target.checked)}
-                                />
-                                <label htmlFor="block-checkbox" className="block-checkbox-label">
-                                    Блокировка
-                                </label>
-                                <span className="add-user-active-label">
-                                    {formData.blocked ? 'Пользователь заблокирован' : 'Пользователь активен'}
-                                </span>
-                            </div>
+                            {!isEditingSelf && (
+                                <div className="add-user-block-row">
+                                    <input
+                                        type="checkbox"
+                                        id="block-checkbox"
+                                        className="block-checkbox"
+                                        checked={formData.blocked}
+                                        onChange={(e) => handleInput('blocked', e.target.checked)}
+                                    />
+                                    <label htmlFor="block-checkbox" className="block-checkbox-label">
+                                        Блокировка
+                                    </label>
+                                    <span className="add-user-active-label">
+                                        {formData.blocked ? 'Пользователь заблокирован' : 'Пользователь активен'}
+                                    </span>
+                                </div>
+                            )}
                         </form>
                     </div>
                 </div>

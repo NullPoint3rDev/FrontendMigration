@@ -19,6 +19,21 @@ import {
 const USERS_PAGE_STATE_KEY = 'usersPageState';
 const TYPE_FILTER_OPTIONS = ['admin', 'user', 'blocked'];
 
+const ROLE_TYPE_LABELS = {
+    ADMIN_ALLOY: 'Администратор Эллой',
+    USER_ALLOY: 'Пользователь Эллой',
+    ADMIN_DEALER: 'Администратор дилера',
+    USER_DEALER: 'Пользователь дилера',
+    ADMIN_ENTERPRISE: 'Администратор предприятия',
+    USER_ENTERPRISE: 'Пользователь предприятия',
+};
+
+function formatRoleTypeLabel(label) {
+    const words = String(label || '').trim().split(/\s+/);
+    if (words.length <= 1) return words[0] || '—';
+    return `${words[0]}\n${words.slice(1).join(' ')}`;
+}
+
 function normalizeTypeFilterFromSaved(saved) {
     if (Array.isArray(saved)) return saved;
     if (saved === 'admin') return ['admin'];
@@ -207,7 +222,14 @@ function EmployeesPage() {
         return unitName;
     };
 
-    const getRootOrganizationName = (user) => {
+    const getOrganizationName = (user) => {
+        const orgId = user.organizationId ?? user.organization?.id ?? null;
+        if (orgId != null) {
+            const fromList = organizationsList.find((o) => String(o.id) === String(orgId));
+            if (fromList?.name) return fromList.name;
+            if (user.organization?.name) return user.organization.name;
+        }
+
         const unitId = user.organizationUnit?.id;
         if (unitId == null) return '—';
         const flat = visibleOrganizationUnits;
@@ -218,21 +240,37 @@ function EmployeesPage() {
         const maxDepth = 50;
         while (current && depth < maxDepth) {
             const parentId = getParentId(current);
-            if (parentId == null) return current.name || '—';
+            if (parentId == null) {
+                const unitOrgId =
+                    current.organizationId ?? current.organization?.id ?? current.organization_id ?? null;
+                if (unitOrgId != null) {
+                    const org = organizationsList.find((o) => String(o.id) === String(unitOrgId));
+                    if (org?.name) return org.name;
+                }
+                return current.name || '—';
+            }
             current = flat.find((u) => u.id === parentId || u.id === parseInt(parentId, 10));
             depth++;
         }
         return current?.name || '—';
     };
 
-    const getRoleName = (user) => {
+    const getRoleTypeLabel = (user) => {
         const roleId = user.userRoleId;
-        if (roleId == null) return 'Польз.';
+        if (roleId == null) return formatRoleTypeLabel('Пользователь');
         const role = roles.find((r) => r.id === roleId || r.id === parseInt(roleId, 10));
-        if (!role || !role.name) return 'Польз.';
-        const name = (role.name || '').toLowerCase();
-        return name.includes('admin') || name.includes('админ') ? 'Админ.' : 'Польз.';
+        if (!role?.name) return formatRoleTypeLabel('Пользователь');
+        const roleKey = String(role.name).toUpperCase();
+        if (ROLE_TYPE_LABELS[roleKey]) {
+            return formatRoleTypeLabel(ROLE_TYPE_LABELS[roleKey]);
+        }
+        const name = role.name.toLowerCase();
+        const fallback =
+            name.includes('admin') || name.includes('админ') ? 'Администратор' : 'Пользователь';
+        return formatRoleTypeLabel(fallback);
     };
+
+    const getRoleTypeSortKey = (user) => getRoleTypeLabel(user).replace(/\n/g, ' ').toLowerCase();
 
     const isAdminRole = (user) => {
         const roleId = user.userRoleId;
@@ -318,9 +356,9 @@ function EmployeesPage() {
                     case 'login':
                         return (item.username || '').toLowerCase();
                     case 'type':
-                        return getRoleName(item);
+                        return getRoleTypeSortKey(item);
                     case 'organization':
-                        return getRootOrganizationName(item).toLowerCase();
+                        return getOrganizationName(item).toLowerCase();
                     case 'unit':
                         return getOrganizationUnitName(item).toLowerCase();
                     case 'position':
@@ -768,7 +806,10 @@ function EmployeesPage() {
                                             {sortField === 'login' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
                                         </span>
                                 </th>
-                                <th onClick={() => toggleSort('type')} className={sortField === 'type' ? 'sort-active' : ''}>
+                                <th
+                                    onClick={() => toggleSort('type')}
+                                    className={`user-type-header ${sortField === 'type' ? 'sort-active' : ''}`}
+                                >
                                     <span>Тип</span>
                                     <span className={`sort-arrow ${sortField === 'type' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
                                             {sortField === 'type' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
@@ -839,8 +880,15 @@ function EmployeesPage() {
                                         </td>
                                         <td className={userNameCellClass}>{user.fullName || '—'}</td>
                                         <td>{user.username || '—'}</td>
-                                        <td>{getRoleName(user)}</td>
-                                        <td>{getRootOrganizationName(user)}</td>
+                                        <td className="user-type-cell">
+                                            {getRoleTypeLabel(user).split('\n').map((line, lineIndex) => (
+                                                <React.Fragment key={lineIndex}>
+                                                    {lineIndex > 0 && <br />}
+                                                    {line}
+                                                </React.Fragment>
+                                            ))}
+                                        </td>
+                                        <td>{getOrganizationName(user)}</td>
                                         <td>{getOrganizationUnitName(user)}</td>
                                         <td>{user.position || '—'}</td>
                                         <td>{user.phone || '—'}</td>
