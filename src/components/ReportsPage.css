@@ -73,6 +73,18 @@
     min-height: 0;
 }
 
+.reports-panel-middle-inner {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+}
+
+.report-type-dropdown-container--locked .report-type-dropdown-header {
+    cursor: not-allowed;
+}
+
 .reports-panel-right {
     flex: 1;
     min-width: 0;
@@ -1542,6 +1554,52 @@
     padding-top: 8px;
     border-top: 1px solid rgba(79, 70, 90, 0.4);
     flex-shrink: 0;
+}
+
+.right-panel-generate-progress {
+    width: 100%;
+    flex-basis: 100%;
+    order: 10;
+    margin-top: 4px;
+}
+
+.right-panel-generate-progress-bar-track {
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(79, 70, 90, 0.45);
+    overflow: hidden;
+}
+
+.right-panel-generate-progress-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #7c4dff 0%, #b388ff 100%);
+    transition: width 0.45s ease-out;
+    will-change: width;
+}
+
+.right-panel-generate-progress-bar-fill-instant {
+    transition: none;
+}
+
+.right-panel-generate-progress-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #c5b8d8;
+}
+
+.right-panel-generate-progress-percent {
+    font-weight: 600;
+    color: #e8ddf5;
+    min-width: 36px;
+}
+
+.right-panel-generate-progress-message {
+    flex: 1;
+    line-height: 1.35;
 }
 
 .right-panel-generate-error {

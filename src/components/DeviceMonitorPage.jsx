@@ -14,7 +14,13 @@ import {
 } from 'chart.js';
 import '../styles/mainContentNew.css';
 import * as archiveDeviceApi from '../api/archiveDeviceApi';
-import { deleteWeldingMachine, getAllWeldingMachines, updateWeldingMachine, getWeldingMachineById, getAllOrganizationUnits } from '../api/weldingMachineApi';
+import {
+    hardDeleteWeldingMachine,
+    getAllWeldingMachines,
+    updateWeldingMachine,
+    getWeldingMachineById,
+    getAllOrganizationUnits,
+} from '../api/weldingMachineApi';
 import { getWelderByRfidCode } from '../api/welderApi';
 import machineImage from '../images/Untitled 3 копия.png';
 import WelderIcon from '../images/WelderIcon.png';
@@ -22,8 +28,10 @@ import AddEquipmentModal from './AddEquipmentModal';
 import { RiRfidFill } from 'react-icons/ri';
 import { FaBell, FaCompress, FaExpand } from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
+import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
 import MonitorWeldersTab from './MonitorWeldersTab';
 import '../styles/monitorWeldersTab.css';
+import { formatWeldingMachineStateDisplay } from '../utils/weldingMachineStateDisplay';
 
 // Названия ошибок по коду 1–23 (синхронно с EquipmentErrorMessages и протоколом аппарата: 1–10, 17–21)
 const EQUIPMENT_ERROR_MESSAGES = [
@@ -118,7 +126,7 @@ const DEFAULT_TELEMETRY_SERIES = TELEMETRY_CHANNELS_CONFIG.reduce((acc, channel)
 
 const DAILY_ACTIVITY_INITIAL = {
     offMs: 0,
-    standbyMs: 0,
+    errorMs: 0,
     onMs: 0,
     weldingMs: 0,
 };
@@ -130,7 +138,7 @@ function applyDailyStatsDto(setDailyActivity, setDailyWireConsumptionKg, dto) {
     if (!dto) return;
     setDailyActivity({
         offMs: Math.max(0, Number(dto.offMs) || 0),
-        standbyMs: Math.max(0, Number(dto.standbyMs) || 0),
+        errorMs: Math.max(0, Number(dto.errorMs ?? dto.standbyMs) || 0),
         onMs: Math.max(0, Number(dto.onMs) || 0),
         weldingMs: Math.max(0, Number(dto.weldingMs) || 0),
     });
@@ -669,6 +677,7 @@ ChartJS.register(
 );
 
 const DeviceMonitorPage = () => {
+    const { canWriteEquipment: canWriteEquipmentPerm } = useCurrentUserPermissions();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const machineName = searchParams.get('machine') || 'Неизвестный аппарат';
@@ -708,6 +717,7 @@ const DeviceMonitorPage = () => {
 
     // Состояние для хранения ID аппарата (для удаления)
     const [machineId, setMachineId] = useState(null);
+    const [isDeletingMachine, setIsDeletingMachine] = useState(false);
     const [rfidLookup, setRfidLookup] = useState({ status: 'idle' });
     /** Кэш поиска по RFID: не перезапрашивать при каждом poll телеметрии, только при смене кода */
     const rfidLookupCacheRef = useRef({ code: null, snapshot: null });
@@ -1986,18 +1996,22 @@ const DeviceMonitorPage = () => {
             return;
         }
 
-        const confirmMessage = `Вы уверены, что хотите удалить аппарат "${equipmentName}"?\n\nЭто действие нельзя отменить.`;
+        const machineLabel = displayName || equipmentName || machineName || 'аппарат';
+        const confirmMessage =
+            `Удалить аппарат «${machineLabel}»?\n\nВсе данные аппарата (включая MAC-адрес) будут безвозвратно удалены из базы данных.`;
         if (!window.confirm(confirmMessage)) {
             return;
         }
 
+        setIsDeletingMachine(true);
         try {
-            await deleteWeldingMachine(machineId);
-            // Перенаправляем на страницу оборудования после успешного удаления
+            await hardDeleteWeldingMachine(machineId);
             navigate('/equipment');
         } catch (err) {
             console.error('Ошибка удаления аппарата:', err);
             alert('Ошибка удаления аппарата: ' + (err.message || 'Неизвестная ошибка'));
+        } finally {
+            setIsDeletingMachine(false);
         }
     };
 
@@ -2558,7 +2572,7 @@ const DeviceMonitorPage = () => {
             const stateColor = weldingMachineState ? getStateColor(weldingMachineState) : null;
             params.push({
                 label: 'Состояние аппарата',
-                value: isDeviceOff ? 'Не в сети' : weldingMachineState,
+                value: isDeviceOff ? 'Не в сети' : formatWeldingMachineStateDisplay(weldingMachineState),
                 stateColor: stateColor // Добавляем цвет для состояния
             });
         }
@@ -2979,7 +2993,7 @@ const DeviceMonitorPage = () => {
     const machineStateValue = (!hasData || !currentStatusData)
         ? 'Не в сети'
         : (currentStatusData['Состояние аппарата'] || currentStatusData['WeldingMachineState'] || currentStatusData.weldingMachineState || 'Не в сети');
-    const machineStateDisplayValue = machineStateValue === 'Авария' ? 'Ошибка' : machineStateValue;
+    const machineStateDisplayValue = formatWeldingMachineStateDisplay(machineStateValue);
     const machineStateColor = getStateColor(machineStateValue) || 'rgba(242, 241, 244, 0.9)';
     const statusPhaseA = parseNumberOrNull(
         currentStatusData['Напряжение фазы А'] ??
@@ -4301,6 +4315,7 @@ const DeviceMonitorPage = () => {
                                     type="button"
                                     className="machine-info-icon-tile"
                                     onClick={handleOpenEditModal}
+                                    disabled={!canWriteEquipmentPerm}
                                     title="Редактировать наименование и подразделение"
                                 >
                                     <span className="machine-info-icon">✎</span>
@@ -4315,6 +4330,7 @@ const DeviceMonitorPage = () => {
                                     type="button"
                                     className="machine-info-icon-tile"
                                     onClick={handleOpenEditModal}
+                                    disabled={!canWriteEquipmentPerm}
                                     title="Редактировать наименование и подразделение"
                                 >
                                     <span className="machine-info-icon">✎</span>
@@ -4419,20 +4435,20 @@ const DeviceMonitorPage = () => {
                         <div className="status-tile-block">
                             <div className="status-tile-title">Активность за сутки:</div>
                             <div className="status-row">
-                                <span className="status-label">Выкл. состояние:</span>
-                                <span className="status-value numeric status-value-danger">{formatMsToClock(dailyActivity.offMs)}</span>
-                            </div>
-                            <div className="status-row">
-                                <span className="status-label">Деж. режим:</span>
-                                <span className="status-value numeric status-value-warning">{formatMsToClock(dailyActivity.standbyMs)}</span>
-                            </div>
-                            <div className="status-row">
                                 <span className="status-label">Вкл. состояние:</span>
                                 <span className="status-value numeric status-value-success">{statusOnActiveClock}</span>
                             </div>
                             <div className="status-row">
                                 <span className="status-label">Сварка:</span>
                                 <span className="status-value numeric status-value-accent">{statusWeldingClock}</span>
+                            </div>
+                            <div className="status-row">
+                                <span className="status-label">Ошибки:</span>
+                                <span className="status-value numeric status-value-danger">{formatMsToClock(dailyActivity.errorMs)}</span>
+                            </div>
+                            <div className="status-row">
+                                <span className="status-label">Выкл. состояние:</span>
+                                <span className="status-value numeric status-value-danger">{formatMsToClock(dailyActivity.offMs)}</span>
                             </div>
                         </div>
 
@@ -4749,10 +4765,23 @@ const DeviceMonitorPage = () => {
                                     </div>
                                     <button type="button" className="info-tile-btn">История ТО ИП</button>
                                 </div>
-                                <div className="info-tile">
-                                    <div className="info-tile-row">
-                                        <span className="info-tile-label">RFID код</span>
-                                        <span className="info-tile-value">{getRfidCode() || '—'}</span>
+                                <div className="info-tile-rfid-delete-group">
+                                    <div className="info-tile">
+                                        <div className="info-tile-row">
+                                            <span className="info-tile-label">RFID код</span>
+                                            <span className="info-tile-value">{getRfidCode() || '—'}</span>
+                                        </div>
+                                    </div>
+                                    <div className="machine-delete-tile">
+                                        <button
+                                            type="button"
+                                            className="machine-delete-btn"
+                                            onClick={handleDeleteMachine}
+                                            disabled={!machineId || isDeletingMachine || !canWriteEquipmentPerm}
+                                            title="Полностью удалить аппарат из базы данных"
+                                        >
+                                            <span>{isDeletingMachine ? 'Удаление…' : 'Удалить аппарат'}</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>

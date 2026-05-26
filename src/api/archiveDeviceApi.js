@@ -141,7 +141,7 @@ export async function getArchivePanelState(mac) {
     }
 }
 
-/** Суточная статистика мониторинга из БД: проволока (кг), таймеры off/standby/on/welding. */
+/** Суточная статистика мониторинга из БД: проволока (кг), таймеры off/error/on/welding. */
 export async function getArchiveDailyStats(mac, date) {
     const params = new URLSearchParams();
     params.append('mac', mac);

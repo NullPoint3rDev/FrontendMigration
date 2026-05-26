@@ -10,6 +10,16 @@ import { getRoles, createUserAccount, getUserAccountById, updateUserAccount } fr
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { api } from '../services/api';
 import { buildOrganizationHierarchy } from '../utils/organizationUnitTree';
+import {
+    VIEW_ONLY,
+    VIEW_ONLY_BY_SECTION_TITLE,
+    getSectionWriteItemIds,
+    isPermissionItemDisabled,
+    canReadUsers,
+    canWriteUsers,
+} from '../utils/userPermissions';
+import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
+import { useReportsUnsaved } from '../contexts/ReportsUnsavedContext';
 import '../styles/addUserPage.css';
 
 function AddUserPage() {
@@ -17,9 +27,16 @@ function AddUserPage() {
     const location = useLocation();
     const { id } = useParams();
     const isEditMode = !!id;
+    const { canWriteUsers: canWriteUsersPerm } = useCurrentUserPermissions();
+    const readOnlyUserForm = isEditMode && !canWriteUsersPerm;
     const fromCreateEnterprise = location.state?.fromCreateEnterprise === true;
     const enterpriseName = location.state?.enterpriseName || '';
     const enterpriseData = location.state?.enterpriseData || null;
+    const [allowLeaveWithoutConfirm, setAllowLeaveWithoutConfirm] = useState(false);
+    const shouldGuardEnterpriseCreation = fromCreateEnterprise && !isEditMode && !allowLeaveWithoutConfirm;
+    const reportsUnsaved = useReportsUnsaved();
+    const pendingLeavePathRef = useRef(null);
+    const [showLeaveEnterpriseConfirm, setShowLeaveEnterpriseConfirm] = useState(false);
     const [roles, setRoles] = useState([]);
     const [accessAllowed, setAccessAllowed] = useState(null);
     const [currentUserIsAdminAlloy, setCurrentUserIsAdminAlloy] = useState(false);
@@ -50,6 +67,56 @@ function AddUserPage() {
     const [savedEmailFromServer, setSavedEmailFromServer] = useState('');
     const [submitError, setSubmitError] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const requestNavigateAway = (path) => {
+        if (!shouldGuardEnterpriseCreation) {
+            navigate(path);
+            return;
+        }
+        pendingLeavePathRef.current = path;
+        setShowLeaveEnterpriseConfirm(true);
+    };
+
+    const confirmLeaveEnterpriseCreation = () => {
+        setShowLeaveEnterpriseConfirm(false);
+        setAllowLeaveWithoutConfirm(true);
+        const path = pendingLeavePathRef.current || '/enterprise-map';
+        reportsUnsaved?.setPendingLeavePath(null);
+        pendingLeavePathRef.current = null;
+        navigate(path);
+    };
+
+    const cancelLeaveEnterpriseCreation = () => {
+        setShowLeaveEnterpriseConfirm(false);
+        reportsUnsaved?.setPendingLeavePath(null);
+        pendingLeavePathRef.current = null;
+    };
+
+    useEffect(() => {
+        if (!shouldGuardEnterpriseCreation || !reportsUnsaved?.isDirtyRef) return;
+        reportsUnsaved.isDirtyRef.current = () => true;
+        return () => {
+            reportsUnsaved.isDirtyRef.current = () => false;
+        };
+    }, [shouldGuardEnterpriseCreation, reportsUnsaved]);
+
+    useEffect(() => {
+        if (!shouldGuardEnterpriseCreation || !reportsUnsaved?.pendingLeavePath) return;
+        const path = reportsUnsaved.pendingLeavePath;
+        reportsUnsaved.setPendingLeavePath(null);
+        pendingLeavePathRef.current = path;
+        setShowLeaveEnterpriseConfirm(true);
+    }, [reportsUnsaved?.pendingLeavePath, shouldGuardEnterpriseCreation, reportsUnsaved]);
+
+    useEffect(() => {
+        if (!shouldGuardEnterpriseCreation) return;
+        const handleBeforeUnload = (e) => {
+            e.preventDefault();
+            e.returnValue = '';
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [shouldGuardEnterpriseCreation]);
 
     const [formData, setFormData] = useState({
         userTypeId: null,
@@ -108,7 +175,18 @@ function AddUserPage() {
                     fromCreateEnterprise &&
                     (isAdminAlloy || (isUserAlloy && hasCreateEnterprises && hasManageEnterpriseAdmins));
                 const allowUserAlloyEnterpriseAdmin = isUserAlloy && hasManageEnterpriseAdmins;
-                setAccessAllowed(isAdmin || allowFromEnterpriseFlow || allowUserAlloyEnterpriseAdmin);
+                const roleNameUpper = String(role?.name || '').toUpperCase();
+                const allowUserAlloyUserForm =
+                    isUserAlloy &&
+                    (isEditMode
+                        ? !!id && canReadUsers(currentUser, roleNameUpper)
+                        : canWriteUsers(currentUser, roleNameUpper));
+                setAccessAllowed(
+                    isAdmin ||
+                    allowFromEnterpriseFlow ||
+                    allowUserAlloyEnterpriseAdmin ||
+                    allowUserAlloyUserForm
+                );
                 setCurrentUserIsAdminAlloy(!!isAdminAlloy);
                 setCurrentUserIsAdminDealer(!!isAdminDealer);
                 setCurrentUserIsUserAlloy(!!isUserAlloy);
@@ -117,7 +195,12 @@ function AddUserPage() {
                 setIsEnterpriseScopedRole(!!(isAdminEnterprise || isUserEnterprise));
                 setCurrentUserOrgId(currentUser.organizationId ?? currentUser.organization?.id ?? null);
                 setCurrentUserId(currentUser.id ?? null);
-                if (!isAdmin && !allowFromEnterpriseFlow && !allowUserAlloyEnterpriseAdmin) {
+                if (
+                    !isAdmin &&
+                    !allowFromEnterpriseFlow &&
+                    !allowUserAlloyEnterpriseAdmin &&
+                    !allowUserAlloyUserForm
+                ) {
                     navigate('/employees', { replace: true });
                     return;
                 }
@@ -130,7 +213,7 @@ function AddUserPage() {
             }
         };
         checkAccess();
-    }, [navigate, location.state]);
+    }, [navigate, location.state, id, isEditMode]);
 
     useEffect(() => {
         if (!accessAllowed) return;
@@ -287,6 +370,7 @@ function AddUserPage() {
             {
                 title: 'Работа с пользователями',
                 items: [
+                    { id: VIEW_ONLY.users, label: 'Только просмотр пользователей', defaultChecked: false },
                     { id: 'recovery_account', label: 'Восстановление аккаунта по номеру тел., эл. почте', defaultChecked: true },
                     { id: 'create_edit_enterprise_admins', label: 'Создание/редактирование админов предприятий', defaultChecked: true },
                     { id: 'create_edit_enterprise_users', label: 'Создание/редактирование пользователей предприятий', defaultChecked: false },
@@ -304,6 +388,7 @@ function AddUserPage() {
             {
                 title: 'Работа с оборудованием',
                 items: [
+                    { id: VIEW_ONLY.equipment, label: 'Только просмотр ИП', defaultChecked: false },
                     { id: 'wifi_modules_wt2', label: 'Внесения/удаления модулей Wi-Fi в базу WT2', defaultChecked: false },
                     { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Pulse)', defaultChecked: true },
                     { id: 'move_equipment_change_info', label: 'Перемещение между подразд., изм. инфор. об оборуд.', defaultChecked: true },
@@ -317,6 +402,7 @@ function AddUserPage() {
             {
                 title: 'Работа с организациями',
                 items: [
+                    { id: VIEW_ONLY.organizations, label: 'Только просмотр организаций', defaultChecked: false },
                     { id: 'visibility_edit_dealers', label: 'Видимость/редактирование диллеров', defaultChecked: false },
                     { id: 'create_delete_dealers', label: 'Создание/удаление диллеров', defaultChecked: false },
                     { id: 'visibility_edit_enterprises', label: 'Видимость/редактирование предприятий', defaultChecked: false },
@@ -327,6 +413,7 @@ function AddUserPage() {
             {
                 title: 'Работа со сварщиками',
                 items: [
+                    { id: VIEW_ONLY.welders, label: 'Только просмотр сварщиков', defaultChecked: false },
                     { id: 'add_delete_edit_welders', label: 'Добавление/удаление/изменение сварщиков', disabled: true },
                     { id: 'manage_welder_certification', label: 'Управление данными об аттестации сварщика', disabled: true },
                     { id: 'add_delete_rfid_passes', label: 'Добавление/удаление RFID пропусков', disabled: true },
@@ -722,6 +809,8 @@ function AddUserPage() {
         );
     };
     const isEnterpriseRoleTarget = formData.userTypeId === 'ADMIN_ENTERPRISE' || formData.userTypeId === 'USER_ENTERPRISE';
+    const isEnterpriseAdminUser = formData.userTypeId === 'ADMIN_ENTERPRISE';
+    const canBlockUser = !isEditingSelf && !isEnterpriseAdminUser;
     const canConfigureAllowedActions =
         currentUserIsAdminAlloy === true ||
         (
@@ -809,7 +898,20 @@ function AddUserPage() {
     };
 
     const getPermissionChecked = (item) => permissionChecks[item.id] ?? item.defaultChecked ?? false;
-    const setPermissionChecked = (id, checked) => setPermissionChecks((prev) => ({ ...prev, [id]: checked }));
+    const setPermissionChecked = (id, checked, section) => {
+        setPermissionChecks((prev) => {
+            const next = { ...prev, [id]: checked };
+            if (checked && section && formData.userTypeId === 'USER_ALLOY') {
+                const viewOnlyId = VIEW_ONLY_BY_SECTION_TITLE[section.title] || null;
+                if (viewOnlyId && id === viewOnlyId) {
+                    getSectionWriteItemIds(section.title, section.items).forEach((writeId) => {
+                        next[writeId] = false;
+                    });
+                }
+            }
+            return next;
+        });
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -905,26 +1007,29 @@ function AddUserPage() {
             }
 
             const payload = {
-                username: formData.login.trim(),
                 fullName: formData.fullName.trim(),
                 organizationId: createdOrgId ?? (formData.organizationId != null ? Number(formData.organizationId) : undefined),
                 organizationUnit: !fromCreateEnterprise ? (formData.departmentId ? { id: formData.departmentId } : null) : null,
-                userRoleId: role.id,
                 position: formData.position?.trim() || null,
                 phone: formData.phone?.trim() || null,
                 email: isEditMode ? formData.email?.trim() || null : null,
                 personnelNumber: formData.personnelNumber?.trim() || null,
                 status: isEditingSelf
                     ? savedUserStatus
-                    : (formData.blocked ? 'Blocked' : 'Active'),
+                    : (isEnterpriseAdminUser ? 'Active' : (formData.blocked ? 'Blocked' : 'Active')),
                 rfid: rfidString || null,
                 allowedUserActions: allowedUserActions ?? undefined,
             };
+            if (!isEditMode) {
+                payload.username = formData.login.trim();
+                payload.userRoleId = role.id;
+            }
             if (formData.password?.trim()) {
                 payload.password = formData.password;
             }
             if (isEditMode) {
                 await updateUserAccount(id, payload);
+                setAllowLeaveWithoutConfirm(true);
                 navigate('/employees', { replace: true });
             } else {
                 try {
@@ -940,6 +1045,7 @@ function AddUserPage() {
                     }
                     throw createUserErr;
                 }
+                setAllowLeaveWithoutConfirm(true);
                 if (fromCreateEnterprise) {
                     navigate('/enterprise-map', {
                         replace: true,
@@ -963,7 +1069,7 @@ function AddUserPage() {
             <div className="add-user-page">
                 <div className="add-user-header">
                     <div className="header-left">
-                        <button type="button" className="back-btn" onClick={() => navigate('/employees')}>
+                        <button type="button" className="back-btn" onClick={() => requestNavigateAway(fromCreateEnterprise ? '/enterprise-map' : '/employees')}>
                             &lt;
                         </button>
                         <h1 className="page-title">{isEditMode ? 'Редактировать пользователя' : 'Создать пользователя'}</h1>
@@ -986,7 +1092,7 @@ function AddUserPage() {
                     <button
                         type="button"
                         className="back-btn"
-                        onClick={() => navigate(fromCreateEnterprise ? '/enterprise-map' : '/employees')}
+                        onClick={() => requestNavigateAway(fromCreateEnterprise ? '/enterprise-map' : '/employees')}
                     >
                         &lt;
                     </button>
@@ -1001,7 +1107,7 @@ function AddUserPage() {
                     <button
                         type="button"
                         className="control-btn notifications-btn"
-                        onClick={() => navigate('/notifications')}
+                        onClick={() => requestNavigateAway('/notifications')}
                     >
                         <FaBell className="notifications-icon" />
                         <span className="notifications-badge" />
@@ -1014,124 +1120,138 @@ function AddUserPage() {
                 <div className="add-user-form-section">
                     <div className="add-user-form-card">
                         <form onSubmit={handleSubmit}>
-                            {!fromCreateEnterprise && (
-                                <div className="form-group">
-                                    <label>Тип пользователя<span className="required">*</span>:</label>
-                                    <div ref={typeRef} style={{ position: 'relative' }}>
-                                        <button
-                                            type="button"
-                                            className={`add-user-type-select ${selectedRole ? 'has-value' : ''} ${typeDropdownOpen ? 'open' : ''}`}
-                                            onClick={() => setTypeDropdownOpen((v) => !v)}
-                                        >
-                                            <span>{selectedRole ? selectedRole.label : 'Выбрать'}</span>
-                                            <FaChevronRight className="chevron" />
-                                        </button>
-                                        {typeDropdownOpen && (
-                                            <div className="add-user-type-dropdown">
-                                                {userTypeOptions.map((option) => (
-                                                    <div
-                                                        key={option.id}
-                                                        className={`add-user-type-dropdown-option ${formData.userTypeId === option.id ? 'selected' : ''}`}
-                                                        onClick={() => {
-                                                            handleInput('userTypeId', option.id);
-                                                            setTypeDropdownOpen(false);
-                                                        }}
-                                                    >
-                                                        {option.label}
+                            <fieldset disabled={readOnlyUserForm} className="add-user-form-fieldset">
+                                {!fromCreateEnterprise && (
+                                    <div className="form-group">
+                                        <label>Тип пользователя<span className="required">*</span>:</label>
+                                        {isEditMode ? (
+                                            <input
+                                                type="text"
+                                                className="add-user-field-readonly"
+                                                value={selectedRole ? selectedRole.label : (formData.userTypeId || '—')}
+                                                readOnly
+                                                tabIndex={-1}
+                                            />
+                                        ) : (
+                                            <div ref={typeRef} style={{ position: 'relative' }}>
+                                                <button
+                                                    type="button"
+                                                    className={`add-user-type-select ${selectedRole ? 'has-value' : ''} ${typeDropdownOpen ? 'open' : ''}`}
+                                                    onClick={() => setTypeDropdownOpen((v) => !v)}
+                                                >
+                                                    <span>{selectedRole ? selectedRole.label : 'Выбрать'}</span>
+                                                    <FaChevronRight className="chevron" />
+                                                </button>
+                                                {typeDropdownOpen && (
+                                                    <div className="add-user-type-dropdown">
+                                                        {userTypeOptions.map((option) => (
+                                                            <div
+                                                                key={option.id}
+                                                                className={`add-user-type-dropdown-option ${formData.userTypeId === option.id ? 'selected' : ''}`}
+                                                                onClick={() => {
+                                                                    handleInput('userTypeId', option.id);
+                                                                    setTypeDropdownOpen(false);
+                                                                }}
+                                                            >
+                                                                {option.label}
+                                                            </div>
+                                                        ))}
                                                     </div>
-                                                ))}
+                                                )}
                                             </div>
                                         )}
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            <div className="form-group">
-                                <label>Логин<span className="required">*</span>:</label>
-                                <input
-                                    type="text"
-                                    value={formData.login}
-                                    onChange={(e) => handleInput('login', e.target.value)}
-                                    placeholder=""
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label>Пароль{!isEditMode && <span className="required">*</span>}:</label>
-                                <input
-                                    type="password"
-                                    value={formData.password}
-                                    onChange={(e) => handleInput('password', e.target.value)}
-                                    placeholder={isEditMode ? 'Сменить пароль' : ''}
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label>Ф.И.О<span className="required">*</span>:</label>
-                                <input
-                                    type="text"
-                                    value={formData.fullName}
-                                    onChange={(e) => handleInput('fullName', e.target.value)}
-                                    placeholder=""
-                                />
-                            </div>
-
-                            {!fromCreateEnterprise && (
                                 <div className="form-group">
-                                    <label>Предприятие<span className="required">*</span>:</label>
-                                    <div style={{ position: 'relative' }}>
-                                        <button
-                                            type="button"
-                                            className={`add-user-department-select ${selectedOrganization ? 'has-value' : ''}`}
-                                            onClick={() => setDepartmentDropdownOpen(false)}
-                                        >
-                                            <span>{selectedOrganization ? selectedOrganization.name : 'Выбрать'}</span>
-                                            <FaChevronRight className="chevron" />
-                                        </button>
-                                        <select
-                                            value={formData.organizationId ?? ''}
-                                            onChange={(e) => handleInput('organizationId', e.target.value || null)}
-                                            style={{
-                                                position: 'absolute',
-                                                inset: 0,
-                                                width: '100%',
-                                                height: '100%',
-                                                opacity: 0,
-                                                cursor: 'pointer',
-                                            }}
-                                            required
-                                        >
-                                            <option value="">Выбрать</option>
-                                            {organizations.map((org) => (
-                                                <option key={org.id} value={org.id}>
-                                                    {org.name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                    <label>Логин<span className="required">*</span>:</label>
+                                    <input
+                                        type="text"
+                                        value={formData.login}
+                                        onChange={(e) => handleInput('login', e.target.value)}
+                                        placeholder=""
+                                        readOnly={isEditMode}
+                                        className={isEditMode ? 'add-user-field-readonly' : undefined}
+                                        tabIndex={isEditMode ? -1 : undefined}
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Пароль{!isEditMode && <span className="required">*</span>}:</label>
+                                    <input
+                                        type="password"
+                                        value={formData.password}
+                                        onChange={(e) => handleInput('password', e.target.value)}
+                                        placeholder={isEditMode ? 'Сменить пароль' : ''}
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Ф.И.О<span className="required">*</span>:</label>
+                                    <input
+                                        type="text"
+                                        value={formData.fullName}
+                                        onChange={(e) => handleInput('fullName', e.target.value)}
+                                        placeholder=""
+                                    />
+                                </div>
+
+                                {!fromCreateEnterprise && (
+                                    <div className="form-group">
+                                        <label>Предприятие<span className="required">*</span>:</label>
+                                        <div style={{ position: 'relative' }}>
+                                            <button
+                                                type="button"
+                                                className={`add-user-department-select ${selectedOrganization ? 'has-value' : ''}`}
+                                                onClick={() => setDepartmentDropdownOpen(false)}
+                                            >
+                                                <span>{selectedOrganization ? selectedOrganization.name : 'Выбрать'}</span>
+                                                <FaChevronRight className="chevron" />
+                                            </button>
+                                            <select
+                                                value={formData.organizationId ?? ''}
+                                                onChange={(e) => handleInput('organizationId', e.target.value || null)}
+                                                style={{
+                                                    position: 'absolute',
+                                                    inset: 0,
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    opacity: 0,
+                                                    cursor: 'pointer',
+                                                }}
+                                                required
+                                            >
+                                                <option value="">Выбрать</option>
+                                                {organizations.map((org) => (
+                                                    <option key={org.id} value={org.id}>
+                                                        {org.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {!fromCreateEnterprise && (
-                                <div className="form-group">
-                                    <label>Подразделение:</label>
-                                    <div ref={departmentRef} className="unit-select-container">
-                                        <div
-                                            role="button"
-                                            tabIndex={0}
-                                            className={`unit-select-dropdown ${departmentDropdownOpen ? 'open' : ''} ${!formData.organizationId ? 'disabled' : ''} ${selectedUnit ? 'has-value' : ''}`}
-                                            onClick={() => {
-                                                if (!formData.organizationId) return;
-                                                setDepartmentDropdownOpen((v) => !v);
-                                            }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' || e.key === ' ') {
-                                                    e.preventDefault();
+                                {!fromCreateEnterprise && (
+                                    <div className="form-group">
+                                        <label>Подразделение:</label>
+                                        <div ref={departmentRef} className="unit-select-container">
+                                            <div
+                                                role="button"
+                                                tabIndex={0}
+                                                className={`unit-select-dropdown ${departmentDropdownOpen ? 'open' : ''} ${!formData.organizationId ? 'disabled' : ''} ${selectedUnit ? 'has-value' : ''}`}
+                                                onClick={() => {
                                                     if (!formData.organizationId) return;
                                                     setDepartmentDropdownOpen((v) => !v);
-                                                }
-                                            }}
-                                        >
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.preventDefault();
+                                                        if (!formData.organizationId) return;
+                                                        setDepartmentDropdownOpen((v) => !v);
+                                                    }
+                                                }}
+                                            >
                                             <span className="unit-select-label">
                                                 {!formData.organizationId
                                                     ? 'Сначала выберите предприятие'
@@ -1141,150 +1261,156 @@ function AddUserPage() {
                                                             ? 'Выбрать'
                                                             : 'Нет подразделений'}
                                             </span>
-                                            <span className={`unit-select-arrow ${departmentDropdownOpen ? 'open' : ''}`}>
+                                                <span className={`unit-select-arrow ${departmentDropdownOpen ? 'open' : ''}`}>
                                                 <FaChevronDown />
                                             </span>
-                                        </div>
-                                        {departmentDropdownOpen && formData.organizationId && (
-                                            <div className="unit-select-options">
-                                                {organizationUnitHierarchy.length > 0 ? (
-                                                    organizationUnitHierarchy.map((unit) => renderDepartmentUnitOption(unit))
-                                                ) : (
-                                                    <div
-                                                        className="unit-option"
-                                                        style={{ padding: '8px 12px', color: '#7B8BA6', cursor: 'default' }}
-                                                    >
-                                                        Нет подразделений
-                                                    </div>
-                                                )}
                                             </div>
-                                        )}
+                                            {departmentDropdownOpen && formData.organizationId && (
+                                                <div className="unit-select-options">
+                                                    {organizationUnitHierarchy.length > 0 ? (
+                                                        organizationUnitHierarchy.map((unit) => renderDepartmentUnitOption(unit))
+                                                    ) : (
+                                                        <div
+                                                            className="unit-option"
+                                                            style={{ padding: '8px 12px', color: '#7B8BA6', cursor: 'default' }}
+                                                        >
+                                                            Нет подразделений
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            <div className="form-group">
-                                <label>Должность:</label>
-                                <input
-                                    type="text"
-                                    value={formData.position}
-                                    onChange={(e) => handleInput('position', e.target.value)}
-                                    placeholder=""
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label>Телефон:</label>
-                                <input
-                                    type="text"
-                                    value={formData.phone}
-                                    onChange={(e) => handleInput('phone', e.target.value)}
-                                    placeholder=""
-                                />
-                            </div>
-
-                            {isEditMode && (
                                 <div className="form-group">
-                                    <label>Email:</label>
-                                    <div className="add-user-email-row">
-                                        <input
-                                            type="email"
-                                            value={formData.email}
-                                            onChange={(e) => handleInput('email', e.target.value)}
-                                            placeholder=""
-                                        />
-                                        <div className="add-user-email-actions">
-                                            {formData.emailVerified ? (
-                                                <span className="add-user-email-badge">Подтверждён</span>
-                                            ) : null}
+                                    <label>Должность:</label>
+                                    <input
+                                        type="text"
+                                        value={formData.position}
+                                        onChange={(e) => handleInput('position', e.target.value)}
+                                        placeholder=""
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Телефон:</label>
+                                    <input
+                                        type="text"
+                                        value={formData.phone}
+                                        onChange={(e) => handleInput('phone', e.target.value)}
+                                        placeholder=""
+                                    />
+                                </div>
+
+                                {isEditMode && (
+                                    <div className="form-group">
+                                        <label>Email:</label>
+                                        <div className="add-user-email-row">
+                                            <input
+                                                type="email"
+                                                value={formData.email}
+                                                onChange={(e) => handleInput('email', e.target.value)}
+                                                placeholder=""
+                                            />
+                                            <div className="add-user-email-actions">
+                                                {formData.emailVerified ? (
+                                                    <span className="add-user-email-badge">Подтверждён</span>
+                                                ) : null}
+                                                <button
+                                                    type="button"
+                                                    className="add-user-verify-email-btn"
+                                                    onClick={handleOpenEmailVerify}
+                                                    disabled={!canOpenEmailVerify}
+                                                    title={
+                                                        emailUnsavedForVerify && emailTrim
+                                                            ? 'Сохраните email перед подтверждением'
+                                                            : formData.emailVerified
+                                                                ? 'Email уже подтверждён'
+                                                                : !emailTrim
+                                                                    ? 'Укажите email'
+                                                                    : ''
+                                                    }
+                                                >
+                                                    Подтвердить
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {emailUnsavedForVerify && emailTrim ? (
+                                            <p className="add-user-email-hint">Сохраните карточку, чтобы подтвердить этот адрес.</p>
+                                        ) : null}
+                                    </div>
+                                )}
+
+                                <div className="form-group">
+                                    <label>Табельный №:</label>
+                                    <input
+                                        type="text"
+                                        value={formData.personnelNumber}
+                                        onChange={(e) => handleInput('personnelNumber', e.target.value)}
+                                        placeholder=""
+                                    />
+                                </div>
+
+                                <div className="add-user-rfid-block">
+                                    <div className="add-user-rfid-block-header">
+                                        <span className="rfid-label">Пропуска RFID</span>
+                                        <div className="rfid-toolbar">
                                             <button
                                                 type="button"
-                                                className="add-user-verify-email-btn"
-                                                onClick={handleOpenEmailVerify}
-                                                disabled={!canOpenEmailVerify}
-                                                title={
-                                                    emailUnsavedForVerify && emailTrim
-                                                        ? 'Сохраните email перед подтверждением'
-                                                        : formData.emailVerified
-                                                            ? 'Email уже подтверждён'
-                                                            : !emailTrim
-                                                                ? 'Укажите email'
-                                                                : ''
-                                                }
+                                                className="add-pass-btn"
+                                                onClick={() => setIsRfidModalOpen(true)}
                                             >
-                                                Подтвердить
+                                                Добавить пропуск +
                                             </button>
                                         </div>
                                     </div>
-                                    {emailUnsavedForVerify && emailTrim ? (
-                                        <p className="add-user-email-hint">Сохраните карточку, чтобы подтвердить этот адрес.</p>
-                                    ) : null}
-                                </div>
-                            )}
-
-                            <div className="form-group">
-                                <label>Табельный №:</label>
-                                <input
-                                    type="text"
-                                    value={formData.personnelNumber}
-                                    onChange={(e) => handleInput('personnelNumber', e.target.value)}
-                                    placeholder=""
-                                />
-                            </div>
-
-                            <div className="add-user-rfid-block">
-                                <div className="add-user-rfid-block-header">
-                                    <span className="rfid-label">Пропуска RFID</span>
-                                    <div className="rfid-toolbar">
-                                        <button
-                                            type="button"
-                                            className="add-pass-btn"
-                                            onClick={() => setIsRfidModalOpen(true)}
-                                        >
-                                            Добавить пропуск +
-                                        </button>
+                                    <div className="rfid-area">
+                                        <div className="rfid-list scrollable-section">
+                                            {rfidPasses.map((pass) => (
+                                                <div key={pass.id} className="rfid-item">
+                                                    <input type="checkbox" className="rfid-checkbox" />
+                                                    <RiRfidFill className="rfid-icon" />
+                                                    <span className="rfid-code">{pass.code}</span>
+                                                    <button
+                                                        type="button"
+                                                        className="delete-btn-small"
+                                                        onClick={() => handleDeleteRfidPass(pass.id)}
+                                                    >
+                                                        <FaTrash />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {rfidPasses.length === 0 && (
+                                                <div className="empty-state">Нет пропусков</div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="rfid-area">
-                                    <div className="rfid-list scrollable-section">
-                                        {rfidPasses.map((pass) => (
-                                            <div key={pass.id} className="rfid-item">
-                                                <input type="checkbox" className="rfid-checkbox" />
-                                                <RiRfidFill className="rfid-icon" />
-                                                <span className="rfid-code">{pass.code}</span>
-                                                <button
-                                                    type="button"
-                                                    className="delete-btn-small"
-                                                    onClick={() => handleDeleteRfidPass(pass.id)}
-                                                >
-                                                    <FaTrash />
-                                                </button>
-                                            </div>
-                                        ))}
-                                        {rfidPasses.length === 0 && (
-                                            <div className="empty-state">Нет пропусков</div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
 
-                            {!isEditingSelf && (
-                                <div className="add-user-block-row">
-                                    <input
-                                        type="checkbox"
-                                        id="block-checkbox"
-                                        className="block-checkbox"
-                                        checked={formData.blocked}
-                                        onChange={(e) => handleInput('blocked', e.target.checked)}
-                                    />
-                                    <label htmlFor="block-checkbox" className="block-checkbox-label">
-                                        Блокировка
-                                    </label>
-                                    <span className="add-user-active-label">
+                                {canBlockUser && (
+                                    <div className="add-user-block-row">
+                                        <input
+                                            type="checkbox"
+                                            id="block-checkbox"
+                                            className="block-checkbox"
+                                            checked={formData.blocked}
+                                            onChange={(e) => handleInput('blocked', e.target.checked)}
+                                        />
+                                        <label htmlFor="block-checkbox" className="block-checkbox-label">
+                                            Блокировка
+                                        </label>
+                                        <span className="add-user-active-label">
                                         {formData.blocked ? 'Пользователь заблокирован' : 'Пользователь активен'}
                                     </span>
-                                </div>
-                            )}
+                                    </div>
+                                )}
+                                {isEnterpriseAdminUser && !isEditingSelf && (
+                                    <p className="add-user-block-hint">
+                                        Администратора предприятия нельзя заблокировать
+                                    </p>
+                                )}
+                            </fieldset>
                         </form>
                     </div>
                 </div>
@@ -1300,7 +1426,13 @@ function AddUserPage() {
                                             <h3 className="add-user-permissions-section-title">{section.title}</h3>
                                             <div className="add-user-permissions-list">
                                                 {section.items.map((item) => {
-                                                    const isDisabledStatic = item.disabled;
+                                                    const isDisabledStatic = isPermissionItemDisabled(
+                                                        item,
+                                                        section.title,
+                                                        permissionChecks,
+                                                        getPermissionChecked,
+                                                        formData.userTypeId
+                                                    );
                                                     if (isDisabledStatic && !isLockedAdminAlloy) {
                                                         return (
                                                             <div key={item.id} className="add-user-permission-item disabled">
@@ -1309,13 +1441,13 @@ function AddUserPage() {
                                                         );
                                                     }
                                                     const checked = getPermissionChecked(item);
-                                                    const isLocked = isLockedAdminAlloy && !isDisabledStatic;
+                                                    const isLocked = isLockedAdminAlloy && !item.disabled;
                                                     return (
                                                         <label
                                                             key={item.id}
                                                             className={`add-user-permission-item add-user-permission-checkbox${
                                                                 isLocked ? ' locked' : ''
-                                                            }${isDisabledStatic ? ' disabled' : ''}`}
+                                                            }`}
                                                         >
                                                             <input
                                                                 type="checkbox"
@@ -1324,7 +1456,7 @@ function AddUserPage() {
                                                                 onChange={
                                                                     isLocked
                                                                         ? undefined
-                                                                        : (e) => setPermissionChecked(item.id, e.target.checked)
+                                                                        : (e) => setPermissionChecked(item.id, e.target.checked, section)
                                                                 }
                                                             />
                                                             <span>{item.label}</span>
@@ -1350,7 +1482,7 @@ function AddUserPage() {
                             type="button"
                             className="add-user-submit-btn"
                             onClick={handleSubmit}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || readOnlyUserForm}
                         >
                             <span>{isSubmitting ? (isEditMode ? 'Сохранение...' : 'Создание...') : isEditMode ? 'Сохранить' : fromCreateEnterprise ? 'Добавить Администратора' : 'Добавить'}</span>
                         </button>
@@ -1370,6 +1502,41 @@ function AddUserPage() {
                 email={verifyEmailSnapshot}
                 onVerified={handleEmailVerified}
             />
+
+            {showLeaveEnterpriseConfirm && (
+                <div className="modal-overlay modal-overlay-no-close-on-backdrop">
+                    <div className="resave-confirm-modal">
+                        <button
+                            type="button"
+                            className="resave-confirm-close-btn"
+                            onClick={cancelLeaveEnterpriseCreation}
+                            aria-label="Остаться"
+                        >
+                            ×
+                        </button>
+                        <div className="resave-confirm-icon">⚠</div>
+                        <div className="resave-confirm-question">
+                            Если вы уйдете со страницы — предприятие не будет создано
+                        </div>
+                        <div className="resave-confirm-buttons">
+                            <button
+                                type="button"
+                                className="resave-confirm-btn resave-confirm-btn-yes"
+                                onClick={confirmLeaveEnterpriseCreation}
+                            >
+                                Уйти
+                            </button>
+                            <button
+                                type="button"
+                                className="resave-confirm-btn resave-confirm-btn-no"
+                                onClick={cancelLeaveEnterpriseCreation}
+                            >
+                                Остаться
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

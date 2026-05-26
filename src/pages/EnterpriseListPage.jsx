@@ -7,6 +7,7 @@ import OrganizationLogo from '../images/OrganizationLogo.png';
 import ResourcesLogo from '../images/ResourcesLogo.png';
 import WelderIcon from '../images/WelderIcon.png';
 import { api } from '../services/api';
+import { canReadOrganizations } from '../utils/userPermissions';
 import { getRoles, getAllUserAccounts } from '../api/userAccountApi';
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { getAllWelders } from '../api/welderApi';
@@ -47,6 +48,7 @@ function EnterpriseListPage() {
     const [canAddEnterprise, setCanAddEnterprise] = useState(false);
     const [canViewEnterprises, setCanViewEnterprises] = useState(false);
     const [canViewAlloyEnterprise, setCanViewAlloyEnterprise] = useState(false);
+    const [currentUserIsUserAlloy, setCurrentUserIsUserAlloy] = useState(false);
     const [isCreatingEnterprise, setIsCreatingEnterprise] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [currentUserOrgId, setCurrentUserOrgId] = useState(null);
@@ -90,12 +92,20 @@ function EnterpriseListPage() {
                 setCanAddEnterprise(
                     isAdminAlloy || (isUserAlloy && hasCreateEnterprises && hasManageEnterpriseAdmins)
                 );
-                setCanViewEnterprises(isAdminAlloy || hasVisibilityEditEnterprises);
-                setCanViewAlloyEnterprise(isAdminAlloy);
+                const roleNameUpper = String(role?.name || '').toUpperCase();
+                setCanViewEnterprises(
+                    isAdminAlloy || hasVisibilityEditEnterprises || canReadOrganizations(currentUser, roleNameUpper)
+                );
+                const hasVisibilityEditAlloy =
+                    allowedLower.includes('visibility_edit_alloy') ||
+                    allowedLower.some((a) => a.includes('visibility_edit_alloy'));
+                setCurrentUserIsUserAlloy(isUserAlloy);
+                setCanViewAlloyEnterprise(isAdminAlloy || hasVisibilityEditAlloy);
             } catch (_) {
                 setCanAddEnterprise(false);
                 setCanViewEnterprises(false);
                 setCanViewAlloyEnterprise(false);
+                setCurrentUserIsUserAlloy(false);
                 setIsEnterpriseScopedRole(false);
                 setCurrentUserOrgId(null);
             }
@@ -190,18 +200,34 @@ function EnterpriseListPage() {
     const filteredOrganizations = useMemo(() => {
         if (!canViewEnterprises) return [];
         const term = (searchTerm || '').trim().toLowerCase();
-        const withoutAlloy = canViewAlloyEnterprise
-            ? organizations
-            : organizations.filter((org) => {
-                const name = (org?.name || '').trim().toLowerCase();
-                return name !== 'alloy' && name !== 'эллой';
-            });
+        const visibleOrgs = organizations.filter((org) => {
+            const name = (org?.name || '').trim().toLowerCase();
+            const isAlloyName = name === 'alloy' || name === 'эллой';
+            if (!isAlloyName) return true;
+            if (canViewAlloyEnterprise) return true;
+            if (
+                currentUserIsUserAlloy &&
+                currentUserOrgId != null &&
+                String(org.id) === String(currentUserOrgId)
+            ) {
+                return true;
+            }
+            return false;
+        });
         const scoped = isEnterpriseScopedRole && currentUserOrgId != null
-            ? withoutAlloy.filter((org) => String(org.id) === String(currentUserOrgId))
-            : withoutAlloy;
+            ? visibleOrgs.filter((org) => String(org.id) === String(currentUserOrgId))
+            : visibleOrgs;
         if (!term) return scoped;
         return scoped.filter((org) => (org.name || '').toLowerCase().includes(term));
-    }, [organizations, searchTerm, canViewEnterprises, canViewAlloyEnterprise, isEnterpriseScopedRole, currentUserOrgId]);
+    }, [
+        organizations,
+        searchTerm,
+        canViewEnterprises,
+        canViewAlloyEnterprise,
+        currentUserIsUserAlloy,
+        isEnterpriseScopedRole,
+        currentUserOrgId,
+    ]);
 
     const toggleSelect = (id) => {
         setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));

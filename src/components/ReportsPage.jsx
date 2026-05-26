@@ -62,6 +62,55 @@ const ReportsPage = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [generateError, setGenerateError] = useState('')
     const [isGenerating, setIsGenerating] = useState(false)
+    const [generateProgressPercent, setGenerateProgressPercent] = useState(0)
+    const [generateProgressMessage, setGenerateProgressMessage] = useState('')
+    const generatePollCancelledRef = useRef(false)
+    const generateProgressTargetRef = useRef(0)
+    const generateProgressDisplayRef = useRef(0)
+    const generateProgressMessageRef = useRef('')
+    const [progressBarInstant, setProgressBarInstant] = useState(false)
+
+    // Скорость полоски: 24 ч — 1% в секунду, 7 дней — 1% в 2 секунды.
+    // Между этапами с бэка (5→20→25→80→100) полоска идёт дальше до порога следующего этапа.
+    useEffect(() => {
+        if (!isGenerating) {
+            return undefined
+        }
+
+        const tickMs = periodType === 'За 7 дней' ? 2000 : 1000
+        const stepPercent = 1
+        const backendStages = [5, 20, 25, 80, 100]
+        const creepCeilingFor = (target) => {
+            if (target >= 100) return 100
+            const nextStage = backendStages.find((p) => p > target)
+            return nextStage != null ? Math.min(99, nextStage - 1) : 99
+        }
+
+        const intervalId = setInterval(() => {
+            const target = generateProgressTargetRef.current
+            let current = generateProgressDisplayRef.current
+
+            if (current < target) {
+                current += Math.min(stepPercent, target - current)
+            } else if (target < 100) {
+                const creepCeiling = creepCeilingFor(target)
+                if (current < creepCeiling) {
+                    current += stepPercent
+                }
+            }
+
+            if (target >= 100 && current < 100) {
+                current = Math.min(100, current + stepPercent)
+            }
+
+            current = Math.min(100, Math.max(0, current))
+            generateProgressDisplayRef.current = current
+            const rounded = Math.round(current)
+            setGenerateProgressPercent((prev) => (prev !== rounded ? rounded : prev))
+        }, tickMs)
+
+        return () => clearInterval(intervalId)
+    }, [isGenerating, periodType])
     const [saveButtonBlink, setSaveButtonBlink] = useState(false)
     const saveButtonBlinkTimeoutRef = useRef(null)
     const [lastSavedSnapshot, setLastSavedSnapshot] = useState(null)
@@ -323,6 +372,13 @@ const ReportsPage = () => {
         }
         loadTemplates()
     }, [])
+
+    useEffect(() => {
+        if (!isCreatingTemplate && !currentTemplateId) {
+            setReportTypeDropdownOpen(false)
+            setReportTypeDropdownHighlight(false)
+        }
+    }, [isCreatingTemplate, currentTemplateId])
 
     // Helper function to format welder name
     const formatWelderName = (welder) => {
@@ -1573,24 +1629,67 @@ const ReportsPage = () => {
         return t
     }
 
+    const normalizeDay = (date) => {
+        const d = new Date(date)
+        d.setHours(0, 0, 0, 0)
+        return d
+    }
+
+    const addDays = (date, days) => {
+        const d = normalizeDay(date)
+        d.setDate(d.getDate() + days)
+        return d
+    }
+
+    /** Минимальная дата окончания — следующий день после начала. */
+    const getMinEndDate = (start) => (start ? addDays(start, 1) : null)
+
+    const clampEndAfterStart = (start, preferredEnd) => {
+        const today = todayStart()
+        const minEnd = getMinEndDate(start)
+        let end = preferredEnd ? normalizeDay(preferredEnd) : minEnd
+        if (end < minEnd) end = minEnd
+        if (end > today) end = today
+        return end
+    }
+
+    const applyArbitraryStartDate = (newStart) => {
+        const start = normalizeDay(newStart)
+        const today = todayStart()
+        if (start > today) return
+        setStartDate(start)
+        setStartMonth(new Date(start.getFullYear(), start.getMonth()))
+        const end = clampEndAfterStart(start, endDate)
+        setEndDate(end)
+        setEndMonth(new Date(end.getFullYear(), end.getMonth()))
+    }
+
+    const applyArbitraryEndDate = (newEnd) => {
+        const end = normalizeDay(newEnd)
+        const today = todayStart()
+        if (end > today) return
+        if (startDate) {
+            const minEnd = getMinEndDate(startDate)
+            if (end < minEnd) return
+        }
+        setEndDate(end)
+        setEndMonth(new Date(end.getFullYear(), end.getMonth()))
+    }
+
     // Изменение даты начала периода на ±1 день (стрелки в компактной строке)
     const adjustArbitraryStartDay = (delta) => {
         const today = todayStart()
         if (startDate) {
-            const d = new Date(startDate)
-            d.setDate(d.getDate() + delta)
-            d.setHours(0, 0, 0, 0)
+            const d = addDays(startDate, delta)
             if (d > today) return
-            setStartDate(d)
-            setStartMonth(new Date(d.getFullYear(), d.getMonth()))
+            applyArbitraryStartDate(d)
         } else {
             if (delta > 0) {
                 const first = new Date(startMonth.getFullYear(), startMonth.getMonth(), 1)
-                setStartDate(first)
+                applyArbitraryStartDate(first)
             } else {
                 const lastPrev = new Date(startMonth.getFullYear(), startMonth.getMonth(), 0)
-                setStartDate(lastPrev)
-                setStartMonth(new Date(lastPrev.getFullYear(), lastPrev.getMonth()))
+                applyArbitraryStartDate(lastPrev)
             }
         }
     }
@@ -1598,26 +1697,19 @@ const ReportsPage = () => {
     // Изменение даты окончания периода на ±1 день
     const adjustArbitraryEndDay = (delta) => {
         const today = todayStart()
+        const minEnd = startDate ? getMinEndDate(startDate) : null
         if (endDate) {
-            const d = new Date(endDate)
-            d.setDate(d.getDate() + delta)
-            d.setHours(0, 0, 0, 0)
+            const d = addDays(endDate, delta)
             if (d > today) return
-            if (startDate) {
-                const start = new Date(startDate)
-                start.setHours(0, 0, 0, 0)
-                if (d < start) return
-            }
-            setEndDate(d)
-            setEndMonth(new Date(d.getFullYear(), d.getMonth()))
+            if (minEnd && d < minEnd) return
+            applyArbitraryEndDate(d)
         } else {
+            const base = minEnd || new Date(endMonth.getFullYear(), endMonth.getMonth(), 1)
             if (delta > 0) {
-                const first = new Date(endMonth.getFullYear(), endMonth.getMonth(), 1)
-                setEndDate(first)
+                applyArbitraryEndDate(base)
             } else {
-                const lastPrev = new Date(endMonth.getFullYear(), endMonth.getMonth(), 0)
-                setEndDate(lastPrev)
-                setEndMonth(new Date(lastPrev.getFullYear(), lastPrev.getMonth()))
+                const prev = addDays(base, -1)
+                if (!minEnd || prev >= minEnd) applyArbitraryEndDate(prev)
             }
         }
     }
@@ -1626,11 +1718,15 @@ const ReportsPage = () => {
     const monthDays = Array.from({ length: 31 }, (_, i) => i + 1)
     const monthLabelsShort = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
 
-    // При создании нового шаблона настройки (чекбоксы, даты) недоступны, пока не выбран тип отчета
-    const configDisabled = isCreatingTemplate && !selectedReportType
+    // Редактор активен после «Новый отчёт» или выбора шаблона из списка
+    const reportEditorActive = Boolean(isCreatingTemplate || currentTemplateId)
+    const panelLocked = !reportEditorActive
+    // Чекбоксы/период недоступны, пока у нового отчёта не выбран тип
+    const configDisabled = reportEditorActive && isCreatingTemplate && !selectedReportType
+    const rightPanelLocked = panelLocked || configDisabled
 
     const handleConfigAreaClick = () => {
-        if (configDisabled) {
+        if (configDisabled && !panelLocked) {
             setReportTypeDropdownHighlight(true)
             setReportTypeDropdownOpen(true)
         }
@@ -2055,14 +2151,28 @@ const ReportsPage = () => {
             )
             if (template.periodSettings.startDate) {
                 const startDateObj = new Date(template.periodSettings.startDate)
-                setStartDate(startDateObj)
-                // Устанавливаем месяц календаря на месяц выбранной даты начала
-                setStartMonth(new Date(startDateObj.getFullYear(), startDateObj.getMonth()))
-            }
-            if (template.periodSettings.endDate) {
+                if (loadedPeriodType === 'Произвольный период') {
+                    const endPref = template.periodSettings.endDate
+                        ? new Date(template.periodSettings.endDate)
+                        : null
+                    const start = normalizeDay(startDateObj)
+                    const end = clampEndAfterStart(start, endPref)
+                    setStartDate(start)
+                    setStartMonth(new Date(start.getFullYear(), start.getMonth()))
+                    setEndDate(end)
+                    setEndMonth(new Date(end.getFullYear(), end.getMonth()))
+                } else {
+                    setStartDate(startDateObj)
+                    setStartMonth(new Date(startDateObj.getFullYear(), startDateObj.getMonth()))
+                    if (template.periodSettings.endDate) {
+                        const endDateObj = new Date(template.periodSettings.endDate)
+                        setEndDate(endDateObj)
+                        setEndMonth(new Date(endDateObj.getFullYear(), endDateObj.getMonth()))
+                    }
+                }
+            } else if (template.periodSettings.endDate) {
                 const endDateObj = new Date(template.periodSettings.endDate)
                 setEndDate(endDateObj)
-                // Устанавливаем месяц календаря на месяц выбранной даты окончания
                 setEndMonth(new Date(endDateObj.getFullYear(), endDateObj.getMonth()))
             }
             setTimeRange(template.periodSettings.timeRange || { start: '00:00', end: '23:59' })
@@ -2270,8 +2380,37 @@ const ReportsPage = () => {
                 return
             }
         }
-        setGenerateError('') // сбрасываем при успешной проверке
+        setGenerateError('')
+        generatePollCancelledRef.current = false
+        generateProgressTargetRef.current = 0
+        generateProgressDisplayRef.current = 0
+        generateProgressMessageRef.current = ''
+        setGenerateProgressPercent(0)
+        setGenerateProgressMessage('')
         setIsGenerating(true)
+
+        const onGenerateProgress = ({ percent, message }) => {
+            if (generatePollCancelledRef.current) return
+            const stepPercent = Math.min(100, Math.max(0, typeof percent === 'number' ? percent : 0))
+            const messageChanged = Boolean(message) && message !== generateProgressMessageRef.current
+            const displayBehindStep = generateProgressDisplayRef.current < stepPercent - 0.5
+
+            if (message) {
+                generateProgressMessageRef.current = message
+                setGenerateProgressMessage(message)
+            }
+
+            generateProgressTargetRef.current = Math.max(generateProgressTargetRef.current, stepPercent)
+
+            // Новый этап раньше, чем полоска доехала — скачок на % шага; дальше тик продолжит рост до следующего порога
+            if (messageChanged && displayBehindStep) {
+                generateProgressDisplayRef.current = stepPercent
+                generateProgressTargetRef.current = stepPercent
+                setProgressBarInstant(true)
+                setGenerateProgressPercent(Math.round(stepPercent))
+                window.setTimeout(() => setProgressBarInstant(false), 50)
+            }
+        }
 
         try {
             // Форматируем даты для API (YYYY-MM-DD)
@@ -2333,12 +2472,16 @@ const ReportsPage = () => {
             const normalizedReportType = normalizeReportType(selectedReportType) || selectedReportType
             // Вызываем соответствующий API в зависимости от типа отчета
             if (normalizedReportType === REPORT_TYPE_WIRE) {
-                await reportApi.generateWireConsumptionReport(
-                    currentTemplateId,
-                    formatDate(periodStartDate),
-                    formatDate(periodEndDate),
-                    periodStartTime,
-                    periodEndTime
+                await reportApi.generateReportWithProgress(
+                    reportApi.REPORT_JOB_TYPE.WIRE,
+                    {
+                        templateId: currentTemplateId,
+                        periodStartDate: formatDate(periodStartDate),
+                        periodEndDate: formatDate(periodEndDate),
+                        periodStartTime,
+                        periodEndTime
+                    },
+                    onGenerateProgress
                 )
             } else if (normalizedReportType === REPORT_TYPE_WELDER) {
                 // Собираем выбранные опциональные колонки из текущих галочек (parameters)
@@ -2351,17 +2494,22 @@ const ReportsPage = () => {
                     'gasConsumption'
                 ]
                 const selectedColumns = welderWorkOptionalKeys.filter((key) => parameters[key] === true)
-                await reportApi.generateWelderWorkReport(
-                    currentTemplateId,
-                    formatDate(periodStartDate),
-                    formatDate(periodEndDate),
+                const welderBody = {
+                    templateId: currentTemplateId,
+                    periodStartDate: formatDate(periodStartDate),
+                    periodEndDate: formatDate(periodEndDate),
                     periodStartTime,
                     periodEndTime,
                     selectedColumns,
-                    minSeamIntervalEnabled ? minSeamInterval : null,
-                    minSeamDurationEnabled ? minSeamDuration : null,
-                    minSeamIntervalEnabled,
-                    minSeamDurationEnabled
+                    minSeamIntervalEnabled: !!minSeamIntervalEnabled,
+                    minSeamDurationEnabled: !!minSeamDurationEnabled
+                }
+                if (minSeamIntervalEnabled && minSeamInterval != null) welderBody.minSeamInterval = minSeamInterval
+                if (minSeamDurationEnabled && minSeamDuration != null) welderBody.minSeamDuration = minSeamDuration
+                await reportApi.generateReportWithProgress(
+                    reportApi.REPORT_JOB_TYPE.WELDER,
+                    welderBody,
+                    onGenerateProgress
                 )
             } else if (normalizedReportType === REPORT_TYPE_EQUIPMENT) {
                 const equipmentWorkOptionalKeys = [
@@ -2383,18 +2531,23 @@ const ReportsPage = () => {
                     alert('Выберите хотя бы один аппарат')
                     return
                 }
-                await reportApi.generateEquipmentWorkReport(
-                    currentTemplateId,
-                    formatDate(periodStartDate),
-                    formatDate(periodEndDate),
+                const equipmentBody = {
+                    templateId: currentTemplateId,
+                    periodStartDate: formatDate(periodStartDate),
+                    periodEndDate: formatDate(periodEndDate),
                     periodStartTime,
                     periodEndTime,
                     selectedColumns,
                     selectedEquipmentIds,
-                    minSeamIntervalEnabled ? minSeamInterval : null,
-                    minSeamDurationEnabled ? minSeamDuration : null,
-                    minSeamIntervalEnabled,
-                    minSeamDurationEnabled
+                    minSeamIntervalEnabled: !!minSeamIntervalEnabled,
+                    minSeamDurationEnabled: !!minSeamDurationEnabled
+                }
+                if (minSeamIntervalEnabled && minSeamInterval != null) equipmentBody.minSeamInterval = minSeamInterval
+                if (minSeamDurationEnabled && minSeamDuration != null) equipmentBody.minSeamDuration = minSeamDuration
+                await reportApi.generateReportWithProgress(
+                    reportApi.REPORT_JOB_TYPE.EQUIPMENT,
+                    equipmentBody,
+                    onGenerateProgress
                 )
             } else if (normalizedReportType === REPORT_TYPE_MALFUNCTION) {
                 const selectedEquipmentIds = Object.keys(selectedEquipment)
@@ -2404,13 +2557,17 @@ const ReportsPage = () => {
                     alert('Выберите хотя бы один аппарат')
                     return
                 }
-                await reportApi.generateEquipmentMalfunctionReport(
-                    formatDate(periodStartDate),
-                    formatDate(periodEndDate),
-                    periodStartTime,
-                    periodEndTime,
-                    selectedEquipmentIds,
-                    periodType
+                await reportApi.generateReportWithProgress(
+                    reportApi.REPORT_JOB_TYPE.MALFUNCTION,
+                    {
+                        periodStartDate: formatDate(periodStartDate),
+                        periodEndDate: formatDate(periodEndDate),
+                        periodStartTime,
+                        periodEndTime,
+                        selectedEquipmentIds,
+                        periodType
+                    },
+                    onGenerateProgress
                 )
             } else {
                 alert('Неизвестный тип отчета: ' + (normalizedReportType || selectedReportType))
@@ -2419,7 +2576,28 @@ const ReportsPage = () => {
             console.error('Ошибка генерации отчета:', error)
             alert('Ошибка генерации отчета: ' + (error.message || 'Неизвестная ошибка'))
         } finally {
+            generatePollCancelledRef.current = true
+            generateProgressTargetRef.current = 100
+            await new Promise((resolve) => {
+                const startedAt = Date.now()
+                const waitUntilFull = () => {
+                    if (generateProgressDisplayRef.current >= 99.5 || Date.now() - startedAt > 1400) {
+                        resolve()
+                        return
+                    }
+                    requestAnimationFrame(waitUntilFull)
+                }
+                requestAnimationFrame(waitUntilFull)
+            })
+            setGenerateProgressPercent(100)
             setIsGenerating(false)
+            setTimeout(() => {
+                generateProgressTargetRef.current = 0
+                generateProgressDisplayRef.current = 0
+                generateProgressMessageRef.current = ''
+                setGenerateProgressPercent(0)
+                setGenerateProgressMessage('')
+            }, 1500)
         }
     }
 
@@ -2602,1032 +2780,1046 @@ const ReportsPage = () => {
                 </div>
 
                 {/* Middle Panel - Report Parameters */}
-                <div className="reports-panel reports-panel-middle">
-                    <div className="panel-header">
-                        <div className="report-name">
-                            <span className="template-report-label">Имя:*</span>
-                            <input
-                                type="text"
-                                className="report-name-input"
-                                placeholder="Введите название"
-                                value={templateName}
-                                onChange={(e) => setTemplateName(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Выпадающий список "Выберите тип отчета" */}
-                    <div className={`report-type-dropdown-container ${reportTypeDropdownOpen ? 'open' : ''}`}>
+                <div className="reports-panel reports-panel-middle" style={{ position: 'relative' }}>
+                    {panelLocked && (
                         <div
-                            className={`report-type-dropdown-header ${reportTypeDropdownHighlight ? 'report-type-dropdown-header--highlight' : ''}`}
-                            onClick={() => {
-                                setReportTypeDropdownOpen(!reportTypeDropdownOpen)
-                                setReportTypeDropdownHighlight(false)
-                            }}
-                        >
+                            className="report-config-disabled-overlay"
+                            aria-label="Создайте новый отчёт или выберите отчёт из списка"
+                        />
+                    )}
+                    <div className={panelLocked ? 'reports-panel-middle-inner report-config-content-disabled' : 'reports-panel-middle-inner'}>
+                        <div className="panel-header">
+                            <div className="report-name">
+                                <span className="template-report-label">Имя:*</span>
+                                <input
+                                    type="text"
+                                    className="report-name-input"
+                                    placeholder="Введите название"
+                                    value={templateName}
+                                    onChange={(e) => setTemplateName(e.target.value)}
+                                    disabled={panelLocked}
+                                    readOnly={panelLocked}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Выпадающий список "Выберите тип отчета" */}
+                        <div className={`report-type-dropdown-container ${reportTypeDropdownOpen && !panelLocked ? 'open' : ''} ${panelLocked ? 'report-type-dropdown-container--locked' : ''}`}>
+                            <div
+                                className={`report-type-dropdown-header ${reportTypeDropdownHighlight ? 'report-type-dropdown-header--highlight' : ''}`}
+                                onClick={() => {
+                                    if (panelLocked) return
+                                    setReportTypeDropdownOpen(!reportTypeDropdownOpen)
+                                    setReportTypeDropdownHighlight(false)
+                                }}
+                            >
                             <span className={`report-type-dropdown-title ${!selectedReportType ? 'placeholder' : ''}`}>
                                 {selectedReportType || 'Выберите тип отчета*'}
                             </span>
-                            <button
-                                className="org-unit-expand-btn"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setReportTypeDropdownOpen(!reportTypeDropdownOpen);
-                                }}
-                            >
-                                {reportTypeDropdownOpen ? (
-                                    <FaChevronDown className="expand-icon" />
-                                ) : (
-                                    <FaChevronRight className="expand-icon" />
-                                )}
-                            </button>
-                        </div>
-                        {reportTypeDropdownOpen && (
-                            <div className="report-type-dropdown-list">
-                                {reportTypes.map(type => (
-                                    <div
-                                        key={type}
-                                        className={`report-type-dropdown-item ${selectedReportType === type ? 'selected' : ''}`}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedReportType(type);
-                                            setReportTypeDropdownOpen(false);
-                                            setReportTypeDropdownHighlight(false);
-                                        }}
-                                    >
-                                        <span>{type}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    <div className="panel-body middle-panel-content" style={{ position: 'relative' }}>
-                        {configDisabled && (
-                            <div
-                                className="report-config-disabled-overlay"
-                                onClick={handleConfigAreaClick}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleConfigAreaClick(); } }}
-                                role="button"
-                                tabIndex={0}
-                                aria-label="Сначала выберите тип отчета"
-                            />
-                        )}
-                        <div className={`middle-panel-content-inner ${configDisabled ? 'report-config-content-disabled' : ''}`}>
-                            {/* Left sub-panel - Welders or Equipment selection */}
-                            <div className="middle-subpanel middle-subpanel-left">
-                                <div className="parameters-list">
-                                    {(selectedReportType === REPORT_TYPE_EQUIPMENT || selectedReportType === REPORT_TYPE_MALFUNCTION) ? (
-                                        (() => {
-                                            const equipmentHierarchy = buildEquipmentHierarchy()
-                                            const allEquipmentIds = getAllEquipmentFromHierarchy(equipmentHierarchy)
-                                            const allEquipmentSelected = allEquipmentIds.length > 0 && allEquipmentIds.every(id => selectedEquipment[String(id)])
-
-                                            const getEquipmentUnitState = (unit) => {
-                                                const unitMachines = getMachinesFromUnit(unit)
-                                                const selectedCount = unitMachines.filter(m => selectedEquipment[String(m.id)]).length
-                                                const allSelected = unitMachines.length > 0 && selectedCount === unitMachines.length
-                                                const someSelected = selectedCount > 0
-                                                if (unit.children && unit.children.length > 0) {
-                                                    const childrenStates = unit.children.map(c => getEquipmentUnitState(c))
-                                                    const allChildrenChecked = childrenStates.every(s => s.checked)
-                                                    const someChildrenChecked = childrenStates.some(s => s.checked || s.indeterminate)
-                                                    let someInChildren = false
-                                                    unit.children.forEach(child => {
-                                                        const childMachines = getMachinesFromUnit(child)
-                                                        if (childMachines.some(m => selectedEquipment[String(m.id)])) someInChildren = true
-                                                    })
-                                                    if (allChildrenChecked) {
-                                                        if (unitMachines.length > 0) {
-                                                            return allSelected ? { checked: true, indeterminate: false } : { checked: false, indeterminate: true }
-                                                        }
-                                                        return { checked: true, indeterminate: false }
-                                                    }
-                                                    if (someChildrenChecked || someSelected || someInChildren) return { checked: false, indeterminate: true }
-                                                    return { checked: false, indeterminate: false }
-                                                }
-                                                if (unitMachines.length > 0) {
-                                                    if (allSelected) return { checked: true, indeterminate: false }
-                                                    if (someSelected) return { checked: false, indeterminate: true }
-                                                }
-                                                return { checked: false, indeterminate: false }
-                                            }
-
-                                            const renderEquipmentUnit = (unit, level = 0) => {
-                                                const unitState = getEquipmentUnitState(unit)
-                                                const isUnitChecked = Boolean(unitState?.checked ?? false)
-                                                const isUnitIndeterminate = Boolean(unitState?.indeterminate ?? false)
-                                                const searchLower = equipmentSearchTerm ? equipmentSearchTerm.toLowerCase() : ''
-                                                const filteredMachines = (unit.machines || []).filter(m => !searchLower || m.name.toLowerCase().includes(searchLower))
-                                                const unitNameMatch = !searchLower || unit.name.toLowerCase().includes(searchLower)
-                                                const hasMatchingChildren = unit.children && unit.children.some(child => {
-                                                    const childNameMatch = !searchLower || child.name.toLowerCase().includes(searchLower)
-                                                    const childHasMachines = (child.machines || []).some(m => !searchLower || m.name.toLowerCase().includes(searchLower))
-                                                    return childNameMatch || childHasMachines
-                                                })
-                                                if (searchLower && !unitNameMatch && filteredMachines.length === 0 && !hasMatchingChildren) return null
-                                                const hasContent = filteredMachines.length > 0 || (unit.children && unit.children.length > 0)
-                                                const indentSize = 12
-                                                const paddingLeft = level * indentSize
-                                                return (
-                                                    <div key={unit.id} className="parameter-item-expandable" style={{ marginLeft: `${paddingLeft}px` }}>
-                                                        <div className="parameter-item" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={isUnitChecked}
-                                                                ref={input => { if (input) input.indeterminate = isUnitIndeterminate }}
-                                                                onChange={() => toggleEquipmentOrganizationUnit(unit.id)}
-                                                            />
-                                                            <span
-                                                                className="parameter-label"
-                                                                style={{ flex: 1, cursor: 'pointer', color: isUnitIndeterminate ? '#F6B243' : undefined }}
-                                                                onClick={() => toggleEquipmentUnitExpanded(unit.id)}
-                                                            >
-                                                                {unit.name}
-                                                            </span>
-                                                            {hasContent && (
-                                                                <button
-                                                                    type="button"
-                                                                    className="org-unit-expand-btn"
-                                                                    onClick={e => { e.stopPropagation(); toggleEquipmentUnitExpanded(unit.id); }}
-                                                                >
-                                                                    {expandedEquipmentUnits[unit.id] ? <FaChevronDown className="expand-icon" /> : <FaChevronRight className="expand-icon" />}
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                        {expandedEquipmentUnits[unit.id] && (
-                                                            <div className="parameter-expanded-content" style={{ marginLeft: '0', paddingLeft: '0' }}>
-                                                                {unit.children && unit.children.length > 0 && unit.children.map(child => renderEquipmentUnit(child, level + 1)).filter(Boolean)}
-                                                                {filteredMachines.length > 0 && filteredMachines.map(m => (
-                                                                    <label key={m.id} className="parameter-sub-item" style={{ marginLeft: `${indentSize}px`, paddingLeft: '0' }}>
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={!!selectedEquipment[String(m.id)]}
-                                                                            onChange={() => toggleEquipment(m.id)}
-                                                                        />
-                                                                        <span>{m.name}</span>
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )
-                                            }
-
-                                            return (
-                                                <>
-                                                    <div className="subpanel-title">Оборудование*</div>
-                                                    <input
-                                                        type="text"
-                                                        className="welder-search-input"
-                                                        placeholder="Поиск"
-                                                        value={equipmentSearchTerm}
-                                                        onChange={e => setEquipmentSearchTerm(e.target.value)}
-                                                        style={{
-                                                            backgroundColor: '#122536',
-                                                            padding: '4px 8px',
-                                                            marginBottom: '8px',
-                                                            borderRadius: '3px',
-                                                            fontSize: '11px',
-                                                            color: '#fff',
-                                                            border: 'none',
-                                                            outline: 'none',
-                                                            width: '100%',
-                                                            boxSizing: 'border-box'
-                                                        }}
-                                                    />
-                                                    <label className="parameter-item">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={allEquipmentSelected}
-                                                            onChange={handleToggleAllEquipment}
-                                                        />
-                                                        <span className="parameter-label">Все</span>
-                                                    </label>
-                                                    {loadingEquipment ? (
-                                                        <div className="parameter-item" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
-                                                            Загрузка оборудования...
-                                                        </div>
-                                                    ) : equipmentHierarchy.length === 0 ? (
-                                                        <div className="parameter-item" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
-                                                            Нет доступного оборудования
-                                                        </div>
-                                                    ) : (
-                                                        equipmentHierarchy.map(unit => renderEquipmentUnit(unit)).filter(Boolean)
-                                                    )}
-                                                </>
-                                            )
-                                        })()
+                                <button
+                                    type="button"
+                                    className="org-unit-expand-btn"
+                                    disabled={panelLocked}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (panelLocked) return
+                                        setReportTypeDropdownOpen(!reportTypeDropdownOpen);
+                                    }}
+                                >
+                                    {reportTypeDropdownOpen ? (
+                                        <FaChevronDown className="expand-icon" />
                                     ) : (
-                                        <>
-                                            <div className="subpanel-title">Сварщик*</div>
-                                            <input
-                                                type="text"
-                                                className="welder-search-input"
-                                                placeholder="Поиск"
-                                                value={welderSearchTerm}
-                                                onChange={(e) => setWelderSearchTerm(e.target.value)}
-                                                style={{
-                                                    backgroundColor: '#122536',
-                                                    padding: '4px 8px',
-                                                    marginBottom: '8px',
-                                                    borderRadius: '3px',
-                                                    fontSize: '11px',
-                                                    color: '#fff',
-                                                    border: 'none',
-                                                    outline: 'none',
-                                                    width: '100%',
-                                                    boxSizing: 'border-box'
-                                                }}
-                                            />
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={(() => {
-                                                        const hierarchy = buildOrganizationHierarchy()
-                                                        const allWelderIds = getAllWeldersFromHierarchy(hierarchy)
+                                        <FaChevronRight className="expand-icon" />
+                                    )}
+                                </button>
+                            </div>
+                            {reportTypeDropdownOpen && !panelLocked && (
+                                <div className="report-type-dropdown-list">
+                                    {reportTypes.map(type => (
+                                        <div
+                                            key={type}
+                                            className={`report-type-dropdown-item ${selectedReportType === type ? 'selected' : ''}`}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedReportType(type);
+                                                setReportTypeDropdownOpen(false);
+                                                setReportTypeDropdownHighlight(false);
+                                            }}
+                                        >
+                                            <span>{type}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="panel-body middle-panel-content" style={{ position: 'relative' }}>
+                            {configDisabled && (
+                                <div
+                                    className="report-config-disabled-overlay"
+                                    onClick={handleConfigAreaClick}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleConfigAreaClick(); } }}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label="Сначала выберите тип отчета"
+                                />
+                            )}
+                            <div className={`middle-panel-content-inner ${configDisabled ? 'report-config-content-disabled' : ''}`}>
+                                {/* Left sub-panel - Welders or Equipment selection */}
+                                <div className="middle-subpanel middle-subpanel-left">
+                                    <div className="parameters-list">
+                                        {(selectedReportType === REPORT_TYPE_EQUIPMENT || selectedReportType === REPORT_TYPE_MALFUNCTION) ? (
+                                            (() => {
+                                                const equipmentHierarchy = buildEquipmentHierarchy()
+                                                const allEquipmentIds = getAllEquipmentFromHierarchy(equipmentHierarchy)
+                                                const allEquipmentSelected = allEquipmentIds.length > 0 && allEquipmentIds.every(id => selectedEquipment[String(id)])
 
-                                                        // Проверяем, выбраны ли все сварщики
-                                                        const isNoneSelected = selectedWelders.__NONE__ || (Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0)
-                                                        const showAllChecked = !isNoneSelected && Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0
-                                                        const allWeldersSelected = allWelderIds.length > 0 && allWelderIds.every(id => selectedWelders[id] && !selectedWelders.__NONE__)
-
-                                                        // Проверяем, выбраны ли все подразделения (включая дочерние)
-                                                        const allOrgUnitIds = []
-                                                        const collectAllUnitIds = (units) => {
-                                                            units.forEach(unit => {
-                                                                allOrgUnitIds.push(unit.id)
-                                                                if (unit.children && unit.children.length > 0) {
-                                                                    collectAllUnitIds(unit.children)
-                                                                }
-                                                            })
-                                                        }
-                                                        collectAllUnitIds(hierarchy)
-
-                                                        const allOrgUnitsSelected = allOrgUnitIds.length > 0 &&
-                                                            !selectedOrganizationUnits.__NONE__ &&
-                                                            allOrgUnitIds.every(id => selectedOrganizationUnits[id] === true)
-
-                                                        // "Все" выбрано только если выбраны И все сварщики, И все подразделения
-                                                        return (showAllChecked || allWeldersSelected) && allOrgUnitsSelected
-                                                    })()}
-                                                    onChange={handleToggleAll}
-                                                />
-                                                <span className="parameter-label">Все</span>
-                                            </label>
-
-                                            {loadingWelders ? (
-                                                <div className="parameter-item" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
-                                                    Загрузка сварщиков...
-                                                </div>
-                                            ) : organizationHierarchy.length > 0 ? (() => {
-                                                const hierarchy = buildOrganizationHierarchy()
-                                                const allWelderIds = getAllWeldersFromHierarchy(hierarchy)
-                                                const isNoneSelected = selectedWelders.__NONE__ || (Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0)
-                                                const showAllChecked = !isNoneSelected && Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0
-
-                                                // Рекурсивная функция для получения всех сварщиков из подразделения и его дочерних
-                                                const getAllWeldersInUnit = (unit) => {
-                                                    const welders = [...(unit.welders || [])]
+                                                const getEquipmentUnitState = (unit) => {
+                                                    const unitMachines = getMachinesFromUnit(unit)
+                                                    const selectedCount = unitMachines.filter(m => selectedEquipment[String(m.id)]).length
+                                                    const allSelected = unitMachines.length > 0 && selectedCount === unitMachines.length
+                                                    const someSelected = selectedCount > 0
                                                     if (unit.children && unit.children.length > 0) {
+                                                        const childrenStates = unit.children.map(c => getEquipmentUnitState(c))
+                                                        const allChildrenChecked = childrenStates.every(s => s.checked)
+                                                        const someChildrenChecked = childrenStates.some(s => s.checked || s.indeterminate)
+                                                        let someInChildren = false
                                                         unit.children.forEach(child => {
-                                                            welders.push(...getAllWeldersInUnit(child))
+                                                            const childMachines = getMachinesFromUnit(child)
+                                                            if (childMachines.some(m => selectedEquipment[String(m.id)])) someInChildren = true
                                                         })
-                                                    }
-                                                    return welders
-                                                }
-
-                                                // Рекурсивная функция для определения состояния подразделения
-                                                // Возвращает объект: { checked: boolean, indeterminate: boolean }
-                                                const getUnitState = (unit) => {
-                                                    if (showAllChecked) return { checked: true, indeterminate: false }
-                                                    if (selectedOrganizationUnits.__NONE__) return { checked: false, indeterminate: false }
-
-                                                    // Проверяем, явно ли выбрано это подразделение
-                                                    const explicitlySelected = selectedOrganizationUnits[unit.id] === true
-
-                                                    // Проверяем состояние сварщиков в этом подразделении
-                                                    const unitWelders = unit.welders || []
-                                                    const selectedWeldersCount = unitWelders.filter(w => selectedWelders[w.id] && !selectedWelders.__NONE__).length
-                                                    const allWeldersSelected = unitWelders.length > 0 && selectedWeldersCount === unitWelders.length
-                                                    const someWeldersSelected = selectedWeldersCount > 0
-
-                                                    // Проверяем состояние дочерних подразделений
-                                                    let allChildrenChecked = false
-                                                    let someChildrenChecked = false
-
-                                                    // Проверяем, есть ли выбранные сварщики в дочерних подразделениях
-                                                    let someWeldersInChildrenSelected = false
-
-                                                    if (unit.children && unit.children.length > 0) {
-                                                        const childrenStates = unit.children.map(child => {
-                                                            const state = getUnitState(child)
-                                                            return state
-                                                        })
-                                                        allChildrenChecked = childrenStates.every(state => state.checked)
-                                                        // Проверяем, есть ли хотя бы один выбранный или частично выбранный дочерний элемент
-                                                        someChildrenChecked = childrenStates.some(state => state.checked || state.indeterminate)
-
-                                                        // Проверяем, есть ли выбранные сварщики в дочерних подразделениях
-                                                        unit.children.forEach(child => {
-                                                            const childWelders = getAllWeldersInUnit(child)
-                                                            const hasSelectedWelders = childWelders.some(w => selectedWelders[w.id] && !selectedWelders.__NONE__)
-                                                            if (hasSelectedWelders) {
-                                                                someWeldersInChildrenSelected = true
-                                                            }
-                                                        })
-                                                    }
-
-                                                    // Если есть дочерние подразделения, учитываем их состояние
-                                                    if (unit.children && unit.children.length > 0) {
-                                                        // Если все дочерние подразделения выбраны
-                                                        // Для родительских подразделений проверяем только дочерние, сварщики не обязательны
                                                         if (allChildrenChecked) {
-                                                            // Если есть сварщики в этом подразделении, они тоже должны быть выбраны
-                                                            if (unitWelders.length > 0) {
-                                                                if (allWeldersSelected) {
-                                                                    return { checked: true, indeterminate: false }
-                                                                } else {
-                                                                    return { checked: false, indeterminate: true }
-                                                                }
-                                                            } else {
-                                                                // Если нет сварщиков в этом подразделении, достаточно что все дочерние выбраны
-                                                                return { checked: true, indeterminate: false }
+                                                            if (unitMachines.length > 0) {
+                                                                return allSelected ? { checked: true, indeterminate: false } : { checked: false, indeterminate: true }
                                                             }
+                                                            return { checked: true, indeterminate: false }
                                                         }
-                                                        // Если хотя бы что-то выбрано (дочерние или сварщики в этом подразделении или в дочерних)
-                                                        if (someChildrenChecked || someWeldersSelected || someWeldersInChildrenSelected) {
-                                                            return { checked: false, indeterminate: true }
-                                                        }
-                                                        // Если явно выбрано, но дочерние не все выбраны - indeterminate
-                                                        if (explicitlySelected) {
-                                                            return { checked: false, indeterminate: true }
-                                                        }
+                                                        if (someChildrenChecked || someSelected || someInChildren) return { checked: false, indeterminate: true }
                                                         return { checked: false, indeterminate: false }
                                                     }
-
-                                                    // Для подразделений без дочерних элементов проверяем сварщиков и явный выбор
-                                                    if (unitWelders.length > 0) {
-                                                        if (allWeldersSelected) {
-                                                            return { checked: true, indeterminate: false }
-                                                        } else if (someWeldersSelected) {
-                                                            return { checked: false, indeterminate: true }
-                                                        }
+                                                    if (unitMachines.length > 0) {
+                                                        if (allSelected) return { checked: true, indeterminate: false }
+                                                        if (someSelected) return { checked: false, indeterminate: true }
                                                     }
-
-                                                    // Если нет сварщиков и нет дочерних, проверяем только явный выбор
-                                                    // Подразделение считается выбранным, если оно явно выбрано
-                                                    return { checked: explicitlySelected, indeterminate: false }
+                                                    return { checked: false, indeterminate: false }
                                                 }
 
-                                                // Для обратной совместимости
-                                                const isUnitSelected = (unit) => {
-                                                    const state = getUnitState(unit)
-                                                    return state.checked
-                                                }
-
-                                                // Рекурсивная функция для рендеринга подразделения с дочерними
-                                                const renderOrganizationUnit = (unit, level = 0) => {
-                                                    const unitState = getUnitState(unit)
+                                                const renderEquipmentUnit = (unit, level = 0) => {
+                                                    const unitState = getEquipmentUnitState(unit)
                                                     const isUnitChecked = Boolean(unitState?.checked ?? false)
                                                     const isUnitIndeterminate = Boolean(unitState?.indeterminate ?? false)
-
-                                                    // Фильтрация сварщиков по поисковому запросу
-                                                    const searchLower = welderSearchTerm ? welderSearchTerm.toLowerCase() : ''
-                                                    const filteredWelders = unit.welders.filter(welder => {
-                                                        if (!searchLower) return true
-                                                        return welder.name.toLowerCase().includes(searchLower)
-                                                    })
-
-                                                    // Проверяем, нужно ли показывать это подразделение (если есть поиск)
+                                                    const searchLower = equipmentSearchTerm ? equipmentSearchTerm.toLowerCase() : ''
+                                                    const filteredMachines = (unit.machines || []).filter(m => !searchLower || m.name.toLowerCase().includes(searchLower))
                                                     const unitNameMatch = !searchLower || unit.name.toLowerCase().includes(searchLower)
-                                                    const hasMatchingWelders = filteredWelders.length > 0
                                                     const hasMatchingChildren = unit.children && unit.children.some(child => {
                                                         const childNameMatch = !searchLower || child.name.toLowerCase().includes(searchLower)
-                                                        const childHasWelders = child.welders.some(w => {
-                                                            if (!searchLower) return true
-                                                            return w.name.toLowerCase().includes(searchLower)
-                                                        })
-                                                        return childNameMatch || childHasWelders
+                                                        const childHasMachines = (child.machines || []).some(m => !searchLower || m.name.toLowerCase().includes(searchLower))
+                                                        return childNameMatch || childHasMachines
                                                     })
-
-                                                    // Показываем подразделение, если оно соответствует поиску или имеет соответствующих сварщиков/дочерние
-                                                    if (searchLower && !unitNameMatch && !hasMatchingWelders && !hasMatchingChildren) {
-                                                        return null
-                                                    }
-
-                                                    const hasContent = filteredWelders.length > 0 || (unit.children && unit.children.length > 0)
-
-                                                    // Отступ для видимости иерархии
-                                                    const indentSize = 12 // пикселей на уровень
+                                                    if (searchLower && !unitNameMatch && filteredMachines.length === 0 && !hasMatchingChildren) return null
+                                                    const hasContent = filteredMachines.length > 0 || (unit.children && unit.children.length > 0)
+                                                    const indentSize = 12
                                                     const paddingLeft = level * indentSize
-
                                                     return (
                                                         <div key={unit.id} className="parameter-item-expandable" style={{ marginLeft: `${paddingLeft}px` }}>
                                                             <div className="parameter-item" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={isUnitChecked}
-                                                                    ref={(input) => {
-                                                                        if (input) {
-                                                                            input.indeterminate = false // Убираем indeterminate с чекбокса
-                                                                        }
-                                                                    }}
-                                                                    onChange={() => toggleOrganizationUnit(unit.id)}
+                                                                    ref={input => { if (input) input.indeterminate = isUnitIndeterminate }}
+                                                                    onChange={() => toggleEquipmentOrganizationUnit(unit.id)}
                                                                 />
                                                                 <span
                                                                     className="parameter-label"
-                                                                    style={{
-                                                                        flex: 1,
-                                                                        cursor: 'pointer',
-                                                                        color: isUnitIndeterminate ? '#F6B243' : undefined // Желтый цвет для частичного выбора
-                                                                    }}
-                                                                    onClick={() => toggleOrganizationUnitExpanded(unit.id)}
+                                                                    style={{ flex: 1, cursor: 'pointer', color: isUnitIndeterminate ? '#F6B243' : undefined }}
+                                                                    onClick={() => toggleEquipmentUnitExpanded(unit.id)}
                                                                 >
-                                                    {unit.name}
-                                                </span>
+                                                                {unit.name}
+                                                            </span>
                                                                 {hasContent && (
                                                                     <button
+                                                                        type="button"
                                                                         className="org-unit-expand-btn"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            toggleOrganizationUnitExpanded(unit.id);
-                                                                        }}
+                                                                        onClick={e => { e.stopPropagation(); toggleEquipmentUnitExpanded(unit.id); }}
                                                                     >
-                                                                        {expandedOrganizationUnits[unit.id] ? (
-                                                                            <FaChevronDown className="expand-icon" />
-                                                                        ) : (
-                                                                            <FaChevronRight className="expand-icon" />
-                                                                        )}
+                                                                        {expandedEquipmentUnits[unit.id] ? <FaChevronDown className="expand-icon" /> : <FaChevronRight className="expand-icon" />}
                                                                     </button>
                                                                 )}
                                                             </div>
-                                                            {expandedOrganizationUnits[unit.id] && (
+                                                            {expandedEquipmentUnits[unit.id] && (
                                                                 <div className="parameter-expanded-content" style={{ marginLeft: '0', paddingLeft: '0' }}>
-                                                                    {/* Рендерим дочерние подразделения ПЕРЕД сварщиками */}
-                                                                    {/* Важно: дочерние подразделения рендерятся с level + 1, что даст им правильный отступ */}
-                                                                    {/* Отступ применяется через marginLeft в renderOrganizationUnit, поэтому дочерние подразделения будут иметь отступ 24px относительно родителя */}
-                                                                    {unit.children && unit.children.length > 0 && (
-                                                                        <>
-                                                                            {unit.children.map(child => {
-                                                                                // Рекурсивно рендерим дочернее подразделение с увеличенным уровнем
-                                                                                // level + 1 даст отступ (level + 1) * 24px = например, для ОГК внутри Alloy: 1 * 24 = 24px
-                                                                                return renderOrganizationUnit(child, level + 1)
-                                                                            }).filter(Boolean)}
-                                                                        </>
-                                                                    )}
-                                                                    {/* Рендерим сварщиков ПОСЛЕ дочерних подразделений */}
-                                                                    {filteredWelders.length > 0 && filteredWelders.map(welder => {
-                                                                        const isWelderChecked = Boolean(showAllChecked || (selectedWelders[welder.id] && !selectedWelders.__NONE__))
-                                                                        return (
-                                                                            <label key={welder.id} className="parameter-sub-item" style={{ marginLeft: `${indentSize}px`, paddingLeft: '0' }}>
-                                                                                <input
-                                                                                    type="checkbox"
-                                                                                    checked={isWelderChecked}
-                                                                                    onChange={() => toggleWelder(welder.id)}
-                                                                                />
-                                                                                <span>{welder.name}</span>
-                                                                            </label>
-                                                                        )
-                                                                    })}
+                                                                    {unit.children && unit.children.length > 0 && unit.children.map(child => renderEquipmentUnit(child, level + 1)).filter(Boolean)}
+                                                                    {filteredMachines.length > 0 && filteredMachines.map(m => (
+                                                                        <label key={m.id} className="parameter-sub-item" style={{ marginLeft: `${indentSize}px`, paddingLeft: '0' }}>
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={!!selectedEquipment[String(m.id)]}
+                                                                                onChange={() => toggleEquipment(m.id)}
+                                                                            />
+                                                                            <span>{m.name}</span>
+                                                                        </label>
+                                                                    ))}
                                                                 </div>
                                                             )}
                                                         </div>
                                                     )
                                                 }
 
-                                                // Фильтрация корневых подразделений по поисковому запросу
-                                                const searchLower = welderSearchTerm ? welderSearchTerm.toLowerCase() : ''
-                                                const filteredRootUnits = hierarchy.filter(unit => {
-                                                    if (!searchLower) return true
-                                                    const unitNameMatch = unit.name.toLowerCase().includes(searchLower)
-                                                    const hasMatchingWelders = unit.welders.some(welder =>
-                                                        welder.name.toLowerCase().includes(searchLower)
-                                                    )
-                                                    // Проверяем дочерние подразделения рекурсивно
-                                                    const hasMatchingChildren = unit.children && unit.children.some(child => {
-                                                        const childNameMatch = child.name.toLowerCase().includes(searchLower)
-                                                        const childHasWelders = child.welders.some(w => w.name.toLowerCase().includes(searchLower))
-                                                        return childNameMatch || childHasWelders
+                                                return (
+                                                    <>
+                                                        <div className="subpanel-title">Оборудование*</div>
+                                                        <input
+                                                            type="text"
+                                                            className="welder-search-input"
+                                                            placeholder="Поиск"
+                                                            value={equipmentSearchTerm}
+                                                            onChange={e => setEquipmentSearchTerm(e.target.value)}
+                                                            style={{
+                                                                backgroundColor: '#122536',
+                                                                padding: '4px 8px',
+                                                                marginBottom: '8px',
+                                                                borderRadius: '3px',
+                                                                fontSize: '11px',
+                                                                color: '#fff',
+                                                                border: 'none',
+                                                                outline: 'none',
+                                                                width: '100%',
+                                                                boxSizing: 'border-box'
+                                                            }}
+                                                        />
+                                                        <label className="parameter-item">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={allEquipmentSelected}
+                                                                onChange={handleToggleAllEquipment}
+                                                            />
+                                                            <span className="parameter-label">Все</span>
+                                                        </label>
+                                                        {loadingEquipment ? (
+                                                            <div className="parameter-item" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
+                                                                Загрузка оборудования...
+                                                            </div>
+                                                        ) : equipmentHierarchy.length === 0 ? (
+                                                            <div className="parameter-item" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
+                                                                Нет доступного оборудования
+                                                            </div>
+                                                        ) : (
+                                                            equipmentHierarchy.map(unit => renderEquipmentUnit(unit)).filter(Boolean)
+                                                        )}
+                                                    </>
+                                                )
+                                            })()
+                                        ) : (
+                                            <>
+                                                <div className="subpanel-title">Сварщик*</div>
+                                                <input
+                                                    type="text"
+                                                    className="welder-search-input"
+                                                    placeholder="Поиск"
+                                                    value={welderSearchTerm}
+                                                    onChange={(e) => setWelderSearchTerm(e.target.value)}
+                                                    style={{
+                                                        backgroundColor: '#122536',
+                                                        padding: '4px 8px',
+                                                        marginBottom: '8px',
+                                                        borderRadius: '3px',
+                                                        fontSize: '11px',
+                                                        color: '#fff',
+                                                        border: 'none',
+                                                        outline: 'none',
+                                                        width: '100%',
+                                                        boxSizing: 'border-box'
+                                                    }}
+                                                />
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(() => {
+                                                            const hierarchy = buildOrganizationHierarchy()
+                                                            const allWelderIds = getAllWeldersFromHierarchy(hierarchy)
+
+                                                            // Проверяем, выбраны ли все сварщики
+                                                            const isNoneSelected = selectedWelders.__NONE__ || (Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0)
+                                                            const showAllChecked = !isNoneSelected && Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0
+                                                            const allWeldersSelected = allWelderIds.length > 0 && allWelderIds.every(id => selectedWelders[id] && !selectedWelders.__NONE__)
+
+                                                            // Проверяем, выбраны ли все подразделения (включая дочерние)
+                                                            const allOrgUnitIds = []
+                                                            const collectAllUnitIds = (units) => {
+                                                                units.forEach(unit => {
+                                                                    allOrgUnitIds.push(unit.id)
+                                                                    if (unit.children && unit.children.length > 0) {
+                                                                        collectAllUnitIds(unit.children)
+                                                                    }
+                                                                })
+                                                            }
+                                                            collectAllUnitIds(hierarchy)
+
+                                                            const allOrgUnitsSelected = allOrgUnitIds.length > 0 &&
+                                                                !selectedOrganizationUnits.__NONE__ &&
+                                                                allOrgUnitIds.every(id => selectedOrganizationUnits[id] === true)
+
+                                                            // "Все" выбрано только если выбраны И все сварщики, И все подразделения
+                                                            return (showAllChecked || allWeldersSelected) && allOrgUnitsSelected
+                                                        })()}
+                                                        onChange={handleToggleAll}
+                                                    />
+                                                    <span className="parameter-label">Все</span>
+                                                </label>
+
+                                                {loadingWelders ? (
+                                                    <div className="parameter-item" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
+                                                        Загрузка сварщиков...
+                                                    </div>
+                                                ) : organizationHierarchy.length > 0 ? (() => {
+                                                    const hierarchy = buildOrganizationHierarchy()
+                                                    const allWelderIds = getAllWeldersFromHierarchy(hierarchy)
+                                                    const isNoneSelected = selectedWelders.__NONE__ || (Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0)
+                                                    const showAllChecked = !isNoneSelected && Object.keys(selectedWelders).length === 0 && allWelderIds.length > 0
+
+                                                    // Рекурсивная функция для получения всех сварщиков из подразделения и его дочерних
+                                                    const getAllWeldersInUnit = (unit) => {
+                                                        const welders = [...(unit.welders || [])]
+                                                        if (unit.children && unit.children.length > 0) {
+                                                            unit.children.forEach(child => {
+                                                                welders.push(...getAllWeldersInUnit(child))
+                                                            })
+                                                        }
+                                                        return welders
+                                                    }
+
+                                                    // Рекурсивная функция для определения состояния подразделения
+                                                    // Возвращает объект: { checked: boolean, indeterminate: boolean }
+                                                    const getUnitState = (unit) => {
+                                                        if (showAllChecked) return { checked: true, indeterminate: false }
+                                                        if (selectedOrganizationUnits.__NONE__) return { checked: false, indeterminate: false }
+
+                                                        // Проверяем, явно ли выбрано это подразделение
+                                                        const explicitlySelected = selectedOrganizationUnits[unit.id] === true
+
+                                                        // Проверяем состояние сварщиков в этом подразделении
+                                                        const unitWelders = unit.welders || []
+                                                        const selectedWeldersCount = unitWelders.filter(w => selectedWelders[w.id] && !selectedWelders.__NONE__).length
+                                                        const allWeldersSelected = unitWelders.length > 0 && selectedWeldersCount === unitWelders.length
+                                                        const someWeldersSelected = selectedWeldersCount > 0
+
+                                                        // Проверяем состояние дочерних подразделений
+                                                        let allChildrenChecked = false
+                                                        let someChildrenChecked = false
+
+                                                        // Проверяем, есть ли выбранные сварщики в дочерних подразделениях
+                                                        let someWeldersInChildrenSelected = false
+
+                                                        if (unit.children && unit.children.length > 0) {
+                                                            const childrenStates = unit.children.map(child => {
+                                                                const state = getUnitState(child)
+                                                                return state
+                                                            })
+                                                            allChildrenChecked = childrenStates.every(state => state.checked)
+                                                            // Проверяем, есть ли хотя бы один выбранный или частично выбранный дочерний элемент
+                                                            someChildrenChecked = childrenStates.some(state => state.checked || state.indeterminate)
+
+                                                            // Проверяем, есть ли выбранные сварщики в дочерних подразделениях
+                                                            unit.children.forEach(child => {
+                                                                const childWelders = getAllWeldersInUnit(child)
+                                                                const hasSelectedWelders = childWelders.some(w => selectedWelders[w.id] && !selectedWelders.__NONE__)
+                                                                if (hasSelectedWelders) {
+                                                                    someWeldersInChildrenSelected = true
+                                                                }
+                                                            })
+                                                        }
+
+                                                        // Если есть дочерние подразделения, учитываем их состояние
+                                                        if (unit.children && unit.children.length > 0) {
+                                                            // Если все дочерние подразделения выбраны
+                                                            // Для родительских подразделений проверяем только дочерние, сварщики не обязательны
+                                                            if (allChildrenChecked) {
+                                                                // Если есть сварщики в этом подразделении, они тоже должны быть выбраны
+                                                                if (unitWelders.length > 0) {
+                                                                    if (allWeldersSelected) {
+                                                                        return { checked: true, indeterminate: false }
+                                                                    } else {
+                                                                        return { checked: false, indeterminate: true }
+                                                                    }
+                                                                } else {
+                                                                    // Если нет сварщиков в этом подразделении, достаточно что все дочерние выбраны
+                                                                    return { checked: true, indeterminate: false }
+                                                                }
+                                                            }
+                                                            // Если хотя бы что-то выбрано (дочерние или сварщики в этом подразделении или в дочерних)
+                                                            if (someChildrenChecked || someWeldersSelected || someWeldersInChildrenSelected) {
+                                                                return { checked: false, indeterminate: true }
+                                                            }
+                                                            // Если явно выбрано, но дочерние не все выбраны - indeterminate
+                                                            if (explicitlySelected) {
+                                                                return { checked: false, indeterminate: true }
+                                                            }
+                                                            return { checked: false, indeterminate: false }
+                                                        }
+
+                                                        // Для подразделений без дочерних элементов проверяем сварщиков и явный выбор
+                                                        if (unitWelders.length > 0) {
+                                                            if (allWeldersSelected) {
+                                                                return { checked: true, indeterminate: false }
+                                                            } else if (someWeldersSelected) {
+                                                                return { checked: false, indeterminate: true }
+                                                            }
+                                                        }
+
+                                                        // Если нет сварщиков и нет дочерних, проверяем только явный выбор
+                                                        // Подразделение считается выбранным, если оно явно выбрано
+                                                        return { checked: explicitlySelected, indeterminate: false }
+                                                    }
+
+                                                    // Для обратной совместимости
+                                                    const isUnitSelected = (unit) => {
+                                                        const state = getUnitState(unit)
+                                                        return state.checked
+                                                    }
+
+                                                    // Рекурсивная функция для рендеринга подразделения с дочерними
+                                                    const renderOrganizationUnit = (unit, level = 0) => {
+                                                        const unitState = getUnitState(unit)
+                                                        const isUnitChecked = Boolean(unitState?.checked ?? false)
+                                                        const isUnitIndeterminate = Boolean(unitState?.indeterminate ?? false)
+
+                                                        // Фильтрация сварщиков по поисковому запросу
+                                                        const searchLower = welderSearchTerm ? welderSearchTerm.toLowerCase() : ''
+                                                        const filteredWelders = unit.welders.filter(welder => {
+                                                            if (!searchLower) return true
+                                                            return welder.name.toLowerCase().includes(searchLower)
+                                                        })
+
+                                                        // Проверяем, нужно ли показывать это подразделение (если есть поиск)
+                                                        const unitNameMatch = !searchLower || unit.name.toLowerCase().includes(searchLower)
+                                                        const hasMatchingWelders = filteredWelders.length > 0
+                                                        const hasMatchingChildren = unit.children && unit.children.some(child => {
+                                                            const childNameMatch = !searchLower || child.name.toLowerCase().includes(searchLower)
+                                                            const childHasWelders = child.welders.some(w => {
+                                                                if (!searchLower) return true
+                                                                return w.name.toLowerCase().includes(searchLower)
+                                                            })
+                                                            return childNameMatch || childHasWelders
+                                                        })
+
+                                                        // Показываем подразделение, если оно соответствует поиску или имеет соответствующих сварщиков/дочерние
+                                                        if (searchLower && !unitNameMatch && !hasMatchingWelders && !hasMatchingChildren) {
+                                                            return null
+                                                        }
+
+                                                        const hasContent = filteredWelders.length > 0 || (unit.children && unit.children.length > 0)
+
+                                                        // Отступ для видимости иерархии
+                                                        const indentSize = 12 // пикселей на уровень
+                                                        const paddingLeft = level * indentSize
+
+                                                        return (
+                                                            <div key={unit.id} className="parameter-item-expandable" style={{ marginLeft: `${paddingLeft}px` }}>
+                                                                <div className="parameter-item" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isUnitChecked}
+                                                                        ref={(input) => {
+                                                                            if (input) {
+                                                                                input.indeterminate = false // Убираем indeterminate с чекбокса
+                                                                            }
+                                                                        }}
+                                                                        onChange={() => toggleOrganizationUnit(unit.id)}
+                                                                    />
+                                                                    <span
+                                                                        className="parameter-label"
+                                                                        style={{
+                                                                            flex: 1,
+                                                                            cursor: 'pointer',
+                                                                            color: isUnitIndeterminate ? '#F6B243' : undefined // Желтый цвет для частичного выбора
+                                                                        }}
+                                                                        onClick={() => toggleOrganizationUnitExpanded(unit.id)}
+                                                                    >
+                                                    {unit.name}
+                                                </span>
+                                                                    {hasContent && (
+                                                                        <button
+                                                                            className="org-unit-expand-btn"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                toggleOrganizationUnitExpanded(unit.id);
+                                                                            }}
+                                                                        >
+                                                                            {expandedOrganizationUnits[unit.id] ? (
+                                                                                <FaChevronDown className="expand-icon" />
+                                                                            ) : (
+                                                                                <FaChevronRight className="expand-icon" />
+                                                                            )}
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                {expandedOrganizationUnits[unit.id] && (
+                                                                    <div className="parameter-expanded-content" style={{ marginLeft: '0', paddingLeft: '0' }}>
+                                                                        {/* Рендерим дочерние подразделения ПЕРЕД сварщиками */}
+                                                                        {/* Важно: дочерние подразделения рендерятся с level + 1, что даст им правильный отступ */}
+                                                                        {/* Отступ применяется через marginLeft в renderOrganizationUnit, поэтому дочерние подразделения будут иметь отступ 24px относительно родителя */}
+                                                                        {unit.children && unit.children.length > 0 && (
+                                                                            <>
+                                                                                {unit.children.map(child => {
+                                                                                    // Рекурсивно рендерим дочернее подразделение с увеличенным уровнем
+                                                                                    // level + 1 даст отступ (level + 1) * 24px = например, для ОГК внутри Alloy: 1 * 24 = 24px
+                                                                                    return renderOrganizationUnit(child, level + 1)
+                                                                                }).filter(Boolean)}
+                                                                            </>
+                                                                        )}
+                                                                        {/* Рендерим сварщиков ПОСЛЕ дочерних подразделений */}
+                                                                        {filteredWelders.length > 0 && filteredWelders.map(welder => {
+                                                                            const isWelderChecked = Boolean(showAllChecked || (selectedWelders[welder.id] && !selectedWelders.__NONE__))
+                                                                            return (
+                                                                                <label key={welder.id} className="parameter-sub-item" style={{ marginLeft: `${indentSize}px`, paddingLeft: '0' }}>
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={isWelderChecked}
+                                                                                        onChange={() => toggleWelder(welder.id)}
+                                                                                    />
+                                                                                    <span>{welder.name}</span>
+                                                                                </label>
+                                                                            )
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )
+                                                    }
+
+                                                    // Фильтрация корневых подразделений по поисковому запросу
+                                                    const searchLower = welderSearchTerm ? welderSearchTerm.toLowerCase() : ''
+                                                    const filteredRootUnits = hierarchy.filter(unit => {
+                                                        if (!searchLower) return true
+                                                        const unitNameMatch = unit.name.toLowerCase().includes(searchLower)
+                                                        const hasMatchingWelders = unit.welders.some(welder =>
+                                                            welder.name.toLowerCase().includes(searchLower)
+                                                        )
+                                                        // Проверяем дочерние подразделения рекурсивно
+                                                        const hasMatchingChildren = unit.children && unit.children.some(child => {
+                                                            const childNameMatch = child.name.toLowerCase().includes(searchLower)
+                                                            const childHasWelders = child.welders.some(w => w.name.toLowerCase().includes(searchLower))
+                                                            return childNameMatch || childHasWelders
+                                                        })
+                                                        return unitNameMatch || hasMatchingWelders || hasMatchingChildren
                                                     })
-                                                    return unitNameMatch || hasMatchingWelders || hasMatchingChildren
-                                                })
 
-                                                return filteredRootUnits.map(unit => renderOrganizationUnit(unit, 0)).filter(Boolean)
-                                            })() : (
-                                                <div className="parameter-item" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
-                                                    Нет доступных подразделений
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
+                                                    return filteredRootUnits.map(unit => renderOrganizationUnit(unit, 0)).filter(Boolean)
+                                                })() : (
+                                                    <div className="parameter-item" style={{ color: '#7B8BA6', fontSize: '12px', padding: '8px 12px' }}>
+                                                        Нет доступных подразделений
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Right sub-panel - Report columns selection (зависит от типа отчёта) */}
-                            <div className="middle-subpanel middle-subpanel-right">
-                                <div className="parameters-list">
-                                    {selectedReportType === REPORT_TYPE_MALFUNCTION ? (
-                                        /* Отчёт по неисправностям оборудования: только эти колонки, все включены и не снимаются */
-                                        <>
-                                            <div className="subpanel-title">Колонки отчёта</div>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">Модель оборудования</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">Наименование оборудования</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">Подразделение</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">Серийный №</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">Инв. №</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">Неисправности</span>
-                                            </label>
-                                        </>
-                                    ) : (selectedReportType === REPORT_TYPE_EQUIPMENT || selectedReportType === REPORT_TYPE_WELDER) ? (
-                                        /* Параметры отчёта по работе сварщика / по работе оборудования: одинаковый набор */
-                                        <>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">№ п/п</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">Дата</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">Время начала шва</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">Режим работы оборудования</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">Рабочий ток, А</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">Рабочее напряжение, В</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input type="checkbox" checked={true} disabled={true} />
-                                                <span className="parameter-label">Время шва, с</span>
-                                            </label>
-                                            {selectedReportType === REPORT_TYPE_EQUIPMENT && (
-                                                <>
-                                                    <label className="parameter-item">
-                                                        <input type="checkbox" checked={parameters.welderFullName} onChange={() => toggleParameter('welderFullName')} />
-                                                        <span className="parameter-label">ФИО сварщика</span>
-                                                    </label>
-                                                    <label className="parameter-item">
-                                                        <input type="checkbox" checked={parameters.welderTabNumber} onChange={() => toggleParameter('welderTabNumber')} />
-                                                        <span className="parameter-label">таб. № сварщика</span>
-                                                    </label>
-                                                    <label className="parameter-item">
-                                                        <input type="checkbox" checked={parameters.profession} onChange={() => toggleParameter('profession')} />
-                                                        <span className="parameter-label">Профессия</span>
-                                                    </label>
-                                                </>
-                                            )}
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.equipmentModel}
-                                                    onChange={() => toggleParameter('equipmentModel')}
-                                                />
-                                                <span className="parameter-label">Модель оборудования</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.equipmentName}
-                                                    onChange={() => toggleParameter('equipmentName')}
-                                                />
-                                                <span className="parameter-label">Наименование оборудования</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.wireFeedSpeed}
-                                                    onChange={() => toggleParameter('wireFeedSpeed')}
-                                                />
-                                                <span className="parameter-label">Скорость подачи проволоки, м/мин</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.consumption}
-                                                    onChange={() => toggleParameter('consumption')}
-                                                />
-                                                <span className="parameter-label">Расход проволоки, кг</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.energyConsumed}
-                                                    onChange={() => toggleParameter('energyConsumed')}
-                                                />
-                                                <span className="parameter-label">Затраченная энергия на шов, кВт*ч</span>
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.gasConsumption}
-                                                    onChange={() => toggleParameter('gasConsumption')}
-                                                />
-                                                <span className="parameter-label">Расход газа, л</span>
-                                            </label>
-                                            <div className="parameter-item-expandable">
-                                                <label
-                                                    className="parameter-item"
-                                                    onClick={(e) => {
-                                                        if (e.target.type !== 'checkbox') toggleExpanded('workOutsideActualCurrent')
-                                                    }}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={parameters.workOutsideActualCurrent}
-                                                        onChange={() => toggleParameter('workOutsideActualCurrent')}
-                                                    />
-                                                    <span className="parameter-label">Пределы разрешенного факт.тока, А (min — max)</span>
-                                                    <button
-                                                        className="org-unit-expand-btn"
-                                                        onClick={(e) => { e.stopPropagation(); toggleExpanded('workOutsideActualCurrent'); }}
-                                                    >
-                                                        {expandedWorkOutsideActualCurrent ? <FaChevronDown className="expand-icon" /> : <FaChevronRight className="expand-icon" />}
-                                                    </button>
+                                {/* Right sub-panel - Report columns selection (зависит от типа отчёта) */}
+                                <div className="middle-subpanel middle-subpanel-right">
+                                    <div className="parameters-list">
+                                        {selectedReportType === REPORT_TYPE_MALFUNCTION ? (
+                                            /* Отчёт по неисправностям оборудования: только эти колонки, все включены и не снимаются */
+                                            <>
+                                                <div className="subpanel-title">Колонки отчёта</div>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">Модель оборудования</span>
                                                 </label>
-                                                {expandedWorkOutsideActualCurrent && (
-                                                    <div className="parameter-expanded-content">
-                                                        <div className="current-range-controls">
-                                                            <div className="current-range-inputs">
-                                                                <input
-                                                                    type="number"
-                                                                    min="5"
-                                                                    max={workOutsideActualCurrentRange.max}
-                                                                    value={workOutsideActualCurrentRange.min}
-                                                                    onChange={(e) => handleActualCurrentMinChange(e.target.value)}
-                                                                    className="current-range-input"
-                                                                />
-                                                                <span className="current-range-separator">—</span>
-                                                                <input
-                                                                    type="number"
-                                                                    min={workOutsideActualCurrentRange.min}
-                                                                    max="500"
-                                                                    value={workOutsideActualCurrentRange.max}
-                                                                    onChange={(e) => handleActualCurrentMaxChange(e.target.value)}
-                                                                    className="current-range-input"
-                                                                />
-                                                            </div>
-                                                            <div className="current-range-slider-wrapper">
-                                                                <div className="current-range-slider">
-                                                                    <div className="current-range-slider-track-bg"></div>
-                                                                    <div
-                                                                        className="current-range-slider-track"
-                                                                        style={{
-                                                                            left: `${((workOutsideActualCurrentRange.min - 5) / (500 - 5)) * 100}%`,
-                                                                            width: `${((workOutsideActualCurrentRange.max - workOutsideActualCurrentRange.min) / (500 - 5)) * 100}%`
-                                                                        }}
-                                                                    />
-                                                                    <input type="range" min="5" max="500" value={workOutsideActualCurrentRange.min} onInput={(e) => handleActualCurrentMinChange(e.target.value)} onChange={(e) => handleActualCurrentMinChange(e.target.value)} className="current-range-slider-input current-range-slider-input-min" />
-                                                                    <input type="range" min="5" max="500" value={workOutsideActualCurrentRange.max} onInput={(e) => handleActualCurrentMaxChange(e.target.value)} onChange={(e) => handleActualCurrentMaxChange(e.target.value)} className="current-range-slider-input current-range-slider-input-max" />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">Наименование оборудования</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">Подразделение</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">Серийный №</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">Инв. №</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">Неисправности</span>
+                                                </label>
+                                            </>
+                                        ) : (selectedReportType === REPORT_TYPE_EQUIPMENT || selectedReportType === REPORT_TYPE_WELDER) ? (
+                                            /* Параметры отчёта по работе сварщика / по работе оборудования: одинаковый набор */
+                                            <>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">№ п/п</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">Дата</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">Время начала шва</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">Режим работы оборудования</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">Рабочий ток, А</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">Рабочее напряжение, В</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input type="checkbox" checked={true} disabled={true} />
+                                                    <span className="parameter-label">Время шва, с</span>
+                                                </label>
+                                                {selectedReportType === REPORT_TYPE_EQUIPMENT && (
+                                                    <>
+                                                        <label className="parameter-item">
+                                                            <input type="checkbox" checked={parameters.welderFullName} onChange={() => toggleParameter('welderFullName')} />
+                                                            <span className="parameter-label">ФИО сварщика</span>
+                                                        </label>
+                                                        <label className="parameter-item">
+                                                            <input type="checkbox" checked={parameters.welderTabNumber} onChange={() => toggleParameter('welderTabNumber')} />
+                                                            <span className="parameter-label">таб. № сварщика</span>
+                                                        </label>
+                                                        <label className="parameter-item">
+                                                            <input type="checkbox" checked={parameters.profession} onChange={() => toggleParameter('profession')} />
+                                                            <span className="parameter-label">Профессия</span>
+                                                        </label>
+                                                    </>
                                                 )}
-                                            </div>
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={minSeamIntervalEnabled}
-                                                    onChange={(e) => setMinSeamIntervalEnabled(e.target.checked)}
-                                                />
-                                                <span className="parameter-label">Мин. интервал между швами, с (0–10)</span>
-                                                <input
-                                                    type="number"
-                                                    min={0}
-                                                    max={10}
-                                                    value={minSeamInterval}
-                                                    onChange={(e) => setMinSeamInterval(Math.max(0, Math.min(10, Number(e.target.value) || 0)))}
-                                                    className="current-range-input"
-                                                    style={{ width: '50px', marginLeft: '8px' }}
-                                                    disabled={!minSeamIntervalEnabled}
-                                                />
-                                            </label>
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={minSeamDurationEnabled}
-                                                    onChange={(e) => setMinSeamDurationEnabled(e.target.checked)}
-                                                />
-                                                <span className="parameter-label">Мин. учитываемый шов, с (0–10)</span>
-                                                <input
-                                                    type="number"
-                                                    min={0}
-                                                    max={10}
-                                                    value={minSeamDuration}
-                                                    onChange={(e) => setMinSeamDuration(Math.max(0, Math.min(10, Number(e.target.value) || 0)))}
-                                                    className="current-range-input"
-                                                    style={{ width: '50px', marginLeft: '8px' }}
-                                                    disabled={!minSeamDurationEnabled}
-                                                />
-                                            </label>
-                                        </>
-                                    ) : (
-                                        /* Параметры отчёта по расходу проволоки (текущий набор) */
-                                        <>
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.equipmentModel}
-                                                    onChange={() => toggleParameter('equipmentModel')}
-                                                />
-                                                <span className="parameter-label">Модель оборудования</span>
-                                            </label>
-
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.wire}
-                                                    onChange={() => toggleParameter('wire')}
-                                                    disabled={true}
-                                                />
-                                                <span className="parameter-label">Проволока</span>
-                                            </label>
-
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.consumption}
-                                                    onChange={() => toggleParameter('consumption')}
-                                                    disabled={true}
-                                                />
-                                                <span className="parameter-label">Расход, кг</span>
-                                            </label>
-
-                                            <div className="parameter-item-expandable">
-                                                <label
-                                                    className="parameter-item"
-                                                    onClick={(e) => {
-                                                        if (e.target.type !== 'checkbox') {
-                                                            toggleExpanded('workOutsideSetCurrent')
-                                                        }
-                                                    }}
-                                                >
+                                                <label className="parameter-item">
                                                     <input
                                                         type="checkbox"
-                                                        checked={parameters.workOutsideSetCurrent}
-                                                        onChange={() => toggleParameter('workOutsideSetCurrent')}
+                                                        checked={parameters.equipmentModel}
+                                                        onChange={() => toggleParameter('equipmentModel')}
                                                     />
-                                                    <span className="parameter-label">Пределы разрешенного уст. тока</span>
-                                                    <button
-                                                        className="org-unit-expand-btn"
+                                                    <span className="parameter-label">Модель оборудования</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.equipmentName}
+                                                        onChange={() => toggleParameter('equipmentName')}
+                                                    />
+                                                    <span className="parameter-label">Наименование оборудования</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.wireFeedSpeed}
+                                                        onChange={() => toggleParameter('wireFeedSpeed')}
+                                                    />
+                                                    <span className="parameter-label">Скорость подачи проволоки, м/мин</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.consumption}
+                                                        onChange={() => toggleParameter('consumption')}
+                                                    />
+                                                    <span className="parameter-label">Расход проволоки, кг</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.energyConsumed}
+                                                        onChange={() => toggleParameter('energyConsumed')}
+                                                    />
+                                                    <span className="parameter-label">Затраченная энергия на шов, кВт*ч</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.gasConsumption}
+                                                        onChange={() => toggleParameter('gasConsumption')}
+                                                    />
+                                                    <span className="parameter-label">Расход газа, л</span>
+                                                </label>
+                                                <div className="parameter-item-expandable">
+                                                    <label
+                                                        className="parameter-item"
                                                         onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            toggleExpanded('workOutsideSetCurrent');
+                                                            if (e.target.type !== 'checkbox') toggleExpanded('workOutsideActualCurrent')
                                                         }}
                                                     >
-                                                        {expandedWorkOutsideSetCurrent ? (
-                                                            <FaChevronDown className="expand-icon" />
-                                                        ) : (
-                                                            <FaChevronRight className="expand-icon" />
-                                                        )}
-                                                    </button>
-                                                </label>
-                                                {expandedWorkOutsideSetCurrent && (
-                                                    <div className="parameter-expanded-content">
-                                                        <div className="current-range-controls">
-                                                            <div className="current-range-inputs">
-                                                                <input
-                                                                    type="number"
-                                                                    min="5"
-                                                                    max={workOutsideSetCurrentRange.max}
-                                                                    value={workOutsideSetCurrentRange.min}
-                                                                    onChange={(e) => handleSetCurrentMinChange(e.target.value)}
-                                                                    className="current-range-input"
-                                                                />
-                                                                <span className="current-range-separator">—</span>
-                                                                <input
-                                                                    type="number"
-                                                                    min={workOutsideSetCurrentRange.min}
-                                                                    max="500"
-                                                                    value={workOutsideSetCurrentRange.max}
-                                                                    onChange={(e) => handleSetCurrentMaxChange(e.target.value)}
-                                                                    className="current-range-input"
-                                                                />
-                                                            </div>
-                                                            <div className="current-range-slider-wrapper">
-                                                                <div className="current-range-slider">
-                                                                    <div className="current-range-slider-track-bg"></div>
-                                                                    <div
-                                                                        className="current-range-slider-track"
-                                                                        style={{
-                                                                            left: `${((workOutsideSetCurrentRange.min - 5) / (500 - 5)) * 100}%`,
-                                                                            width: `${((workOutsideSetCurrentRange.max - workOutsideSetCurrentRange.min) / (500 - 5)) * 100}%`
-                                                                        }}
-                                                                    />
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={parameters.workOutsideActualCurrent}
+                                                            onChange={() => toggleParameter('workOutsideActualCurrent')}
+                                                        />
+                                                        <span className="parameter-label">Пределы разрешенного факт.тока, А (min — max)</span>
+                                                        <button
+                                                            className="org-unit-expand-btn"
+                                                            onClick={(e) => { e.stopPropagation(); toggleExpanded('workOutsideActualCurrent'); }}
+                                                        >
+                                                            {expandedWorkOutsideActualCurrent ? <FaChevronDown className="expand-icon" /> : <FaChevronRight className="expand-icon" />}
+                                                        </button>
+                                                    </label>
+                                                    {expandedWorkOutsideActualCurrent && (
+                                                        <div className="parameter-expanded-content">
+                                                            <div className="current-range-controls">
+                                                                <div className="current-range-inputs">
                                                                     <input
-                                                                        type="range"
+                                                                        type="number"
                                                                         min="5"
-                                                                        max="500"
-                                                                        value={workOutsideSetCurrentRange.min}
-                                                                        onInput={(e) => handleSetCurrentMinChange(e.target.value)}
-                                                                        onChange={(e) => handleSetCurrentMinChange(e.target.value)}
-                                                                        className="current-range-slider-input current-range-slider-input-min"
-                                                                    />
-                                                                    <input
-                                                                        type="range"
-                                                                        min="5"
-                                                                        max="500"
-                                                                        value={workOutsideSetCurrentRange.max}
-                                                                        onInput={(e) => handleSetCurrentMaxChange(e.target.value)}
-                                                                        onChange={(e) => handleSetCurrentMaxChange(e.target.value)}
-                                                                        className="current-range-slider-input current-range-slider-input-max"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="parameter-item-expandable">
-                                                <label
-                                                    className="parameter-item"
-                                                    onClick={(e) => {
-                                                        if (e.target.type !== 'checkbox') {
-                                                            toggleExpanded('workOutsideActualCurrent')
-                                                        }
-                                                    }}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={parameters.workOutsideActualCurrent}
-                                                        onChange={() => toggleParameter('workOutsideActualCurrent')}
-                                                    />
-                                                    <span className="parameter-label">Пределы разрешенного факт.тока</span>
-                                                    <button
-                                                        className="org-unit-expand-btn"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            toggleExpanded('workOutsideActualCurrent');
-                                                        }}
-                                                    >
-                                                        {expandedWorkOutsideActualCurrent ? (
-                                                            <FaChevronDown className="expand-icon" />
-                                                        ) : (
-                                                            <FaChevronRight className="expand-icon" />
-                                                        )}
-                                                    </button>
-                                                </label>
-                                                {expandedWorkOutsideActualCurrent && (
-                                                    <div className="parameter-expanded-content">
-                                                        <div className="current-range-controls">
-                                                            <div className="current-range-inputs">
-                                                                <input
-                                                                    type="number"
-                                                                    min="5"
-                                                                    max={workOutsideActualCurrentRange.max}
-                                                                    value={workOutsideActualCurrentRange.min}
-                                                                    onChange={(e) => handleActualCurrentMinChange(e.target.value)}
-                                                                    className="current-range-input"
-                                                                />
-                                                                <span className="current-range-separator">—</span>
-                                                                <input
-                                                                    type="number"
-                                                                    min={workOutsideActualCurrentRange.min}
-                                                                    max="500"
-                                                                    value={workOutsideActualCurrentRange.max}
-                                                                    onChange={(e) => handleActualCurrentMaxChange(e.target.value)}
-                                                                    className="current-range-input"
-                                                                />
-                                                            </div>
-                                                            <div className="current-range-slider-wrapper">
-                                                                <div className="current-range-slider">
-                                                                    <div className="current-range-slider-track-bg"></div>
-                                                                    <div
-                                                                        className="current-range-slider-track"
-                                                                        style={{
-                                                                            left: `${((workOutsideActualCurrentRange.min - 5) / (500 - 5)) * 100}%`,
-                                                                            width: `${((workOutsideActualCurrentRange.max - workOutsideActualCurrentRange.min) / (500 - 5)) * 100}%`
-                                                                        }}
-                                                                    />
-                                                                    <input
-                                                                        type="range"
-                                                                        min="5"
-                                                                        max="500"
+                                                                        max={workOutsideActualCurrentRange.max}
                                                                         value={workOutsideActualCurrentRange.min}
-                                                                        onInput={(e) => handleActualCurrentMinChange(e.target.value)}
                                                                         onChange={(e) => handleActualCurrentMinChange(e.target.value)}
-                                                                        className="current-range-slider-input current-range-slider-input-min"
+                                                                        className="current-range-input"
                                                                     />
+                                                                    <span className="current-range-separator">—</span>
                                                                     <input
-                                                                        type="range"
-                                                                        min="5"
+                                                                        type="number"
+                                                                        min={workOutsideActualCurrentRange.min}
                                                                         max="500"
                                                                         value={workOutsideActualCurrentRange.max}
-                                                                        onInput={(e) => handleActualCurrentMaxChange(e.target.value)}
                                                                         onChange={(e) => handleActualCurrentMaxChange(e.target.value)}
-                                                                        className="current-range-slider-input current-range-slider-input-max"
+                                                                        className="current-range-input"
                                                                     />
+                                                                </div>
+                                                                <div className="current-range-slider-wrapper">
+                                                                    <div className="current-range-slider">
+                                                                        <div className="current-range-slider-track-bg"></div>
+                                                                        <div
+                                                                            className="current-range-slider-track"
+                                                                            style={{
+                                                                                left: `${((workOutsideActualCurrentRange.min - 5) / (500 - 5)) * 100}%`,
+                                                                                width: `${((workOutsideActualCurrentRange.max - workOutsideActualCurrentRange.min) / (500 - 5)) * 100}%`
+                                                                            }}
+                                                                        />
+                                                                        <input type="range" min="5" max="500" value={workOutsideActualCurrentRange.min} onInput={(e) => handleActualCurrentMinChange(e.target.value)} onChange={(e) => handleActualCurrentMinChange(e.target.value)} className="current-range-slider-input current-range-slider-input-min" />
+                                                                        <input type="range" min="5" max="500" value={workOutsideActualCurrentRange.max} onInput={(e) => handleActualCurrentMaxChange(e.target.value)} onChange={(e) => handleActualCurrentMaxChange(e.target.value)} className="current-range-slider-input current-range-slider-input-max" />
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                )}
-                                            </div>
+                                                    )}
+                                                </div>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={minSeamIntervalEnabled}
+                                                        onChange={(e) => setMinSeamIntervalEnabled(e.target.checked)}
+                                                    />
+                                                    <span className="parameter-label">Мин. интервал между швами, с (0–10)</span>
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={10}
+                                                        value={minSeamInterval}
+                                                        onChange={(e) => setMinSeamInterval(Math.max(0, Math.min(10, Number(e.target.value) || 0)))}
+                                                        className="current-range-input"
+                                                        style={{ width: '50px', marginLeft: '8px' }}
+                                                        disabled={!minSeamIntervalEnabled}
+                                                    />
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={minSeamDurationEnabled}
+                                                        onChange={(e) => setMinSeamDurationEnabled(e.target.checked)}
+                                                    />
+                                                    <span className="parameter-label">Мин. учитываемый шов, с (0–10)</span>
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={10}
+                                                        value={minSeamDuration}
+                                                        onChange={(e) => setMinSeamDuration(Math.max(0, Math.min(10, Number(e.target.value) || 0)))}
+                                                        className="current-range-input"
+                                                        style={{ width: '50px', marginLeft: '8px' }}
+                                                        disabled={!minSeamDurationEnabled}
+                                                    />
+                                                </label>
+                                            </>
+                                        ) : (
+                                            /* Параметры отчёта по расходу проволоки (текущий набор) */
+                                            <>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.equipmentModel}
+                                                        onChange={() => toggleParameter('equipmentModel')}
+                                                    />
+                                                    <span className="parameter-label">Модель оборудования</span>
+                                                </label>
 
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.tableNumber}
-                                                    onChange={() => toggleParameter('tableNumber')}
-                                                    disabled={true}
-                                                />
-                                                <span className="parameter-label">Таб. №</span>
-                                            </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.wire}
+                                                        onChange={() => toggleParameter('wire')}
+                                                        disabled={true}
+                                                    />
+                                                    <span className="parameter-label">Проволока</span>
+                                                </label>
 
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.profession}
-                                                    onChange={() => toggleParameter('profession')}
-                                                />
-                                                <span className="parameter-label">Профессия</span>
-                                            </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.consumption}
+                                                        onChange={() => toggleParameter('consumption')}
+                                                        disabled={true}
+                                                    />
+                                                    <span className="parameter-label">Расход, кг</span>
+                                                </label>
 
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.department}
-                                                    onChange={() => toggleParameter('department')}
-                                                    disabled={true}
-                                                />
-                                                <span className="parameter-label">Подразделение</span>
-                                            </label>
+                                                <div className="parameter-item-expandable">
+                                                    <label
+                                                        className="parameter-item"
+                                                        onClick={(e) => {
+                                                            if (e.target.type !== 'checkbox') {
+                                                                toggleExpanded('workOutsideSetCurrent')
+                                                            }
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={parameters.workOutsideSetCurrent}
+                                                            onChange={() => toggleParameter('workOutsideSetCurrent')}
+                                                        />
+                                                        <span className="parameter-label">Пределы разрешенного уст. тока</span>
+                                                        <button
+                                                            className="org-unit-expand-btn"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleExpanded('workOutsideSetCurrent');
+                                                            }}
+                                                        >
+                                                            {expandedWorkOutsideSetCurrent ? (
+                                                                <FaChevronDown className="expand-icon" />
+                                                            ) : (
+                                                                <FaChevronRight className="expand-icon" />
+                                                            )}
+                                                        </button>
+                                                    </label>
+                                                    {expandedWorkOutsideSetCurrent && (
+                                                        <div className="parameter-expanded-content">
+                                                            <div className="current-range-controls">
+                                                                <div className="current-range-inputs">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="5"
+                                                                        max={workOutsideSetCurrentRange.max}
+                                                                        value={workOutsideSetCurrentRange.min}
+                                                                        onChange={(e) => handleSetCurrentMinChange(e.target.value)}
+                                                                        className="current-range-input"
+                                                                    />
+                                                                    <span className="current-range-separator">—</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        min={workOutsideSetCurrentRange.min}
+                                                                        max="500"
+                                                                        value={workOutsideSetCurrentRange.max}
+                                                                        onChange={(e) => handleSetCurrentMaxChange(e.target.value)}
+                                                                        className="current-range-input"
+                                                                    />
+                                                                </div>
+                                                                <div className="current-range-slider-wrapper">
+                                                                    <div className="current-range-slider">
+                                                                        <div className="current-range-slider-track-bg"></div>
+                                                                        <div
+                                                                            className="current-range-slider-track"
+                                                                            style={{
+                                                                                left: `${((workOutsideSetCurrentRange.min - 5) / (500 - 5)) * 100}%`,
+                                                                                width: `${((workOutsideSetCurrentRange.max - workOutsideSetCurrentRange.min) / (500 - 5)) * 100}%`
+                                                                            }}
+                                                                        />
+                                                                        <input
+                                                                            type="range"
+                                                                            min="5"
+                                                                            max="500"
+                                                                            value={workOutsideSetCurrentRange.min}
+                                                                            onInput={(e) => handleSetCurrentMinChange(e.target.value)}
+                                                                            onChange={(e) => handleSetCurrentMinChange(e.target.value)}
+                                                                            className="current-range-slider-input current-range-slider-input-min"
+                                                                        />
+                                                                        <input
+                                                                            type="range"
+                                                                            min="5"
+                                                                            max="500"
+                                                                            value={workOutsideSetCurrentRange.max}
+                                                                            onInput={(e) => handleSetCurrentMaxChange(e.target.value)}
+                                                                            onChange={(e) => handleSetCurrentMaxChange(e.target.value)}
+                                                                            className="current-range-slider-input current-range-slider-input-max"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
 
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.equipmentName}
-                                                    onChange={() => toggleParameter('equipmentName')}
-                                                />
-                                                <span className="parameter-label">Наименование оборудования</span>
-                                            </label>
+                                                <div className="parameter-item-expandable">
+                                                    <label
+                                                        className="parameter-item"
+                                                        onClick={(e) => {
+                                                            if (e.target.type !== 'checkbox') {
+                                                                toggleExpanded('workOutsideActualCurrent')
+                                                            }
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={parameters.workOutsideActualCurrent}
+                                                            onChange={() => toggleParameter('workOutsideActualCurrent')}
+                                                        />
+                                                        <span className="parameter-label">Пределы разрешенного факт.тока</span>
+                                                        <button
+                                                            className="org-unit-expand-btn"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleExpanded('workOutsideActualCurrent');
+                                                            }}
+                                                        >
+                                                            {expandedWorkOutsideActualCurrent ? (
+                                                                <FaChevronDown className="expand-icon" />
+                                                            ) : (
+                                                                <FaChevronRight className="expand-icon" />
+                                                            )}
+                                                        </button>
+                                                    </label>
+                                                    {expandedWorkOutsideActualCurrent && (
+                                                        <div className="parameter-expanded-content">
+                                                            <div className="current-range-controls">
+                                                                <div className="current-range-inputs">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="5"
+                                                                        max={workOutsideActualCurrentRange.max}
+                                                                        value={workOutsideActualCurrentRange.min}
+                                                                        onChange={(e) => handleActualCurrentMinChange(e.target.value)}
+                                                                        className="current-range-input"
+                                                                    />
+                                                                    <span className="current-range-separator">—</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        min={workOutsideActualCurrentRange.min}
+                                                                        max="500"
+                                                                        value={workOutsideActualCurrentRange.max}
+                                                                        onChange={(e) => handleActualCurrentMaxChange(e.target.value)}
+                                                                        className="current-range-input"
+                                                                    />
+                                                                </div>
+                                                                <div className="current-range-slider-wrapper">
+                                                                    <div className="current-range-slider">
+                                                                        <div className="current-range-slider-track-bg"></div>
+                                                                        <div
+                                                                            className="current-range-slider-track"
+                                                                            style={{
+                                                                                left: `${((workOutsideActualCurrentRange.min - 5) / (500 - 5)) * 100}%`,
+                                                                                width: `${((workOutsideActualCurrentRange.max - workOutsideActualCurrentRange.min) / (500 - 5)) * 100}%`
+                                                                            }}
+                                                                        />
+                                                                        <input
+                                                                            type="range"
+                                                                            min="5"
+                                                                            max="500"
+                                                                            value={workOutsideActualCurrentRange.min}
+                                                                            onInput={(e) => handleActualCurrentMinChange(e.target.value)}
+                                                                            onChange={(e) => handleActualCurrentMinChange(e.target.value)}
+                                                                            className="current-range-slider-input current-range-slider-input-min"
+                                                                        />
+                                                                        <input
+                                                                            type="range"
+                                                                            min="5"
+                                                                            max="500"
+                                                                            value={workOutsideActualCurrentRange.max}
+                                                                            onInput={(e) => handleActualCurrentMaxChange(e.target.value)}
+                                                                            onChange={(e) => handleActualCurrentMaxChange(e.target.value)}
+                                                                            className="current-range-slider-input current-range-slider-input-max"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
 
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.timeOnline}
-                                                    onChange={() => toggleParameter('timeOnline')}
-                                                    disabled={true}
-                                                />
-                                                <span className="parameter-label">Время в сети</span>
-                                            </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.tableNumber}
+                                                        onChange={() => toggleParameter('tableNumber')}
+                                                        disabled={true}
+                                                    />
+                                                    <span className="parameter-label">Таб. №</span>
+                                                </label>
 
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.arcBurningTime}
-                                                    onChange={() => toggleParameter('arcBurningTime')}
-                                                    disabled={true}
-                                                />
-                                                <span className="parameter-label">Время горения дуги</span>
-                                            </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.profession}
+                                                        onChange={() => toggleParameter('profession')}
+                                                    />
+                                                    <span className="parameter-label">Профессия</span>
+                                                </label>
 
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.efficiency}
-                                                    onChange={() => toggleParameter('efficiency')}
-                                                />
-                                                <span className="parameter-label">Эффективность, %</span>
-                                            </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.department}
+                                                        onChange={() => toggleParameter('department')}
+                                                        disabled={true}
+                                                    />
+                                                    <span className="parameter-label">Подразделение</span>
+                                                </label>
 
-                                            <label className="parameter-item">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={parameters.energyConsumed}
-                                                    onChange={() => toggleParameter('energyConsumed')}
-                                                />
-                                                <span className="parameter-label">Затраченная энергия, кВт*ч</span>
-                                            </label>
-                                        </>
-                                    )}
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.equipmentName}
+                                                        onChange={() => toggleParameter('equipmentName')}
+                                                    />
+                                                    <span className="parameter-label">Наименование оборудования</span>
+                                                </label>
+
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.timeOnline}
+                                                        onChange={() => toggleParameter('timeOnline')}
+                                                        disabled={true}
+                                                    />
+                                                    <span className="parameter-label">Время в сети</span>
+                                                </label>
+
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.arcBurningTime}
+                                                        onChange={() => toggleParameter('arcBurningTime')}
+                                                        disabled={true}
+                                                    />
+                                                    <span className="parameter-label">Время горения дуги</span>
+                                                </label>
+
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.efficiency}
+                                                        onChange={() => toggleParameter('efficiency')}
+                                                    />
+                                                    <span className="parameter-label">Эффективность, %</span>
+                                                </label>
+
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.energyConsumed}
+                                                        onChange={() => toggleParameter('energyConsumed')}
+                                                    />
+                                                    <span className="parameter-label">Затраченная энергия, кВт*ч</span>
+                                                </label>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -3637,17 +3829,21 @@ const ReportsPage = () => {
                 {/* Right Panel - Report Period/Delivery */}
                 <div className="reports-panel reports-panel-right">
                     <div className="panel-body right-panel-body" style={{ position: 'relative' }}>
-                        {configDisabled && (
+                        {rightPanelLocked && (
                             <div
                                 className="report-config-disabled-overlay"
-                                onClick={handleConfigAreaClick}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleConfigAreaClick(); } }}
-                                role="button"
-                                tabIndex={0}
-                                aria-label="Сначала выберите тип отчета"
+                                onClick={configDisabled && !panelLocked ? handleConfigAreaClick : undefined}
+                                onKeyDown={configDisabled && !panelLocked ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleConfigAreaClick(); } } : undefined}
+                                role={configDisabled && !panelLocked ? 'button' : undefined}
+                                tabIndex={configDisabled && !panelLocked ? 0 : undefined}
+                                aria-label={
+                                    panelLocked
+                                        ? 'Создайте новый отчёт или выберите отчёт из списка'
+                                        : 'Сначала выберите тип отчета'
+                                }
                             />
                         )}
-                        <div className={`right-panel-content ${configDisabled ? 'report-config-content-disabled' : ''}`}>
+                        <div className={`right-panel-content ${rightPanelLocked ? 'report-config-content-disabled' : ''}`}>
                             {/* Сверху только период для формирования отчёта */}
                             <div className="right-panel-period-section">
                                 <div className="right-panel-period-header">
@@ -3785,7 +3981,7 @@ const ReportsPage = () => {
                                                                             onClick={() => {
                                                                                 if (day && !isFuture) {
                                                                                     if (isSelected) setStartDate(null)
-                                                                                    else setStartDate(new Date(startMonth.getFullYear(), startMonth.getMonth(), day))
+                                                                                    else applyArbitraryStartDate(new Date(startMonth.getFullYear(), startMonth.getMonth(), day))
                                                                                     setOpenArbitraryDatePicker(null)
                                                                                 }
                                                                             }}
@@ -3811,7 +4007,7 @@ const ReportsPage = () => {
                                                 tabIndex={0}
                                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenArbitraryDatePicker(prev => prev === 'end' ? null : 'end'); } }}
                                             >
-                                                <button type="button" className="right-panel-arbitrary-date-chevron" onClick={(e) => { e.stopPropagation(); adjustArbitraryEndDay(-1); }} disabled={!!(endDate && startDate && new Date(endDate).toDateString() === new Date(startDate).toDateString())} aria-label="Предыдущий день">&lt;</button>
+                                                <button type="button" className="right-panel-arbitrary-date-chevron" onClick={(e) => { e.stopPropagation(); adjustArbitraryEndDay(-1); }} disabled={!!(endDate && startDate && normalizeDay(endDate).getTime() <= getMinEndDate(startDate).getTime())} aria-label="Предыдущий день">&lt;</button>
                                                 <span className="right-panel-arbitrary-date-text">{endDate ? formatDateDisplay(endDate) : formatMonthYear(endMonth)}</span>
                                                 <span className="right-panel-arbitrary-date-calendar-icon" aria-hidden>📅</span>
                                                 <button type="button" className="right-panel-arbitrary-date-chevron" onClick={(e) => { e.stopPropagation(); adjustArbitraryEndDay(1); }} disabled={!!(endDate && new Date(endDate).toDateString() === todayStart().toDateString())} aria-label="Следующий день">&gt;</button>
@@ -3833,6 +4029,8 @@ const ReportsPage = () => {
                                                                     const dayDate = day ? new Date(endMonth.getFullYear(), endMonth.getMonth(), day) : null
                                                                     const isSelected = endDate && dayDate && endDate.getDate() === dayDate.getDate() && endDate.getMonth() === dayDate.getMonth() && endDate.getFullYear() === dayDate.getFullYear()
                                                                     const isFuture = dayDate && isFutureDate(dayDate)
+                                                                    const minEndDate = startDate ? getMinEndDate(startDate) : null
+                                                                    const isBeforeMinEnd = dayDate && minEndDate && normalizeDay(dayDate) < minEndDate
                                                                     const isInRange = dayDate && startDate && endDate && isDateInRange(dayDate, startDate, endDate)
                                                                     return (
                                                                         <button
@@ -3840,13 +4038,13 @@ const ReportsPage = () => {
                                                                             type="button"
                                                                             className={`right-panel-calendar-day ${isSelected ? 'selected' : ''} ${!day ? 'empty' : ''} ${isInRange ? 'in-range' : ''}`}
                                                                             onClick={() => {
-                                                                                if (day && !isFuture) {
+                                                                                if (day && !isFuture && !isBeforeMinEnd) {
                                                                                     if (isSelected) setEndDate(null)
-                                                                                    else setEndDate(new Date(endMonth.getFullYear(), endMonth.getMonth(), day))
+                                                                                    else applyArbitraryEndDate(new Date(endMonth.getFullYear(), endMonth.getMonth(), day))
                                                                                     setOpenArbitraryDatePicker(null)
                                                                                 }
                                                                             }}
-                                                                            disabled={!day || isFuture}
+                                                                            disabled={!day || isFuture || isBeforeMinEnd}
                                                                         >
                                                                             {day}
                                                                         </button>
@@ -4000,6 +4198,26 @@ const ReportsPage = () => {
                                     {isFormDirty() && (
                                         <div className="right-panel-save-before-generate-hint">
                                             Сохраните изменения перед формированием отчета
+                                        </div>
+                                    )}
+                                    {isGenerating && (
+                                        <div className="right-panel-generate-progress" role="status" aria-live="polite">
+                                            <div className="right-panel-generate-progress-bar-track">
+                                                <div
+                                                    className={`right-panel-generate-progress-bar-fill${progressBarInstant ? ' right-panel-generate-progress-bar-fill-instant' : ''}`}
+                                                    style={{ width: `${Math.min(100, Math.max(0, generateProgressPercent))}%` }}
+                                                />
+                                            </div>
+                                            <div className="right-panel-generate-progress-meta">
+                                                <span className="right-panel-generate-progress-percent">
+                                                    {generateProgressPercent}%
+                                                </span>
+                                                {generateProgressMessage && (
+                                                    <span className="right-panel-generate-progress-message">
+                                                        {generateProgressMessage}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>

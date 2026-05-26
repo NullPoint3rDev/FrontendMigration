@@ -95,3 +95,41 @@ export function flattenUnitNamesFromForest(roots) {
     walk(roots);
     return names;
 }
+
+const ORG_FILTER_PREFIX = '__ORG__:';
+
+/** Токен выбранного предприятия без подразделений (или целиком по orgKey). */
+export function orgFilterToken(orgKey) {
+    return `${ORG_FILTER_PREFIX}${orgKey}`;
+}
+
+export function isOrgFilterToken(value) {
+    return typeof value === 'string' && value.startsWith(ORG_FILTER_PREFIX);
+}
+
+export function orgKeyFromFilterToken(token) {
+    if (!isOrgFilterToken(token)) return null;
+    return token.slice(ORG_FILTER_PREFIX.length);
+}
+
+/**
+ * Ключи для полного выбора фильтра: имена подразделений + токены предприятий без подразделений.
+ */
+export function flattenOrganizationFilterKeys(organizationsForFilter) {
+    const keys = [];
+    (organizationsForFilter || []).forEach(({ orgKey, hierarchy }) => {
+        const names = flattenUnitNamesFromForest(hierarchy);
+        if (names.length === 0) {
+            keys.push(orgFilterToken(orgKey));
+        } else {
+            keys.push(...names);
+        }
+    });
+    return keys;
+}
+
+export function isOrganizationFilterFullySelected(filter, organizationsForFilter) {
+    const allKeys = flattenOrganizationFilterKeys(organizationsForFilter);
+    if (allKeys.length === 0) return filter.length === 0;
+    return allKeys.every((k) => filter.includes(k));
+}

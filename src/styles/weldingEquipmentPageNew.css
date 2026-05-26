@@ -273,6 +273,11 @@
     color: #f2f1f4;
 }
 
+.add-device-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .add-icon {
     font-size: 18px;
     font-weight: 300;

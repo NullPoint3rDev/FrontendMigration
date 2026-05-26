@@ -13,38 +13,20 @@ import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { buildOrganizationHierarchy } from '../utils/organizationUnitTree';
 import { getCertificationsByWelderId } from '../api/certificationApi';
 import { getArchivePanelState } from '../api/archiveDeviceApi';
+import {
+    computeLastPowerOnFromPanelState,
+    resolveLastPowerOnDisplay,
+    seedLastPowerOnFromMachines as seedLastPowerOnFromMachinesUtil,
+} from '../utils/weldingMachineLastPowerOn';
+import { getMachineStatusBadge } from '../utils/weldingMachineStateDisplay';
 import machineImage from '../images/Untitled 3 копия.png';
 import '../styles/addWelderPage.css';
+import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
 
 const STATUS_STALE_MS = 10000;
 const STATUS_POLL_INTERVAL_MS = 4000;
 const STATUS_POLL_IDLE_TIMEOUT_MS = 2000;
 const STATUS_POLL_DEFER_FALLBACK_MS = 150;
-const CORE_UPTIME_SEC_TO_MS = 1000;
-const WORK_TIME_SINCE_POWER_ON_KEYS = ['Core.WorkTimeSincePowerOn', 'Время работы с включения'];
-
-function parsePanelNumber(value) {
-    if (value === undefined || value === null || value === '') return null;
-    const raw = String(value).trim();
-    if (!raw) return null;
-    const normalized = raw.replace(',', '.').replace(/[^\d.+-]/g, '');
-    const decimal = parseFloat(normalized);
-    return Number.isFinite(decimal) ? decimal : null;
-}
-
-function getPanelNumberByKeys(stateObj, keys) {
-    if (!stateObj) return null;
-    const props = stateObj.properties || {};
-    for (const key of keys) {
-        const fromPropValue = parsePanelNumber(props?.[key]?.value);
-        if (fromPropValue != null) return fromPropValue;
-        const fromPropDirect = parsePanelNumber(props?.[key]);
-        if (fromPropDirect != null) return fromPropDirect;
-        const fromStateDirect = parsePanelNumber(stateObj?.[key]);
-        if (fromStateDirect != null) return fromStateDirect;
-    }
-    return null;
-}
 
 function computeStatusFromPanelState(machine, stateObj) {
     try {
@@ -70,30 +52,6 @@ function computeStatusFromPanelState(machine, stateObj) {
     }
 }
 
-function computeLastPowerOnFromPanelState(stateObj, nowMs = Date.now()) {
-    const workSec = getPanelNumberByKeys(stateObj, WORK_TIME_SINCE_POWER_ON_KEYS);
-    if (workSec == null) return null;
-    return nowMs - workSec * CORE_UPTIME_SEC_TO_MS;
-}
-
-function formatLastPowerOnDisplay(timestampMs) {
-    if (timestampMs == null || !Number.isFinite(timestampMs)) return null;
-    return new Date(timestampMs).toLocaleString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-}
-
-function parseDbLastPoweredOnMs(item) {
-    const raw = item?.lastPoweredOnAt;
-    if (raw == null || raw === '') return null;
-    const t = new Date(raw).getTime();
-    return Number.isFinite(t) ? t : null;
-}
-
 function AddWelderPage() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -101,6 +59,8 @@ function AddWelderPage() {
     const idRef = useRef(id);
     idRef.current = id;
     const isEditMode = !!id;
+    const { canWriteWelders: canWriteWeldersPerm } = useCurrentUserPermissions();
+    const readOnlyWelderForm = isEditMode && !canWriteWeldersPerm;
     const reportsUnsaved = useReportsUnsaved();
     const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
     const pendingActionRef = useRef(null);
@@ -556,18 +516,7 @@ function AddWelderPage() {
     };
 
     const seedLastPowerOnFromMachines = (machines) => {
-        if (!Array.isArray(machines) || machines.length === 0) return;
-        const updates = {};
-        machines.forEach((m) => {
-            const ts = parseDbLastPoweredOnMs(m);
-            if (ts != null && m.mac) {
-                lastPowerOnByMacRef.current[m.mac] = ts;
-                updates[m.mac] = ts;
-            }
-        });
-        if (Object.keys(updates).length > 0) {
-            setLastPowerOnByMac((prev) => ({ ...prev, ...updates }));
-        }
+        seedLastPowerOnFromMachinesUtil(machines, lastPowerOnByMacRef, setLastPowerOnByMac);
     };
 
     const loadWelderData = async (welderId) => {
@@ -878,20 +827,76 @@ function AddWelderPage() {
         setRelatedMachines((prev) => [...prev, ...newMachines]);
     };
 
-    const handleDeleteMachine = () => {
-        // Удаляем выбранные аппараты (те, у которых чекбокс отмечен)
+    const buildWelderPayload = ({ machines = relatedMachines } = {}) => {
+        const unitId = formData.organizationUnitId
+            ? (typeof formData.organizationUnitId === 'string'
+                ? parseInt(formData.organizationUnitId, 10)
+                : formData.organizationUnitId)
+            : null;
+        const selectedUnit = organizationUnits.find((unit) => {
+            const unitIdNum = typeof unit.id === 'string' ? parseInt(unit.id, 10) : unit.id;
+            return unitIdNum === unitId;
+        });
+        const departmentName = selectedUnit ? selectedUnit.name : '';
+        const fullName = `${formData.lastName} ${formData.firstName} ${formData.middleName}`.trim();
+        const rfidCodes = rfidPasses.length > 0 ? rfidPasses.map((pass) => pass.code) : null;
+        const machineIds = isEditMode
+            ? machines.map((machine) => machine.id)
+            : (machines.length > 0 ? machines.map((machine) => machine.id) : null);
+
+        const welderData = {
+            name: fullName,
+            status: isEditMode ? currentWelderStatus : 'ACTIVE',
+            department: departmentName || null,
+            position: formData.position || null,
+            employeeId: formData.employeeId || null,
+            birthDate: formData.birthDate || null,
+            hireDate: formData.hireDate || null,
+            phone: formData.phone || null,
+            rfidCodes: rfidCodes || null,
+            machineIds: machineIds ?? null,
+        };
+
+        Object.keys(welderData).forEach((key) => {
+            if (key === 'machineIds' && isEditMode && Array.isArray(welderData[key])) {
+                return;
+            }
+            if (welderData[key] === null || welderData[key] === '') {
+                delete welderData[key];
+            }
+        });
+
+        return welderData;
+    };
+
+    const handleDeleteMachine = async () => {
         const selectedCheckboxes = document.querySelectorAll('.machines-table input[type="checkbox"]:checked');
         if (selectedCheckboxes.length === 0) {
             alert('Выберите аппараты для удаления');
             return;
         }
 
-        const selectedIds = Array.from(selectedCheckboxes).map(cb => {
+        const selectedIds = Array.from(selectedCheckboxes).map((cb) => {
             const row = cb.closest('tr');
             return row ? row.dataset.machineId : null;
         }).filter(Boolean);
 
-        setRelatedMachines(prev => prev.filter(m => !selectedIds.includes(m.id.toString())));
+        const nextMachines = relatedMachines.filter((m) => !selectedIds.includes(m.id.toString()));
+
+        if (isEditMode && id) {
+            try {
+                const welderData = buildWelderPayload({ machines: nextMachines });
+                await updateWelder(id, welderData);
+                setRelatedMachines(nextMachines);
+                setTimeout(() => commitBaseline(), 0);
+            } catch (error) {
+                console.error('Ошибка сохранения привязки оборудования:', error);
+                alert('Не удалось удалить привязку оборудования. Попробуйте ещё раз.');
+            }
+            return;
+        }
+
+        setRelatedMachines(nextMachines);
     };
 
     // Функции для отображения аппаратов (как на WeldingEquipmentPage)
@@ -925,17 +930,8 @@ function AddWelderPage() {
         return 'Не указано';
     };
 
-    const getLastActivation = (item) => {
-        const mac = item?.mac;
-        let timestampMs = null;
-        if (mac) {
-            timestampMs = lastPowerOnByMac[mac] ?? lastPowerOnByMacRef.current[mac];
-        }
-        if (timestampMs == null) {
-            timestampMs = parseDbLastPoweredOnMs(item);
-        }
-        return formatLastPowerOnDisplay(timestampMs);
-    };
+    const getLastActivation = (item) =>
+        resolveLastPowerOnDisplay(item, lastPowerOnByMac, lastPowerOnByMacRef);
 
     const navigateToMachine = (machine) => {
         const params = new URLSearchParams({
@@ -947,38 +943,7 @@ function AddWelderPage() {
         goWithUnsavedGuard(`/device-monitor?${params.toString()}`);
     };
 
-    const getFormattedStatus = (status, rawState) => {
-        if (rawState !== null && rawState !== undefined) {
-            const stateLower = String(rawState).toLowerCase().trim();
-
-            if (stateLower.includes('дежурн') || stateLower.includes('standby')) {
-                return { text: 'Деж.Режим', className: 'on', color: '#0cff00' };
-            }
-
-            if (stateLower.includes('ожидан') || stateLower.includes('waiting')) {
-                return { text: 'Ожидание', className: 'on', color: '#0cff00' };
-            }
-
-            if (stateLower.includes('заблок') || stateLower.includes('block')) {
-                return { text: 'Блок', className: 'off', color: '#7B8BA6' };
-            }
-
-            if (stateLower.includes('свар') || stateLower.includes('weld')) {
-                return { text: 'Сварка', className: 'welding', color: '#FEB63E' };
-            }
-        }
-
-        switch (status) {
-            case 'welding':
-                return { text: 'Сварка', className: 'welding', color: '#FEB63E' };
-            case 'on':
-                return { text: 'Включен', className: 'on', color: '#39956C' };
-            case 'off':
-                return { text: 'Выкл', className: 'off', color: '#7B8BA6' };
-            default:
-                return { text: 'Выкл', className: 'off', color: '#7B8BA6' };
-        }
-    };
+    const getFormattedStatus = (status, rawState) => getMachineStatusBadge(status, rawState);
 
     const validateForm = () => {
         const newErrors = {};
@@ -1006,15 +971,6 @@ function AddWelderPage() {
         }
 
         try {
-            // Находим название подразделения по ID
-            const unitId = formData.organizationUnitId ? (typeof formData.organizationUnitId === 'string' ? parseInt(formData.organizationUnitId) : formData.organizationUnitId) : null;
-            const selectedUnit = organizationUnits.find(unit => {
-                const unitIdNum = typeof unit.id === 'string' ? parseInt(unit.id) : unit.id;
-                return unitIdNum === unitId;
-            });
-            const departmentName = selectedUnit ? selectedUnit.name : '';
-
-            // Формируем полное имя
             const fullName = `${formData.lastName} ${formData.firstName} ${formData.middleName}`.trim();
 
             if (!fullName) {
@@ -1022,36 +978,7 @@ function AddWelderPage() {
                 return false;
             }
 
-            // Получаем все RFID коды из списка пропусков
-            const rfidCodes = rfidPasses.length > 0
-                ? rfidPasses.map(pass => pass.code)
-                : null;
-
-            // Получаем ID связанных аппаратов
-            const machineIds = relatedMachines.length > 0
-                ? relatedMachines.map(machine => machine.id)
-                : null;
-
-            // Подготавливаем данные для отправки
-            const welderData = {
-                name: fullName,
-                status: isEditMode ? currentWelderStatus : 'ACTIVE', // При редактировании сохраняем текущий статус
-                department: departmentName || null, // Название подразделения вместо ID
-                position: formData.position || null,
-                employeeId: formData.employeeId || null,
-                birthDate: formData.birthDate || null,
-                hireDate: formData.hireDate || null,
-                phone: formData.phone || null,
-                rfidCodes: rfidCodes || null, // Отправляем массив всех RFID кодов
-                machineIds: machineIds || null // Отправляем массив ID связанных аппаратов
-            };
-
-            // Удаляем пустые поля
-            Object.keys(welderData).forEach(key => {
-                if (welderData[key] === null || welderData[key] === '') {
-                    delete welderData[key];
-                }
-            });
+            const welderData = buildWelderPayload();
 
             console.log('Отправка данных сварщика:', welderData);
 
@@ -1354,7 +1281,7 @@ function AddWelderPage() {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <button type="button" className="save-btn" onClick={handleSave}>
+                                    <button type="button" className="save-btn" onClick={handleSave} disabled={readOnlyWelderForm}>
                                         Сохранить
                                     </button>
                                 </div>

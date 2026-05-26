@@ -179,6 +179,19 @@
     color: #6C7386;
 }
 
+.add-user-page .form-group input.add-user-field-readonly,
+.add-user-page .form-group input.add-user-field-readonly:read-only {
+    cursor: default;
+    opacity: 0.85;
+    color: #c8cdd8;
+}
+
+.add-user-block-hint {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: #9CA3B8;
+}
+
 .add-user-type-select {
     position: relative;
     width: 100%;
@@ -550,6 +563,13 @@
     border-color: #7B8BA6;
 }
 
+.add-user-form-fieldset {
+    border: none;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
 .add-user-permission-item.disabled {
     background: #1B1622;
     color: #7B8BA6;
@@ -762,4 +782,110 @@
 
 .add-user-page .unit-select-container .org-unit-expand-btn .expand-icon {
     font-size: 12px;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.modal-overlay-no-close-on-backdrop {
+    /* Клик по фону не закрывает модалку */
+}
+
+.resave-confirm-modal {
+    position: relative;
+    background: #1A1420;
+    border-radius: 8px;
+    padding: 24px;
+    padding-top: 40px;
+    min-width: 320px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.resave-confirm-close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: rgba(123, 139, 166, 0.2);
+    color: #f0f4ff;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s;
+}
+
+.resave-confirm-close-btn:hover {
+    background: rgba(123, 139, 166, 0.35);
+    color: #fff;
+}
+
+.resave-confirm-icon {
+    font-size: 48px;
+    color: #FFC107;
+    line-height: 1;
+}
+
+.resave-confirm-question {
+    color: #FFC107;
+    font-size: 16px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.resave-confirm-buttons {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+}
+
+.resave-confirm-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.resave-confirm-btn-no {
+    background: #3D2A3F;
+    color: #f0f4ff;
+}
+
+.resave-confirm-btn-no:hover {
+    background: #4A354B;
+}
+
+.resave-confirm-btn-yes {
+    background: #FFC107;
+    color: #1A1420;
+}
+
+.resave-confirm-btn-yes:hover {
+    background: #FFD54F;
 }

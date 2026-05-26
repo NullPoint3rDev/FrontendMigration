@@ -12,6 +12,7 @@ import { getAllWelders } from '../api/welderApi';
 import { getAllWeldingMachines, createWeldingMachine } from '../api/weldingMachineApi';
 import { api } from '../services/api';
 import '../styles/enterpriseMapPage.css';
+import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
 
 const CreateOrganizationUnitModal = lazy(() => import('./CreateOrganizationUnitModal'));
 const MoveOrganizationUnitModal = lazy(() => import('./MoveOrganizationUnitModal'));
@@ -71,6 +72,11 @@ function saveSelectedUnitToStorage(selectedUnitId, selectedUnitLevel) {
 }
 
 function EnterpriseMapPageSimpleContent({ initialUser = null }) {
+    const {
+        canWriteOrganizations: canWriteOrgsPerm,
+        canWriteEquipment: canWriteEquipPerm,
+        canWriteWelders: canWriteWeldersPerm,
+    } = useCurrentUserPermissions();
     const { organizationId } = useParams();
     const [searchTerm, setSearchTerm] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -798,8 +804,10 @@ function EnterpriseMapPageSimpleContent({ initialUser = null }) {
                     </div>
                     <div className="action-tile add-tile">
                         <button
+                            type="button"
                             className="tile-btn add-btn"
                             onClick={() => setIsCreateModalOpen(true)}
+                            disabled={!canWriteOrgsPerm}
                         >
                             <img src={OrganizationLogo} alt="Organization" className="add-btn-icon" />
                             Добавить подразделение +
@@ -810,6 +818,7 @@ function EnterpriseMapPageSimpleContent({ initialUser = null }) {
                             type="button"
                             className="tile-btn add-btn"
                             onClick={openAddEquipmentModal}
+                            disabled={!canWriteEquipPerm}
                         >
                             <img src={ResourcesLogo} alt="" className="add-btn-icon" />
                             Добавить аппарат
@@ -820,6 +829,7 @@ function EnterpriseMapPageSimpleContent({ initialUser = null }) {
                             type="button"
                             className="tile-btn add-btn"
                             onClick={() => navigate('/welders/add')}
+                            disabled={!canWriteWeldersPerm}
                         >
                             <img src={WelderIcon} alt="" className="add-btn-icon" />
                             Добавить сварщика
@@ -834,6 +844,7 @@ function EnterpriseMapPageSimpleContent({ initialUser = null }) {
                             type="button"
                             className="tile-btn move-btn"
                             onClick={openMoveModal}
+                            disabled={!canWriteOrgsPerm && !canWriteEquipPerm && !canWriteWeldersPerm}
                         >
                             <FaArrowRight className="btn-icon" />
                             Переместить
@@ -843,7 +854,7 @@ function EnterpriseMapPageSimpleContent({ initialUser = null }) {
                         <button
                             className="tile-btn delete-btn"
                             onClick={handleDelete}
-                            disabled={isDeleting || selectedUnits.length === 0}
+                            disabled={isDeleting || selectedUnits.length === 0 || !canWriteOrgsPerm}
                         >
                             <FaTimes className="btn-icon" />
                             Удалить

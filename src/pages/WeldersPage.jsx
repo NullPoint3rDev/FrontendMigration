@@ -13,12 +13,18 @@ import {
 } from '../api/welderApi';
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
 import { getCertificationsByWelderId } from '../api/certificationApi';
+import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
 import { api } from '../services/api';
 import { getRoles } from '../api/userAccountApi';
 import {
     groupUnitsByOrganization,
     findUnitInForest,
     flattenUnitNamesFromForest,
+    orgFilterToken,
+    isOrgFilterToken,
+    orgKeyFromFilterToken,
+    flattenOrganizationFilterKeys,
+    isOrganizationFilterFullySelected,
 } from '../utils/organizationUnitFilterGroups';
 
 const WELDERS_PAGE_STATE_KEY = 'weldersPageState';
@@ -56,6 +62,7 @@ function saveWeldersPageState(state) {
 }
 
 function WeldersPage() {
+    const { canWriteWelders: canWriteWeldersPerm } = useCurrentUserPermissions();
     const savedState = useMemo(() => loadWeldersPageState(), []);
     const [welders, setWelders] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
@@ -302,6 +309,27 @@ function WeldersPage() {
         return unitName;
     };
 
+    const welderMatchesOrganizationFilter = (welder, filter) => {
+        const unitId = welder.organizationUnit?.id ?? welder.organizationUnitId ?? null;
+        if (unitId != null) {
+            const unit = visibleOrganizationUnits.find(
+                (u) => u.id === unitId || u.id === parseInt(unitId, 10)
+            );
+            const orgId = unit?.organizationId ?? unit?.organization?.id ?? unit?.organization_id ?? null;
+            if (orgId != null) {
+                const orgKey = String(orgId);
+                if (filter.some((key) => isOrgFilterToken(key) && orgKeyFromFilterToken(key) === orgKey)) {
+                    return true;
+                }
+            }
+        }
+        const unitName = getOrganizationUnitName(welder);
+        if (unitName === 'Не указано') {
+            return false;
+        }
+        return filter.includes(unitName);
+    };
+
     // Функция для форматирования статуса сварщика (столбец «Статус»)
     const getWelderStatusDisplay = (welder) => {
         const statusKey = getWelderStatusRaw(welder);
@@ -506,14 +534,9 @@ function WeldersPage() {
             if (organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__') {
                 filtered = [];
             } else {
-                filtered = filtered.filter(item => {
-                    const unitName = getOrganizationUnitName(item);
-                    // Пропускаем элементы с "Не указано" (удаленные подразделения)
-                    if (unitName === 'Не указано') {
-                        return false;
-                    }
-                    return organizationUnitFilter.includes(unitName);
-                });
+                filtered = filtered.filter((item) =>
+                    welderMatchesOrganizationFilter(item, organizationUnitFilter)
+                );
             }
         }
 
@@ -620,32 +643,31 @@ function WeldersPage() {
         const allChildUnits = getAllChildUnits(unit);
         const allUnitNames = allChildUnits.map(u => u.name);
 
-        setOrganizationUnitFilter(prev => {
-            const isNoneSelected = prev.length === 1 && prev[0] === '__NONE__';
-            const currentlyChecked = !isNoneSelected && allUnitNames.every(name => prev.includes(name));
-            const willBeChecked = !currentlyChecked;
+        setOrganizationUnitFilter((prev) => {
+            const isNone = prev.length === 1 && prev[0] === '__NONE__';
+            const showAll = prev.length === 0 && !isNone;
+            const allChecked = showAll || (!isNone && allUnitNames.every((name) => prev.includes(name)));
 
-            if (willBeChecked) {
-                // Выбираем подразделение и все дочерние
-                if (isNoneSelected) {
-                    return allUnitNames;
-                } else {
-                    const newFilter = [...prev];
-                    allUnitNames.forEach(name => {
-                        if (!newFilter.includes(name)) {
-                            newFilter.push(name);
-                        }
-                    });
-                    return newFilter;
+            if (!allChecked) {
+                if (isNone) return allUnitNames;
+                if (showAll) {
+                    return flattenOrganizationFilterKeys(organizationsForFilter).filter(
+                        (k) => !allUnitNames.includes(k)
+                    );
                 }
-            } else {
-                // Убираем подразделение и все дочерние
-                const newFilter = prev.filter(name => !allUnitNames.includes(name));
-                if (newFilter.length === 0) {
-                    return ['__NONE__'];
-                }
-                return newFilter;
+                const next = [...prev];
+                allUnitNames.forEach((name) => {
+                    if (!next.includes(name)) next.push(name);
+                });
+                return next;
             }
+
+            const next = showAll
+                ? flattenOrganizationFilterKeys(organizationsForFilter).filter(
+                    (k) => !allUnitNames.includes(k)
+                )
+                : prev.filter((name) => !allUnitNames.includes(name));
+            return next.length === 0 ? ['__NONE__'] : next;
         });
     };
 
@@ -653,29 +675,32 @@ function WeldersPage() {
         const entry = organizationsForFilter.find((e) => e.orgKey === orgKey);
         if (!entry) return;
         const names = flattenUnitNamesFromForest(entry.hierarchy);
-        if (names.length === 0) return;
-        setOrganizationUnitFilter((prev) => {
-            const isNoneSelected = prev.length === 1 && prev[0] === '__NONE__';
-            const currentlyChecked = !isNoneSelected && names.every((name) => prev.includes(name));
-            const willBeChecked = !currentlyChecked;
+        const token = orgFilterToken(orgKey);
+        const orgKeys = names.length > 0 ? names : [token];
 
-            if (willBeChecked) {
-                if (isNoneSelected) {
-                    return names;
+        setOrganizationUnitFilter((prev) => {
+            const isNone = prev.length === 1 && prev[0] === '__NONE__';
+            const showAll = prev.length === 0 && !isNone;
+            const allChecked =
+                showAll || (!isNone && orgKeys.every((k) => prev.includes(k)));
+
+            if (!allChecked) {
+                if (isNone) return orgKeys;
+                if (showAll) {
+                    const allKeys = flattenOrganizationFilterKeys(organizationsForFilter);
+                    return allKeys.filter((k) => !orgKeys.includes(k));
                 }
-                const newFilter = [...prev];
-                names.forEach((name) => {
-                    if (!newFilter.includes(name)) {
-                        newFilter.push(name);
-                    }
+                const next = [...prev];
+                orgKeys.forEach((k) => {
+                    if (!next.includes(k)) next.push(k);
                 });
-                return newFilter;
+                return next;
             }
-            const newFilter = prev.filter((name) => !names.includes(name));
-            if (newFilter.length === 0) {
-                return ['__NONE__'];
-            }
-            return newFilter;
+
+            const next = showAll
+                ? flattenOrganizationFilterKeys(organizationsForFilter).filter((k) => !orgKeys.includes(k))
+                : prev.filter((k) => !orgKeys.includes(k));
+            return next.length === 0 ? ['__NONE__'] : next;
         });
     };
 
@@ -939,12 +964,14 @@ function WeldersPage() {
                             <span className="filter-arrow">{expandedFilters.department ? '▾' : '▸'}</span>
                         </button>
                         {expandedFilters.department && (() => {
-                            const allUnitNames = organizationsForFilter.flatMap((o) =>
-                                flattenUnitNamesFromForest(o.hierarchy)
-                            );
                             const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
-                            const allSelected = (organizationUnitFilter.length === 0 ||
-                                organizationUnitFilter.length === allUnitNames.length) && !isNoneSelected;
+                            const allSelected =
+                                (organizationUnitFilter.length === 0 ||
+                                    isOrganizationFilterFullySelected(
+                                        organizationUnitFilter,
+                                        organizationsForFilter
+                                    )) &&
+                                !isNoneSelected;
                             const showAllChecked = organizationUnitFilter.length === 0 && !isNoneSelected;
 
                             // Рекурсивная функция для рендеринга подразделений
@@ -1001,10 +1028,8 @@ function WeldersPage() {
                                             checked={allSelected}
                                             onChange={(e) => {
                                                 if (e.target.checked) {
-                                                    // Выбираем все
-                                                    setOrganizationUnitFilter(allUnitNames);
+                                                    setOrganizationUnitFilter([]);
                                                 } else {
-                                                    // При снятии галочки с активного "Все" - сбрасываем все галочки
                                                     setOrganizationUnitFilter(['__NONE__']);
                                                 }
                                             }}
@@ -1014,14 +1039,15 @@ function WeldersPage() {
                                     {organizationsForFilter.length > 0 ? (
                                         organizationsForFilter.map(({ orgKey, orgName, hierarchy }) => {
                                             const orgNames = flattenUnitNamesFromForest(hierarchy);
+                                            const orgToken = orgFilterToken(orgKey);
+                                            const orgKeys = orgNames.length > 0 ? orgNames : [orgToken];
                                             const isOrgExpanded = expandedOrgInFilter[orgKey] === true;
                                             const isNoneSelectedOrg = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
                                             const orgShowAllChecked = organizationUnitFilter.length === 0 && !isNoneSelectedOrg;
                                             const isOrgRowChecked =
                                                 orgShowAllChecked ||
                                                 (!isNoneSelectedOrg &&
-                                                    orgNames.length > 0 &&
-                                                    orgNames.every((n) => organizationUnitFilter.includes(n)));
+                                                    orgKeys.every((k) => organizationUnitFilter.includes(k)));
 
                                             return (
                                                 <div key={orgKey} className="filter-org-block">
@@ -1269,7 +1295,13 @@ function WeldersPage() {
                 <div className="equipment-content-column">
                     <div className="content-header">
                         <div className="add-device-tile">
-                            <button className="add-device-btn" onClick={() => navigate('/welders/add')}>
+                            <button
+                                type="button"
+                                className="add-device-btn"
+                                onClick={() => navigate('/welders/add')}
+                                disabled={!canWriteWeldersPerm}
+                                title={!canWriteWeldersPerm ? 'Нет прав на добавление сварщиков' : undefined}
+                            >
                                 <span className="add-icon">+</span>
                                 <span>Добавить сварщика</span>
                             </button>

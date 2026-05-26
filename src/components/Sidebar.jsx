@@ -31,8 +31,10 @@ const Sidebar = () => {
     const handleNavigate = (path) => {
         const isWelderFormPage =
             location.pathname === '/welders/add' || /^\/welders\/add\/\d+$/.test(location.pathname)
+        const isEnterpriseAdminCreatePage =
+            location.pathname === '/employees/add' && location.state?.fromCreateEnterprise === true
         const shouldConfirmLeave =
-            (location.pathname === '/reports' || isWelderFormPage) &&
+            (location.pathname === '/reports' || isWelderFormPage || isEnterpriseAdminCreatePage) &&
             reportsUnsaved?.isDirtyRef?.current?.()
         if (shouldConfirmLeave) {
             reportsUnsaved.requestLeave(path)

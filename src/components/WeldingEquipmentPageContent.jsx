@@ -15,8 +15,15 @@ import {
 } from '../api/weldingMachineApi';
 import { getAllEmployees } from '../api/employeeApi';
 import { getArchivePanelState } from '../api/archiveDeviceApi';
+import {
+    computeLastPowerOnFromPanelState,
+    resolveLastPowerOnDisplay,
+    seedLastPowerOnFromMachines,
+} from '../utils/weldingMachineLastPowerOn';
+import { getMachineStatusBadgeShort } from '../utils/weldingMachineStateDisplay';
 import { api } from '../services/api';
 import { getRoles } from '../api/userAccountApi';
+import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
 
 // Данные теперь загружаются с API сервера
 const AddEquipmentModal = lazy(() => import('./AddEquipmentModal'));
@@ -106,6 +113,7 @@ function getInitialFilterState() {
 }
 
 function WeldingEquipmentPageContent({ initialUser = null }) {
+    const { canWriteEquipment: canWriteEquipmentPerm } = useCurrentUserPermissions();
     const initialFilters = useMemo(() => getInitialFilterState(), []);
     const [equipment, setEquipment] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
@@ -132,12 +140,14 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
     const currentYear = new Date().getFullYear();
     const navigate = useNavigate();
     const [deviceStatusesByMac, setDeviceStatusesByMac] = useState({}); // { [mac]: 'off' | 'on' | 'welding' }
-    const [deviceStatesByMac, setDeviceStatesByMac] = useState({}); // { [mac]: 'Дежурный режим' | 'Ожидание' | 'Заблокирован' | ... }
+    const [deviceStatesByMac, setDeviceStatesByMac] = useState({}); // { [mac]: текст состояния с аппарата }
     const [shownErrors, setShownErrors] = useState(new Set());
     const [currentUserOrgId, setCurrentUserOrgId] = useState(null);
     const [isEnterpriseScopedRole, setIsEnterpriseScopedRole] = useState(false);
     const lastGoodStateByMacRef = useRef({});
     const lastGoodSeenAtRef = useRef({});
+    const lastPowerOnByMacRef = useRef({});
+    const [lastPowerOnByMac, setLastPowerOnByMac] = useState({});
     const STATUS_STALE_MS = 10000;
     const STATUS_POLL_INTERVAL_MS = 4000;
     /** Отложить первый опрос статусов после paint (шаг C — не конкурировать с LCP) */
@@ -359,6 +369,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                 index === self.findIndex(t => t.id === item.id)
             ) : [];
             setEquipment(uniqueEquipment);
+            seedLastPowerOnFromMachines(uniqueEquipment, lastPowerOnByMacRef, setLastPowerOnByMac);
         } catch (err) {
             setErrors({ api: 'Ошибка загрузки оборудования: ' + err.message });
             setEquipment([]);
@@ -531,6 +542,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         if (macs.length === 0) return;
 
         // Запрашиваем статусы параллельно
+        const powerOnUpdates = {};
         const promises = list.map(async (machine) => {
             const now = Date.now();
             const mac = machine.mac;
@@ -548,9 +560,17 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                     }
                 }
                 const status = computeStatusFromState(machine, resolvedState);
-                // Получаем реальное состояние аппарата для форматирования
                 const props = resolvedState?.properties || {};
                 const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState || null;
+
+                if (resolvedState) {
+                    const powerOnMs = computeLastPowerOnFromPanelState(resolvedState, now);
+                    if (powerOnMs != null) {
+                        powerOnUpdates[mac] = powerOnMs;
+                        lastPowerOnByMacRef.current[mac] = powerOnMs;
+                    }
+                }
+
                 return [mac, status, rawState];
             } catch {
                 const lastSeen = lastGoodSeenAtRef.current[mac];
@@ -579,6 +599,9 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
             });
             return next;
         });
+        if (Object.keys(powerOnUpdates).length > 0) {
+            setLastPowerOnByMac((prev) => ({ ...prev, ...powerOnUpdates }));
+        }
     };
 
     const toggleSort = (field) => {
@@ -975,7 +998,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
     const filteredEquipment = useMemo(() => {
         return getFilteredEquipment(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [equipment, modelFilter, organizationUnitFilter, statusFilter, searchTerm, sortField, sortDirection, deviceStatusesByMac]);
+    }, [equipment, modelFilter, organizationUnitFilter, statusFilter, searchTerm, sortField, sortDirection, deviceStatusesByMac, lastPowerOnByMac]);
 
     // Функция для получения модели аппарата для отображения
     const getModelDisplay = (item) => {
@@ -992,12 +1015,8 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         return 'Не назначен';
     };
 
-    // Функция для получения последнего включения
-    const getLastActivation = (item) => {
-        // Можно использовать данные из deviceStatusesByMac или другие поля
-        // Пока возвращаем пустую строку, если нет данных
-        return '';
-    };
+    const getLastActivation = (item) =>
+        resolveLastPowerOnDisplay(item, lastPowerOnByMac, lastPowerOnByMacRef);
 
     // Функция для получения цвета индикатора по статусу
     const getStatusIndicatorColor = (status) => {
@@ -1014,60 +1033,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         }
     };
 
-    // Функция для форматирования статуса для отображения в status-badge
-    const getFormattedStatus = (status, rawState) => {
-        // Если есть реальное состояние аппарата, используем его
-        if (rawState !== null && rawState !== undefined) {
-            const stateLower = String(rawState).toLowerCase().trim();
-
-            // Дежурный режим -> Деж.Режим (зеленым #0cff00, как в DeviceMonitorPage)
-            if (stateLower.includes('дежурн') || stateLower.includes('standby')) {
-                return { text: 'Деж.Режим', className: 'on', color: '#0cff00' };
-            }
-
-            // Ожидание -> Ожидание (зеленым #0cff00, как в DeviceMonitorPage)
-            if (stateLower.includes('ожидан') || stateLower.includes('waiting')) {
-                return { text: 'Ожидание', className: 'on', color: '#0cff00' };
-            }
-
-            // Заблокирован -> Блок (серым, как в DeviceMonitorPage)
-            if (stateLower.includes('заблокирован') || stateLower.includes('blocked') ||
-                stateLower.includes('lock') || stateLower.includes('блокиров')) {
-                return { text: 'Блок', className: 'off', color: 'rgba(188, 183, 197, 0.5)' };
-            }
-
-            // Сварка -> Сварка (желтым)
-            if (stateLower.includes('сварка') || stateLower.includes('welding') ||
-                stateLower.includes('weld') || stateLower.includes('сварочн')) {
-                return { text: 'Сварка', className: 'welding' };
-            }
-
-            // Авария/Ошибка -> Ошибка (красным)
-            if (stateLower.includes('авария') || stateLower.includes('error') ||
-                stateLower.includes('ошибка') || stateLower.includes('emergency') ||
-                stateLower.includes('failure')) {
-                return { text: 'Ошибка', className: 'error' };
-            }
-
-            // Аппарат включен -> Вкл (зеленым)
-            if (stateLower.includes('включен') || stateLower.includes('on')) {
-                return { text: 'Вкл', className: 'on' };
-            }
-        }
-
-        // Если нет реального состояния, используем базовый статус
-        switch (status) {
-            case 'welding':
-                return { text: 'Сварка', className: 'welding' };
-            case 'on':
-                return { text: 'Вкл', className: 'on' };
-            case 'error':
-                return { text: 'Ошибка', className: 'error' };
-            case 'off':
-            default:
-                return { text: 'Выкл', className: 'off' };
-        }
-    };
+    const getFormattedStatus = (status, rawState) => getMachineStatusBadgeShort(status, rawState);
 
     // Разделяем модель на "CORE" и остальную часть для цветового оформления
     const formatModel = (modelName) => {
@@ -1194,7 +1160,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
 
     const statuses = [
         { id: 'all', label: 'Все' },
-        { id: 'on', label: 'Деж. режим' },
+        { id: 'on', label: 'Включен' },
         { id: 'welding', label: 'Сварка' },
         { id: 'error', label: 'Ошибка' },
         { id: 'off', label: 'Выключен' }
@@ -1528,7 +1494,13 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                 <div className="equipment-content-column">
                     <div className="content-header">
                         <div className="add-device-tile">
-                            <button className="add-device-btn" onClick={openAddModal}>
+                            <button
+                                type="button"
+                                className="add-device-btn"
+                                onClick={openAddModal}
+                                disabled={!canWriteEquipmentPerm}
+                                title={!canWriteEquipmentPerm ? 'Нет прав на добавление оборудования' : undefined}
+                            >
                                 <span className="add-icon">+</span>
                                 <span>Добавить оборудование</span>
                             </button>

@@ -14,7 +14,13 @@ import {
     groupUnitsByOrganization,
     findUnitInForest,
     flattenUnitNamesFromForest,
+    orgFilterToken,
+    isOrgFilterToken,
+    orgKeyFromFilterToken,
+    flattenOrganizationFilterKeys,
+    isOrganizationFilterFullySelected,
 } from '../utils/organizationUnitFilterGroups';
+import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
 
 const USERS_PAGE_STATE_KEY = 'usersPageState';
 const TYPE_FILTER_OPTIONS = ['admin', 'user', 'blocked'];
@@ -24,8 +30,8 @@ const ROLE_TYPE_LABELS = {
     USER_ALLOY: 'Пользователь Эллой',
     ADMIN_DEALER: 'Администратор дилера',
     USER_DEALER: 'Пользователь дилера',
-    ADMIN_ENTERPRISE: 'Администратор предприятия',
-    USER_ENTERPRISE: 'Пользователь предприятия',
+    ADMIN_ENTERPRISE: 'Администратор',
+    USER_ENTERPRISE: 'Пользователь',
 };
 
 function formatRoleTypeLabel(label) {
@@ -58,6 +64,7 @@ function saveUsersPageState(state) {
 }
 
 function EmployeesPage() {
+    const { canWriteUsers: canWriteUsersPerm } = useCurrentUserPermissions();
     const savedState = useMemo(() => loadUsersPageState(), []);
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
@@ -222,6 +229,19 @@ function EmployeesPage() {
         return unitName;
     };
 
+    const userMatchesOrganizationFilter = (user, filter) => {
+        const orgId = user.organizationId ?? user.organization?.id ?? null;
+        if (orgId != null) {
+            const orgKey = String(orgId);
+            if (filter.some((key) => isOrgFilterToken(key) && orgKeyFromFilterToken(key) === orgKey)) {
+                return true;
+            }
+        }
+        const unitName = getOrganizationUnitName(user);
+        if (unitName === '—') return false;
+        return filter.includes(unitName);
+    };
+
     const getOrganizationName = (user) => {
         const orgId = user.organizationId ?? user.organization?.id ?? null;
         if (orgId != null) {
@@ -346,40 +366,50 @@ function EmployeesPage() {
         }
     };
 
+    /** 0 — активные админы, 1 — остальные активные, 2 — заблокированные (всегда в конце). */
+    const getUserListSortPriority = (user) => {
+        if (isBlockedUser(user)) return 2;
+        if (isAdminRole(user)) return 0;
+        return 1;
+    };
+
     const getSorted = (arr) => {
-        if (!sortField) return arr;
-        const sorted = [...arr].sort((a, b) => {
-            const getVal = (item) => {
-                switch (sortField) {
-                    case 'name':
-                        return (item.fullName || '').toLowerCase();
-                    case 'login':
-                        return (item.username || '').toLowerCase();
-                    case 'type':
-                        return getRoleTypeSortKey(item);
-                    case 'organization':
-                        return getOrganizationName(item).toLowerCase();
-                    case 'unit':
-                        return getOrganizationUnitName(item).toLowerCase();
-                    case 'position':
-                        return (item.position || '').toLowerCase();
-                    case 'phone':
-                        return (item.phone || '').toLowerCase();
-                    case 'blocked':
-                        return getBlockedDisplay(item).text.toLowerCase();
-                    case 'status':
-                        return getOnlineDisplay(item).text.toLowerCase();
-                    default:
-                        return '';
-                }
-            };
-            const va = getVal(a);
-            const vb = getVal(b);
-            if (va < vb) return -1;
-            if (va > vb) return 1;
+        const getColumnSortValue = (item) => {
+            if (!sortField) return '';
+            switch (sortField) {
+                case 'name':
+                    return (item.fullName || '').toLowerCase();
+                case 'login':
+                    return (item.username || '').toLowerCase();
+                case 'type':
+                    return getRoleTypeSortKey(item);
+                case 'organization':
+                    return getOrganizationName(item).toLowerCase();
+                case 'unit':
+                    return getOrganizationUnitName(item).toLowerCase();
+                case 'position':
+                    return (item.position || '').toLowerCase();
+                case 'phone':
+                    return (item.phone || '').toLowerCase();
+                case 'blocked':
+                    return getBlockedDisplay(item).text.toLowerCase();
+                case 'status':
+                    return getOnlineDisplay(item).text.toLowerCase();
+                default:
+                    return '';
+            }
+        };
+
+        return [...arr].sort((a, b) => {
+            const priorityDiff = getUserListSortPriority(a) - getUserListSortPriority(b);
+            if (priorityDiff !== 0) return priorityDiff;
+
+            const va = getColumnSortValue(a);
+            const vb = getColumnSortValue(b);
+            if (va < vb) return sortDirection === 'desc' ? 1 : -1;
+            if (va > vb) return sortDirection === 'desc' ? -1 : 1;
             return 0;
         });
-        return sortDirection === 'asc' ? sorted : sorted.reverse();
     };
 
     const handleDelete = async () => {
@@ -439,11 +469,9 @@ function EmployeesPage() {
             if (organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__') {
                 filtered = [];
             } else {
-                filtered = filtered.filter((item) => {
-                    const name = getOrganizationUnitName(item);
-                    if (name === '—') return false;
-                    return organizationUnitFilter.includes(name);
-                });
+                filtered = filtered.filter((item) =>
+                    userMatchesOrganizationFilter(item, organizationUnitFilter)
+                );
             }
         }
 
@@ -505,19 +533,32 @@ function EmployeesPage() {
         const entry = organizationsForFilter.find((e) => e.orgKey === orgKey);
         if (!entry) return;
         const names = flattenUnitNamesFromForest(entry.hierarchy);
-        if (names.length === 0) return;
+        const token = orgFilterToken(orgKey);
+        const orgKeys = names.length > 0 ? names : [token];
+
         setOrganizationUnitFilter((prev) => {
             const isNone = prev.length === 1 && prev[0] === '__NONE__';
-            const allChecked = !isNone && names.every((n) => prev.includes(n));
+            const showAll = prev.length === 0 && !isNone;
+            const allChecked =
+                showAll ||
+                (!isNone && orgKeys.every((k) => prev.includes(k)));
+
             if (!allChecked) {
-                if (isNone) return names;
+                if (isNone) return orgKeys;
+                if (showAll) {
+                    const allKeys = flattenOrganizationFilterKeys(organizationsForFilter);
+                    return allKeys.filter((k) => !orgKeys.includes(k));
+                }
                 const next = [...prev];
-                names.forEach((n) => {
-                    if (!next.includes(n)) next.push(n);
+                orgKeys.forEach((k) => {
+                    if (!next.includes(k)) next.push(k);
                 });
                 return next;
             }
-            const next = prev.filter((n) => !names.includes(n));
+
+            const next = showAll
+                ? flattenOrganizationFilterKeys(organizationsForFilter).filter((k) => !orgKeys.includes(k))
+                : prev.filter((k) => !orgKeys.includes(k));
             return next.length === 0 ? ['__NONE__'] : next;
         });
     };
@@ -629,11 +670,12 @@ function EmployeesPage() {
                             <span className="filter-arrow">{expandedFilters.organizations ? '▾' : '▸'}</span>
                         </button>
                         {expandedFilters.organizations && (() => {
-                            const allUnitNames = organizationsForFilter.flatMap((o) =>
-                                flattenUnitNamesFromForest(o.hierarchy)
-                            );
+                            const allFilterKeys = flattenOrganizationFilterKeys(organizationsForFilter);
                             const isNoneSelected = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
-                            const allSelected = (organizationUnitFilter.length === 0 || organizationUnitFilter.length === allUnitNames.length) && !isNoneSelected;
+                            const allSelected =
+                                (organizationUnitFilter.length === 0 ||
+                                    isOrganizationFilterFullySelected(organizationUnitFilter, organizationsForFilter)) &&
+                                !isNoneSelected;
                             const showAllChecked = organizationUnitFilter.length === 0 && !isNoneSelected;
 
                             const renderUnit = (unit, level = 0) => {
@@ -689,7 +731,7 @@ function EmployeesPage() {
                                             checked={allSelected}
                                             onChange={(e) => {
                                                 if (e.target.checked) {
-                                                    setOrganizationUnitFilter(allUnitNames);
+                                                    setOrganizationUnitFilter([]);
                                                 } else {
                                                     setOrganizationUnitFilter(['__NONE__']);
                                                 }
@@ -700,14 +742,14 @@ function EmployeesPage() {
                                     {organizationsForFilter.length > 0 ? (
                                         organizationsForFilter.map(({ orgKey, orgName, hierarchy }) => {
                                             const orgNames = flattenUnitNamesFromForest(hierarchy);
+                                            const orgToken = orgFilterToken(orgKey);
+                                            const orgKeys = orgNames.length > 0 ? orgNames : [orgToken];
                                             const isOrgExpanded = expandedOrgInFilter[orgKey] === true;
                                             const isNoneSelectedOrg = organizationUnitFilter.length === 1 && organizationUnitFilter[0] === '__NONE__';
                                             const orgShowAllChecked = organizationUnitFilter.length === 0 && !isNoneSelectedOrg;
                                             const isOrgRowChecked =
                                                 orgShowAllChecked ||
-                                                (!isNoneSelectedOrg &&
-                                                    orgNames.length > 0 &&
-                                                    orgNames.every((n) => organizationUnitFilter.includes(n)));
+                                                (!isNoneSelectedOrg && orgKeys.every((k) => organizationUnitFilter.includes(k)));
 
                                             return (
                                                 <div key={orgKey} className="filter-org-block">
@@ -762,7 +804,13 @@ function EmployeesPage() {
                 <div className="equipment-content-column">
                     <div className="content-header">
                         <div className="add-device-tile">
-                            <button type="button" className="add-device-btn" onClick={handleAddUser}>
+                            <button
+                                type="button"
+                                className="add-device-btn"
+                                onClick={handleAddUser}
+                                disabled={!canWriteUsersPerm}
+                                title={!canWriteUsersPerm ? 'Нет прав на добавление пользователей' : undefined}
+                            >
                                 <span className="add-icon">+</span>
                                 <span>Добавить пользователя</span>
                             </button>

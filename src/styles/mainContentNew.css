@@ -1603,6 +1603,71 @@
     border-color: rgba(102, 86, 120, 0.6);
 }
 
+.info-tile-rfid-delete-group {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 8px;
+    min-height: 0;
+    height: 100%;
+}
+
+/* Плитка RFID — как остальные .info-tile в сетке (на всю высоту ячейки) */
+.info-tile-rfid-delete-group > .info-tile {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    align-self: stretch;
+}
+
+/* Кнопка отдельно: не тянется по высоте, только по содержимому */
+.machine-delete-tile {
+    flex: 0 0 auto;
+    align-self: center;
+    background: rgba(20, 18, 31, 0.94);
+    padding: 0;
+    width: auto;
+    border-radius: 5px;
+}
+
+.machine-delete-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 6px 12px;
+    background: rgba(20, 18, 31, 0.94);
+    border: 1px solid rgba(59, 49, 74, 0.55);
+    border-radius: 4px;
+    color: #7A8BA5;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.machine-delete-btn span {
+    line-height: 1.2;
+}
+
+.machine-delete-btn:hover:not(:disabled) {
+    border-color: rgba(122, 139, 165, 0.6);
+    background: rgba(20, 18, 31, 0.94);
+    color: #9aadc4;
+}
+
+.machine-delete-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
 .info-tile-software .info-tile-row {
     flex-shrink: 0;
 }

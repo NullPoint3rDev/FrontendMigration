@@ -44,6 +44,15 @@ export function downloadBlobAsFile(blob, filename) {
     scheduleRevokeObjectURL(url);
 }
 
+const REPORT_JOB_TYPE = {
+    WIRE: 'WIRE_CONSUMPTION',
+    WELDER: 'WELDER_WORK',
+    EQUIPMENT: 'EQUIPMENT_WORK',
+    MALFUNCTION: 'EQUIPMENT_MALFUNCTION'
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const reportApi = {
     // Получить типы отчетов
     getReportTypes: async () => {
@@ -328,6 +337,76 @@ export const reportApi = {
             throw error;
         }
     },
+
+    /**
+     * Асинхронная генерация с прогрессом (polling раз в 2 с).
+     * onProgress({ percent, message, status })
+     */
+    generateReportWithProgress: async (reportType, requestBody, onProgress) => {
+        const startRes = await fetch(`${BASE_URL}/generation-jobs`, {
+            method: 'POST',
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ reportType, payload: requestBody })
+        });
+        if (!startRes.ok) {
+            throw new Error(`Не удалось запустить формирование отчёта (${startRes.status})`);
+        }
+        const started = await startRes.json();
+        const jobId = started.jobId;
+        if (!jobId) {
+            throw new Error('Сервер не вернул идентификатор задачи');
+        }
+        if (onProgress) {
+            onProgress({
+                percent: started.percent ?? 0,
+                message: started.message ?? 'Запуск…',
+                status: started.status ?? 'RUNNING'
+            });
+        }
+
+        let lastStatus = started;
+        for (;;) {
+            await sleep(2000);
+            const statusRes = await fetch(`${BASE_URL}/generation-jobs/${encodeURIComponent(jobId)}`, {
+                method: 'GET',
+                headers: getAuthHeaders()
+            });
+            if (!statusRes.ok) {
+                throw new Error(`Ошибка получения статуса (${statusRes.status})`);
+            }
+            lastStatus = await statusRes.json();
+            if (onProgress) {
+                onProgress({
+                    percent: lastStatus.percent ?? 0,
+                    message: lastStatus.message ?? '',
+                    status: lastStatus.status
+                });
+            }
+            if (lastStatus.status === 'COMPLETED') break;
+            if (lastStatus.status === 'FAILED') {
+                throw new Error(lastStatus.error || 'Ошибка формирования отчёта');
+            }
+        }
+
+        const downloadRes = await fetch(`${BASE_URL}/generation-jobs/${encodeURIComponent(jobId)}/download`, {
+            method: 'GET',
+            headers: getAuthHeaders()
+        });
+        if (!downloadRes.ok) {
+            throw new Error(`Ошибка скачивания отчёта (${downloadRes.status})`);
+        }
+        const blob = await downloadRes.blob();
+        const contentDisposition = downloadRes.headers.get('Content-Disposition');
+        const fallback = lastStatus.filename || 'report.xlsx';
+        const filename = parseFilenameFromContentDisposition(contentDisposition, fallback);
+        downloadBlobAsFile(blob, filename);
+        return { success: true, jobId };
+    },
+
+    REPORT_JOB_TYPE,
 
     // Генерация отчета по расходу проволоки
     generateWireConsumptionReport: async (templateId, periodStartDate, periodEndDate, periodStartTime, periodEndTime) => {
