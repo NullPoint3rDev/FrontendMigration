@@ -4,6 +4,7 @@ import { ReportsUnsavedProvider } from './contexts/ReportsUnsavedContext';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import ScopedCssBaseline from '@mui/material/ScopedCssBaseline';
 import Sidebar from './components/Sidebar';
+import { api } from './services/api';
 import './App.css';
 
 const HomePage = lazy(() => import('./components/HomePage'));
@@ -114,6 +115,22 @@ function App() {
         return () => {
             window.fetch = originalFetch;
         };
+    }, []);
+
+    // Heartbeat активной сессии раз в 5 минут (метрика «реально онлайн» в Prometheus)
+    useEffect(() => {
+        const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
+
+        const sendHeartbeat = () => {
+            if (localStorage.getItem('token')) {
+                api.heartbeat();
+            }
+        };
+
+        sendHeartbeat();
+        const intervalId = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+
+        return () => clearInterval(intervalId);
     }, []);
 
     return (

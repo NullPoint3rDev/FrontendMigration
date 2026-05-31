@@ -171,6 +171,27 @@ export const api = {
         }
     },
 
+    // Heartbeat активной сессии для метрики «реально онлайн» (Prometheus).
+    // Намеренно не редиректит при ошибке/401 — это фоновый best-effort пинг.
+    heartbeat: async () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            return false;
+        }
+        try {
+            const response = await fetch(`${API_BASE_URL}/session/heartbeat`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            });
+            return response.ok;
+        } catch (error) {
+            return false;
+        }
+    },
+
     // User methods
     getCurrentUser: async () => {
         try {
