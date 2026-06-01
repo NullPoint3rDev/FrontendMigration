@@ -1,6 +1,6 @@
 # CI на каждый push/PR в main; CD — только frontend при push в main.
 # Требуется self-hosted runner на Windows (метки: self-hosted, windows, wt2-staging).
-# Шаги CD используют shell: powershell (Windows PowerShell 5.1), не pwsh — PowerShell 7 на сервере не обязателен.
+# CD: checkout в _work; FRONTEND_BUILD_CONTEXT → свежий код; .env с C:\WTStaging\BackendStaging\deploy.
 
 name: Frontend Staging CI/CD
 
@@ -49,42 +49,47 @@ jobs:
     name: Deploy frontend to Staging
     needs: [build, secrets]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
     runs-on: [self-hosted, windows, wt2-staging]
     concurrency:
       group: staging-frontend-deploy
       cancel-in-progress: false
     steps:
-      - name: Configure git safe.directory (runner service account)
-        shell: powershell
-        run: |
-          Set-StrictMode -Version Latest
-          $ErrorActionPreference = 'Stop'
-          git config --global --add safe.directory 'C:/WTStaging/BackendStaging'
-          git config --global --add safe.directory 'C:/WTStaging/FrontendStaging'
+      - name: Checkout BackendStaging (docker-compose)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/BackendStaging
+          ref: main
+          path: BackendStaging
 
-      - name: Pull FrontendStaging (main)
-        shell: powershell
-        run: |
-          Set-StrictMode -Version Latest
-          $ErrorActionPreference = 'Stop'
-          Set-Location 'C:\WTStaging\FrontendStaging'
-          git fetch origin main
-          git checkout main
-          git pull origin main
+      - name: Checkout FrontendStaging
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: FrontendStaging
+          clean: true
 
       - name: Rebuild and restart frontend
         shell: powershell
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = 'Stop'
-          Set-Location 'C:\WTStaging\BackendStaging\deploy'
-          docker compose up -d --build frontend
+          $stagingEnv = 'C:\WTStaging\BackendStaging\deploy\.env'
+          if (-not (Test-Path $stagingEnv)) {
+            throw "Missing $stagingEnv — copy deploy/.env.example and configure staging secrets."
+          }
+          $compose = Join-Path $env:GITHUB_WORKSPACE 'BackendStaging\deploy\docker-compose.yml'
+          $env:FRONTEND_BUILD_CONTEXT = Join-Path $env:GITHUB_WORKSPACE 'FrontendStaging'
+          docker compose -f $compose --env-file $stagingEnv up -d --build frontend
 
       - name: Wait for frontend healthy
         shell: powershell
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = 'Stop'
+          $stagingEnv = 'C:\WTStaging\BackendStaging\deploy\.env'
+          $compose = Join-Path $env:GITHUB_WORKSPACE 'BackendStaging\deploy\docker-compose.yml'
           $deadline = (Get-Date).AddMinutes(2)
           do {
             $status = docker inspect --format='{{.State.Health.Status}}' wt2-staging-frontend 2>$null
@@ -95,5 +100,5 @@ jobs:
             Start-Sleep -Seconds 5
           } while ((Get-Date) -lt $deadline)
           Write-Error "Frontend did not become healthy within 2 minutes (last status: $status)"
-          docker compose -f C:\WTStaging\BackendStaging\deploy\docker-compose.yml logs --tail 50 frontend
+          docker compose -f $compose --env-file $stagingEnv logs --tail 50 frontend
           exit 1
