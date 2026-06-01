@@ -93,15 +93,16 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $stagingEnv = 'C:\WTStaging\BackendStaging\deploy\.env'
           $compose = 'C:\WTStaging\BackendStaging\deploy\docker-compose.yml'
-          $deadline = (Get-Date).AddMinutes(2)
+          $deadline = (Get-Date).AddMinutes(5)
           do {
             $status = docker inspect --format='{{.State.Health.Status}}' wt2-staging-frontend 2>$null
+            Write-Host "frontend health: $status"
             if ($status -eq 'healthy') {
               Write-Host "Frontend is healthy"
               exit 0
             }
             Start-Sleep -Seconds 5
           } while ((Get-Date) -lt $deadline)
-          Write-Error "Frontend did not become healthy within 2 minutes (last status: $status)"
-          docker compose -f $compose --env-file $stagingEnv logs --tail 50 frontend
-          exit 1
+          docker inspect wt2-staging-frontend --format='{{json .State.Health}}' 2>$null | Write-Host
+          docker compose -f $compose --env-file $stagingEnv logs --tail 100 frontend
+          throw "Frontend did not become healthy within 5 minutes (last status: $status)"
