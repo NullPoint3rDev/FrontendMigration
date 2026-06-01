@@ -70,6 +70,17 @@ jobs:
           path: FrontendStaging
           clean: true
 
+      - name: Verify Docker access
+        shell: powershell
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          docker version 2>&1 | Out-Host
+          if ($LASTEXITCODE -ne 0) {
+            $account = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+            throw "Docker API not available for $account. Start Docker Desktop. Run the Actions runner service under the same Windows user as Docker (not NETWORK SERVICE). Add that user to local group docker-users, restart the runner service."
+          }
+
       - name: Rebuild and restart frontend
         shell: powershell
         run: |
