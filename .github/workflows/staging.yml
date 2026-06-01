@@ -1,5 +1,6 @@
 # CI на каждый push/PR в main; CD — только frontend при push в main.
-# Требуется self-hosted runner на сервере с метками: self-hosted, windows, wt2-staging
+# Требуется self-hosted runner на Windows (метки: self-hosted, windows, wt2-staging).
+# Шаги CD используют shell: powershell (Windows PowerShell 5.1), не pwsh — PowerShell 7 на сервере не обязателен.
 
 name: Frontend Staging CI/CD
 
@@ -54,7 +55,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Pull FrontendStaging (main)
-        shell: pwsh
+        shell: powershell
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = 'Stop'
@@ -64,7 +65,7 @@ jobs:
           git pull origin main
 
       - name: Rebuild and restart frontend
-        shell: pwsh
+        shell: powershell
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = 'Stop'
@@ -72,7 +73,7 @@ jobs:
           docker compose up -d --build frontend
 
       - name: Wait for frontend healthy
-        shell: pwsh
+        shell: powershell
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = 'Stop'
