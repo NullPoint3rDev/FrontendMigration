@@ -1,6 +1,6 @@
 # CI на каждый push/PR в main; CD — только frontend при push в main.
 # Требуется self-hosted runner на Windows (метки: self-hosted, windows, wt2-staging).
-# CD: checkout в _work; FRONTEND_BUILD_CONTEXT → свежий код; .env с C:\WTStaging\BackendStaging\deploy.
+# CD: checkout frontend в _work; docker-compose и .env с C:\WTStaging (синхронизируется backend deploy).
 
 name: Frontend Staging CI/CD
 
@@ -49,25 +49,14 @@ jobs:
     name: Deploy frontend to Staging
     needs: [build, secrets]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
     runs-on: [self-hosted, windows, wt2-staging]
     concurrency:
       group: staging-frontend-deploy
       cancel-in-progress: false
     steps:
-      - name: Checkout BackendStaging (docker-compose)
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository_owner }}/BackendStaging
-          ref: main
-          path: BackendStaging
-
-      - name: Checkout FrontendStaging
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: main
-          path: FrontendStaging
           clean: true
 
       - name: Verify Docker access
@@ -90,8 +79,11 @@ jobs:
           if (-not (Test-Path $stagingEnv)) {
             throw "Missing $stagingEnv - copy deploy/.env.example and configure staging secrets."
           }
-          $compose = Join-Path $env:GITHUB_WORKSPACE 'BackendStaging\deploy\docker-compose.yml'
-          $env:FRONTEND_BUILD_CONTEXT = Join-Path $env:GITHUB_WORKSPACE 'FrontendStaging'
+          $compose = 'C:\WTStaging\BackendStaging\deploy\docker-compose.yml'
+          if (-not (Test-Path $compose)) {
+            throw "Missing $compose - run BackendStaging deploy once (syncs compose) or copy deploy folder to C:\WTStaging."
+          }
+          $env:FRONTEND_BUILD_CONTEXT = $env:GITHUB_WORKSPACE
           docker compose -f $compose --env-file $stagingEnv up -d --build frontend
 
       - name: Wait for frontend healthy
@@ -100,7 +92,7 @@ jobs:
           Set-StrictMode -Version Latest
           $ErrorActionPreference = 'Stop'
           $stagingEnv = 'C:\WTStaging\BackendStaging\deploy\.env'
-          $compose = Join-Path $env:GITHUB_WORKSPACE 'BackendStaging\deploy\docker-compose.yml'
+          $compose = 'C:\WTStaging\BackendStaging\deploy\docker-compose.yml'
           $deadline = (Get-Date).AddMinutes(2)
           do {
             $status = docker inspect --format='{{.State.Health.Status}}' wt2-staging-frontend 2>$null
