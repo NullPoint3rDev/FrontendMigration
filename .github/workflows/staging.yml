@@ -77,7 +77,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $stagingEnv = 'C:\WTStaging\BackendStaging\deploy\.env'
           if (-not (Test-Path $stagingEnv)) {
-            throw "Missing $stagingEnv — copy deploy/.env.example and configure staging secrets."
+            throw "Missing $stagingEnv - copy deploy/.env.example and configure staging secrets."
           }
           $compose = Join-Path $env:GITHUB_WORKSPACE 'BackendStaging\deploy\docker-compose.yml'
           $env:FRONTEND_BUILD_CONTEXT = Join-Path $env:GITHUB_WORKSPACE 'FrontendStaging'
