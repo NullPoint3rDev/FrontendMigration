@@ -1,0 +1,90 @@
+# CI на каждый push/PR в main; CD — только frontend при push в main.
+# Требуется self-hosted runner на сервере с метками: self-hosted, windows, wt2-staging
+
+name: Frontend Staging CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: frontend-staging-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (staging)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build -- --mode staging
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    name: Deploy frontend to Staging
+    needs: [build, secrets]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, windows, wt2-staging]
+    concurrency:
+      group: staging-frontend-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Pull FrontendStaging (main)
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          Set-Location 'C:\WTStaging\FrontendStaging'
+          git fetch origin main
+          git checkout main
+          git pull origin main
+
+      - name: Rebuild and restart frontend
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          Set-Location 'C:\WTStaging\BackendStaging\deploy'
+          docker compose up -d --build frontend
+
+      - name: Wait for frontend healthy
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          $deadline = (Get-Date).AddMinutes(2)
+          do {
+            $status = docker inspect --format='{{.State.Health.Status}}' wt2-staging-frontend 2>$null
+            if ($status -eq 'healthy') {
+              Write-Host "Frontend is healthy"
+              exit 0
+            }
+            Start-Sleep -Seconds 5
+          } while ((Get-Date) -lt $deadline)
+          Write-Error "Frontend did not become healthy within 2 minutes (last status: $status)"
+          docker compose -f C:\WTStaging\BackendStaging\deploy\docker-compose.yml logs --tail 50 frontend
+          exit 1
