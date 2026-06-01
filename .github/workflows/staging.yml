@@ -54,6 +54,14 @@ jobs:
       group: staging-frontend-deploy
       cancel-in-progress: false
     steps:
+      - name: Configure git safe.directory (runner service account)
+        shell: powershell
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          git config --global --add safe.directory 'C:/WTStaging/BackendStaging'
+          git config --global --add safe.directory 'C:/WTStaging/FrontendStaging'
+
       - name: Pull FrontendStaging (main)
         shell: powershell
         run: |
