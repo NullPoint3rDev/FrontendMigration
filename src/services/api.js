@@ -154,7 +154,7 @@ export const api = {
             throw error;
         }
     },
-
+ 
     logout: async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/auth/logout`, {
