@@ -1,3 +1,5 @@
+import { isStandbyMachineState } from './weldingMachineStateDisplay';
+
 const CORE_UPTIME_SEC_TO_MS = 1000;
 const WORK_TIME_SINCE_POWER_ON_KEYS = ['Core.WorkTimeSincePowerOn', 'Время работы с включения'];
 
@@ -24,7 +26,40 @@ function getPanelNumberByKeys(stateObj, keys) {
     return null;
 }
 
-/** Время последнего включения по телеметрии (мс), если аппарат сейчас включён. */
+export function getRawMachineStateFromPanelState(stateObj) {
+    if (!stateObj) return null;
+    const props = stateObj.properties || {};
+    return props?.WeldingMachineState?.value
+        || props?.WeldingMachineState
+        || props?.['Состояние аппарата']?.value
+        || props?.['Состояние аппарата']
+        || stateObj?.WeldingMachineState
+        || stateObj?.['Состояние аппарата']
+        || null;
+}
+
+function isMachineStateExplicitlyOff(rawState) {
+    if (rawState == null || rawState === '') return true;
+    const stateLower = String(rawState).toLowerCase().trim();
+    return stateLower.includes('выключ')
+        || stateLower === 'off'
+        || stateLower.includes('offline')
+        || stateLower.includes('не в сети')
+        || stateLower.includes('заблок')
+        || stateLower.includes('block')
+        || stateLower.includes('блокиров');
+}
+
+/** Обновлять «последнее включение» по Core.WorkTimeSincePowerOn (Включен, Сварка, Ошибка). */
+export function shouldRefreshLastPowerOnFromPanelState(stateObj) {
+    if (!stateObj) return false;
+    const rawState = getRawMachineStateFromPanelState(stateObj);
+    if (isMachineStateExplicitlyOff(rawState)) return false;
+    if (isStandbyMachineState(rawState)) return false;
+    return true;
+}
+
+/** Время последнего включения по телеметрии (мс) при активном состоянии (не дежурный/выкл). */
 export function computeLastPowerOnFromPanelState(stateObj, nowMs = Date.now()) {
     const workSec = getPanelNumberByKeys(stateObj, WORK_TIME_SINCE_POWER_ON_KEYS);
     if (workSec == null) return null;

@@ -31,7 +31,11 @@ import UserProfile from '../components/UserProfile';
 import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
 import MonitorWeldersTab from './MonitorWeldersTab';
 import '../styles/monitorWeldersTab.css';
-import { formatWeldingMachineStateDisplay } from '../utils/weldingMachineStateDisplay';
+import {
+    formatWeldingMachineStateDisplay,
+    isStandbyMachineState,
+    STANDBY_MACHINE_STATE_DISPLAY,
+} from '../utils/weldingMachineStateDisplay';
 
 // Названия ошибок по коду 1–23 (синхронно с EquipmentErrorMessages и протоколом аппарата: 1–10, 17–21)
 const EQUIPMENT_ERROR_MESSAGES = [
@@ -57,6 +61,10 @@ const EQUIPMENT_ERROR_MESSAGES = [
 const TELEMETRY_CHANNELS_CONFIG = [
     { key: 'weldingCurrent', label: 'Сварочный ток', color: '#3ec7ff' },
     { key: 'weldingVoltage', label: 'Сварочное напряжение', color: '#ff61c8' },
+    { key: 'setWeldingCurrent', label: 'Установленный ток', color: '#2a9fd4' },
+    { key: 'setWeldingVoltage', label: 'Установленное напряжение', color: '#d94fad' },
+    { key: 'welderPresence', label: 'Сварщик', color: '#c8e650' },
+    /** Мгновенный расход, л/мин — State.GasFlow с бэка (не «Расход газа с включения»). */
     { key: 'gasFlow', label: 'Расход газа', color: '#2fe4a8' },
     { key: 'wireConsumption', label: 'Расход проволоки', color: '#ffae64' },
     { key: 'mainsVoltage', label: 'Напряжение сети', color: '#a07dff' },
@@ -66,14 +74,21 @@ const TELEMETRY_CHANNELS_CONFIG = [
     { key: 'chillerTempOut', label: 'Исход. темп. охл. жидкости', color: '#ffd95a' }
 ];
 
-const TELEMETRY_NO_DRAW_KEYS = new Set(['gasFlow', 'wireConsumption']);
+const TELEMETRY_NO_DRAW_KEYS = new Set(['wireConsumption']);
 
 /** Сколько каналов (кроме сети по фазам) одновременно на основном графике — при заполнении остальные в списке тусклые, переключение только после снятия выбора. */
-const TELEMETRY_GRAPH_SLOT_COUNT = 2;
+const TELEMETRY_GRAPH_SLOT_COUNT = 3;
+
+const WELDER_PRESENCE_CHART_Y = 100;
+
+const TELEMETRY_SLOT_KEYS = ['slot1', 'slot2', 'slot3'];
 
 /** Каналы, привязанные к правой оси Y (0–50). */
 const RIGHT_Y_AXIS_CHANNEL_KEYS = new Set([
     'weldingVoltage',
+    'setWeldingVoltage',
+    'welderPresence',
+    'gasFlow',
     'radiatorTemp',
     'inverterTemp',
     'chillerTempIn',
@@ -131,10 +146,13 @@ const DAILY_ACTIVITY_INITIAL = {
     weldingMs: 0,
 };
 
-/** Суточные плитки (проволока кг, таймеры): опрос API раз в минуту, без привязки к poll panel-state (~1 с). */
+/** Суточные плитки: проволока/таймеры — реже; газ синхронизируем чаще (baseline + кэш). */
 const DAILY_STATS_REFRESH_MS = 60000;
+const DAILY_GAS_STATS_REFRESH_MS = 15000;
+/** Интервал poll panel-state (см. startPolling). */
+const PANEL_STATE_POLL_MS = 1300;
 
-function applyDailyStatsDto(setDailyActivity, setDailyWireConsumptionKg, dto) {
+function applyDailyStatsDto(setDailyActivity, setDailyWireConsumptionKg, setDailyGasConsumptionL, gasDayBaselineRef, gasSessionBaselineRef, dto) {
     if (!dto) return;
     setDailyActivity({
         offMs: Math.max(0, Number(dto.offMs) || 0),
@@ -144,6 +162,116 @@ function applyDailyStatsDto(setDailyActivity, setDailyWireConsumptionKg, dto) {
     });
     const kg = dto.wireConsumptionKg != null ? Number(dto.wireConsumptionKg) : 0;
     setDailyWireConsumptionKg(Math.max(0, Number.isFinite(kg) ? kg : 0));
+    const gasL = dto.gasConsumptionL != null ? Number(dto.gasConsumptionL) : 0;
+    setDailyGasConsumptionL(Math.max(0, Number.isFinite(gasL) ? gasL : 0));
+    if (gasDayBaselineRef && dto.gasBaselineAtDayStartL != null && Number.isFinite(Number(dto.gasBaselineAtDayStartL))) {
+        gasDayBaselineRef.current = Number(dto.gasBaselineAtDayStartL);
+        if (gasSessionBaselineRef) {
+            gasSessionBaselineRef.current = null;
+        }
+    }
+}
+
+/** Мгновенный расход газа (л/мин), не накопленный счётчик. */
+const GAS_FLOW_KEYS = ['State.GasFlow', 'GasFlow', 'gasFlow'];
+
+function getInstantGasFlowLpmFromPanel(flatOrWrapped) {
+    return getStateNumberByKeys(flatOrWrapped, GAS_FLOW_KEYS) ?? 0;
+}
+
+function extractGasCumulativeFromPanel(panelState) {
+    if (!panelState) return null;
+    const flat = flattenPanelState(panelState);
+    let v = getStateNumberByKeys({ properties: flat }, GAS_CUMULATIVE_KEYS);
+    if (v != null) return v;
+    const props = panelState.properties;
+    if (props && typeof props === 'object') {
+        for (const key of GAS_CUMULATIVE_KEYS) {
+            const prop = props[key];
+            if (prop && typeof prop === 'object' && prop.value != null) {
+                v = parseNumberOrNull(prop.value);
+                if (v != null) return v;
+            }
+        }
+    }
+    return null;
+}
+
+function resolveGasDayBaseline(ctx, cumulative) {
+    const apiBaseline = ctx?.gasDayBaselineRef?.current;
+    if (apiBaseline != null && Number.isFinite(apiBaseline)) {
+        return apiBaseline;
+    }
+    const server = Math.max(0, Number(ctx?.dailyGasFromServerRef?.current) || 0);
+    if (cumulative != null && Number.isFinite(cumulative) && server > 0 && ctx?.gasSessionBaselineRef) {
+        if (ctx.gasSessionBaselineRef.current == null) {
+            ctx.gasSessionBaselineRef.current = cumulative - server;
+        }
+        return ctx.gasSessionBaselineRef.current;
+    }
+    return null;
+}
+
+/**
+ * Суточный расход (л) = текущий счётчик «с включения» − baseline на начало суток.
+ * Не используем max() с устаревшим daily-stats — иначе плитка залипает до F5.
+ */
+function computeLiveDailyGasLiters({
+                                       baseline,
+                                       cumulative,
+                                       gasFlowLpm,
+                                       isWelding,
+                                       pollIntervalMs,
+                                       smoothRef,
+                                       dailyFromServerFallback,
+                                   }) {
+    const server = Math.max(0, Number(dailyFromServerFallback) || 0);
+    /** Счётчик «с включения» сбрасывается при перезагрузке — не обнуляем суточный итог из БД. */
+    const floorAtServer = (value) => Math.max(server, Math.max(0, Number(value) || 0));
+
+    if (baseline == null || !Number.isFinite(baseline) || cumulative == null || !Number.isFinite(cumulative)) {
+        return server;
+    }
+    if (cumulative + 1e-6 < baseline) {
+        return server;
+    }
+    const fromCounter = Math.max(0, cumulative - baseline);
+    const smooth = smoothRef?.current ?? { anchored: 0, extra: 0, lastPollMs: 0 };
+    const now = Date.now();
+    if (fromCounter > (smooth.anchored ?? -1) + 1e-6) {
+        smoothRef.current = { anchored: fromCounter, extra: 0, lastPollMs: now };
+        return floorAtServer(fromCounter);
+    }
+    if (isWelding && gasFlowLpm > 0) {
+        const dtMin = smooth.lastPollMs ? (now - smooth.lastPollMs) / 60000 : pollIntervalMs / 60000;
+        smooth.extra = (smooth.extra || 0) + gasFlowLpm * dtMin;
+        smooth.lastPollMs = now;
+        const estimated = (smooth.anchored ?? fromCounter) + smooth.extra;
+        const cap = fromCounter + Math.max(gasFlowLpm * 0.5, 0.2);
+        smoothRef.current = smooth;
+        return floorAtServer(Math.min(Math.max(fromCounter, estimated), cap));
+    }
+    smooth.lastPollMs = now;
+    smoothRef.current = { anchored: fromCounter, extra: 0, lastPollMs: now };
+    return floorAtServer(fromCounter);
+}
+
+function updateLiveDailyGasFromPanelState(panelState, ctx) {
+    if (!panelState || !ctx?.setLiveDailyGasLiters) return;
+    const flat = flattenPanelState(panelState);
+    const cumulative = extractGasCumulativeFromPanel(panelState);
+    const gasFlowLpm = getInstantGasFlowLpmFromPanel({ properties: flat });
+    const baseline = resolveGasDayBaseline(ctx, cumulative);
+    const liters = computeLiveDailyGasLiters({
+        baseline,
+        cumulative,
+        gasFlowLpm,
+        isWelding: isWeldingFromPanelState(panelState),
+        pollIntervalMs: PANEL_STATE_POLL_MS,
+        smoothRef: ctx.gasSmoothRef,
+        dailyFromServerFallback: ctx.dailyGasFromServerRef?.current ?? 0,
+    });
+    ctx.setLiveDailyGasLiters(liters);
 }
 
 const formatMsToClock = (ms) => {
@@ -162,6 +290,17 @@ const formatKgValue = (kg) => {
     const value = Math.max(0, Number(kg) || 0);
     return Number(value.toFixed(3)).toString();
 };
+
+const formatLitersValue = (liters) => {
+    const value = Math.max(0, Number(liters) || 0);
+    return Number(value.toFixed(1)).toString();
+};
+
+const GAS_CUMULATIVE_KEYS = [
+    'Core.GasConsumptionSincePowerOn',
+    'Расход газа с включения',
+    'GasConsumptionSincePowerOn',
+];
 
 const parseNumberOrNull = (value) => {
     if (value === undefined || value === null || value === '') return null;
@@ -327,7 +466,7 @@ function extractTelemetrySampleFromPanelState(state) {
     return {
         weldingCurrent: current,
         weldingVoltage: voltage,
-        gasFlow: 0,
+        gasFlow: getInstantGasFlowLpmFromPanel(wrappedState),
         wireConsumption: getStateNumberByKeys(wrappedState, ['Расход проволоки', 'WireConsumption', 'wireConsumption']) ?? 0,
         mainsVoltageA: phaseA,
         mainsVoltageB: phaseB,
@@ -424,6 +563,75 @@ function getMachineActivityModeFromPanelState(state) {
 
 const isHistoryPointWelding = (p) => String(p?.status || '').toLowerCase() === 'welding';
 
+/** Держим последнее ненулевое уст. значение при кратком 0 / «не сварка» в успешном poll. */
+const SET_METRIC_HOLD_MS = 6000;
+
+const parseSetMetric = (raw) => {
+    const n = parseFloat(String(raw ?? '').replace(',', '.'));
+    return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
+};
+
+const resolveSetChartY = ({
+                              wNow,
+                              wasWelding,
+                              weldingSource,
+                              idleSource,
+                              holdRef,
+                              now,
+                          }) => {
+    let candidate;
+    if (wNow) {
+        candidate = parseSetMetric(weldingSource);
+    } else if (wasWelding) {
+        candidate = 0;
+    } else {
+        candidate = Math.round(Number(idleSource) * 10) / 10;
+        if (!Number.isFinite(candidate)) candidate = 0;
+    }
+
+    if (candidate > 0) {
+        holdRef.current = { value: candidate, at: now };
+        return candidate;
+    }
+
+    const { value, at } = holdRef.current;
+    if (value > 0 && now - at < SET_METRIC_HOLD_MS) {
+        return value;
+    }
+    return candidate;
+};
+
+/** История: уст. ток/напряжение в простое; на интервале сварки — плоская линия последней уставки. */
+function buildSetMetricSeriesFromHistoryPoints(points, mapSetY) {
+    const series = [];
+    if (!points?.length) return series;
+    let lastSet = null;
+
+    points.forEach((p) => {
+        const x = p.ts;
+        const rawSet = mapSetY(p);
+        if (rawSet !== null && rawSet !== undefined) {
+            const n = Math.round(Number(rawSet) * 10) / 10;
+            if (Number.isFinite(n) && n > 0) {
+                lastSet = n;
+            }
+        }
+        const nowWelding = isHistoryPointWelding(p);
+        let y;
+        if (nowWelding) {
+            y = lastSet ?? 0;
+        } else if (rawSet !== null && rawSet !== undefined) {
+            const n = Math.round(Number(rawSet) * 10) / 10;
+            y = Number.isFinite(n) ? n : (lastSet ?? 0);
+        } else {
+            y = lastSet ?? 0;
+        }
+        series.push({ x, y });
+    });
+
+    return series;
+}
+
 /** Вертикальные фронты на старт/стоп сварки: две точки с одним x (дубликат x = вертикаль в Chart.js). */
 function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, xPoll) {
     const y = Math.round(Number(yRaw) * 10) / 10;
@@ -491,7 +699,15 @@ function buildWeldingPulseSeriesFromHistoryPoints(points, mapY) {
     return series;
 }
 
-/** Прореживание без разрушения пар (x, y1)-(x, y2) — иначе фронт снова становится наклонным. */
+const usesSteppedChartChannel = (channelKey) => (
+    channelKey === 'weldingCurrent'
+    || channelKey === 'weldingVoltage'
+    || channelKey === 'setWeldingCurrent'
+    || channelKey === 'setWeldingVoltage'
+    || channelKey === 'welderPresence'
+);
+
+/** Прореживание: вертикальные пары (x) + min/max Y в корзинах — иначе шов выглядит «плоским», а тултип показывает скачки. */
 function decimateWeldingPulseSeries(points, maxPoints) {
     const n = points?.length || 0;
     if (n <= maxPoints) return points || [];
@@ -504,13 +720,110 @@ function decimateWeldingPulseSeries(points, maxPoints) {
         }
     }
 
-    const idxs = new Set(mustKeep);
-    const target = Math.min(maxPoints, n);
-    for (let k = 0; k < target && idxs.size < maxPoints; k += 1) {
-        idxs.add(Math.round((k * (n - 1)) / Math.max(target - 1, 1)));
+    const bucketCount = Math.max(1, Math.floor((maxPoints - mustKeep.size) / 2));
+    const bucketSize = Math.max(1, Math.ceil(n / bucketCount));
+    for (let b = 0; b < bucketCount; b += 1) {
+        const from = b * bucketSize;
+        const to = Math.min(n - 1, (b + 1) * bucketSize - 1);
+        if (from > to) continue;
+        let minIdx = from;
+        let maxIdx = from;
+        let minY = Number(points[from].y);
+        let maxY = minY;
+        for (let i = from; i <= to; i += 1) {
+            if (mustKeep.has(i)) continue;
+            const y = Number(points[i].y);
+            if (!Number.isFinite(y)) continue;
+            if (y < minY) {
+                minY = y;
+                minIdx = i;
+            }
+            if (y > maxY) {
+                maxY = y;
+                maxIdx = i;
+            }
+        }
+        mustKeep.add(minIdx);
+        if (maxIdx !== minIdx) mustKeep.add(maxIdx);
+        if (mustKeep.size >= maxPoints) break;
     }
 
-    return [...idxs].sort((a, b) => a - b).map((j) => points[j]);
+    if (mustKeep.size > maxPoints) {
+        const sorted = [...mustKeep].sort((a, b) => a - b);
+        const stride = Math.ceil(sorted.length / maxPoints);
+        const reduced = new Set();
+        for (let i = 0; i < sorted.length; i += stride) reduced.add(sorted[i]);
+        reduced.add(0);
+        reduced.add(n - 1);
+        return [...reduced].sort((a, b) => a - b).map((j) => points[j]);
+    }
+
+    return [...mustKeep].sort((a, b) => a - b).map((j) => points[j]);
+}
+
+/** Ступенчатая линия 0 / 100 по наличию RFID (история). */
+function buildWelderPresenceSeriesFromHistoryPoints(points) {
+    const series = [];
+    if (!points?.length) return series;
+    let wasPresent = false;
+    let lastY = 0;
+
+    points.forEach((p) => {
+        const x = p.ts;
+        const nowPresent = Boolean(p.rfid && String(p.rfid).trim());
+        const y = nowPresent ? WELDER_PRESENCE_CHART_Y : 0;
+
+        if (!wasPresent && !nowPresent) {
+            series.push({ x, y: 0 });
+        } else if (!wasPresent && nowPresent) {
+            series.push({ x, y: 0 });
+            series.push({ x, y });
+            lastY = y;
+        } else if (wasPresent && nowPresent) {
+            if (lastY === 0 && y > 0) {
+                series.push({ x, y: 0 });
+                series.push({ x, y });
+            } else {
+                series.push({ x, y });
+            }
+            lastY = y;
+        } else if (wasPresent && !nowPresent) {
+            series.push({ x, y: lastY });
+            series.push({ x, y: 0 });
+            lastY = 0;
+        }
+        wasPresent = nowPresent;
+    });
+
+    return series;
+}
+
+function appendWelderPresenceSeries(prev, hasWelder, wasPresent, xPoll) {
+    const y = hasWelder ? WELDER_PRESENCE_CHART_Y : 0;
+    let next = [...prev];
+    const nowPresent = Boolean(hasWelder);
+
+    if (!wasPresent && !nowPresent) {
+        next.push({ x: xPoll, y: 0 });
+    } else if (!wasPresent && nowPresent) {
+        next.push({ x: xPoll, y: 0 });
+        next.push({ x: xPoll, y });
+    } else if (wasPresent && nowPresent) {
+        next.push({ x: xPoll, y });
+    } else if (wasPresent && !nowPresent) {
+        next.push({ x: xPoll, y: WELDER_PRESENCE_CHART_Y });
+        next.push({ x: xPoll, y: 0 });
+    }
+    return next;
+}
+
+function prepareSeriesForChart(raw, channelKey, graphUsesServerData, maxPoints) {
+    const pts = raw || [];
+    if (!graphUsesServerData || !pts.length) return pts;
+    if (usesSteppedChartChannel(channelKey)) {
+        return decimateWeldingPulseSeries(pts, maxPoints);
+    }
+    return decimateSeriesPoints(pts, maxPoints);
 }
 
 /**
@@ -711,7 +1024,7 @@ const DeviceMonitorPage = () => {
     const [isTelemetryListExpanded, setIsTelemetryListExpanded] = useState(true);
 
     // Состояние для активной вкладки (Графики/Информация)
-    const [activeTab, setActiveTab] = useState('info');
+    const [activeTab, setActiveTab] = useState('graphs');
     /** Развернуть область графика на место верхней сетки (только вкладка «Графики»; при «Инфо» сбрасывается). */
     const [graphExpandedLayout, setGraphExpandedLayout] = useState(false);
 
@@ -755,14 +1068,19 @@ const DeviceMonitorPage = () => {
     const lastWeldingVoltageChartRef = useRef(0);
     /** Последние ток/напряжение в простое — для колонки «Уст.» на время сварки (заморозка перед дугой). */
     const idleControlMetricsRef = useRef({ current: '0', voltage: '0' });
+    const lastSetWeldingCurrentHoldRef = useRef({ value: 0, at: 0 });
+    const lastSetWeldingVoltageHoldRef = useRef({ value: 0, at: 0 });
     const [telemetrySelection, setTelemetrySelection] = useState({
         slot1: 'weldingCurrent',
         slot2: 'weldingVoltage',
+        slot3: null,
     });
     const [telemetryPhaseSelection, setTelemetryPhaseSelection] = useState({
         slot1: 'A',
         slot2: 'B',
+        slot3: 'A',
     });
+    const prevWelderPresentForChartRef = useRef(false);
     /** Выбранные фазы сети (до 3) — по умолчанию ни одна, пока пользователь не включит A/B/C. */
     const [mainsVoltagePhases, setMainsVoltagePhases] = useState([]);
     /** Масштаб по оси X: 1 — весь диапазон; больше — «приближение» к последним точкам (окно справа). */
@@ -788,9 +1106,29 @@ const DeviceMonitorPage = () => {
     }, [activeTab]);
     const [dailyActivity, setDailyActivity] = useState(DAILY_ACTIVITY_INITIAL);
     const [dailyWireConsumptionKg, setDailyWireConsumptionKg] = useState(0);
+    const [dailyWireStatsLoading, setDailyWireStatsLoading] = useState(true);
+    const [dailyWireStatsLoaded, setDailyWireStatsLoaded] = useState(false);
+    const [dailyGasConsumptionL, setDailyGasConsumptionL] = useState(0);
+    const [liveDailyGasLiters, setLiveDailyGasLiters] = useState(0);
+    const gasDayBaselineRef = useRef(null);
+    const gasSessionBaselineRef = useRef(null);
+    const dailyGasFromServerRef = useRef(0);
+    const gasSmoothRef = useRef({ anchored: 0, extra: 0, lastPollMs: 0 });
+    const lastPanelStateRef = useRef(null);
     const dailyStatsIntervalRef = useRef(null);
+    const dailyGasStatsIntervalRef = useRef(null);
+    const liveGasCtxRef = useRef(null);
+    liveGasCtxRef.current = {
+        setLiveDailyGasLiters,
+        gasDayBaselineRef,
+        gasSessionBaselineRef,
+        dailyGasFromServerRef,
+        gasSmoothRef,
+    };
 
     const [historyError, setHistoryError] = useState(null);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const historyLoadingCountRef = useRef(0);
     const [isHistoryMode, setIsHistoryMode] = useState(false);
     /** Сегодня: пользователь тронул пины — суточная шкала, данные с сервера, без авто‑live окна. */
     const [todayPinExplore, setTodayPinExplore] = useState(false);
@@ -844,6 +1182,12 @@ const DeviceMonitorPage = () => {
         graphUsesServerDataRef.current = graphUsesServerData;
     }, [graphUsesServerData]);
 
+    useEffect(() => {
+        if (graphUsesServerData) return;
+        historyLoadingCountRef.current = 0;
+        setHistoryLoading(false);
+    }, [graphUsesServerData]);
+
     const toLocalDateInput = (d) => {
         const pad = (n) => String(n).padStart(2, '0');
         const yyyy = d.getFullYear();
@@ -878,6 +1222,10 @@ const DeviceMonitorPage = () => {
         };
         const mapCurrentY = (p) => (p.current === null || p.current === undefined ? 0 : Number(p.current));
         const mapVoltageY = (p) => (p.voltage === null || p.voltage === undefined ? 0 : (Number(p.voltage) || 0) / 10);
+        const mapSetCurrentY = (p) => (p.setCurrent === null || p.setCurrent === undefined ? null : Number(p.setCurrent));
+        const mapSetVoltageY = (p) => (
+            p.setVoltage === null || p.setVoltage === undefined ? null : (Number(p.setVoltage) || 0) / 10
+        );
 
         return {
             ...DEFAULT_TELEMETRY_SERIES,
@@ -911,6 +1259,13 @@ const DeviceMonitorPage = () => {
                 x: p.ts,
                 y: toNumericOrNull(p.chillerTemperatureOut),
             })),
+            gasFlow: points.map((p) => ({
+                x: p.ts,
+                y: toNumericOrNull(p.gasFlowLpm),
+            })),
+            setWeldingCurrent: buildSetMetricSeriesFromHistoryPoints(points, mapSetCurrentY),
+            setWeldingVoltage: buildSetMetricSeriesFromHistoryPoints(points, mapSetVoltageY),
+            welderPresence: buildWelderPresenceSeriesFromHistoryPoints(points),
         };
     }, []);
 
@@ -933,34 +1288,44 @@ const DeviceMonitorPage = () => {
         });
     }, []);
 
+    const bumpHistoryLoading = useCallback((delta) => {
+        historyLoadingCountRef.current = Math.max(0, historyLoadingCountRef.current + delta);
+        setHistoryLoading(historyLoadingCountRef.current > 0);
+    }, []);
+
     /** Один запрос на весь интервал [fromMs, toMs]: перезаписываем точки в этом диапазоне (без дозагрузки «кусками»). */
     const ensureHistoryIntervalLoaded = useCallback(async (dateStr, fromMs, toMs) => {
         if (!dateStr || !Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs <= fromMs) return { points: 0 };
 
-        const [yyyy, mm, dd] = String(dateStr).split('-').map((x) => parseInt(x, 10));
-        const dayStart = new Date(yyyy, mm - 1, dd, 0, 0, 0, 0).getTime();
-        const dayEnd = dayStart + HISTORY_MAX_MS;
+        bumpHistoryLoading(1);
+        try {
+            const [yyyy, mm, dd] = String(dateStr).split('-').map((x) => parseInt(x, 10));
+            const dayStart = new Date(yyyy, mm - 1, dd, 0, 0, 0, 0).getTime();
+            const dayEnd = dayStart + HISTORY_MAX_MS;
 
-        if (historyCacheRef.current.date !== dateStr) {
-            historyCacheRef.current = { date: dateStr, dayStart, dayEnd, pointsByTs: new Map() };
+            if (historyCacheRef.current.date !== dateStr) {
+                historyCacheRef.current = { date: dateStr, dayStart, dayEnd, pointsByTs: new Map() };
+            }
+
+            const pts = await archiveDeviceApi.getArchiveTelemetryHistory(machineMac, fromMs, toMs);
+
+            const cache = historyCacheRef.current;
+            /** Только после успешного ответа: иначе при ошибке/узком окне зума терялись уже загруженные точки и показывалась ложная ошибка. */
+            for (const ts of Array.from(cache.pointsByTs.keys())) {
+                if (ts >= fromMs && ts <= toMs) cache.pointsByTs.delete(ts);
+            }
+            let added = 0;
+            (pts || []).forEach((p) => {
+                const ts = Number(p.ts);
+                if (!Number.isFinite(ts)) return;
+                cache.pointsByTs.set(ts, p);
+                added += 1;
+            });
+            return { points: added };
+        } finally {
+            bumpHistoryLoading(-1);
         }
-
-        const pts = await archiveDeviceApi.getArchiveTelemetryHistory(machineMac, fromMs, toMs);
-
-        const cache = historyCacheRef.current;
-        /** Только после успешного ответа: иначе при ошибке/узком окне зума терялись уже загруженные точки и показывалась ложная ошибка. */
-        for (const ts of Array.from(cache.pointsByTs.keys())) {
-            if (ts >= fromMs && ts <= toMs) cache.pointsByTs.delete(ts);
-        }
-        let added = 0;
-        (pts || []).forEach((p) => {
-            const ts = Number(p.ts);
-            if (!Number.isFinite(ts)) return;
-            cache.pointsByTs.set(ts, p);
-            added += 1;
-        });
-        return { points: added };
-    }, [machineMac, HISTORY_MAX_MS]);
+    }, [machineMac, HISTORY_MAX_MS, bumpHistoryLoading]);
 
     const pickDefaultHourWithData = useCallback(async (dateStr) => {
         const [yyyy, mm, dd] = String(dateStr).split('-').map((x) => parseInt(x, 10));
@@ -989,25 +1354,68 @@ const DeviceMonitorPage = () => {
         return { dayStart, dayEnd: dayStart + HISTORY_MAX_MS };
     }, [HISTORY_MAX_MS]);
 
-    /** Запись интервала пинов для исторической даты (в ref-карту). */
+    /** Суточная шкала пинов для «сегодня»: правая граница — сейчас, не полночь. */
+    const getTodayPinExploreDayBounds = useCallback((dateStr) => {
+        const { dayStart, dayEnd } = getDayBoundsForDateStr(dateStr);
+        return { dayStart, dayEnd: Math.min(Date.now(), dayEnd) };
+    }, [getDayBoundsForDateStr]);
+
+    const getPinDayBounds = useCallback((dateStr) => {
+        const { dayStart, dayEnd: rawDayEnd } = getDayBoundsForDateStr(dateStr);
+        const dayEnd = isTodayDateStr(dateStr) ? Math.min(Date.now(), rawDayEnd) : rawDayEnd;
+        return { dayStart, dayEnd };
+    }, [getDayBoundsForDateStr, isTodayDateStr]);
+
+    /** Окно пинов лежит внутри суток dateStr (не «чужие» timestamp при смене даты). */
+    const isPinWindowInsideDay = useCallback((dateStr, start, end, minGap = 60 * 1000) => {
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return false;
+        const { dayStart, dayEnd } = getPinDayBounds(dateStr);
+        if (start < dayStart || end > dayEnd) return false;
+        if (end - start < minGap) return false;
+        return true;
+    }, [getPinDayBounds]);
+
+    const clampPinWindowToDay = useCallback((dateStr, start, end, minGap = 60 * 1000) => {
+        const { dayStart, dayEnd } = getPinDayBounds(dateStr);
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+        if (start >= dayEnd || end <= dayStart) return null;
+        let s = Math.max(dayStart, Math.min(start, dayEnd - minGap));
+        let e = Math.min(dayEnd, Math.max(end, dayStart + minGap));
+        if (e - s < minGap) e = Math.min(dayEnd, s + minGap);
+        if (e <= s) return null;
+        return { start: s, end: e };
+    }, [getPinDayBounds]);
+
+    /** Артефакт clamp: оба пина у правого края суток (после подстановки чужих timestamp). */
+    const isCollapsedPinWindowArtifact = useCallback((dateStr, start, end, minGap = 60 * 1000) => {
+        if (!Number.isFinite(start) || !Number.isFinite(end)) return true;
+        const { dayStart, dayEnd } = getPinDayBounds(dateStr);
+        const span = end - start;
+        if (span > minGap * 3) return false;
+        const nearDayEnd = end >= dayEnd - minGap * 2;
+        const farFromDayStart = start > dayStart + (dayEnd - dayStart) * 0.85;
+        return nearDayEnd && farFromDayStart && span <= minGap * 2;
+    }, [getPinDayBounds]);
+
+    /** Запись интервала пинов (в ref-карту), в т.ч. для сегодняшней даты. */
     const persistHistoryPinWindow = useCallback(
         (dateStr, start, end) => {
-            if (!dateStr || isTodayDateStr(dateStr)) return;
-            if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return;
-            const { dayStart, dayEnd } = getDayBoundsForDateStr(dateStr);
-            if (start < dayStart || end > dayEnd) return;
-            historyPinWindowsRef.current[dateStr] = { start, end };
+            if (!dateStr || !isPinWindowInsideDay(dateStr, start, end)) return;
+            const clamped = clampPinWindowToDay(dateStr, start, end);
+            if (!clamped || isCollapsedPinWindowArtifact(dateStr, clamped.start, clamped.end)) return;
+            historyPinWindowsRef.current[dateStr] = clamped;
         },
-        [getDayBoundsForDateStr, isTodayDateStr]
+        [clampPinWindowToDay, isPinWindowInsideDay, isCollapsedPinWindowArtifact]
     );
 
-    /** Любое валидное окно в сутках выбранной исторической даты — сразу в карту (колесо X, догрузка и т.д.). */
+    /** Любое валидное окно в сутках — сразу в карту (колесо X, догрузка и т.д.). */
     useEffect(() => {
-        if (!isHistoryMode) return;
-        if (!selectedGraphDate || isTodayDateStr(selectedGraphDate)) return;
+        if (!isHistoryMode && !todayPinExplore) return;
+        if (!selectedGraphDate) return;
+        if (!timeWindow.touched) return;
         const { start, end } = timeWindow;
         persistHistoryPinWindow(selectedGraphDate, start, end);
-    }, [isHistoryMode, selectedGraphDate, timeWindow.start, timeWindow.end, isTodayDateStr, persistHistoryPinWindow]);
+    }, [isHistoryMode, todayPinExplore, selectedGraphDate, timeWindow.touched, timeWindow.start, timeWindow.end, persistHistoryPinWindow]);
 
     /** Сохраняем интервал пинов для предыдущей исторической даты до запуска useEffect загрузки (тот же latestTimeWindowRef, что и на этом рендере). */
     useLayoutEffect(() => {
@@ -1029,12 +1437,28 @@ const DeviceMonitorPage = () => {
         prevGraphDateForPinStorageRef.current = selectedGraphDate || null;
     }, [selectedGraphDate, getDayBoundsForDateStr, isTodayDateStr, persistHistoryPinWindow]);
 
+    /** Смена даты: не клампить старое окно к новым суткам (оба пина уезжают к 00:00). */
+    useLayoutEffect(() => {
+        if (!selectedGraphDate) return;
+        if (isTodayDateStr(selectedGraphDate)) return;
+        const { dayStart, dayEnd } = getDayBoundsForDateStr(selectedGraphDate);
+        setHistoryDayBounds({ start: dayStart, end: dayEnd });
+        setTimeWindow({ start: null, end: null, touched: false });
+        pinDragPreviewRef.current = null;
+        setPinDragPreview(null);
+        setDraggingPin(null);
+    }, [selectedGraphDate, isTodayDateStr, getDayBoundsForDateStr]);
+
     useEffect(() => {
         if (!selectedGraphDate) return;
         if (isTodayDateStr(selectedGraphDate)) {
             setIsHistoryMode(false);
             if (skipTodayLiveResetRef.current) {
                 skipTodayLiveResetRef.current = false;
+                return undefined;
+            }
+            // Уже в explore за сегодня — не сбрасывать (иначе mouseup теряет commit пинов).
+            if (todayPinExploreRef.current) {
                 return undefined;
             }
             // Live режим по умолчанию (пятиминутка); суточный просмотр — только через пины / «История».
@@ -1063,27 +1487,18 @@ const DeviceMonitorPage = () => {
             const minGap = 60 * 1000;
             const saved = historyPinWindowsRef.current[selectedGraphDate];
             let window;
-            if (
-                saved &&
-                Number.isFinite(saved.start) &&
-                Number.isFinite(saved.end) &&
-                saved.end > saved.start
-            ) {
-                let start = Math.max(dayStart, Math.min(saved.start, dayEnd - minGap));
-                let end = Math.min(dayEnd, Math.max(saved.end, dayStart + minGap));
-                if (end - start < minGap) {
-                    end = Math.min(dayEnd, start + minGap);
-                }
-                if (end > dayEnd) {
-                    end = dayEnd;
-                    start = Math.max(dayStart, end - minGap);
-                }
-                if (end <= start) {
-                    window = await pickDefaultHourWithData(selectedGraphDate);
-                } else {
-                    window = { start, end };
-                }
+            const savedUsable = saved
+                && Number.isFinite(saved.start)
+                && Number.isFinite(saved.end)
+                && saved.end > saved.start
+                && isPinWindowInsideDay(selectedGraphDate, saved.start, saved.end, minGap)
+                && !isCollapsedPinWindowArtifact(selectedGraphDate, saved.start, saved.end, minGap);
+            if (savedUsable) {
+                window = { start: saved.start, end: saved.end };
             } else {
+                if (saved) {
+                    delete historyPinWindowsRef.current[selectedGraphDate];
+                }
                 window = await pickDefaultHourWithData(selectedGraphDate);
             }
             if (cancelled) return;
@@ -1111,6 +1526,8 @@ const DeviceMonitorPage = () => {
         buildHistorySeriesForWindow,
         buildHistoryTimelineForWindow,
         ensureHistoryIntervalLoaded,
+        isPinWindowInsideDay,
+        isCollapsedPinWindowArtifact,
     ]);
 
     const historyFetchDebounceRef = useRef(null);
@@ -1241,12 +1658,35 @@ const DeviceMonitorPage = () => {
 
     const refreshDailyStatsFromServer = useCallback(async () => {
         if (!machineMac || machineMac === 'Неизвестный MAC') return;
+        setDailyWireStatsLoading(true);
         try {
             const dto = await archiveDeviceApi.getArchiveDailyStats(machineMac);
-            applyDailyStatsDto(setDailyActivity, setDailyWireConsumptionKg, dto);
+            applyDailyStatsDto(setDailyActivity, setDailyWireConsumptionKg, setDailyGasConsumptionL, gasDayBaselineRef, gasSessionBaselineRef, dto);
+            setDailyWireStatsLoaded(true);
+            if (liveGasCtxRef.current && lastPanelStateRef.current) {
+                updateLiveDailyGasFromPanelState(lastPanelStateRef.current, liveGasCtxRef.current);
+            }
         } catch (err) {
             console.warn('[DeviceMonitor] daily-stats:', err?.message || err);
+        } finally {
+            setDailyWireStatsLoading(false);
         }
+    }, [machineMac]);
+
+    useEffect(() => {
+        dailyGasFromServerRef.current = dailyGasConsumptionL;
+    }, [dailyGasConsumptionL]);
+
+    useEffect(() => {
+        gasDayBaselineRef.current = null;
+        gasSessionBaselineRef.current = null;
+        dailyGasFromServerRef.current = 0;
+        gasSmoothRef.current = { anchored: 0, extra: 0, lastPollMs: 0 };
+        lastPanelStateRef.current = null;
+        setLiveDailyGasLiters(0);
+        setDailyWireConsumptionKg(0);
+        setDailyWireStatsLoading(true);
+        setDailyWireStatsLoaded(false);
     }, [machineMac]);
 
     useEffect(() => {
@@ -1254,11 +1694,19 @@ const DeviceMonitorPage = () => {
         if (dailyStatsIntervalRef.current) {
             clearInterval(dailyStatsIntervalRef.current);
         }
+        if (dailyGasStatsIntervalRef.current) {
+            clearInterval(dailyGasStatsIntervalRef.current);
+        }
         dailyStatsIntervalRef.current = setInterval(refreshDailyStatsFromServer, DAILY_STATS_REFRESH_MS);
+        dailyGasStatsIntervalRef.current = setInterval(refreshDailyStatsFromServer, DAILY_GAS_STATS_REFRESH_MS);
         return () => {
             if (dailyStatsIntervalRef.current) {
                 clearInterval(dailyStatsIntervalRef.current);
                 dailyStatsIntervalRef.current = null;
+            }
+            if (dailyGasStatsIntervalRef.current) {
+                clearInterval(dailyGasStatsIntervalRef.current);
+                dailyGasStatsIntervalRef.current = null;
             }
         };
     }, [refreshDailyStatsFromServer]);
@@ -1363,6 +1811,9 @@ const DeviceMonitorPage = () => {
         prevWeldingForChartRef.current = null;
         lastWeldingCurrentChartRef.current = 0;
         lastWeldingVoltageChartRef.current = 0;
+        lastSetWeldingCurrentHoldRef.current = { value: 0, at: 0 };
+        lastSetWeldingVoltageHoldRef.current = { value: 0, at: 0 };
+        prevWelderPresentForChartRef.current = false;
         setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
         setTelemetryChartZoom({ top: 1, bottom: 1 });
         setTimelineSamples([]);
@@ -1377,10 +1828,13 @@ const DeviceMonitorPage = () => {
             prevWeldingForChartRef.current = null;
             lastWeldingCurrentChartRef.current = 0;
             lastWeldingVoltageChartRef.current = 0;
+            prevWelderPresentForChartRef.current = false;
             setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
             setTelemetryChartZoom({ top: 1, bottom: 1 });
             setTimelineSamples([]);
-            setTimeWindow({ start: null, end: null, touched: false });
+            if (!graphUsesServerDataRef.current) {
+                setTimeWindow({ start: null, end: null, touched: false });
+            }
         }
     }, [hasData]);
 
@@ -1470,7 +1924,9 @@ const DeviceMonitorPage = () => {
                 setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
                 setTelemetryChartZoom({ top: 1, bottom: 1 });
                 setTimelineSamples([]);
-                setTimeWindow({ start: null, end: null, touched: false });
+                if (!graphUsesServerDataRef.current) {
+                    setTimeWindow({ start: null, end: null, touched: false });
+                }
                 disconnectTimeoutRef.current = null;
             }, 3000); // 3 секунды задержки
 
@@ -1496,7 +1952,7 @@ const DeviceMonitorPage = () => {
         // Интервал опроса panel-state: 1 с (реалтайм-графики синхронизированы с этим же опросом)
         const interval = setInterval(() => {
             fetchDeviceState();
-        }, 1300);
+        }, PANEL_STATE_POLL_MS);
 
         setPollingInterval(interval);
     };
@@ -1517,11 +1973,13 @@ const DeviceMonitorPage = () => {
 
             if (response && response !== null) {
                 const sampleTs = Date.now();
+                lastPanelStateRef.current = response;
                 // Обрабатываем данные
                 processStructuredData({
                     mac: machineMac,
                     state: response
                 });
+                updateLiveDailyGasFromPanelState(response, liveGasCtxRef.current);
 
                 // Реалтайм-графики: одна точка на каждый успешный poll (как WeldingMachinePanel.updateChart)
                 const { current: iRaw, voltage: uRaw } = extractCurrentVoltageFromPanelState(response);
@@ -1531,6 +1989,30 @@ const DeviceMonitorPage = () => {
                 const wasWelding = prevWeldingForChartRef.current === true;
                 const yi = Math.round(Number(iRaw) * 10) / 10;
                 const yu = Math.round(Number(uRaw) * 10) / 10;
+                const flatState = flattenPanelState(response);
+                const stateRfid = flatState['RFID.Hex'] ||
+                    flatState.RFID ||
+                    flatState.Rfid ||
+                    flatState.rfid ||
+                    null;
+                const hasWelder = Boolean(stateRfid && String(stateRfid).trim());
+                const wasWelderPresent = prevWelderPresentForChartRef.current === true;
+                const setCurrentY = resolveSetChartY({
+                    wNow,
+                    wasWelding,
+                    weldingSource: idleControlMetricsRef.current.current,
+                    idleSource: yi,
+                    holdRef: lastSetWeldingCurrentHoldRef,
+                    now: xPoll,
+                });
+                const setVoltageY = resolveSetChartY({
+                    wNow,
+                    wasWelding,
+                    weldingSource: idleControlMetricsRef.current.voltage,
+                    idleSource: yu,
+                    holdRef: lastSetWeldingVoltageHoldRef,
+                    now: xPoll,
+                });
                 setTelemetrySeries(prev => {
                     const next = { ...prev };
                     TELEMETRY_CHANNELS_CONFIG.forEach(channel => {
@@ -1561,19 +2043,36 @@ const DeviceMonitorPage = () => {
                                 xPoll
                             );
                             next.weldingVoltage = (series || []).filter((p) => typeof p?.x === 'number' && p.x >= xPoll - LIVE_WINDOW_MS);
-                        } else {
+                        } else if (channel.key === 'setWeldingCurrent') {
+                            next.setWeldingCurrent = trimSeriesByTime(
+                                prev.setWeldingCurrent || [],
+                                { x: xPoll, y: setCurrentY },
+                                LIVE_WINDOW_MS
+                            );
+                        } else if (channel.key === 'setWeldingVoltage') {
+                            next.setWeldingVoltage = trimSeriesByTime(
+                                prev.setWeldingVoltage || [],
+                                { x: xPoll, y: setVoltageY },
+                                LIVE_WINDOW_MS
+                            );
+                        } else if (channel.key === 'welderPresence') {
+                            const series = appendWelderPresenceSeries(
+                                prev.welderPresence || [],
+                                hasWelder,
+                                wasWelderPresent,
+                                xPoll
+                            );
+                            next.welderPresence = (series || []).filter(
+                                (p) => typeof p?.x === 'number' && p.x >= xPoll - LIVE_WINDOW_MS
+                            );
+                        } else if (!['setWeldingCurrent', 'setWeldingVoltage', 'welderPresence'].includes(channel.key)) {
                             const y = Math.round(Number(telemetrySample[channel.key] ?? 0) * 10) / 10;
                             next[channel.key] = trimSeriesByTime(prev[channel.key] || [], { x: xPoll, y }, LIVE_WINDOW_MS);
                         }
                     });
                     return next;
                 });
-                const flatState = flattenPanelState(response);
-                const stateRfid = flatState['RFID.Hex'] ||
-                    flatState.RFID ||
-                    flatState.Rfid ||
-                    flatState.rfid ||
-                    null;
+                prevWelderPresentForChartRef.current = hasWelder;
                 const errorCode = parseErrorCodeForTimeline(response);
                 setTimelineSamples(prev => {
                     const next = [
@@ -2522,7 +3021,11 @@ const DeviceMonitorPage = () => {
     // Функция для определения цвета состояния аппарата
     const getStateColor = (state) => {
         if (!state) return null;
-        const stateLower = String(state).toLowerCase().trim();
+        const stateStr = String(state).trim();
+        if (isStandbyMachineState(state) || stateStr === STANDBY_MACHINE_STATE_DISPLAY) {
+            return 'rgba(188, 183, 197, 0.5)';
+        }
+        const stateLower = stateStr.toLowerCase();
 
         // Режим ожидания - зеленый
         if (stateLower.includes('ожидан') || stateLower.includes('waiting') || stateLower === 'режим ожидания') {
@@ -2543,11 +3046,6 @@ const DeviceMonitorPage = () => {
         if (stateLower.includes('авария') || stateLower.includes('error') || stateLower.includes('ошибка') ||
             stateLower.includes('emergency') || stateLower.includes('failure')) {
             return '#f06c7b';
-        }
-
-        // Дежурный режим - серый
-        if (stateLower.includes('дежурн') || stateLower.includes('standby') || stateLower === 'дежурный режим') {
-            return 'rgba(188, 183, 197, 0.5)'; // Серый
         }
 
         // Аппарат заблокирован - серый
@@ -2910,17 +3408,24 @@ const DeviceMonitorPage = () => {
         return false;
     };
 
+    const shiftTelemetrySlotsRemove = (prev, slotKey) => {
+        const order = TELEMETRY_SLOT_KEYS;
+        const idx = order.indexOf(slotKey);
+        const next = { ...prev };
+        for (let j = idx; j < order.length - 1; j += 1) {
+            next[order[j]] = prev[order[j + 1]] || null;
+        }
+        next[order[order.length - 1]] = null;
+        return next;
+    };
+
     const handleTelemetryTileClick = (channelKey) => {
         if (channelKey === 'mainsVoltage') return;
         setTelemetrySelection((prev) => {
-            if (prev.slot1 === channelKey) {
-                return { slot1: prev.slot2 || null, slot2: null };
-            }
-            if (prev.slot2 === channelKey) {
-                return { ...prev, slot2: null };
-            }
-            if (!prev.slot1) return { ...prev, slot1: channelKey };
-            if (!prev.slot2) return { ...prev, slot2: channelKey };
+            const occupied = TELEMETRY_SLOT_KEYS.find((s) => prev[s] === channelKey);
+            if (occupied) return shiftTelemetrySlotsRemove(prev, occupied);
+            const empty = TELEMETRY_SLOT_KEYS.find((s) => !prev[s]);
+            if (empty) return { ...prev, [empty]: channelKey };
             return prev;
         });
     };
@@ -2938,13 +3443,13 @@ const DeviceMonitorPage = () => {
     };
 
     const graphTelemetrySlotsFull =
-        [telemetrySelection.slot1, telemetrySelection.slot2].filter(Boolean).length >= TELEMETRY_GRAPH_SLOT_COUNT;
+        TELEMETRY_SLOT_KEYS.filter((s) => telemetrySelection[s]).length >= TELEMETRY_GRAPH_SLOT_COUNT;
 
     const telemetryChannels = TELEMETRY_CHANNELS_CONFIG.map((channel) => {
         const onGraph =
             channel.key === 'mainsVoltage'
                 ? mainsVoltagePhases.length > 0
-                : telemetrySelection.slot1 === channel.key || telemetrySelection.slot2 === channel.key;
+                : TELEMETRY_SLOT_KEYS.some((s) => telemetrySelection[s] === channel.key);
         const graphPickBlocked =
             channel.key !== 'mainsVoltage' && graphTelemetrySlotsFull && !onGraph;
         return {
@@ -2952,9 +3457,19 @@ const DeviceMonitorPage = () => {
             active: onGraph,
             tile1: telemetrySelection.slot1 === channel.key,
             tile2: telemetrySelection.slot2 === channel.key,
+            tile3: telemetrySelection.slot3 === channel.key,
             graphPickBlocked,
         };
     });
+
+    /** Плитка «Газ»: суточный итог из БД + live; не ниже пересчитанного gas_consumption_l. */
+    const displayedDailyGasLiters = useMemo(
+        () => Math.max(
+            Math.max(0, Number(dailyGasConsumptionL) || 0),
+            Math.max(0, Number(liveDailyGasLiters) || 0)
+        ),
+        [dailyGasConsumptionL, liveDailyGasLiters]
+    );
 
     const incidentLog = getErrors();
     const isWeldingActive = isWelding();
@@ -3070,7 +3585,7 @@ const DeviceMonitorPage = () => {
     const timelineXs = useMemo(() => {
         const xs = [];
         const display = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
-        const selectedKeys = [telemetrySelection.slot1, telemetrySelection.slot2].filter(Boolean);
+        const selectedKeys = TELEMETRY_SLOT_KEYS.map((s) => telemetrySelection[s]).filter(Boolean);
 
         const pushSeriesKey = (sourceKey) => {
             if (!sourceKey) return;
@@ -3080,7 +3595,8 @@ const DeviceMonitorPage = () => {
         };
 
         mainsVoltagePhases.forEach((phase) => pushSeriesKey(resolveMainsPhaseSeriesKey(phase)));
-        [telemetrySelection.slot1, telemetrySelection.slot2].forEach((channelKey) => {
+        TELEMETRY_SLOT_KEYS.forEach((slot) => {
+            const channelKey = telemetrySelection[slot];
             if (!channelKey || channelKey === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(channelKey)) return;
             pushSeriesKey(channelKey);
         });
@@ -3099,11 +3615,26 @@ const DeviceMonitorPage = () => {
     }, [
         telemetrySelection.slot1,
         telemetrySelection.slot2,
+        telemetrySelection.slot3,
         mainsVoltagePhases,
         telemetrySeries,
         historySeriesSnapshot,
         graphUsesServerData
     ]);
+
+    /** Те же точки, что рисует Chart.js — тултип не расходится с линией после decimate. */
+    const chartDisplaySeries = useMemo(() => {
+        const src = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
+        const out = { ...src };
+        TELEMETRY_CHANNELS_CONFIG.forEach((ch) => {
+            if (ch.key === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(ch.key)) return;
+            out[ch.key] = prepareSeriesForChart(src[ch.key] || [], ch.key, graphUsesServerData, HISTORY_CHART_MAX_POINTS);
+        });
+        ['mainsVoltageA', 'mainsVoltageB', 'mainsVoltageC'].forEach((key) => {
+            out[key] = prepareSeriesForChart(src[key] || [], key, graphUsesServerData, HISTORY_CHART_MAX_POINTS);
+        });
+        return out;
+    }, [graphUsesServerData, historySeriesSnapshot, telemetrySeries, HISTORY_CHART_MAX_POINTS]);
 
     const chartBounds = useMemo(() => {
         const fallbackEnd = Date.now();
@@ -3112,21 +3643,25 @@ const DeviceMonitorPage = () => {
 
         if (graphUsesServerData && Number.isFinite(historyDayBounds.start) && Number.isFinite(historyDayBounds.end)) {
             const start = historyDayBounds.start;
-            const end = Math.max(historyDayBounds.end, start + 1);
+            let end = Math.max(historyDayBounds.end, start + 1);
+            if (todayPinExplore && selectedGraphDate && isTodayDateStr(selectedGraphDate)) {
+                end = Math.min(end, Date.now());
+            }
             return { dayStart: start, dayEnd: end, dataMax: end };
         }
 
         const start = Number.isFinite(timeWindow.start) ? timeWindow.start : fallbackStart;
         const end = Number.isFinite(timeWindow.end) ? timeWindow.end : fallbackEnd;
         return { dayStart: start, dayEnd: Math.max(end, start + 1), dataMax };
-    }, [timelineXs, timeWindow.start, timeWindow.end, LIVE_WINDOW_MS, graphUsesServerData, historyDayBounds.start, historyDayBounds.end]);
+    }, [timelineXs, timeWindow.start, timeWindow.end, LIVE_WINDOW_MS, graphUsesServerData, historyDayBounds.start, historyDayBounds.end, todayPinExplore, selectedGraphDate, isTodayDateStr]);
 
     useEffect(() => {
         if (timeWindow.touched) return;
+        if (graphUsesServerData) return;
         const end = Math.min(chartBounds.dataMax, chartBounds.dayEnd);
         const start = Math.max(chartBounds.dayStart, end - LIVE_WINDOW_MS);
         setTimeWindow({ start, end, touched: false });
-    }, [chartBounds, timeWindow.touched, LIVE_WINDOW_MS]);
+    }, [chartBounds, timeWindow.touched, LIVE_WINDOW_MS, graphUsesServerData]);
 
     const activeWindow = useMemo(() => {
         const minGap = 60 * 1000;
@@ -3154,6 +3689,29 @@ const DeviceMonitorPage = () => {
         const snapped = Math.round(ts / step) * step;
         return new Date(snapped).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     }, []);
+
+    const historyChartHasStaleContent = useMemo(() => {
+        if (!graphUsesServerData) return false;
+        if (historyTimelineSnapshot.length > 0) return true;
+        return Object.values(historySeriesSnapshot).some(
+            (series) => Array.isArray(series) && series.length > 0
+        );
+    }, [graphUsesServerData, historySeriesSnapshot, historyTimelineSnapshot]);
+
+    const historyLoadingMessage = useMemo(() => {
+        const start = timeWindow.start;
+        const end = timeWindow.end;
+        if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+            const range = `${formatHistoryPinHintTime(start)} – ${formatHistoryPinHintTime(end)}`;
+            return historyChartHasStaleContent ? `Обновление: ${range}…` : `Загрузка: ${range}…`;
+        }
+        return historyChartHasStaleContent ? 'Обновление…' : 'Загрузка истории…';
+    }, [
+        timeWindow.start,
+        timeWindow.end,
+        formatHistoryPinHintTime,
+        historyChartHasStaleContent,
+    ]);
 
     const telemetryOverlayChartOptions = useMemo(() => {
         const windowStart = activeWindow.start;
@@ -3270,7 +3828,7 @@ const DeviceMonitorPage = () => {
     }, [activeWindow.start, activeWindow.end, graphUsesServerData, yAxisLeftMax, yAxisRightMax]);
 
     const topChartData = useMemo(() => {
-        const src = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
+        const src = chartDisplaySeries;
         const mapPt = (d) => {
             const y = d?.y;
             const ny = y === null || y === undefined || Number.isNaN(Number(y)) ? null : Number(y);
@@ -3281,8 +3839,7 @@ const DeviceMonitorPage = () => {
         const buildMainsDataset = (phase) => {
             if (!mainsChannel) return null;
             const sourceKey = resolveMainsPhaseSeriesKey(phase);
-            let raw = src[sourceKey] || [];
-            if (graphUsesServerData) raw = decimateSeriesPoints(raw, HISTORY_CHART_MAX_POINTS);
+            const raw = src[sourceKey] || [];
             return {
                 label: `${mainsChannel.label} (${phase})`,
                 data: raw.map(mapPt),
@@ -3297,14 +3854,10 @@ const DeviceMonitorPage = () => {
             if (!channelKey || channelKey === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(channelKey)) return null;
             const channel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === channelKey);
             if (!channel) return null;
-            let raw = src[channelKey] || [];
+            const raw = src[channelKey] || [];
             const isCurrent = channelKey === 'weldingCurrent';
             const isVoltage = channelKey === 'weldingVoltage';
-            if (graphUsesServerData) {
-                raw = isCurrent || isVoltage
-                    ? decimateWeldingPulseSeries(raw, HISTORY_CHART_MAX_POINTS)
-                    : decimateSeriesPoints(raw, HISTORY_CHART_MAX_POINTS);
-            }
+            const stepped = usesSteppedChartChannel(channelKey);
             const data = raw.map(mapPt);
 
             return {
@@ -3325,25 +3878,23 @@ const DeviceMonitorPage = () => {
                         : 'rgba(255,255,255,0.04)',
                 fill: isCurrent || isVoltage ? (graphUsesServerData ? 'origin' : true) : false,
                 yAxisID: resolveChannelYAxisId(channelKey),
-                ...(isCurrent || isVoltage ? { stepped: 'after' } : {}),
+                ...(stepped ? { stepped: 'after' } : {}),
             };
         };
 
         const datasets = [
             ...mainsVoltagePhases.map(buildMainsDataset),
-            buildDataset(telemetrySelection.slot1),
-            buildDataset(telemetrySelection.slot2),
+            ...TELEMETRY_SLOT_KEYS.map((slot) => buildDataset(telemetrySelection[slot])),
         ].filter(Boolean);
 
         return { datasets };
     }, [
         graphUsesServerData,
-        historySeriesSnapshot,
-        telemetrySeries,
+        chartDisplaySeries,
         telemetrySelection.slot1,
         telemetrySelection.slot2,
+        telemetrySelection.slot3,
         mainsVoltagePhases,
-        HISTORY_CHART_MAX_POINTS
     ]);
 
     const timelineInWindow = useMemo(
@@ -3356,6 +3907,22 @@ const DeviceMonitorPage = () => {
         () => sanitizeBriefOfflineBetweenOnline(timelineInWindow, activeWindow.end, 5000),
         [timelineInWindow, activeWindow.end]
     );
+
+    /** Не рисуем «включен» в будущее: только до последней точки (и до «сейчас» для сегодня). */
+    const stateLaneWindowEnd = useMemo(() => {
+        let lastTs = null;
+        timelineInWindow.forEach((s) => {
+            if (Number.isFinite(s.x)) {
+                lastTs = lastTs == null ? s.x : Math.max(lastTs, s.x);
+            }
+        });
+        let cap = activeWindow.end;
+        if (lastTs != null) cap = Math.min(cap, lastTs);
+        if (selectedGraphDate && isTodayDateStr(selectedGraphDate)) {
+            cap = Math.min(cap, Date.now());
+        }
+        return Math.max(activeWindow.start, cap);
+    }, [timelineInWindow, activeWindow.start, activeWindow.end, selectedGraphDate, isTodayDateStr]);
 
     /**
      * Сегмент дорожки держит состояние до следующей точки опроса (как stepped: 'after' на графике),
@@ -3394,7 +3961,7 @@ const DeviceMonitorPage = () => {
     };
 
     const timelineRows = useMemo(() => {
-        const wEnd = activeWindow.end;
+        const wEnd = stateLaneWindowEnd;
         const offline = buildSegments(timelineForStateLane, (s) => !s.isOnline, null, wEnd);
         const online = buildSegments(timelineForStateLane, (s) => Boolean(s.isOnline), null, wEnd);
         const welding = buildSegments(timelineForStateLane, (s) => Boolean(s.isWelding), null, wEnd);
@@ -3411,7 +3978,7 @@ const DeviceMonitorPage = () => {
             wEnd
         );
         return { offline, online, welding, errors, welder };
-    }, [timelineInWindow, timelineForStateLane, activeWindow.end]);
+    }, [timelineInWindow, timelineForStateLane, stateLaneWindowEnd, activeWindow.end]);
 
     const toPercent = useCallback((x) => {
         const range = Math.max(activeWindow.end - activeWindow.start, 1);
@@ -3455,28 +4022,57 @@ const DeviceMonitorPage = () => {
         return Number.isFinite(val) ? val : null;
     }, []);
 
-    /** Совпадает с Chart.js stepped: 'after' — без «наклонных» участков между дискретными точками. */
+    /**
+     * Chart.js stepped: 'after' — горизонталь y_i на [x_i, x_{i+1}); при нескольких точках с одним x
+     * (вертикальный фронт) для горизонтали берём последний y на этом x.
+     */
     const valueAtTsSteppedAfter = useCallback((series, ts) => {
         if (!Array.isArray(series) || !Number.isFinite(ts)) return null;
-        const pts = series
-            .filter((p) => p && Number.isFinite(p.x) && p.y !== null && p.y !== undefined && !Number.isNaN(Number(p.y)))
-            .map((p) => ({ x: p.x, y: Number(p.y) }))
-            .sort((a, b) => a.x - b.x || a.y - b.y);
-        if (!pts.length) return null;
-        if (ts < pts[0].x) return pts[0].y;
-        let value = pts[0].y;
-        for (let i = 0; i < pts.length; i += 1) {
-            const p = pts[i];
-            if (p.x > ts) break;
-            value = p.y;
+        const raw = series.filter(
+            (p) => p && Number.isFinite(p.x) && p.y !== null && p.y !== undefined && !Number.isNaN(Number(p.y))
+        );
+        if (!raw.length) return null;
+
+        const byX = new Map();
+        raw.forEach((p, idx) => {
+            const x = p.x;
+            const y = Number(p.y);
+            if (!byX.has(x)) byX.set(x, []);
+            byX.get(x).push({ y, idx });
+        });
+        const distinct = [...byX.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([x, arr]) => {
+                arr.sort((a, b) => a.idx - b.idx);
+                return { x, y: arr[arr.length - 1].y };
+            });
+
+        if (ts < distinct[0].x) {
+            const v = distinct[0].y;
+            return Number.isFinite(v) ? v : null;
         }
-        return Number.isFinite(value) ? value : null;
+        for (let i = 0; i < distinct.length - 1; i += 1) {
+            if (ts < distinct[i + 1].x) {
+                const v = distinct[i].y;
+                return Number.isFinite(v) ? v : null;
+            }
+        }
+        const v = distinct[distinct.length - 1].y;
+        return Number.isFinite(v) ? v : null;
     }, []);
+
+    const resolveSteppedTooltipValue = useCallback((_channelKey, series, ts) => (
+        valueAtTsSteppedAfter(series, ts)
+    ), [valueAtTsSteppedAfter]);
 
     const hoverInfo = useMemo(() => {
         if (!hoverCursor.active || !Number.isFinite(hoverCursor.ts)) return null;
-        const displaySeries = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
+        const displaySeries = chartDisplaySeries;
         const selectedRows = [];
+        const errorSeg = findSegmentAtTs(timelineRows.errors, hoverCursor.ts);
+        const welderSeg = findSegmentAtTs(timelineRows.welder, hoverCursor.ts);
+        const welderLabel = welderSeg?.value ? welderNameByRfid[welderSeg.value] || null : null;
+
         const mainsChannel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === 'mainsVoltage');
         mainsVoltagePhases.forEach((phase) => {
             const sourceKey = resolveMainsPhaseSeriesKey(phase);
@@ -3492,13 +4088,23 @@ const DeviceMonitorPage = () => {
         const addSelectedRow = (channelKey, slotName) => {
             if (!channelKey || channelKey === 'mainsVoltage') return;
             const raw = displaySeries[channelKey] || [];
-            const value =
-                channelKey === 'weldingCurrent' || channelKey === 'weldingVoltage'
-                    ? valueAtTsSteppedAfter(raw, hoverCursor.ts)
-                    : findNearestPointValue(raw, hoverCursor.ts);
-            if (value == null) return;
+            const stepped = usesSteppedChartChannel(channelKey);
+            const value = stepped
+                ? resolveSteppedTooltipValue(channelKey, raw, hoverCursor.ts)
+                : findNearestPointValue(raw, hoverCursor.ts);
+            if (value == null && channelKey !== 'welderPresence') return;
             const channel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === channelKey);
             if (!channel) return;
+            if (channelKey === 'welderPresence') {
+                selectedRows.push({
+                    key: `${slotName}-welderPresence`,
+                    label: channel.label,
+                    color: channel.color,
+                    value: value ?? 0,
+                    displayText: welderLabel || '—',
+                });
+                return;
+            }
             selectedRows.push({
                 key: `${slotName}-${channelKey}`,
                 label: channel.label,
@@ -3506,12 +4112,7 @@ const DeviceMonitorPage = () => {
                 value,
             });
         };
-        addSelectedRow(telemetrySelection.slot1, 'slot1');
-        addSelectedRow(telemetrySelection.slot2, 'slot2');
-        const errorSeg = findSegmentAtTs(timelineRows.errors, hoverCursor.ts);
-        const welderSeg = findSegmentAtTs(timelineRows.welder, hoverCursor.ts);
-
-        const welderLabel = welderSeg?.value ? welderNameByRfid[welderSeg.value] || null : null;
+        TELEMETRY_SLOT_KEYS.forEach((slot) => addSelectedRow(telemetrySelection[slot], slot));
         const errorTooltipLine =
             errorSeg?.value !== undefined && errorSeg?.value !== null
                 ? formatErrorTooltipLine(errorSeg.value)
@@ -3526,14 +4127,13 @@ const DeviceMonitorPage = () => {
         };
     }, [
         hoverCursor,
-        graphUsesServerData,
-        historySeriesSnapshot,
-        telemetrySeries,
+        chartDisplaySeries,
         telemetrySelection.slot1,
         telemetrySelection.slot2,
+        telemetrySelection.slot3,
         mainsVoltagePhases,
         findNearestPointValue,
-        valueAtTsSteppedAfter,
+        resolveSteppedTooltipValue,
         timelineRows,
         findSegmentAtTs,
         welderNameByRfid
@@ -3568,17 +4168,16 @@ const DeviceMonitorPage = () => {
             setPlotDot({ visible: false, leftPx: 0, topPx: 0 });
             return;
         }
-        const displaySeries = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
-        const slots = [telemetrySelection.slot1, telemetrySelection.slot2];
+        const displaySeries = chartDisplaySeries;
         let yVal = null;
         let yAxisId = 'y';
-        for (const key of slots) {
+        for (const slot of TELEMETRY_SLOT_KEYS) {
+            const key = telemetrySelection[slot];
             if (!key || key === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(key)) continue;
             const raw = displaySeries[key] || [];
-            const val =
-                key === 'weldingCurrent' || key === 'weldingVoltage'
-                    ? valueAtTsSteppedAfter(raw, ts)
-                    : findNearestPointValue(raw, ts);
+            const val = usesSteppedChartChannel(key)
+                ? resolveSteppedTooltipValue(key, raw, ts)
+                : findNearestPointValue(raw, ts);
             if (val != null && Number.isFinite(val)) {
                 yVal = val;
                 yAxisId = resolveChannelYAxisId(key);
@@ -3607,12 +4206,11 @@ const DeviceMonitorPage = () => {
             topPx: canvasRect.top - elRect.top + yPixel * scaleY,
         });
     }, [
-        graphUsesServerData,
-        historySeriesSnapshot,
-        telemetrySeries,
+        chartDisplaySeries,
         telemetrySelection.slot1,
         telemetrySelection.slot2,
-        valueAtTsSteppedAfter,
+        telemetrySelection.slot3,
+        resolveSteppedTooltipValue,
         findNearestPointValue,
     ]);
     const chartPanSessionRef = useRef(null);
@@ -4056,7 +4654,7 @@ const DeviceMonitorPage = () => {
     const handleTimelinePinMouseDown = (pin) => {
         pinDragSessionDateRef.current = selectedGraphDateRef.current;
         if (selectedGraphDate && isTodayDateStr(selectedGraphDate) && !todayPinExploreRef.current) {
-            const db = getDayBoundsForDateStr(selectedGraphDate);
+            const db = getTodayPinExploreDayBounds(selectedGraphDate);
             todayPinExploreRef.current = true;
             todayDayBoundsRef.current = db;
             setTodayPinExplore(true);
@@ -4085,12 +4683,12 @@ const DeviceMonitorPage = () => {
             const rect = timelineRulerRef.current.getBoundingClientRect();
             if (!rect.width) return;
             const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-            const dayStart = todayPinExploreRef.current && todayDayBoundsRef.current
-                ? todayDayBoundsRef.current.dayStart
-                : chartBounds.dayStart;
-            const dayEnd = todayPinExploreRef.current && todayDayBoundsRef.current
-                ? todayDayBoundsRef.current.dayEnd
-                : chartBounds.dayEnd;
+            let dayStart = chartBounds.dayStart;
+            let dayEnd = chartBounds.dayEnd;
+            if (todayPinExploreRef.current && todayDayBoundsRef.current) {
+                dayStart = todayDayBoundsRef.current.dayStart;
+                dayEnd = Math.min(Date.now(), todayDayBoundsRef.current.dayEnd);
+            }
             const rawTs = dayStart + ratio * (dayEnd - dayStart);
             const snapped = Math.round(rawTs / 60_000) * 60_000;
             const minGap = 60 * 1000;
@@ -4106,6 +4704,7 @@ const DeviceMonitorPage = () => {
                 const next = { start: nextStart, end: nextEnd };
                 pinDragPreviewRef.current = next;
                 setPinDragPreview(next);
+                setTimeWindow((tw) => ({ ...tw, start: next.start, end: next.end, touched: true }));
             } else {
                 setTimeWindow((prev) => {
                     let nextStart = Number.isFinite(prev.start) ? prev.start : activeWindow.start;
@@ -4120,8 +4719,8 @@ const DeviceMonitorPage = () => {
             }
         };
         const onUp = () => {
-            if ((historyModeRef.current || todayPinExploreRef.current) && pinDragPreviewRef.current) {
-                const p = pinDragPreviewRef.current;
+            const p = pinDragPreviewRef.current;
+            if (p && Number.isFinite(p.start) && Number.isFinite(p.end) && p.end > p.start) {
                 persistHistoryPinWindow(pinDragSessionDateRef.current, p.start, p.end);
                 setTimeWindow((prev) => ({ ...prev, start: p.start, end: p.end, touched: true }));
             }
@@ -4177,13 +4776,18 @@ const DeviceMonitorPage = () => {
     }, []);
 
     const exitTodayHistoryToLive = useCallback(() => {
+        const todayStr = toLocalDateInput(new Date());
+        const tw = latestTimeWindowRef.current;
+        if (Number.isFinite(tw.start) && Number.isFinite(tw.end) && tw.end > tw.start) {
+            persistHistoryPinWindow(todayStr, tw.start, tw.end);
+        }
         setTodayPinExplore(false);
         todayPinExploreRef.current = false;
         todayDayBoundsRef.current = null;
         setHistoryDayBounds({ start: null, end: null });
         setTimeWindow({ start: null, end: null, touched: false });
         setHistoryError(null);
-    }, []);
+    }, [persistHistoryPinWindow]);
 
     /** Переключатель: live ↔ история за сегодня (последний час). */
     const handleToggleTodayHistory = useCallback(async () => {
@@ -4192,10 +4796,13 @@ const DeviceMonitorPage = () => {
             return;
         }
         const todayStr = toLocalDateInput(new Date());
-        const db = getDayBoundsForDateStr(todayStr);
-        const now = Date.now();
-        const end = Math.min(now, db.dayEnd);
-        const start = Math.max(db.dayStart, end - 60 * 60 * 1000);
+        const db = getTodayPinExploreDayBounds(todayStr);
+        const defaultEnd = db.dayEnd;
+        const defaultStart = Math.max(db.dayStart, defaultEnd - 60 * 60 * 1000);
+        const saved = historyPinWindowsRef.current[todayStr];
+        const restored = saved ? clampPinWindowToDay(todayStr, saved.start, saved.end) : null;
+        const start = restored?.start ?? defaultStart;
+        const end = restored?.end ?? defaultEnd;
 
         if (selectedGraphDateRef.current !== todayStr) {
             skipTodayLiveResetRef.current = true;
@@ -4220,7 +4827,8 @@ const DeviceMonitorPage = () => {
     }, [
         todayPinExplore,
         exitTodayHistoryToLive,
-        getDayBoundsForDateStr,
+        getTodayPinExploreDayBounds,
+        clampPinWindowToDay,
         ensureHistoryIntervalLoaded,
         buildHistorySeriesForWindow,
         buildHistoryTimelineForWindow,
@@ -4456,13 +5064,19 @@ const DeviceMonitorPage = () => {
                             <div className="status-tile-title">Расход за сутки</div>
                             <div className="status-subtitle">Газ:</div>
                             <div className="status-row status-row--boxed">
-                                <span className="status-label">Ar92/CO2</span>
-                                <span className="status-value numeric">0 л</span>
+                                <span className="status-label">{getWeldingGas()}</span>
+                                <span className="status-value numeric">{formatLitersValue(displayedDailyGasLiters)} л</span>
                             </div>
                             <div className="status-subtitle status-subtitle--spaced">Проволока:</div>
                             <div className="status-row status-row--boxed">
                                 <span className="status-label">Сталь 1.2</span>
-                                <span className="status-value numeric">{formatKgValue(dailyWireConsumptionKg)} кг</span>
+                                <span className="status-value numeric status-value--wire-daily">
+                                    {dailyWireStatsLoading && !dailyWireStatsLoaded ? (
+                                        <span className="monitor-daily-wire-spinner" aria-label="Загрузка" role="status" />
+                                    ) : (
+                                        `${formatKgValue(dailyWireConsumptionKg)} кг`
+                                    )}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -4636,7 +5250,7 @@ const DeviceMonitorPage = () => {
                                                             disabled={channel.graphPickBlocked}
                                                             title={
                                                                 channel.graphPickBlocked
-                                                                    ? 'На графике уже два параметра. Снимите выбор с одного, чтобы добавить этот.'
+                                                                    ? 'На графике уже три параметра. Снимите выбор с одного, чтобы добавить этот.'
                                                                     : channel.active
                                                                         ? 'Снять с графика'
                                                                         : 'Показать на графике'
@@ -4842,9 +5456,24 @@ const DeviceMonitorPage = () => {
                                             </div>
                                         </div>
                                         <div
-                                            className={`chart-pan-surface${graphUsesServerData ? ' chart-pan-surface--enabled' : ''}${chartPanActive ? ' chart-pan-surface--grabbing' : ''}`}
+                                            className={`chart-pan-surface${graphUsesServerData ? ' chart-pan-surface--enabled' : ''}${chartPanActive ? ' chart-pan-surface--grabbing' : ''}${graphUsesServerData && historyLoading ? ' chart-pan-surface--history-loading' : ''}`}
                                             onMouseDown={handleChartPanMouseDown}
                                         >
+                                            {graphUsesServerData && historyLoading && (
+                                                <div
+                                                    className={`monitor-history-load-overlay${historyChartHasStaleContent ? ' monitor-history-load-overlay--stale' : ''}`}
+                                                    role="status"
+                                                    aria-live="polite"
+                                                    aria-busy="true"
+                                                >
+                                                    <div className="monitor-history-load-overlay-panel">
+                                                        <span className="monitor-history-load-spinner" aria-hidden />
+                                                        <span className="monitor-history-load-overlay-text">
+                                                        {historyLoadingMessage}
+                                                    </span>
+                                                    </div>
+                                                </div>
+                                            )}
                                             <div className="chart-monitor-stack">
                                                 <div
                                                     ref={chartCanvasRef}
@@ -4895,7 +5524,12 @@ const DeviceMonitorPage = () => {
                                                             )}
                                                             {hoverInfo?.selectedRows?.map((row) => (
                                                                 <div key={row.key}>
-                                                                    <span style={{ color: row.color }}>{row.label}: {row.value.toFixed(1)}</span>
+                                                                <span style={{ color: row.color }}>
+                                                                    {row.label}:{' '}
+                                                                    {row.displayText != null
+                                                                        ? row.displayText
+                                                                        : row.value.toFixed(1)}
+                                                                </span>
                                                                 </div>
                                                             ))}
                                                             {hoverInfo?.errorTooltipLine && (

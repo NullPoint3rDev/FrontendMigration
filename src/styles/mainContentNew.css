@@ -1008,6 +1008,24 @@
     color: #f6cd4a;
 }
 
+.status-value--wire-daily {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 3.5em;
+    min-height: 1.1em;
+}
+
+.monitor-daily-wire-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(214, 226, 255, 0.25);
+    border-top-color: rgba(120, 168, 255, 0.95);
+    border-radius: 50%;
+    animation: monitor-history-load-spin 0.75s linear infinite;
+}
+
 .welder-section {
     display: flex;
     flex-direction: column;
@@ -1900,6 +1918,61 @@
 .chart-pan-surface--grabbing,
 .chart-pan-surface--grabbing .chart-canvas {
     cursor: grabbing !important;
+}
+
+.chart-pan-surface--history-loading {
+    position: relative;
+}
+
+.monitor-history-load-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 12;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    background: rgba(8, 14, 28, 0.55);
+}
+
+.monitor-history-load-overlay--stale {
+    background: rgba(8, 14, 28, 0.28);
+}
+
+.monitor-history-load-overlay-panel {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(92%, 420px);
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(12, 22, 42, 0.88);
+    border: 1px solid rgba(214, 226, 255, 0.22);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    color: #e8eefc;
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.monitor-history-load-overlay-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.monitor-history-load-spinner {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(214, 226, 255, 0.25);
+    border-top-color: rgba(120, 168, 255, 0.95);
+    border-radius: 50%;
+    animation: monitor-history-load-spin 0.75s linear infinite;
+}
+
+@keyframes monitor-history-load-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .monitor-hover-crosshair {

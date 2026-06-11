@@ -10,7 +10,7 @@ export function isWaitingMachineState(state) {
         || stateLower.includes('аппарат в режиме ожидания');
 }
 
-/** Дежурный режим (не для страницы мониторинга — там показываем как приходит с аппарата). */
+/** Дежурный режим. */
 export function isStandbyMachineState(state) {
     if (state == null || state === '') return false;
     const stateLower = String(state).toLowerCase().trim();
@@ -19,23 +19,33 @@ export function isStandbyMachineState(state) {
         || stateLower === 'дежурный режим';
 }
 
-/** Ожидание и дежурный режим в списках отображаем как «Включен». */
+export const STANDBY_MACHINE_STATE_DISPLAY = 'Выкл(деж)';
+
+/** Ожидание в списках отображаем как «Включен». */
 export function isOnLikeMachineStateForList(state) {
-    return isWaitingMachineState(state) || isStandbyMachineState(state);
+    return isWaitingMachineState(state);
 }
 
-/** Только страница мониторинга: ожидание → «Включен», дежурный режим без переименования. */
+/** Страница мониторинга и системные параметры: ожидание → «Включен», дежурный → «Выкл(деж)». */
 export function formatWeldingMachineStateDisplay(state) {
     if (state == null || state === '') return state ?? '';
+    if (isStandbyMachineState(state)) return STANDBY_MACHINE_STATE_DISPLAY;
     if (isWaitingMachineState(state)) return 'Включен';
     const trimmed = String(state).trim();
     if (trimmed === 'Авария') return 'Ошибка';
+    if (trimmed === 'Аппарат включен') return 'Включен';
+    const lower = trimmed.toLowerCase();
+    if (lower === 'аппарат включен') return 'Включен';
     return state;
 }
 
 /** Бейдж статуса в списках оборудования / у сварщика */
 export function getMachineStatusBadge(status, rawState) {
     if (rawState !== null && rawState !== undefined && rawState !== '') {
+        if (isStandbyMachineState(rawState)) {
+            return { text: STANDBY_MACHINE_STATE_DISPLAY, className: 'off', color: '#7B8BA6' };
+        }
+
         if (isOnLikeMachineStateForList(rawState)) {
             return { text: 'Включен', className: 'on', color: '#39956C' };
         }
@@ -80,6 +90,10 @@ export function getMachineStatusBadge(status, rawState) {
 /** Краткий бейдж для таблицы оборудования (Вкл / Выкл) */
 export function getMachineStatusBadgeShort(status, rawState) {
     if (rawState !== null && rawState !== undefined && rawState !== '') {
+        if (isStandbyMachineState(rawState)) {
+            return { text: STANDBY_MACHINE_STATE_DISPLAY, className: 'off', color: 'rgba(188, 183, 197, 0.5)' };
+        }
+
         if (isOnLikeMachineStateForList(rawState)) {
             return { text: 'Включен', className: 'on' };
         }

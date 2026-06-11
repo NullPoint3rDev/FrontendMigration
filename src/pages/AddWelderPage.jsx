@@ -17,6 +17,7 @@ import {
     computeLastPowerOnFromPanelState,
     resolveLastPowerOnDisplay,
     seedLastPowerOnFromMachines as seedLastPowerOnFromMachinesUtil,
+    shouldRefreshLastPowerOnFromPanelState,
 } from '../utils/weldingMachineLastPowerOn';
 import { getMachineStatusBadge } from '../utils/weldingMachineStateDisplay';
 import machineImage from '../images/Untitled 3 копия.png';
@@ -257,7 +258,7 @@ function AddWelderPage() {
                     const props = resolvedState?.properties || {};
                     const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState || null;
 
-                    if (resolvedState) {
+                    if (resolvedState && shouldRefreshLastPowerOnFromPanelState(resolvedState)) {
                         const powerOnMs = computeLastPowerOnFromPanelState(resolvedState, now);
                         if (powerOnMs != null) {
                             powerOnUpdates[mac] = powerOnMs;

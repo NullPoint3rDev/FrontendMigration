@@ -70,14 +70,59 @@ const ReportsPage = () => {
     const generateProgressMessageRef = useRef('')
     const [progressBarInstant, setProgressBarInstant] = useState(false)
 
-    // Скорость полоски: 24 ч — 1% в секунду, 7 дней — 1% в 2 секунды.
+    const toDateOnly = (value) => {
+        if (!value) return null
+        const d = value instanceof Date ? new Date(value) : new Date(value)
+        if (Number.isNaN(d.getTime())) return null
+        d.setHours(0, 0, 0, 0)
+        return d
+    }
+
+    /** Длина периода отчёта в календарных днях (для скорости прогресс-бара). */
+    const getReportPeriodDays = () => {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+
+        if (periodType === 'За 24 часа') {
+            return 1
+        }
+        if (periodType === 'За 7 дней') {
+            if (isWelderOrEquipmentOnlyReportType(selectedReportType)) {
+                const start = toDateOnly(startDate) || today
+                const end = toDateOnly(endDate) || today
+                return Math.max(1, Math.round((end - start) / (24 * 60 * 60 * 1000)) + 1)
+            }
+            return 7
+        }
+        if (periodType === 'Месячный отчёт') {
+            if (isWelderOrEquipmentOnlyReportType(selectedReportType)) {
+                const start = toDateOnly(startDate) || today
+                const end = toDateOnly(endDate) || today
+                return Math.max(1, Math.round((end - start) / (24 * 60 * 60 * 1000)) + 1)
+            }
+            const year = today.getFullYear()
+            const months = selectedReportMonths.length > 0 ? selectedReportMonths : [today.getMonth()]
+            const minMonth = Math.min(...months)
+            const maxMonth = Math.max(...months)
+            const start = new Date(year, minMonth, 1)
+            const end = new Date(year, maxMonth + 1, 0)
+            return Math.max(1, Math.round((end - start) / (24 * 60 * 60 * 1000)) + 1)
+        }
+
+        const start = toDateOnly(startDate) || today
+        const end = toDateOnly(endDate) || today
+        return Math.max(1, Math.round((end - start) / (24 * 60 * 60 * 1000)) + 1)
+    }
+
+    // Скорость полоски: 24 ч — 1% в секунду, 7 дней — 1% в 2 секунды, > 7 дней — 1% в 6 секунд.
     // Между этапами с бэка (5→20→25→80→100) полоска идёт дальше до порога следующего этапа.
     useEffect(() => {
         if (!isGenerating) {
             return undefined
         }
 
-        const tickMs = periodType === 'За 7 дней' ? 2000 : 1000
+        const periodDays = getReportPeriodDays()
+        const tickMs = periodDays > 7 ? 6000 : (periodType === 'За 7 дней' ? 2000 : 1000)
         const stepPercent = 1
         const backendStages = [5, 20, 25, 80, 100]
         const creepCeilingFor = (target) => {
@@ -110,7 +155,7 @@ const ReportsPage = () => {
         }, tickMs)
 
         return () => clearInterval(intervalId)
-    }, [isGenerating, periodType])
+    }, [isGenerating, periodType, startDate, endDate, selectedReportMonths])
     const [saveButtonBlink, setSaveButtonBlink] = useState(false)
     const saveButtonBlinkTimeoutRef = useRef(null)
     const [lastSavedSnapshot, setLastSavedSnapshot] = useState(null)
@@ -500,10 +545,9 @@ const ReportsPage = () => {
         if (t.toLowerCase().includes('проволок') || t === 'WIRE_CONSUMPTION' || t === 'wire') return REPORT_TYPE_WIRE
         return t
     }
-    const isWelderOrEquipmentReportType = (type) => {
-        if (!type || typeof type !== 'string') return false
-        const t = type.trim()
-        return t === REPORT_TYPE_WELDER || t === REPORT_TYPE_EQUIPMENT || t === REPORT_TYPE_MALFUNCTION || t.includes('сварщика') || t.includes('оборудован') || t.includes('неисправност')
+    const isWelderOrEquipmentOnlyReportType = (type) => {
+        const t = normalizeReportType(type)
+        return t === REPORT_TYPE_WELDER || t === REPORT_TYPE_EQUIPMENT
     }
 
     const buildSnapshotFromTemplate = (template) => {
@@ -1641,8 +1685,72 @@ const ReportsPage = () => {
         return d
     }
 
+    const getDefaultSevenDayRange = () => {
+        const today = todayStart()
+        return {
+            start: addDays(today, -7),
+            end: addDays(today, -1)
+        }
+    }
+
+    const getDefaultMonthlyRange = () => {
+        const today = todayStart()
+        return {
+            start: new Date(today.getFullYear(), today.getMonth(), 1),
+            end: today
+        }
+    }
+
+    const applyPeriodCalendarDates = (start, end) => {
+        const today = todayStart()
+        let s = normalizeDay(start)
+        let e = normalizeDay(end)
+        if (s > today) s = today
+        if (e > today) e = today
+        if (e < s) e = s
+        setStartDate(s)
+        setStartMonth(new Date(s.getFullYear(), s.getMonth()))
+        setEndDate(e)
+        setEndMonth(new Date(e.getFullYear(), e.getMonth()))
+    }
+
+    const getInclusiveCalendarDaySpan = (start, end) => {
+        const s = toDateOnly(start)
+        const e = toDateOnly(end)
+        if (!s || !e) return 0
+        return Math.max(0, Math.round((e - s) / (24 * 60 * 60 * 1000)) + 1)
+    }
+
+    const validateWelderEquipmentPeriodDates = (reportType, pType, start, end) => {
+        if (!isWelderOrEquipmentOnlyReportType(reportType)) return null
+        if (pType !== 'За 7 дней' && pType !== 'Месячный отчёт') return null
+        if (!start || !end) {
+            return 'Выберите даты начала и окончания периода'
+        }
+        const span = getInclusiveCalendarDaySpan(start, end)
+        if (span <= 0) {
+            return 'Дата окончания не может быть раньше даты начала'
+        }
+        if (pType === 'За 7 дней' && span > 7) {
+            return 'Период «За 7 дней» не может превышать 7 календарных дней'
+        }
+        if (pType === 'Месячный отчёт' && span > 30) {
+            return 'Период «Месячный отчёт» не может превышать 30 календарных дней'
+        }
+        return null
+    }
+
     /** Минимальная дата окончания — следующий день после начала. */
     const getMinEndDate = (start) => (start ? addDays(start, 1) : null)
+
+    const getMinEndDateForCalendar = () => {
+        if (!startDate) return null
+        if (isWelderOrEquipmentOnlyReportType(selectedReportType)
+            && (periodType === 'За 7 дней' || periodType === 'Месячный отчёт')) {
+            return normalizeDay(startDate)
+        }
+        return getMinEndDate(startDate)
+    }
 
     const clampEndAfterStart = (start, preferredEnd) => {
         const today = todayStart()
@@ -1659,9 +1767,21 @@ const ReportsPage = () => {
         if (start > today) return
         setStartDate(start)
         setStartMonth(new Date(start.getFullYear(), start.getMonth()))
-        const end = clampEndAfterStart(start, endDate)
+        const useSameDayMinEnd = isWelderOrEquipmentOnlyReportType(selectedReportType)
+            && (periodType === 'За 7 дней' || periodType === 'Месячный отчёт')
+        let end
+        if (useSameDayMinEnd) {
+            end = endDate ? normalizeDay(endDate) : start
+            if (end < start) end = start
+            if (end > today) end = today
+        } else {
+            end = clampEndAfterStart(start, endDate)
+        }
         setEndDate(end)
         setEndMonth(new Date(end.getFullYear(), end.getMonth()))
+        if (isWelderOrEquipmentOnlyReportType(selectedReportType) && periodType === 'Месячный отчёт') {
+            setSelectedReportMonths([])
+        }
     }
 
     const applyArbitraryEndDate = (newEnd) => {
@@ -1669,11 +1789,16 @@ const ReportsPage = () => {
         const today = todayStart()
         if (end > today) return
         if (startDate) {
-            const minEnd = getMinEndDate(startDate)
+            const useSameDayMinEnd = isWelderOrEquipmentOnlyReportType(selectedReportType)
+                && (periodType === 'За 7 дней' || periodType === 'Месячный отчёт')
+            const minEnd = useSameDayMinEnd ? normalizeDay(startDate) : getMinEndDate(startDate)
             if (end < minEnd) return
         }
         setEndDate(end)
         setEndMonth(new Date(end.getFullYear(), end.getMonth()))
+        if (isWelderOrEquipmentOnlyReportType(selectedReportType) && periodType === 'Месячный отчёт') {
+            setSelectedReportMonths([])
+        }
     }
 
     // Изменение даты начала периода на ±1 день (стрелки в компактной строке)
@@ -1697,7 +1822,7 @@ const ReportsPage = () => {
     // Изменение даты окончания периода на ±1 день
     const adjustArbitraryEndDay = (delta) => {
         const today = todayStart()
-        const minEnd = startDate ? getMinEndDate(startDate) : null
+        const minEnd = startDate ? getMinEndDateForCalendar() : null
         if (endDate) {
             const d = addDays(endDate, delta)
             if (d > today) return
@@ -1751,6 +1876,67 @@ const ReportsPage = () => {
         'За 7 дней',
         'Месячный отчёт'
     ]
+
+    const getAvailablePeriodTypes = (reportType) => {
+        if (isWelderOrEquipmentOnlyReportType(reportType)) {
+            return ['За 24 часа', 'За 7 дней', 'Месячный отчёт']
+        }
+        return periodTypes
+    }
+
+    const handleReportTypeSelect = (type) => {
+        setSelectedReportType(type)
+        setReportTypeDropdownOpen(false)
+        setReportTypeDropdownHighlight(false)
+        if (isWelderOrEquipmentOnlyReportType(type)) {
+            setPeriodType('За 24 часа')
+        }
+    }
+
+    const handlePeriodTypeChange = (newType) => {
+        setPeriodType(newType)
+        if (newType === 'Произвольный период') {
+            setAutoReportEnabled(false)
+        }
+        if (newType === 'За 7 дней') {
+            if (isWelderOrEquipmentOnlyReportType(selectedReportType)) {
+                const { start, end } = getDefaultSevenDayRange()
+                applyPeriodCalendarDates(start, end)
+            } else {
+                setSelectedWorkingDays([...weekDays])
+            }
+        }
+        if (newType === 'Месячный отчёт') {
+            if (isWelderOrEquipmentOnlyReportType(selectedReportType)) {
+                const { start, end } = getDefaultMonthlyRange()
+                applyPeriodCalendarDates(start, end)
+                setSelectedReportMonths([])
+            }
+        }
+    }
+
+    const handleWelderEquipmentMonthSelect = (monthIndex) => {
+        const year = todayStart().getFullYear()
+        const start = new Date(year, monthIndex, 1)
+        const lastDay = new Date(year, monthIndex + 1, 0)
+        const today = todayStart()
+        const end = lastDay > today ? today : lastDay
+        setSelectedReportMonths([monthIndex])
+        applyPeriodCalendarDates(start, end)
+    }
+
+    const showPeriodCalendars = periodType === 'Произвольный период'
+        || (isWelderOrEquipmentOnlyReportType(selectedReportType)
+            && (periodType === 'За 7 дней' || periodType === 'Месячный отчёт'))
+
+    // Если тип отчёта не поддерживает текущий periodType — сбрасываем на «За 24 часа»
+    useEffect(() => {
+        if (!selectedReportType) return
+        const available = getAvailablePeriodTypes(selectedReportType)
+        if (!available.includes(periodType)) {
+            setPeriodType('За 24 часа')
+        }
+    }, [selectedReportType, periodType])
 
     // Закрытие выпадающего списка типов шаблонов при клике вне его области
     useEffect(() => {
@@ -2140,15 +2326,23 @@ const ReportsPage = () => {
         if (template.periodSettings) {
             setSelectedPeriod(template.periodSettings.selectedPeriod || 'day')
             setSelectedDays(template.periodSettings.selectedDays || [])
-            const loadedPeriodType = template.periodSettings.periodType || 'Произвольный период'
+            const normalizedLoadedType = normalizeReportType(loadedReportType)
+            let loadedPeriodType = template.periodSettings.periodType || 'Произвольный период'
+            if (isWelderOrEquipmentOnlyReportType(normalizedLoadedType) && loadedPeriodType === 'Произвольный период') {
+                loadedPeriodType = 'За 24 часа'
+            }
             setPeriodType(loadedPeriodType)
             setWorkingDaysEnabled(template.periodSettings.workingDaysEnabled || false)
             const loadedWorkingDays = template.periodSettings.selectedWorkingDays || []
             setSelectedWorkingDays(
-                loadedPeriodType === 'За 7 дней' && loadedWorkingDays.length === 0
+                loadedPeriodType === 'За 7 дней'
+                && !isWelderOrEquipmentOnlyReportType(normalizedLoadedType)
+                && loadedWorkingDays.length === 0
                     ? ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
                     : loadedWorkingDays
             )
+            const isWeCalendarPeriod = isWelderOrEquipmentOnlyReportType(normalizedLoadedType)
+                && (loadedPeriodType === 'За 7 дней' || loadedPeriodType === 'Месячный отчёт')
             if (template.periodSettings.startDate) {
                 const startDateObj = new Date(template.periodSettings.startDate)
                 if (loadedPeriodType === 'Произвольный период') {
@@ -2161,6 +2355,16 @@ const ReportsPage = () => {
                     setStartMonth(new Date(start.getFullYear(), start.getMonth()))
                     setEndDate(end)
                     setEndMonth(new Date(end.getFullYear(), end.getMonth()))
+                } else if (isWeCalendarPeriod) {
+                    const endPref = template.periodSettings.endDate
+                        ? new Date(template.periodSettings.endDate)
+                        : null
+                    const start = normalizeDay(startDateObj)
+                    const end = endPref ? normalizeDay(endPref) : start
+                    setStartDate(start)
+                    setStartMonth(new Date(start.getFullYear(), start.getMonth()))
+                    setEndDate(end)
+                    setEndMonth(new Date(end.getFullYear(), end.getMonth()))
                 } else {
                     setStartDate(startDateObj)
                     setStartMonth(new Date(startDateObj.getFullYear(), startDateObj.getMonth()))
@@ -2169,6 +2373,14 @@ const ReportsPage = () => {
                         setEndDate(endDateObj)
                         setEndMonth(new Date(endDateObj.getFullYear(), endDateObj.getMonth()))
                     }
+                }
+            } else if (isWeCalendarPeriod) {
+                if (loadedPeriodType === 'За 7 дней') {
+                    const { start, end } = getDefaultSevenDayRange()
+                    applyPeriodCalendarDates(start, end)
+                } else {
+                    const { start, end } = getDefaultMonthlyRange()
+                    applyPeriodCalendarDates(start, end)
                 }
             } else if (template.periodSettings.endDate) {
                 const endDateObj = new Date(template.periodSettings.endDate)
@@ -2381,6 +2593,15 @@ const ReportsPage = () => {
             }
         }
         setGenerateError('')
+
+        const normalizedReportTypeForPeriod = normalizeReportType(selectedReportType) || selectedReportType
+        const periodValidationError = validateWelderEquipmentPeriodDates(
+            normalizedReportTypeForPeriod, periodType, startDate, endDate)
+        if (periodValidationError) {
+            setGenerateError(periodValidationError)
+            return
+        }
+
         generatePollCancelledRef.current = false
         generateProgressTargetRef.current = 0
         generateProgressDisplayRef.current = 0
@@ -2430,6 +2651,7 @@ const ReportsPage = () => {
             let periodEndTime
             const today = new Date()
             today.setHours(0, 0, 0, 0)
+            const isWeOnlyPeriod = isWelderOrEquipmentOnlyReportType(normalizedReportTypeForPeriod)
 
             if (periodType === 'За 24 часа') {
                 // Последние 24 часа до текущего момента (а не «вчера 00:00 — сегодня 00:00», иначе отрезается всё,
@@ -2443,21 +2665,35 @@ const ReportsPage = () => {
                 periodStartTime = formatHms(start)
                 periodEndTime = formatHms(end)
             } else if (periodType === 'За 7 дней') {
-                // 7 дней: с (сегодня − 7 дней) по сегодня
-                periodStartDate = new Date(today)
-                periodStartDate.setDate(periodStartDate.getDate() - 7)
-                periodEndDate = new Date(today)
-                periodStartTime = timeRange?.start || '00:00'
-                periodEndTime = timeRange?.end || '23:59'
+                if (isWeOnlyPeriod) {
+                    periodStartDate = startDate ? new Date(startDate) : getDefaultSevenDayRange().start
+                    periodEndDate = endDate ? new Date(endDate) : getDefaultSevenDayRange().end
+                    periodStartTime = timeRange?.start || '00:00'
+                    periodEndTime = timeRange?.end || '23:59'
+                } else {
+                    // 7 дней: с (сегодня − 7 дней) по сегодня
+                    periodStartDate = new Date(today)
+                    periodStartDate.setDate(periodStartDate.getDate() - 7)
+                    periodEndDate = new Date(today)
+                    periodStartTime = timeRange?.start || '00:00'
+                    periodEndTime = timeRange?.end || '23:59'
+                }
             } else if (periodType === 'Месячный отчёт') {
-                const year = today.getFullYear()
-                const months = selectedReportMonths.length > 0 ? selectedReportMonths : [today.getMonth()]
-                const minMonth = Math.min(...months)
-                const maxMonth = Math.max(...months)
-                periodStartDate = new Date(year, minMonth, 1)
-                periodEndDate = new Date(year, maxMonth + 1, 0)
-                periodStartTime = timeRange?.start || '00:00'
-                periodEndTime = timeRange?.end || '23:59'
+                if (isWeOnlyPeriod) {
+                    periodStartDate = startDate ? new Date(startDate) : getDefaultMonthlyRange().start
+                    periodEndDate = endDate ? new Date(endDate) : getDefaultMonthlyRange().end
+                    periodStartTime = timeRange?.start || '00:00'
+                    periodEndTime = timeRange?.end || '23:59'
+                } else {
+                    const year = today.getFullYear()
+                    const months = selectedReportMonths.length > 0 ? selectedReportMonths : [today.getMonth()]
+                    const minMonth = Math.min(...months)
+                    const maxMonth = Math.max(...months)
+                    periodStartDate = new Date(year, minMonth, 1)
+                    periodEndDate = new Date(year, maxMonth + 1, 0)
+                    periodStartTime = timeRange?.start || '00:00'
+                    periodEndTime = timeRange?.end || '23:59'
+                }
             } else {
                 // Произвольный период — берём выбранные даты
                 periodStartDate = startDate ? new Date(startDate) : new Date(today)
@@ -2841,9 +3077,7 @@ const ReportsPage = () => {
                                             className={`report-type-dropdown-item ${selectedReportType === type ? 'selected' : ''}`}
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                setSelectedReportType(type);
-                                                setReportTypeDropdownOpen(false);
-                                                setReportTypeDropdownHighlight(false);
+                                                handleReportTypeSelect(type);
                                             }}
                                         >
                                             <span>{type}</span>
@@ -3851,18 +4085,9 @@ const ReportsPage = () => {
                                     <select
                                         className="period-type-select"
                                         value={periodType}
-                                        onChange={(e) => {
-                                            const newType = e.target.value
-                                            setPeriodType(newType)
-                                            if (newType === 'За 7 дней') {
-                                                setSelectedWorkingDays([...weekDays])
-                                            }
-                                            if (newType === 'Произвольный период') {
-                                                setAutoReportEnabled(false)
-                                            }
-                                        }}
+                                        onChange={(e) => handlePeriodTypeChange(e.target.value)}
                                     >
-                                        {periodTypes.map(type => (
+                                        {getAvailablePeriodTypes(selectedReportType).map(type => (
                                             <option key={type} value={type}>{type}</option>
                                         ))}
                                     </select>
@@ -3897,7 +4122,7 @@ const ReportsPage = () => {
                                     </label>
                                 </div>
 
-                                {periodType === 'За 7 дней' && (
+                                {periodType === 'За 7 дней' && !isWelderOrEquipmentOnlyReportType(selectedReportType) && (
                                     <div className="right-panel-working-days-row">
                                         <div className="right-panel-working-days-buttons">
                                             {weekDays.map(day => (
@@ -3929,7 +4154,15 @@ const ReportsPage = () => {
                                                     type="button"
                                                     className={`right-panel-month-btn ${selectedReportMonths.includes(index) ? 'selected' : ''}`}
                                                     onClick={() => {
-                                                        setSelectedReportMonths(prev => (prev[0] === index ? [] : [index]))
+                                                        if (isWelderOrEquipmentOnlyReportType(selectedReportType)) {
+                                                            if (selectedReportMonths.includes(index)) {
+                                                                setSelectedReportMonths([])
+                                                            } else {
+                                                                handleWelderEquipmentMonthSelect(index)
+                                                            }
+                                                        } else {
+                                                            setSelectedReportMonths(prev => (prev[0] === index ? [] : [index]))
+                                                        }
                                                     }}
                                                 >
                                                     {label}
@@ -3939,7 +4172,7 @@ const ReportsPage = () => {
                                     </div>
                                 )}
 
-                                {periodType === 'Произвольный период' && (
+                                {showPeriodCalendars && (
                                     <div className="right-panel-date-range-section">
                                         <div className="right-panel-date-picker-group right-panel-arbitrary-date-trigger-group">
                                             <label className="right-panel-date-picker-label">Дата начала периода</label>
@@ -4007,7 +4240,7 @@ const ReportsPage = () => {
                                                 tabIndex={0}
                                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenArbitraryDatePicker(prev => prev === 'end' ? null : 'end'); } }}
                                             >
-                                                <button type="button" className="right-panel-arbitrary-date-chevron" onClick={(e) => { e.stopPropagation(); adjustArbitraryEndDay(-1); }} disabled={!!(endDate && startDate && normalizeDay(endDate).getTime() <= getMinEndDate(startDate).getTime())} aria-label="Предыдущий день">&lt;</button>
+                                                <button type="button" className="right-panel-arbitrary-date-chevron" onClick={(e) => { e.stopPropagation(); adjustArbitraryEndDay(-1); }} disabled={!!(endDate && startDate && getMinEndDateForCalendar() && normalizeDay(endDate).getTime() <= getMinEndDateForCalendar().getTime())} aria-label="Предыдущий день">&lt;</button>
                                                 <span className="right-panel-arbitrary-date-text">{endDate ? formatDateDisplay(endDate) : formatMonthYear(endMonth)}</span>
                                                 <span className="right-panel-arbitrary-date-calendar-icon" aria-hidden>📅</span>
                                                 <button type="button" className="right-panel-arbitrary-date-chevron" onClick={(e) => { e.stopPropagation(); adjustArbitraryEndDay(1); }} disabled={!!(endDate && new Date(endDate).toDateString() === todayStart().toDateString())} aria-label="Следующий день">&gt;</button>
@@ -4029,7 +4262,7 @@ const ReportsPage = () => {
                                                                     const dayDate = day ? new Date(endMonth.getFullYear(), endMonth.getMonth(), day) : null
                                                                     const isSelected = endDate && dayDate && endDate.getDate() === dayDate.getDate() && endDate.getMonth() === dayDate.getMonth() && endDate.getFullYear() === dayDate.getFullYear()
                                                                     const isFuture = dayDate && isFutureDate(dayDate)
-                                                                    const minEndDate = startDate ? getMinEndDate(startDate) : null
+                                                                    const minEndDate = startDate ? getMinEndDateForCalendar() : null
                                                                     const isBeforeMinEnd = dayDate && minEndDate && normalizeDay(dayDate) < minEndDate
                                                                     const isInRange = dayDate && startDate && endDate && isDateInRange(dayDate, startDate, endDate)
                                                                     return (

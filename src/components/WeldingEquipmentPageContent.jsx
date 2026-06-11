@@ -19,6 +19,7 @@ import {
     computeLastPowerOnFromPanelState,
     resolveLastPowerOnDisplay,
     seedLastPowerOnFromMachines,
+    shouldRefreshLastPowerOnFromPanelState,
 } from '../utils/weldingMachineLastPowerOn';
 import { getMachineStatusBadgeShort } from '../utils/weldingMachineStateDisplay';
 import { api } from '../services/api';
@@ -35,6 +36,10 @@ const defaultCoreOptions = {
 };
 
 const EQUIPMENT_FILTERS_STORAGE_KEY = 'weldingEquipmentFilters';
+const INITIAL_SORT_DIRECTION_BY_FIELD = {
+    status: 'desc',
+    lastActivation: 'desc',
+};
 
 function loadFiltersFromStorage() {
     try {
@@ -563,7 +568,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                 const props = resolvedState?.properties || {};
                 const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState || null;
 
-                if (resolvedState) {
+                if (resolvedState && shouldRefreshLastPowerOnFromPanelState(resolvedState)) {
                     const powerOnMs = computeLastPowerOnFromPanelState(resolvedState, now);
                     if (powerOnMs != null) {
                         powerOnUpdates[mac] = powerOnMs;
@@ -609,7 +614,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
             setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
         } else {
             setSortField(field);
-            setSortDirection('asc');
+            setSortDirection(INITIAL_SORT_DIRECTION_BY_FIELD[field] || 'asc');
         }
     };
 
@@ -627,6 +632,27 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         return 'Не назначен';
     };
 
+    const getLastActivationTimestampForSort = (item) => {
+        const mac = item?.mac;
+        if (mac && lastPowerOnByMac[mac] != null) return lastPowerOnByMac[mac];
+        if (mac && lastPowerOnByMacRef.current?.[mac] != null) return lastPowerOnByMacRef.current[mac];
+        if (!item?.lastPoweredOnAt) return 0;
+        const parsed = new Date(item.lastPoweredOnAt).getTime();
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const getStatusRankForSort = (item) => {
+        const status = deviceStatusesByMac[item.mac] || 'off';
+        const rawState = deviceStatesByMac[item.mac] || null;
+        const statusBadge = getMachineStatusBadgeShort(status, rawState);
+
+        if (statusBadge.text === 'Выкл(деж)') return 3;
+        if (statusBadge.className === 'on') return 3;
+        if (statusBadge.className === 'welding') return 2;
+        if (statusBadge.className === 'error') return 1;
+        return 0;
+    };
+
     const getSorted = (arr) => {
         if (!sortField) return arr;
         const dir = sortDirection === 'asc' ? 1 : -1;
@@ -639,7 +665,8 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                     case 'unit': return (item.organizationUnit?.name || '').toLowerCase();
                     case 'inventory': return (item.inventoryNumber || '').toLowerCase();
                     case 'welder': return getWelderDisplayForSort(item).toLowerCase();
-                    case 'status': return deviceStatusesByMac[item.mac] || 'off';
+                    case 'status': return getStatusRankForSort(item);
+                    case 'lastActivation': return getLastActivationTimestampForSort(item);
                     default: return '';
                 }
             };
@@ -1590,9 +1617,14 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                                             {sortField === 'welder' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
                                         </span>
                                     </th>
-                                    <th>
+                                    <th
+                                        onClick={() => toggleSort('lastActivation')}
+                                        className={sortField === 'lastActivation' ? 'sort-active' : ''}
+                                    >
                                         <span>Последнее включение</span>
-                                        <span className="sort-arrow">▾</span>
+                                        <span className={`sort-arrow ${sortField === 'lastActivation' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                            {sortField === 'lastActivation' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                        </span>
                                     </th>
                                     <th
                                         onClick={() => toggleSort('status')}
