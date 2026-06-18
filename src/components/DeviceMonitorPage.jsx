@@ -669,28 +669,31 @@ function buildWeldingPulseSeriesFromHistoryPoints(points, mapY) {
     points.forEach((p) => {
         const x = p.ts;
         const nowWelding = isHistoryPointWelding(p);
-        const y = Math.round(Number(mapY(p)) * 10) / 10;
 
-        if (!wasWelding && !nowWelding) {
-            series.push({ x, y: 0 });
-        } else if (!wasWelding && nowWelding) {
+        if (!nowWelding) {
+            if (wasWelding) {
+                series.push({ x, y: lastY });
+                series.push({ x, y: 0 });
+                lastY = 0;
+            } else {
+                series.push({ x, y: 0 });
+            }
+            wasWelding = false;
+            return;
+        }
+
+        const y = Math.round(Number(mapY(p)) * 10) / 10;
+        if (!wasWelding) {
             series.push({ x, y: 0 });
             series.push({ x, y });
-            lastY = y;
-        } else if (wasWelding && nowWelding) {
-            if (lastY === 0 && y > 0) {
-                series.push({ x, y: 0 });
-                series.push({ x, y });
-            } else {
-                series.push({ x, y });
-            }
-            lastY = y;
-        } else if (wasWelding && !nowWelding) {
-            series.push({ x, y: lastY });
+        } else if (lastY === 0 && y > 0) {
             series.push({ x, y: 0 });
-            lastY = 0;
+            series.push({ x, y });
+        } else {
+            series.push({ x, y });
         }
-        wasWelding = nowWelding;
+        lastY = y;
+        wasWelding = true;
     });
 
     return series;
@@ -820,9 +823,57 @@ function appendWelderPresenceSeries(prev, hasWelder, wasPresent, xPoll) {
     return next;
 }
 
+/** Сварочный ток/напряжение в истории: общие индексы, без раздельного min/max-decimate (ломает stepped и тултип). */
+function prepareWeldingHistoryPairForChart(currentPts, voltagePts, maxPoints) {
+    const n = Math.min(currentPts?.length || 0, voltagePts?.length || 0);
+    if (n === 0) {
+        return { weldingCurrent: currentPts || [], weldingVoltage: voltagePts || [] };
+    }
+    if (n <= maxPoints) {
+        return {
+            weldingCurrent: currentPts.slice(0, n),
+            weldingVoltage: voltagePts.slice(0, n),
+        };
+    }
+
+    const mustKeep = new Set([0, n - 1]);
+    for (let i = 0; i < n - 1; i += 1) {
+        if (currentPts[i].x === currentPts[i + 1].x) {
+            mustKeep.add(i);
+            mustKeep.add(i + 1);
+            continue;
+        }
+        const yc0 = Number(currentPts[i].y);
+        const yc1 = Number(currentPts[i + 1].y);
+        const yv0 = Number(voltagePts[i].y);
+        const yv1 = Number(voltagePts[i + 1].y);
+        if ((Number.isFinite(yc0) && Number.isFinite(yc1) && yc0 !== yc1)
+            || (Number.isFinite(yv0) && Number.isFinite(yv1) && yv0 !== yv1)) {
+            mustKeep.add(i);
+            mustKeep.add(i + 1);
+        }
+    }
+
+    const idxs = [...mustKeep].sort((a, b) => a - b);
+    if (idxs.length > maxPoints) {
+        return {
+            weldingCurrent: currentPts.slice(0, n),
+            weldingVoltage: voltagePts.slice(0, n),
+        };
+    }
+
+    return {
+        weldingCurrent: idxs.map((j) => currentPts[j]),
+        weldingVoltage: idxs.map((j) => voltagePts[j]),
+    };
+}
+
 function prepareSeriesForChart(raw, channelKey, graphUsesServerData, maxPoints) {
     const pts = raw || [];
     if (!graphUsesServerData || !pts.length) return pts;
+    if (channelKey === 'weldingCurrent' || channelKey === 'weldingVoltage') {
+        return pts;
+    }
     if (usesSteppedChartChannel(channelKey)) {
         return decimateWeldingPulseSeries(pts, maxPoints);
     }
@@ -3614,8 +3665,18 @@ const DeviceMonitorPage = () => {
     const chartDisplaySeries = useMemo(() => {
         const src = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
         const out = { ...src };
+        if (graphUsesServerData) {
+            const weldingPair = prepareWeldingHistoryPairForChart(
+                src.weldingCurrent || [],
+                src.weldingVoltage || [],
+                HISTORY_CHART_MAX_POINTS
+            );
+            out.weldingCurrent = weldingPair.weldingCurrent;
+            out.weldingVoltage = weldingPair.weldingVoltage;
+        }
         TELEMETRY_CHANNELS_CONFIG.forEach((ch) => {
             if (ch.key === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(ch.key)) return;
+            if (graphUsesServerData && (ch.key === 'weldingCurrent' || ch.key === 'weldingVoltage')) return;
             out[ch.key] = prepareSeriesForChart(src[ch.key] || [], ch.key, graphUsesServerData, HISTORY_CHART_MAX_POINTS);
         });
         ['mainsVoltageA', 'mainsVoltageB', 'mainsVoltageC'].forEach((key) => {
@@ -4060,6 +4121,10 @@ const DeviceMonitorPage = () => {
         const errorSeg = findSegmentAtTs(timelineRows.errors, hoverCursor.ts);
         const welderSeg = findSegmentAtTs(timelineRows.welder, hoverCursor.ts);
         const welderLabel = welderSeg?.value ? welderNameByRfid[welderSeg.value] || null : null;
+        const isWeldingAtCursor = graphUsesServerData
+            && timelineRows.welding.some(
+                (seg) => hoverCursor.ts >= seg.start && hoverCursor.ts <= seg.end
+            );
 
         const mainsChannel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === 'mainsVoltage');
         mainsVoltagePhases.forEach((phase) => {
@@ -4077,9 +4142,14 @@ const DeviceMonitorPage = () => {
             if (!channelKey || channelKey === 'mainsVoltage') return;
             const raw = displaySeries[channelKey] || [];
             const stepped = usesSteppedChartChannel(channelKey);
-            const value = stepped
+            let value = stepped
                 ? resolveSteppedTooltipValue(channelKey, raw, hoverCursor.ts)
                 : findNearestPointValue(raw, hoverCursor.ts);
+            if (graphUsesServerData
+                && !isWeldingAtCursor
+                && (channelKey === 'weldingCurrent' || channelKey === 'weldingVoltage')) {
+                value = 0;
+            }
             if (value == null && channelKey !== 'welderPresence') return;
             const channel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === channelKey);
             if (!channel) return;
@@ -4116,6 +4186,7 @@ const DeviceMonitorPage = () => {
     }, [
         hoverCursor,
         chartDisplaySeries,
+        graphUsesServerData,
         telemetrySelection.slot1,
         telemetrySelection.slot2,
         telemetrySelection.slot3,
