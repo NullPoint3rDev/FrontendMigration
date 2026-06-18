@@ -1419,6 +1419,14 @@
     overflow: hidden;
 }
 
+.telemetry-controls__machine-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    margin-bottom: 4px;
+}
+
 .telemetry-controls .tabs {
     margin-bottom: 10px;
 }

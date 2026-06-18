@@ -146,8 +146,8 @@ const DAILY_ACTIVITY_INITIAL = {
     weldingMs: 0,
 };
 
-/** Суточные плитки: проволока/таймеры — реже; газ синхронизируем чаще (baseline + кэш). */
-const DAILY_STATS_REFRESH_MS = 60000;
+/** Суточные плитки: активность и расход — опрос daily-stats с сервера. */
+const DAILY_STATS_REFRESH_MS = 30000;
 const DAILY_GAS_STATS_REFRESH_MS = 15000;
 /** Интервал poll panel-state (см. startPolling). */
 const PANEL_STATE_POLL_MS = 1300;
@@ -282,9 +282,6 @@ const formatMsToClock = (ms) => {
     const seconds = totalSeconds % 60;
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
-
-/** Счётчики Core.WorkTimeSincePowerOn / Core.WeldingTimeSincePowerOn с аппарата: uint32, на фронте считаем секундами (×1000 → formatMsToClock). Если прошивка шлёт миллисекунды — замените на 1. */
-const CORE_PACKET_UPTIME_RAW_TO_MS = 1000;
 
 const formatKgValue = (kg) => {
     const value = Math.max(0, Number(kg) || 0);
@@ -715,6 +712,12 @@ function decimateWeldingPulseSeries(points, maxPoints) {
     const mustKeep = new Set([0, n - 1]);
     for (let i = 0; i < n - 1; i += 1) {
         if (points[i].x === points[i + 1].x) {
+            mustKeep.add(i);
+            mustKeep.add(i + 1);
+        }
+        const y0 = Number(points[i].y);
+        const y1 = Number(points[i + 1].y);
+        if (Number.isFinite(y0) && Number.isFinite(y1) && y0 !== y1) {
             mustKeep.add(i);
             mustKeep.add(i + 1);
         }
@@ -3547,23 +3550,8 @@ const DeviceMonitorPage = () => {
         currentStatusData['secondaryCoilTemperature']
     ) ?? 0;
 
-    const wrappedForCoreUptime = { properties: currentStatusData };
-    const coreWorkTimeSincePowerOn = getStateNumberByKeys(wrappedForCoreUptime, [
-        'Core.WorkTimeSincePowerOn',
-        'Время работы с включения',
-    ]);
-    const coreWeldingTimeSincePowerOn = getStateNumberByKeys(wrappedForCoreUptime, [
-        'Core.WeldingTimeSincePowerOn',
-        'Время сварки с включения',
-    ]);
-    const statusOnActiveClock =
-        coreWorkTimeSincePowerOn != null
-            ? formatMsToClock(coreWorkTimeSincePowerOn * CORE_PACKET_UPTIME_RAW_TO_MS)
-            : formatMsToClock(dailyActivity.onMs);
-    const statusWeldingClock =
-        coreWeldingTimeSincePowerOn != null
-            ? formatMsToClock(coreWeldingTimeSincePowerOn * CORE_PACKET_UPTIME_RAW_TO_MS)
-            : formatMsToClock(dailyActivity.weldingMs);
+    const statusOnActiveClock = formatMsToClock(dailyActivity.onMs);
+    const statusWeldingClock = formatMsToClock(dailyActivity.weldingMs);
 
     // Форматирование даты
     const formatDate = () => {
@@ -5065,7 +5053,13 @@ const DeviceMonitorPage = () => {
                             <div className="status-subtitle">Газ:</div>
                             <div className="status-row status-row--boxed">
                                 <span className="status-label">{getWeldingGas()}</span>
-                                <span className="status-value numeric">{formatLitersValue(displayedDailyGasLiters)} л</span>
+                                <span className="status-value numeric status-value--wire-daily">
+                                    {dailyWireStatsLoading && !dailyWireStatsLoaded ? (
+                                        <span className="monitor-daily-wire-spinner" aria-label="Загрузка" role="status" />
+                                    ) : (
+                                        `${formatLitersValue(displayedDailyGasLiters)} л`
+                                    )}
+                                </span>
                             </div>
                             <div className="status-subtitle status-subtitle--spaced">Проволока:</div>
                             <div className="status-row status-row--boxed">
@@ -5178,6 +5172,40 @@ const DeviceMonitorPage = () => {
 
                             {isTelemetryListExpanded && (
                                 <>
+                                    {activeTab === 'graphs' && graphExpandedLayout && (
+                                        <div className="telemetry-controls__machine-meta">
+                                            <div className="machine-info-row machine-info-row--multiline">
+                                                <span className="machine-info-label">Имя:</span>
+                                                <div className="machine-info-value-slot">
+                                                    <span className="machine-info-text">{displayName || '—'}</span>
+                                                    <button
+                                                        type="button"
+                                                        className="machine-info-icon-tile"
+                                                        onClick={handleOpenEditModal}
+                                                        disabled={!canWriteEquipmentPerm}
+                                                        title="Редактировать наименование и подразделение"
+                                                    >
+                                                        <span className="machine-info-icon">✎</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="machine-info-row machine-info-row--multiline">
+                                                <span className="machine-info-label">Подразделение:</span>
+                                                <div className="machine-info-value-slot">
+                                                    <span className="machine-info-text">{organizationUnit || '—'}</span>
+                                                    <button
+                                                        type="button"
+                                                        className="machine-info-icon-tile"
+                                                        onClick={handleOpenEditModal}
+                                                        disabled={!canWriteEquipmentPerm}
+                                                        title="Редактировать наименование и подразделение"
+                                                    >
+                                                        <span className="machine-info-icon">✎</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="machine-info-row" style={{ marginBottom: 10, justifyContent: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             <button type="button" className="machine-info-icon-tile" onClick={handlePrevDay} title="Предыдущий день">
