@@ -897,99 +897,77 @@ function appendWelderPresenceSeries(prev, hasWelder, wasPresent, xPoll) {
     return next;
 }
 
-function steppedYAt(series, ts) {
-    if (!Array.isArray(series) || !Number.isFinite(ts)) return 0;
-    const raw = series.filter(
-        (p) => p && Number.isFinite(p.x) && p.y !== null && p.y !== undefined && !Number.isNaN(Number(p.y))
-    );
-    if (!raw.length) return 0;
-    if (ts < raw[0].x) return Number(raw[0].y) || 0;
-    for (let i = 0; i < raw.length - 1; i += 1) {
-        if (ts >= raw[i].x && ts < raw[i + 1].x) {
-            return Number(raw[i].y) || 0;
-        }
+/**
+ * Сварочный ток/напряжение для графика истории: только факт при status=Welding,
+ * строго 0 вне сварки. Строится из сырых точек API, не из прореженной серии.
+ */
+function buildWeldingFactChartSeries(points, mapY, windowStart, windowEnd) {
+    if (!Number.isFinite(windowStart) || !Number.isFinite(windowEnd) || windowEnd <= windowStart) {
+        return [];
     }
-    return Number(raw[raw.length - 1].y) || 0;
-}
 
-function buildWeldingSegmentsFromTimeline(samples, windowEnd) {
-    const segments = [];
-    if (!Array.isArray(samples) || !samples.length) return segments;
-    let current = null;
-    samples.forEach((s) => {
-        if (!s || !Number.isFinite(s.x)) return;
-        if (s.isWelding) {
-            if (!current) current = { start: s.x, end: s.x };
-            else current.end = s.x;
-        } else if (current) {
-            segments.push(current);
-            current = null;
-        }
-    });
-    if (current) {
-        const endCap = Number.isFinite(windowEnd) ? Math.max(current.end, windowEnd) : current.end;
-        current.end = endCap;
-        segments.push(current);
-    }
-    return segments;
-}
-
-/** Ненулевые значения только внутри сегментов сварки (как зелёная полоса «Состояние»). */
-function rebuildWeldingSeriesForHistoryChart(pulseSeries, weldingSegments, spanStart, spanEnd) {
-    const src = compressSteppedSeries(pulseSeries || []);
-    const segments = (weldingSegments || []).slice().sort((a, b) => a.start - b.start);
-    const lo = Number.isFinite(spanStart)
-        ? spanStart
-        : (src[0]?.x ?? segments[0]?.start ?? Date.now());
-    const hi = Number.isFinite(spanEnd)
-        ? spanEnd
-        : (src[src.length - 1]?.x ?? segments[segments.length - 1]?.end ?? lo);
-    if (hi <= lo) return [{ x: lo, y: 0 }];
+    const sorted = (points || [])
+        .filter((p) => p && Number.isFinite(p.ts))
+        .sort((a, b) => a.ts - b.ts);
 
     const out = [];
     const push = (x, yRaw) => {
         const y = Math.round(Number(yRaw) * 10) / 10;
         const prev = out[out.length - 1];
-        if (prev && prev.x === x) {
-            prev.y = y;
-            return;
-        }
-        if (prev && prev.x < x && prev.y === y) return;
+        if (prev && prev.x === x && prev.y === y) return;
         out.push({ x, y });
     };
 
-    push(lo, 0);
-    segments.forEach((seg) => {
-        if (seg.end < lo || seg.start > hi) return;
-        const segStart = Math.max(seg.start, lo);
-        const segEnd = Math.min(seg.end, hi);
-        if (segEnd <= segStart) return;
+    push(windowStart, 0);
+    let wasWelding = false;
+    let lastY = 0;
 
-        const innerPoints = src.filter((p) => p.x > segStart && p.x < segEnd && Number(p.y) > 0);
-        const yStart = Math.max(0, steppedYAt(src, segStart));
-        const yEnd = Math.max(0, steppedYAt(src, segEnd));
+    sorted.forEach((p) => {
+        const x = p.ts;
+        if (x < windowStart || x > windowEnd) return;
+        const nowWelding = isHistoryPointWelding(p);
 
-        if (out[out.length - 1]?.y !== 0) push(segStart, 0);
-        if (yStart > 0) push(segStart, yStart);
-        innerPoints.forEach((p) => push(p.x, p.y));
-        if (yEnd > 0) push(segEnd, yEnd);
-        push(segEnd, 0);
+        if (!nowWelding) {
+            if (wasWelding) {
+                push(x, lastY);
+                push(x, 0);
+                lastY = 0;
+            }
+            wasWelding = false;
+            return;
+        }
+
+        const ny = Math.round(Number(mapY(p)) * 10) / 10;
+        if (!Number.isFinite(ny)) return;
+
+        if (!wasWelding) {
+            push(x, 0);
+            push(x, ny);
+        } else if (ny !== lastY) {
+            if (lastY === 0 && ny > 0) push(x, 0);
+            push(x, ny);
+        }
+        lastY = ny;
+        wasWelding = true;
     });
-    push(hi, 0);
+
+    push(windowEnd, 0);
     return compressSteppedSeries(out);
 }
 
-/** Сварочный ток/напряжение в истории: маска по сегментам сварки + безопасное сжатие. */
-function prepareWeldingHistoryPairForChart(currentPts, voltagePts, weldingSegments, spanStart, spanEnd, maxPoints) {
+function mapHistoryCurrentY(p) {
+    return p.current === null || p.current === undefined ? 0 : Number(p.current);
+}
+
+function mapHistoryVoltageY(p) {
+    return p.voltage === null || p.voltage === undefined ? 0 : (Number(p.voltage) || 0) / 10;
+}
+
+/** Сварочный ток/напряжение в истории: из сырых точек окна, без decimate. */
+function prepareWeldingHistoryPairForChart(rawPoints, windowStart, windowEnd) {
     return {
-        weldingCurrent: decimateWeldingPulseSeriesSafe(
-            rebuildWeldingSeriesForHistoryChart(currentPts, weldingSegments, spanStart, spanEnd),
-            maxPoints
-        ),
-        weldingVoltage: decimateWeldingPulseSeriesSafe(
-            rebuildWeldingSeriesForHistoryChart(voltagePts, weldingSegments, spanStart, spanEnd),
-            maxPoints
-        ),
+        weldingCurrent: buildWeldingFactChartSeries(rawPoints, mapHistoryCurrentY, windowStart, windowEnd),
+        weldingVoltage: buildWeldingFactChartSeries(rawPoints, mapHistoryVoltageY, windowStart, windowEnd),
     };
 }
 
@@ -3786,37 +3764,6 @@ const DeviceMonitorPage = () => {
         graphUsesServerData
     ]);
 
-    /** Те же точки, что рисует Chart.js — тултип не расходится с линией после decimate. */
-    const chartDisplaySeries = useMemo(() => {
-        const src = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
-        const out = { ...src };
-        if (graphUsesServerData) {
-            const timelineSamples = historyTimelineSnapshot || [];
-            const spanStart = timelineSamples.length ? timelineSamples[0].x : null;
-            const spanEnd = timelineSamples.length ? timelineSamples[timelineSamples.length - 1].x : Date.now();
-            const weldingSegments = buildWeldingSegmentsFromTimeline(timelineSamples, spanEnd);
-            const weldingPair = prepareWeldingHistoryPairForChart(
-                src.weldingCurrent || [],
-                src.weldingVoltage || [],
-                weldingSegments,
-                spanStart,
-                spanEnd,
-                HISTORY_CHART_MAX_POINTS
-            );
-            out.weldingCurrent = weldingPair.weldingCurrent;
-            out.weldingVoltage = weldingPair.weldingVoltage;
-        }
-        TELEMETRY_CHANNELS_CONFIG.forEach((ch) => {
-            if (ch.key === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(ch.key)) return;
-            if (graphUsesServerData && (ch.key === 'weldingCurrent' || ch.key === 'weldingVoltage')) return;
-            out[ch.key] = prepareSeriesForChart(src[ch.key] || [], ch.key, graphUsesServerData, HISTORY_CHART_MAX_POINTS);
-        });
-        ['mainsVoltageA', 'mainsVoltageB', 'mainsVoltageC'].forEach((key) => {
-            out[key] = prepareSeriesForChart(src[key] || [], key, graphUsesServerData, HISTORY_CHART_MAX_POINTS);
-        });
-        return out;
-    }, [graphUsesServerData, historySeriesSnapshot, historyTimelineSnapshot, telemetrySeries, HISTORY_CHART_MAX_POINTS]);
-
     const chartBounds = useMemo(() => {
         const fallbackEnd = Date.now();
         const fallbackStart = fallbackEnd - LIVE_WINDOW_MS;
@@ -3856,6 +3803,41 @@ const DeviceMonitorPage = () => {
         if (end - start < minGap) end = Math.min(chartBounds.dayEnd, start + minGap);
         return { start, end, minGap };
     }, [chartBounds, timeWindow.start, timeWindow.end, graphUsesServerData, LIVE_WINDOW_MS]);
+
+    /** Те же точки, что рисует Chart.js — тултип не расходится с линией. */
+    const chartDisplaySeries = useMemo(() => {
+        const src = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
+        const out = { ...src };
+        if (graphUsesServerData) {
+            const windowStart = activeWindow.start;
+            const windowEnd = activeWindow.end;
+            const rawPoints = [];
+            historyCacheRef.current.pointsByTs.forEach((p, ts) => {
+                if (ts >= windowStart && ts <= windowEnd) rawPoints.push(p);
+            });
+            rawPoints.sort((a, b) => a.ts - b.ts);
+            const weldingPair = prepareWeldingHistoryPairForChart(rawPoints, windowStart, windowEnd);
+            out.weldingCurrent = weldingPair.weldingCurrent;
+            out.weldingVoltage = weldingPair.weldingVoltage;
+        }
+        TELEMETRY_CHANNELS_CONFIG.forEach((ch) => {
+            if (ch.key === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(ch.key)) return;
+            if (graphUsesServerData && (ch.key === 'weldingCurrent' || ch.key === 'weldingVoltage')) return;
+            out[ch.key] = prepareSeriesForChart(src[ch.key] || [], ch.key, graphUsesServerData, HISTORY_CHART_MAX_POINTS);
+        });
+        ['mainsVoltageA', 'mainsVoltageB', 'mainsVoltageC'].forEach((key) => {
+            out[key] = prepareSeriesForChart(src[key] || [], key, graphUsesServerData, HISTORY_CHART_MAX_POINTS);
+        });
+        return out;
+    }, [
+        graphUsesServerData,
+        historySeriesSnapshot,
+        historyTimelineSnapshot,
+        telemetrySeries,
+        activeWindow.start,
+        activeWindow.end,
+        HISTORY_CHART_MAX_POINTS,
+    ]);
 
     const rulerPinBounds = useMemo(() => {
         if (graphUsesServerData && draggingPin && pinDragPreview && Number.isFinite(pinDragPreview.start) && Number.isFinite(pinDragPreview.end)) {
@@ -4045,19 +4027,17 @@ const DeviceMonitorPage = () => {
                 label: channel.label,
                 data,
                 borderColor: channel.color,
-                backgroundColor: graphUsesServerData
-                    ? (isCurrent ? 'rgba(62,199,255,0.12)' : (isVoltage ? 'rgba(255,97,200,0.10)' : 'rgba(255,255,255,0.05)'))
-                    : (isCurrent || isVoltage)
-                        ? (context) => {
-                            const chart = context.chart;
-                            const { ctx, chartArea } = chart;
-                            if (!chartArea) return isCurrent ? 'rgba(62,199,255,0.2)' : 'rgba(255,97,200,0.2)';
-                            return isCurrent
-                                ? createGradient(ctx, chartArea, 'rgba(62,199,255,0.55)', 'rgba(62,199,255,0.02)')
-                                : createGradient(ctx, chartArea, 'rgba(255,97,200,0.48)', 'rgba(255,97,200,0.02)');
-                        }
-                        : 'rgba(255,255,255,0.04)',
-                fill: isCurrent || isVoltage ? (graphUsesServerData ? false : true) : false,
+                backgroundColor: (isCurrent || isVoltage)
+                    ? (context) => {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+                        if (!chartArea) return isCurrent ? 'rgba(62,199,255,0.2)' : 'rgba(255,97,200,0.2)';
+                        return isCurrent
+                            ? createGradient(ctx, chartArea, 'rgba(62,199,255,0.55)', 'rgba(62,199,255,0.02)')
+                            : createGradient(ctx, chartArea, 'rgba(255,97,200,0.48)', 'rgba(255,97,200,0.02)');
+                    }
+                    : (graphUsesServerData ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.04)'),
+                fill: isCurrent || isVoltage ? true : false,
                 yAxisID: resolveChannelYAxisId(channelKey),
                 ...(stepped ? { stepped: 'after' } : {}),
             };
