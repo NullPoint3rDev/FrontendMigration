@@ -753,7 +753,17 @@ function decimateWeldingPulseSeriesSafe(points, maxPoints) {
             mustKeep.add(i + 1);
             continue;
         }
-        if (Number(pts[i].y) !== Number(pts[i + 1].y)) {
+        const y0 = Number(pts[i].y);
+        const y1 = Number(pts[i + 1].y);
+        if (Number.isFinite(y0) && Number.isFinite(y1) && y0 !== y1) {
+            mustKeep.add(i);
+            mustKeep.add(i + 1);
+        }
+        if (y0 === 0 && y1 > 0) {
+            mustKeep.add(i);
+            mustKeep.add(i + 1);
+        }
+        if (y0 > 0 && y1 === 0) {
             mustKeep.add(i);
             mustKeep.add(i + 1);
         }
@@ -779,18 +789,25 @@ function decimateWeldingPulseSeriesSafe(points, maxPoints) {
     idxs = [...structural].sort((a, b) => a - b);
     if (idxs.length > maxPoints) {
         const stride = Math.ceil(idxs.length / maxPoints);
-        const reduced = new Set([0, n - 1]);
+        const reduced = new Set();
         for (let k = 0; k < idxs.length; k += stride) reduced.add(idxs[k]);
         for (let i = 0; i < n - 1; i += 1) {
             if (pts[i].x === pts[i + 1].x || Number(pts[i].y) !== Number(pts[i + 1].y)) {
                 reduced.add(i);
                 reduced.add(i + 1);
             }
+            if (Number(pts[i].y) === 0 && Number(pts[i + 1].y) > 0) {
+                reduced.add(i);
+                reduced.add(i + 1);
+            }
+            if (Number(pts[i].y) > 0 && Number(pts[i + 1].y) === 0) {
+                reduced.add(i);
+                reduced.add(i + 1);
+            }
         }
-        idxs = [...reduced].sort((a, b) => a - b).slice(0, maxPoints);
-        if (!idxs.includes(0)) idxs.unshift(0);
-        if (!idxs.includes(n - 1)) idxs.push(n - 1);
-        idxs = [...new Set(idxs)].sort((a, b) => a - b);
+        reduced.add(0);
+        reduced.add(n - 1);
+        idxs = [...reduced].sort((a, b) => a - b);
     }
 
     return idxs.map((j) => pts[j]);
@@ -912,11 +929,114 @@ function appendWelderPresenceSeries(prev, hasWelder, wasPresent, xPoll) {
     return next;
 }
 
-/** Сварочный ток/напряжение в истории: независимое безопасное сжатие каждого ряда. */
-function prepareWeldingHistoryPairForChart(currentPts, voltagePts, maxPoints) {
+function steppedYAt(series, ts) {
+    if (!Array.isArray(series) || !Number.isFinite(ts)) return 0;
+    const raw = series.filter(
+        (p) => p && Number.isFinite(p.x) && p.y !== null && p.y !== undefined && !Number.isNaN(Number(p.y))
+    );
+    if (!raw.length) return 0;
+    if (ts < raw[0].x) return Number(raw[0].y) || 0;
+    for (let i = 0; i < raw.length - 1; i += 1) {
+        if (ts >= raw[i].x && ts < raw[i + 1].x) {
+            return Number(raw[i].y) || 0;
+        }
+    }
+    return Number(raw[raw.length - 1].y) || 0;
+}
+
+/** Сегменты сварки из таймлайна (как дорожка «Состояние»). */
+function buildWeldingSegmentsFromTimeline(samples, windowEnd) {
+    const segments = [];
+    if (!Array.isArray(samples) || !samples.length) return segments;
+    let current = null;
+    samples.forEach((s) => {
+        if (!s || !Number.isFinite(s.x)) return;
+        if (s.isWelding) {
+            if (!current) current = { start: s.x, end: s.x };
+            else current.end = s.x;
+        } else if (current) {
+            segments.push(current);
+            current = null;
+        }
+    });
+    if (current) {
+        const endCap = Number.isFinite(windowEnd) ? Math.max(current.end, windowEnd) : current.end;
+        current.end = endCap;
+        segments.push(current);
+    }
+    return segments;
+}
+
+/**
+ * График сварочных рядов: ненулевые значения только внутри зелёных сегментов сварки.
+ * После прореживания без этого «залипала» горизонталь между сегментами.
+ */
+function rebuildWeldingSeriesForHistoryChart(pulseSeries, weldingSegments, spanStart, spanEnd) {
+    const src = compressSteppedSeries(pulseSeries || []);
+    const segments = (weldingSegments || []).slice().sort((a, b) => a.start - b.start);
+    const lo = Number.isFinite(spanStart)
+        ? spanStart
+        : (src[0]?.x ?? segments[0]?.start ?? Date.now());
+    const hi = Number.isFinite(spanEnd)
+        ? spanEnd
+        : (src[src.length - 1]?.x ?? segments[segments.length - 1]?.end ?? lo);
+
+    if (hi <= lo) {
+        return [{ x: lo, y: 0 }];
+    }
+
+    const out = [];
+    const push = (x, yRaw) => {
+        const y = Math.round(Number(yRaw) * 10) / 10;
+        const prev = out[out.length - 1];
+        if (prev && prev.x === x) {
+            prev.y = y;
+            return;
+        }
+        if (prev && prev.x < x && prev.y === y) return;
+        out.push({ x, y });
+    };
+
+    push(lo, 0);
+
+    segments.forEach((seg) => {
+        if (seg.end < lo || seg.start > hi) return;
+
+        const segStart = Math.max(seg.start, lo);
+        const segEnd = Math.min(seg.end, hi);
+        if (segEnd <= segStart) return;
+
+        const innerPoints = src.filter(
+            (p) => p.x > segStart && p.x < segEnd && Number(p.y) > 0
+        );
+        const yStart = Math.max(0, steppedYAt(src, segStart));
+        const yEnd = Math.max(0, steppedYAt(src, segEnd));
+
+        if (out[out.length - 1]?.y !== 0) {
+            push(segStart, 0);
+        }
+        if (yStart > 0) push(segStart, yStart);
+        innerPoints.forEach((p) => push(p.x, p.y));
+        if (yEnd > 0) push(segEnd, yEnd);
+        push(segEnd, 0);
+    });
+
+    push(hi, 0);
+    return compressSteppedSeries(out);
+}
+
+
+/** Сварочный ток/напряжение в истории: маска по сегментам сварки + безопасное сжатие. */
+function prepareWeldingHistoryPairForChart(currentPts, voltagePts, weldingSegments, spanStart, spanEnd, maxPoints) {
     return {
-        weldingCurrent: decimateWeldingPulseSeriesSafe(currentPts, maxPoints),
-        weldingVoltage: decimateWeldingPulseSeriesSafe(voltagePts, maxPoints),
+        weldingCurrent: decimateWeldingPulseSeriesSafe(
+            rebuildWeldingSeriesForHistoryChart(currentPts, weldingSegments, spanStart, spanEnd),
+            maxPoints
+        ),
+        weldingVoltage: decimateWeldingPulseSeriesSafe(
+            rebuildWeldingSeriesForHistoryChart(voltagePts, weldingSegments, spanStart, spanEnd),
+            maxPoints
+        ),
     };
 }
 
@@ -3718,9 +3838,16 @@ const DeviceMonitorPage = () => {
         const src = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
         const out = { ...src };
         if (graphUsesServerData) {
+            const timelineSamples = historyTimelineSnapshot || [];
+            const spanStart = timelineSamples.length ? timelineSamples[0].x : null;
+            const spanEnd = timelineSamples.length ? timelineSamples[timelineSamples.length - 1].x : Date.now();
+            const weldingSegments = buildWeldingSegmentsFromTimeline(timelineSamples, spanEnd);
             const weldingPair = prepareWeldingHistoryPairForChart(
                 src.weldingCurrent || [],
                 src.weldingVoltage || [],
+                weldingSegments,
+                spanStart,
+                spanEnd,
                 HISTORY_CHART_MAX_POINTS
             );
             out.weldingCurrent = weldingPair.weldingCurrent;
@@ -3735,7 +3862,7 @@ const DeviceMonitorPage = () => {
             out[key] = prepareSeriesForChart(src[key] || [], key, graphUsesServerData, HISTORY_CHART_MAX_POINTS);
         });
         return out;
-    }, [graphUsesServerData, historySeriesSnapshot, telemetrySeries, HISTORY_CHART_MAX_POINTS]);
+    }, [graphUsesServerData, historySeriesSnapshot, historyTimelineSnapshot, telemetrySeries, HISTORY_CHART_MAX_POINTS]);
 
     const chartBounds = useMemo(() => {
         const fallbackEnd = Date.now();
@@ -3977,7 +4104,7 @@ const DeviceMonitorPage = () => {
                                 : createGradient(ctx, chartArea, 'rgba(255,97,200,0.48)', 'rgba(255,97,200,0.02)');
                         }
                         : 'rgba(255,255,255,0.04)',
-                fill: isCurrent || isVoltage ? (graphUsesServerData ? 'origin' : true) : false,
+                fill: isCurrent || isVoltage ? (graphUsesServerData ? false : true) : false,
                 yAxisID: resolveChannelYAxisId(channelKey),
                 ...(stepped ? { stepped: 'after' } : {}),
             };
