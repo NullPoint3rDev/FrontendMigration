@@ -623,6 +623,36 @@ function clampWeldingChartSeriesToSegments(series, weldingSegments) {
     });
 }
 
+/** Сортировка: по x; на одном x — сначала больший y (вертикальный спад). */
+function finalizeWeldingChartSeries(points) {
+    const sorted = [...(points || [])]
+        .filter((p) => p && Number.isFinite(p.x) && p.y !== null && p.y !== undefined && !Number.isNaN(Number(p.y)))
+        .sort((a, b) => {
+            if (a.x !== b.x) return a.x - b.x;
+            return Number(b.y) - Number(a.y);
+        });
+    const out = [];
+    sorted.forEach((p) => {
+        const y = Math.round(Number(p.y) * 10) / 10;
+        const prev = out[out.length - 1];
+        if (prev && prev.x === p.x && prev.y === y) return;
+        out.push({ x: p.x, y });
+    });
+    return out;
+}
+
+/** Нулевые якоря на каждом опросе вне сварки — иначе stepped: 'after' держит плато до следующей точки. */
+function collectIdleWeldingChartAnchors(timelineSamples, windowStart, windowEnd) {
+    const anchors = [];
+    (timelineSamples || []).forEach((s) => {
+        if (!s || !Number.isFinite(s.x)) return;
+        if (s.x < windowStart || s.x > windowEnd) return;
+        if (s.isWelding) return;
+        anchors.push({ x: s.x, y: 0 });
+    });
+    return anchors;
+}
+
 /** Держим последнее ненулевое уст. значение при кратком 0 / «не сварка» в успешном poll. */
 const SET_METRIC_HOLD_MS = 6000;
 
@@ -964,7 +994,7 @@ function appendWelderPresenceSeries(prev, hasWelder, wasPresent, xPoll) {
  * Сварочный ток/напряжение для графика истории: только факт при status=Welding,
  * строго 0 вне сварки. Строится из сырых точек API, не из прореженной серии.
  */
-function buildWeldingFactChartSeries(points, mapY, windowStart, windowEnd, weldingSegments) {
+function buildWeldingFactChartSeries(points, mapY, windowStart, windowEnd, weldingSegments, timelineSamples) {
     if (!Number.isFinite(windowStart) || !Number.isFinite(windowEnd) || windowEnd <= windowStart) {
         return [];
     }
@@ -992,8 +1022,9 @@ function buildWeldingFactChartSeries(points, mapY, windowStart, windowEnd, weldi
     push(windowStart, 0);
 
     if (!segs.length) {
+        collectIdleWeldingChartAnchors(timelineSamples, windowStart, windowEnd).forEach((p) => push(p.x, p.y));
         push(windowEnd, 0);
-        return compressSteppedSeries(out);
+        return finalizeWeldingChartSeries(out);
     }
 
     let prevSegEnd = windowStart;
@@ -1034,11 +1065,13 @@ function buildWeldingFactChartSeries(points, mapY, windowStart, windowEnd, weldi
         prevSegEnd = seg.end;
     });
 
+    collectIdleWeldingChartAnchors(timelineSamples, windowStart, windowEnd).forEach((p) => push(p.x, p.y));
+
     if (prevSegEnd < windowEnd || out[out.length - 1]?.x !== windowEnd) {
         push(windowEnd, 0);
     }
 
-    return clampWeldingChartSeriesToSegments(compressSteppedSeries(out), segs);
+    return clampWeldingChartSeriesToSegments(finalizeWeldingChartSeries(out), segs);
 }
 
 function mapHistoryCurrentY(p) {
@@ -1050,10 +1083,14 @@ function mapHistoryVoltageY(p) {
 }
 
 /** Сварочный ток/напряжение в истории: из сырых точек окна, без decimate. */
-function prepareWeldingHistoryPairForChart(rawPoints, windowStart, windowEnd, weldingSegments) {
+function prepareWeldingHistoryPairForChart(rawPoints, windowStart, windowEnd, weldingSegments, timelineSamples) {
     return {
-        weldingCurrent: buildWeldingFactChartSeries(rawPoints, mapHistoryCurrentY, windowStart, windowEnd, weldingSegments),
-        weldingVoltage: buildWeldingFactChartSeries(rawPoints, mapHistoryVoltageY, windowStart, windowEnd, weldingSegments),
+        weldingCurrent: buildWeldingFactChartSeries(
+            rawPoints, mapHistoryCurrentY, windowStart, windowEnd, weldingSegments, timelineSamples
+        ),
+        weldingVoltage: buildWeldingFactChartSeries(
+            rawPoints, mapHistoryVoltageY, windowStart, windowEnd, weldingSegments, timelineSamples
+        ),
     };
 }
 
@@ -3938,11 +3975,15 @@ const DeviceMonitorPage = () => {
                 if (ts >= windowStart && ts <= windowEnd) rawPoints.push(p);
             });
             rawPoints.sort((a, b) => a.ts - b.ts);
+            const timelineSamples = (historyTimelineSnapshot || []).filter(
+                (s) => Number.isFinite(s?.x) && s.x >= windowStart && s.x <= windowEnd
+            );
             const weldingPair = prepareWeldingHistoryPairForChart(
                 rawPoints,
                 windowStart,
                 windowEnd,
-                historyWeldingSegments
+                historyWeldingSegments,
+                timelineSamples
             );
             out.weldingCurrent = weldingPair.weldingCurrent;
             out.weldingVoltage = weldingPair.weldingVoltage;
@@ -4155,23 +4196,42 @@ const DeviceMonitorPage = () => {
                 data = clampWeldingChartSeriesToSegments(data, historyWeldingSegments).map(mapPt);
             }
 
+            const historyWeldingFill = false;
+
             return {
                 label: channel.label,
                 data,
                 borderColor: channel.color,
                 backgroundColor: (isCurrent || isVoltage)
-                    ? (context) => {
-                        const chart = context.chart;
-                        const { ctx, chartArea } = chart;
-                        if (!chartArea) return isCurrent ? 'rgba(62,199,255,0.2)' : 'rgba(255,97,200,0.2)';
-                        return isCurrent
-                            ? createGradient(ctx, chartArea, 'rgba(62,199,255,0.55)', 'rgba(62,199,255,0.02)')
-                            : createGradient(ctx, chartArea, 'rgba(255,97,200,0.48)', 'rgba(255,97,200,0.02)');
-                    }
+                    ? (historyWeldingFill
+                        ? ((context) => {
+                            const chart = context.chart;
+                            const { ctx, chartArea } = chart;
+                            if (!chartArea) return isCurrent ? 'rgba(62,199,255,0.2)' : 'rgba(255,97,200,0.2)';
+                            return isCurrent
+                                ? createGradient(ctx, chartArea, 'rgba(62,199,255,0.55)', 'rgba(62,199,255,0.02)')
+                                : createGradient(ctx, chartArea, 'rgba(255,97,200,0.48)', 'rgba(255,97,200,0.02)');
+                        })
+                        : 'transparent')
                     : (graphUsesServerData ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.04)'),
-                fill: isCurrent || isVoltage ? true : false,
+                fill: (isCurrent || isVoltage)
+                    ? (graphUsesServerData ? historyWeldingFill : true)
+                    : false,
                 yAxisID: resolveChannelYAxisId(channelKey),
                 ...(stepped ? { stepped: 'after' } : {}),
+                ...(graphUsesServerData && (isCurrent || isVoltage) && historyWeldingSegments.length
+                    ? {
+                        segment: {
+                            borderColor: (ctx) => {
+                                const x0 = ctx?.p0?.parsed?.x;
+                                const x1 = ctx?.p1?.parsed?.x;
+                                if (!Number.isFinite(x0) || !Number.isFinite(x1)) return channel.color;
+                                const mid = (x0 + x1) / 2;
+                                return isTsInWeldingSegments(mid, historyWeldingSegments) ? channel.color : 'rgba(0,0,0,0)';
+                            },
+                        },
+                    }
+                    : {}),
             };
         };
 
@@ -5785,6 +5845,7 @@ const DeviceMonitorPage = () => {
                                                     className={`chart-canvas${chartPlotCursorHidden ? ' chart-canvas--plot-cursor-none' : ''}`}
                                                 >
                                                     <Line
+                                                        key={`history-chart-${activeWindow.start}-${activeWindow.end}-${historyCacheRevision}`}
                                                         data={topChartData}
                                                         options={telemetryOverlayChartOptions}
                                                         ref={(chart) => {
