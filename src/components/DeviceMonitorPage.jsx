@@ -659,12 +659,19 @@ function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, 
     return next;
 }
 
-/** История: те же вертикальные фронты по смене status Welding / не-Welding. */
+/** История: вертикальные фронты по смене Welding; без лишних точек на плоских участках (stepped: 'after'). */
 function buildWeldingPulseSeriesFromHistoryPoints(points, mapY) {
     const series = [];
     if (!points?.length) return series;
     let wasWelding = false;
     let lastY = 0;
+
+    const pushPoint = (x, yRaw) => {
+        const y = Math.round(Number(yRaw) * 10) / 10;
+        const prev = series[series.length - 1];
+        if (prev && prev.x === x && prev.y === y) return;
+        series.push({ x, y });
+    };
 
     points.forEach((p) => {
         const x = p.ts;
@@ -672,11 +679,11 @@ function buildWeldingPulseSeriesFromHistoryPoints(points, mapY) {
 
         if (!nowWelding) {
             if (wasWelding) {
-                series.push({ x, y: lastY });
-                series.push({ x, y: 0 });
+                pushPoint(x, lastY);
+                pushPoint(x, 0);
                 lastY = 0;
-            } else {
-                series.push({ x, y: 0 });
+            } else if (series.length === 0) {
+                pushPoint(x, 0);
             }
             wasWelding = false;
             return;
@@ -684,13 +691,11 @@ function buildWeldingPulseSeriesFromHistoryPoints(points, mapY) {
 
         const y = Math.round(Number(mapY(p)) * 10) / 10;
         if (!wasWelding) {
-            series.push({ x, y: 0 });
-            series.push({ x, y });
-        } else if (lastY === 0 && y > 0) {
-            series.push({ x, y: 0 });
-            series.push({ x, y });
-        } else {
-            series.push({ x, y });
+            pushPoint(x, 0);
+            pushPoint(x, y);
+        } else if (y !== lastY) {
+            if (lastY === 0 && y > 0) pushPoint(x, 0);
+            pushPoint(x, y);
         }
         lastY = y;
         wasWelding = true;
@@ -706,6 +711,90 @@ const usesSteppedChartChannel = (channelKey) => (
     || channelKey === 'setWeldingVoltage'
     || channelKey === 'welderPresence'
 );
+
+/** stepped:'after' — плоский участок задаётся одной точкой до смены Y. */
+function compressSteppedSeries(points) {
+    const n = points?.length || 0;
+    if (n <= 1) return points || [];
+
+    const out = [points[0]];
+    for (let i = 1; i < n; i += 1) {
+        const cur = points[i];
+        const prev = out[out.length - 1];
+        if (cur.x === prev.x) {
+            out.push(cur);
+            continue;
+        }
+        if (Number(cur.y) !== Number(prev.y)) {
+            out.push(cur);
+        }
+    }
+    const last = points[n - 1];
+    const tail = out[out.length - 1];
+    if (last.x !== tail.x || Number(last.y) !== Number(tail.y)) {
+        out.push(last);
+    }
+    return out;
+}
+
+/**
+ * Прореживание ступенчатых сварочных рядов: сохраняем смены Y и вертикальные фронты;
+ * min/max по корзинам не используем — из-за них «залипала» линия выше нуля.
+ */
+function decimateWeldingPulseSeriesSafe(points, maxPoints) {
+    const pts = compressSteppedSeries(points || []);
+    const n = pts.length;
+    if (n <= maxPoints) return pts;
+
+    const mustKeep = new Set([0, n - 1]);
+    for (let i = 0; i < n - 1; i += 1) {
+        if (pts[i].x === pts[i + 1].x) {
+            mustKeep.add(i);
+            mustKeep.add(i + 1);
+            continue;
+        }
+        if (Number(pts[i].y) !== Number(pts[i + 1].y)) {
+            mustKeep.add(i);
+            mustKeep.add(i + 1);
+        }
+    }
+
+    let idxs = [...mustKeep].sort((a, b) => a - b);
+    if (idxs.length <= maxPoints) {
+        return idxs.map((j) => pts[j]);
+    }
+
+    const structural = new Set(idxs);
+    const weldIdxs = idxs.filter((j) => Number(pts[j].y) > 0);
+    const weldBudget = Math.max(0, maxPoints - (idxs.length - weldIdxs.length));
+    if (weldIdxs.length > weldBudget && weldBudget > 0) {
+        const stride = Math.ceil(weldIdxs.length / weldBudget);
+        for (let k = 0; k < weldIdxs.length; k += stride) {
+            structural.add(weldIdxs[k]);
+        }
+        structural.add(weldIdxs[0]);
+        structural.add(weldIdxs[weldIdxs.length - 1]);
+    }
+
+    idxs = [...structural].sort((a, b) => a - b);
+    if (idxs.length > maxPoints) {
+        const stride = Math.ceil(idxs.length / maxPoints);
+        const reduced = new Set([0, n - 1]);
+        for (let k = 0; k < idxs.length; k += stride) reduced.add(idxs[k]);
+        for (let i = 0; i < n - 1; i += 1) {
+            if (pts[i].x === pts[i + 1].x || Number(pts[i].y) !== Number(pts[i + 1].y)) {
+                reduced.add(i);
+                reduced.add(i + 1);
+            }
+        }
+        idxs = [...reduced].sort((a, b) => a - b).slice(0, maxPoints);
+        if (!idxs.includes(0)) idxs.unshift(0);
+        if (!idxs.includes(n - 1)) idxs.push(n - 1);
+        idxs = [...new Set(idxs)].sort((a, b) => a - b);
+    }
+
+    return idxs.map((j) => pts[j]);
+}
 
 /** Прореживание: вертикальные пары (x) + min/max Y в корзинах — иначе шов выглядит «плоским», а тултип показывает скачки. */
 function decimateWeldingPulseSeries(points, maxPoints) {
@@ -823,48 +912,11 @@ function appendWelderPresenceSeries(prev, hasWelder, wasPresent, xPoll) {
     return next;
 }
 
-/** Сварочный ток/напряжение в истории: общие индексы, без раздельного min/max-decimate (ломает stepped и тултип). */
+/** Сварочный ток/напряжение в истории: независимое безопасное сжатие каждого ряда. */
 function prepareWeldingHistoryPairForChart(currentPts, voltagePts, maxPoints) {
-    const n = Math.min(currentPts?.length || 0, voltagePts?.length || 0);
-    if (n === 0) {
-        return { weldingCurrent: currentPts || [], weldingVoltage: voltagePts || [] };
-    }
-    if (n <= maxPoints) {
-        return {
-            weldingCurrent: currentPts.slice(0, n),
-            weldingVoltage: voltagePts.slice(0, n),
-        };
-    }
-
-    const mustKeep = new Set([0, n - 1]);
-    for (let i = 0; i < n - 1; i += 1) {
-        if (currentPts[i].x === currentPts[i + 1].x) {
-            mustKeep.add(i);
-            mustKeep.add(i + 1);
-            continue;
-        }
-        const yc0 = Number(currentPts[i].y);
-        const yc1 = Number(currentPts[i + 1].y);
-        const yv0 = Number(voltagePts[i].y);
-        const yv1 = Number(voltagePts[i + 1].y);
-        if ((Number.isFinite(yc0) && Number.isFinite(yc1) && yc0 !== yc1)
-            || (Number.isFinite(yv0) && Number.isFinite(yv1) && yv0 !== yv1)) {
-            mustKeep.add(i);
-            mustKeep.add(i + 1);
-        }
-    }
-
-    const idxs = [...mustKeep].sort((a, b) => a - b);
-    if (idxs.length > maxPoints) {
-        return {
-            weldingCurrent: currentPts.slice(0, n),
-            weldingVoltage: voltagePts.slice(0, n),
-        };
-    }
-
     return {
-        weldingCurrent: idxs.map((j) => currentPts[j]),
-        weldingVoltage: idxs.map((j) => voltagePts[j]),
+        weldingCurrent: decimateWeldingPulseSeriesSafe(currentPts, maxPoints),
+        weldingVoltage: decimateWeldingPulseSeriesSafe(voltagePts, maxPoints),
     };
 }
 
