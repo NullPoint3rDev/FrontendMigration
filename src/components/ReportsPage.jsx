@@ -185,6 +185,8 @@ const ReportsPage = () => {
         // Опциональные колонки отчёта по работе сварщика (швы)
         wireFeedSpeed: false,   // Скорость подачи проволоки, м/мин
         gasConsumption: false,  // Расход газа, л
+        setCurrent: false,      // Установленный ток, А
+        setVoltage: false,      // Установленное напряжение, В
         // Опциональные колонки отчёта по работе оборудования (сварщик по шву)
         welderFullName: false,
         welderTabNumber: false
@@ -499,7 +501,9 @@ const ReportsPage = () => {
                 welder: true, all: false, wire: true, consumption: true, equipmentModel: false,
                 workOutsideSetCurrent: false, workOutsideActualCurrent: false, tableNumber: true, profession: false,
                 department: true, equipmentName: false, timeOnline: true, arcBurningTime: true, efficiency: false,
-                energyConsumed: false, wireFeedSpeed: false, gasConsumption: false, welderFullName: false, welderTabNumber: false
+                energyConsumed: false, wireFeedSpeed: false, gasConsumption: false,
+                setCurrent: false, setVoltage: false,
+                welderFullName: false, welderTabNumber: false
             },
             selectedOrganizationUnits: {},
             selectedWelders: {},
@@ -2106,7 +2110,9 @@ const ReportsPage = () => {
             efficiency: false,
             energyConsumed: false,
             wireFeedSpeed: false,
-            gasConsumption: false
+            gasConsumption: false,
+            setCurrent: false,
+            setVoltage: false
         })
         setMinSeamInterval(2)
         setMinSeamDuration(2)
@@ -2727,7 +2733,9 @@ const ReportsPage = () => {
                     'wireFeedSpeed',
                     'consumption',
                     'energyConsumed',
-                    'gasConsumption'
+                    'gasConsumption',
+                    'setCurrent',
+                    'setVoltage'
                 ]
                 const selectedColumns = welderWorkOptionalKeys.filter((key) => parameters[key] === true)
                 const welderBody = {
@@ -2757,7 +2765,9 @@ const ReportsPage = () => {
                     'wireFeedSpeed',
                     'consumption',
                     'energyConsumed',
-                    'gasConsumption'
+                    'gasConsumption',
+                    'setCurrent',
+                    'setVoltage'
                 ]
                 const selectedColumns = equipmentWorkOptionalKeys.filter((key) => parameters[key] === true)
                 const selectedEquipmentIds = Object.keys(selectedEquipment)
@@ -3770,6 +3780,22 @@ const ReportsPage = () => {
                                                         style={{ width: '50px', marginLeft: '8px' }}
                                                         disabled={!minSeamDurationEnabled}
                                                     />
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.setCurrent}
+                                                        onChange={() => toggleParameter('setCurrent')}
+                                                    />
+                                                    <span className="parameter-label">Установленный ток, А</span>
+                                                </label>
+                                                <label className="parameter-item">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={parameters.setVoltage}
+                                                        onChange={() => toggleParameter('setVoltage')}
+                                                    />
+                                                    <span className="parameter-label">Установленное напряжение, В</span>
                                                 </label>
                                             </>
                                         ) : (
