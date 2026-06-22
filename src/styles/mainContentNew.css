@@ -1744,6 +1744,20 @@
     color: rgba(120, 115, 128, 0.85);
 }
 
+.telemetry-item.telemetry-item--disabled {
+    opacity: 0.38;
+    pointer-events: none;
+}
+
+.telemetry-item.telemetry-item--disabled .telemetry-label {
+    color: rgba(100, 96, 108, 0.75);
+}
+
+.telemetry-item.telemetry-item--disabled .telemetry-tile {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 .telemetry-label {
     flex: 1;
     text-align: left;

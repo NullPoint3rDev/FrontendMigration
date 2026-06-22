@@ -147,8 +147,7 @@ const DAILY_ACTIVITY_INITIAL = {
 };
 
 /** Суточные плитки: активность и расход — опрос daily-stats с сервера. */
-const DAILY_STATS_REFRESH_MS = 30000;
-const DAILY_GAS_STATS_REFRESH_MS = 15000;
+const DAILY_STATS_REFRESH_MS = 10000;
 /** Интервал poll panel-state (см. startPolling). */
 const PANEL_STATE_POLL_MS = 1300;
 
@@ -1396,7 +1395,6 @@ const DeviceMonitorPage = () => {
     const gasSmoothRef = useRef({ anchored: 0, extra: 0, lastPollMs: 0 });
     const lastPanelStateRef = useRef(null);
     const dailyStatsIntervalRef = useRef(null);
-    const dailyGasStatsIntervalRef = useRef(null);
     const liveGasCtxRef = useRef(null);
     liveGasCtxRef.current = {
         setLiveDailyGasLiters,
@@ -1977,19 +1975,11 @@ const DeviceMonitorPage = () => {
         if (dailyStatsIntervalRef.current) {
             clearInterval(dailyStatsIntervalRef.current);
         }
-        if (dailyGasStatsIntervalRef.current) {
-            clearInterval(dailyGasStatsIntervalRef.current);
-        }
         dailyStatsIntervalRef.current = setInterval(refreshDailyStatsFromServer, DAILY_STATS_REFRESH_MS);
-        dailyGasStatsIntervalRef.current = setInterval(refreshDailyStatsFromServer, DAILY_GAS_STATS_REFRESH_MS);
         return () => {
             if (dailyStatsIntervalRef.current) {
                 clearInterval(dailyStatsIntervalRef.current);
                 dailyStatsIntervalRef.current = null;
-            }
-            if (dailyGasStatsIntervalRef.current) {
-                clearInterval(dailyGasStatsIntervalRef.current);
-                dailyGasStatsIntervalRef.current = null;
             }
         };
     }, [refreshDailyStatsFromServer]);
@@ -3703,7 +3693,7 @@ const DeviceMonitorPage = () => {
     };
 
     const handleTelemetryTileClick = (channelKey) => {
-        if (channelKey === 'mainsVoltage') return;
+        if (channelKey === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(channelKey)) return;
         setTelemetrySelection((prev) => {
             const occupied = TELEMETRY_SLOT_KEYS.find((s) => prev[s] === channelKey);
             if (occupied) return shiftTelemetrySlotsRemove(prev, occupied);
@@ -3729,14 +3719,16 @@ const DeviceMonitorPage = () => {
         TELEMETRY_SLOT_KEYS.filter((s) => telemetrySelection[s]).length >= TELEMETRY_GRAPH_SLOT_COUNT;
 
     const telemetryChannels = TELEMETRY_CHANNELS_CONFIG.map((channel) => {
+        const channelDisabled = TELEMETRY_NO_DRAW_KEYS.has(channel.key);
         const onGraph =
             channel.key === 'mainsVoltage'
                 ? mainsVoltagePhases.length > 0
-                : TELEMETRY_SLOT_KEYS.some((s) => telemetrySelection[s] === channel.key);
+                : !channelDisabled && TELEMETRY_SLOT_KEYS.some((s) => telemetrySelection[s] === channel.key);
         const graphPickBlocked =
-            channel.key !== 'mainsVoltage' && graphTelemetrySlotsFull && !onGraph;
+            !channelDisabled && channel.key !== 'mainsVoltage' && graphTelemetrySlotsFull && !onGraph;
         return {
             ...channel,
+            channelDisabled,
             active: onGraph,
             tile1: telemetrySelection.slot1 === channel.key,
             tile2: telemetrySelection.slot2 === channel.key,
@@ -5591,7 +5583,7 @@ const DeviceMonitorPage = () => {
                                         {activeTab === 'graphs' && telemetryChannels.map((channel) => (
                                             <div
                                                 key={channel.key}
-                                                className={`telemetry-item ${channel.active ? 'active' : ''}${channel.key === 'mainsVoltage' ? ' telemetry-item--mains' : ''}${channel.graphPickBlocked ? ' telemetry-item--graph-pool-full' : ''}`}
+                                                className={`telemetry-item ${channel.active ? 'active' : ''}${channel.key === 'mainsVoltage' ? ' telemetry-item--mains' : ''}${channel.graphPickBlocked ? ' telemetry-item--graph-pool-full' : ''}${channel.channelDisabled ? ' telemetry-item--disabled' : ''}`}
                                             >
                                                 <span className="telemetry-label">{channel.label}</span>
                                                 <div className="telemetry-tiles">
@@ -5612,9 +5604,11 @@ const DeviceMonitorPage = () => {
                                                             type="button"
                                                             className={`telemetry-tile ${channel.active ? 'active' : ''}`}
                                                             style={{ color: channel.active ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
-                                                            disabled={channel.graphPickBlocked}
+                                                            disabled={channel.channelDisabled || channel.graphPickBlocked}
                                                             title={
-                                                                channel.graphPickBlocked
+                                                                channel.channelDisabled
+                                                                    ? 'Параметр недоступен на графике'
+                                                                    : channel.graphPickBlocked
                                                                     ? 'На графике уже три параметра. Снимите выбор с одного, чтобы добавить этот.'
                                                                     : channel.active
                                                                         ? 'Снять с графика'
