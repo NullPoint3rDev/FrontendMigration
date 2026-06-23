@@ -490,8 +490,23 @@ function flattenPanelState(state) {
     return flat;
 }
 
+function pickMachineStateTextFromPanel(state) {
+    if (!state) return null;
+    const data = flattenPanelState(state);
+    return data['Состояние аппарата']
+        || data['WeldingMachineState']
+        || data.weldingMachineState
+        || data['State.WeldingMachineState']
+        || null;
+}
+
+function isStandbyFromPanelState(state) {
+    return isStandbyMachineState(pickMachineStateTextFromPanel(state));
+}
+
 /** Та же логика, что у isWelding(), но по сырому ответу panel-state (синхронно с poll). */
 function isWeldingFromPanelState(state) {
+    if (isStandbyFromPanelState(state)) return false;
     const data = flattenPanelState(state);
     const weldingMachineState = data['Состояние аппарата'] ||
         data['WeldingMachineState'] ||
@@ -544,8 +559,11 @@ function getMachineActivityModeFromPanelState(state) {
     const status = data.status || data.Status || null;
     const stateLower = String(weldingMachineState || status || '').toLowerCase().trim();
 
-    if (stateLower.includes('дежур') || stateLower.includes('standby') || stateLower.includes('waiting') || stateLower.includes('ожидан')) {
-        return 'standby';
+    if (isStandbyMachineState(weldingMachineState)) {
+        return 'off';
+    }
+    if (stateLower.includes('waiting') || stateLower.includes('ожидан')) {
+        return 'on';
     }
     if (stateLower.includes('выключ') || stateLower === 'off' || stateLower.includes('offline') || stateLower.includes('не в сети')) {
         return 'off';
@@ -1558,10 +1576,11 @@ const DeviceMonitorPage = () => {
         points.sort((a, b) => a.ts - b.ts);
         return points.map((p) => {
             const st = String(p.status || '').toLowerCase();
+            const standby = isStandbyMachineState(p.machineStateText);
             return {
                 x: p.ts,
-                isOnline: st !== 'offline',
-                isWelding: st === 'welding',
+                isOnline: st !== 'offline' && !standby,
+                isWelding: st === 'welding' && !standby,
                 errorCode: p.errorCode,
                 rfid: p.rfid,
             };
@@ -2095,7 +2114,7 @@ const DeviceMonitorPage = () => {
         prevGraphDateForPinStorageRef.current = null;
     }, [machineMac]);
 
-    // Очистка серий при потере связи (не завязываем на deviceData — он обновляется с дебаунсом и мог бы сбрасывать график после poll)
+    // Очистка серий при потере связи или дежурном режиме (Выкл(деж) — график как при выключенном аппарате)
     useEffect(() => {
         if (!hasData) {
             prevWeldingForChartRef.current = null;
@@ -2108,8 +2127,23 @@ const DeviceMonitorPage = () => {
             if (!graphUsesServerDataRef.current) {
                 setTimeWindow({ start: null, end: null, touched: false });
             }
+            return;
         }
-    }, [hasData]);
+        const data = deviceData[machineMac];
+        const rawState = data
+            ? (data['Состояние аппарата'] || data['WeldingMachineState'] || data.weldingMachineState)
+            : null;
+        if (!isStandbyMachineState(rawState)) return;
+        prevWeldingForChartRef.current = null;
+        lastWeldingCurrentChartRef.current = 0;
+        lastWeldingVoltageChartRef.current = 0;
+        prevWelderPresentForChartRef.current = false;
+        setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
+        setTelemetryChartZoom({ top: 1, bottom: 1 });
+        if (!graphUsesServerDataRef.current) {
+            setTimeWindow({ start: null, end: null, touched: false });
+        }
+    }, [hasData, deviceData, machineMac]);
 
     // Отслеживание состояния сварки для таймера
     useEffect(() => {
@@ -2252,12 +2286,37 @@ const DeviceMonitorPage = () => {
                     mac: machineMac,
                     state: response
                 });
+
+                const standbyNow = isStandbyFromPanelState(response);
+                const xPoll = Date.now();
+                const errorCode = parseErrorCodeForTimeline(response);
+
+                if (standbyNow) {
+                    prevWeldingForChartRef.current = false;
+                    prevWelderPresentForChartRef.current = false;
+                    setTimelineSamples((prev) => {
+                        const next = [
+                            ...prev,
+                            {
+                                x: xPoll,
+                                isOnline: false,
+                                isWelding: false,
+                                errorCode,
+                                rfid: null,
+                            },
+                        ];
+                        const cutoff = xPoll - LIVE_WINDOW_MS;
+                        const clipped = next.filter((s) => (typeof s?.x === 'number' ? s.x >= cutoff : true));
+                        return clipped.length > 6000 ? clipped.slice(-6000) : clipped;
+                    });
+                    return;
+                }
+
                 updateLiveDailyGasFromPanelState(response, liveGasCtxRef.current);
 
                 // Реалтайм-графики: одна точка на каждый успешный poll (как WeldingMachinePanel.updateChart)
                 const { current: iRaw, voltage: uRaw } = extractCurrentVoltageFromPanelState(response);
                 const telemetrySample = extractTelemetrySampleFromPanelState(response);
-                const xPoll = Date.now();
                 const wNow = isWeldingFromPanelState(response);
                 const wasWelding = prevWeldingForChartRef.current === true;
                 const yi = Math.round(Number(iRaw) * 10) / 10;
@@ -2346,7 +2405,6 @@ const DeviceMonitorPage = () => {
                     return next;
                 });
                 prevWelderPresentForChartRef.current = hasWelder;
-                const errorCode = parseErrorCodeForTimeline(response);
                 setTimelineSamples(prev => {
                     const next = [
                         ...prev,
@@ -3639,6 +3697,9 @@ const DeviceMonitorPage = () => {
             data.properties?.['Состояние аппарата'];
         if (weldingMachineState) {
             const stateLower = String(weldingMachineState).toLowerCase().trim();
+            if (isStandbyMachineState(weldingMachineState)) {
+                return false;
+            }
             // Проверяем, содержит ли состояние информацию о сварке
             // ВАЖНО: только явное указание "Сварка" или "Welding", не "Аппарат включен"
             if (stateLower === 'сварка' || stateLower === 'welding' ||
