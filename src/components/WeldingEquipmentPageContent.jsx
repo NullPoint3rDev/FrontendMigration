@@ -16,11 +16,10 @@ import {
 import { getAllEmployees } from '../api/employeeApi';
 import { getArchivePanelState } from '../api/archiveDeviceApi';
 import {
-    computeLastPowerOnFromPanelState,
-    resolveLastPowerOnDisplay,
-    seedLastPowerOnFromMachines,
-    shouldRefreshLastPowerOnFromPanelState,
-} from '../utils/weldingMachineLastPowerOn';
+    isWeldingPanelState,
+    resolveLastWeldDisplay,
+    seedLastWeldFromMachines,
+} from '../utils/weldingMachineLastWeld';
 import { getMachineStatusBadgeShort } from '../utils/weldingMachineStateDisplay';
 import { api } from '../services/api';
 import { getRoles } from '../api/userAccountApi';
@@ -38,7 +37,7 @@ const defaultCoreOptions = {
 const EQUIPMENT_FILTERS_STORAGE_KEY = 'weldingEquipmentFilters';
 const INITIAL_SORT_DIRECTION_BY_FIELD = {
     status: 'desc',
-    lastActivation: 'desc',
+    lastWeld: 'desc',
 };
 
 function loadFiltersFromStorage() {
@@ -151,8 +150,8 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
     const [isEnterpriseScopedRole, setIsEnterpriseScopedRole] = useState(false);
     const lastGoodStateByMacRef = useRef({});
     const lastGoodSeenAtRef = useRef({});
-    const lastPowerOnByMacRef = useRef({});
-    const [lastPowerOnByMac, setLastPowerOnByMac] = useState({});
+    const lastWeldByMacRef = useRef({});
+    const [lastWeldByMac, setLastWeldByMac] = useState({});
     const STATUS_STALE_MS = 10000;
     const STATUS_POLL_INTERVAL_MS = 4000;
     /** Отложить первый опрос статусов после paint (шаг C — не конкурировать с LCP) */
@@ -374,7 +373,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                 index === self.findIndex(t => t.id === item.id)
             ) : [];
             setEquipment(uniqueEquipment);
-            seedLastPowerOnFromMachines(uniqueEquipment, lastPowerOnByMacRef, setLastPowerOnByMac);
+            seedLastWeldFromMachines(uniqueEquipment, lastWeldByMacRef, setLastWeldByMac);
         } catch (err) {
             setErrors({ api: 'Ошибка загрузки оборудования: ' + err.message });
             setEquipment([]);
@@ -547,7 +546,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         if (macs.length === 0) return;
 
         // Запрашиваем статусы параллельно
-        const powerOnUpdates = {};
+        const weldUpdates = {};
         const promises = list.map(async (machine) => {
             const now = Date.now();
             const mac = machine.mac;
@@ -568,12 +567,9 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                 const props = resolvedState?.properties || {};
                 const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState || null;
 
-                if (resolvedState && shouldRefreshLastPowerOnFromPanelState(resolvedState)) {
-                    const powerOnMs = computeLastPowerOnFromPanelState(resolvedState, now);
-                    if (powerOnMs != null) {
-                        powerOnUpdates[mac] = powerOnMs;
-                        lastPowerOnByMacRef.current[mac] = powerOnMs;
-                    }
+                if (resolvedState && isWeldingPanelState(resolvedState)) {
+                    weldUpdates[mac] = now;
+                    lastWeldByMacRef.current[mac] = now;
                 }
 
                 return [mac, status, rawState];
@@ -604,8 +600,8 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
             });
             return next;
         });
-        if (Object.keys(powerOnUpdates).length > 0) {
-            setLastPowerOnByMac((prev) => ({ ...prev, ...powerOnUpdates }));
+        if (Object.keys(weldUpdates).length > 0) {
+            setLastWeldByMac((prev) => ({ ...prev, ...weldUpdates }));
         }
     };
 
@@ -632,12 +628,12 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         return 'Не назначен';
     };
 
-    const getLastActivationTimestampForSort = (item) => {
+    const getLastWeldTimestampForSort = (item) => {
         const mac = item?.mac;
-        if (mac && lastPowerOnByMac[mac] != null) return lastPowerOnByMac[mac];
-        if (mac && lastPowerOnByMacRef.current?.[mac] != null) return lastPowerOnByMacRef.current[mac];
-        if (!item?.lastPoweredOnAt) return 0;
-        const parsed = new Date(item.lastPoweredOnAt).getTime();
+        if (mac && lastWeldByMac[mac] != null) return lastWeldByMac[mac];
+        if (mac && lastWeldByMacRef.current?.[mac] != null) return lastWeldByMacRef.current[mac];
+        if (!item?.lastWeldAt) return 0;
+        const parsed = new Date(item.lastWeldAt).getTime();
         return Number.isFinite(parsed) ? parsed : 0;
     };
 
@@ -666,7 +662,9 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                     case 'inventory': return (item.inventoryNumber || '').toLowerCase();
                     case 'welder': return getWelderDisplayForSort(item).toLowerCase();
                     case 'status': return getStatusRankForSort(item);
-                    case 'lastActivation': return getLastActivationTimestampForSort(item);
+                    case 'lastWeld':
+                    case 'lastActivation':
+                        return getLastWeldTimestampForSort(item);
                     default: return '';
                 }
             };
@@ -1025,7 +1023,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
     const filteredEquipment = useMemo(() => {
         return getFilteredEquipment(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [equipment, modelFilter, organizationUnitFilter, statusFilter, searchTerm, sortField, sortDirection, deviceStatusesByMac, lastPowerOnByMac]);
+    }, [equipment, modelFilter, organizationUnitFilter, statusFilter, searchTerm, sortField, sortDirection, deviceStatusesByMac, lastWeldByMac]);
 
     // Функция для получения модели аппарата для отображения
     const getModelDisplay = (item) => {
@@ -1042,8 +1040,8 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         return 'Не назначен';
     };
 
-    const getLastActivation = (item) =>
-        resolveLastPowerOnDisplay(item, lastPowerOnByMac, lastPowerOnByMacRef);
+    const getLastWeld = (item) =>
+        resolveLastWeldDisplay(item, lastWeldByMac, lastWeldByMacRef);
 
     // Функция для получения цвета индикатора по статусу
     const getStatusIndicatorColor = (status) => {
@@ -1618,12 +1616,12 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                                         </span>
                                     </th>
                                     <th
-                                        onClick={() => toggleSort('lastActivation')}
-                                        className={sortField === 'lastActivation' ? 'sort-active' : ''}
+                                        onClick={() => toggleSort('lastWeld')}
+                                        className={sortField === 'lastWeld' || sortField === 'lastActivation' ? 'sort-active' : ''}
                                     >
-                                        <span>Последнее включение</span>
-                                        <span className={`sort-arrow ${sortField === 'lastActivation' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
-                                            {sortField === 'lastActivation' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                        <span>Последний шов</span>
+                                        <span className={`sort-arrow ${sortField === 'lastWeld' || sortField === 'lastActivation' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                            {sortField === 'lastWeld' || sortField === 'lastActivation' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
                                         </span>
                                     </th>
                                     <th
@@ -1672,7 +1670,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                                             <td>{item.organizationUnit?.name || 'Не указано'}</td>
                                             <td>{item.inventoryNumber || 'Не указан'}</td>
                                             <td>{getWelderDisplay(item)}</td>
-                                            <td>{getLastActivation(item) || 'Нет данных'}</td>
+                                            <td>{getLastWeld(item) || 'Нет данных'}</td>
                                             <td>
                                                 <span
                                                     className={`status-badge ${formattedStatus.className}`}
