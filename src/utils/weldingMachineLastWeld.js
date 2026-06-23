@@ -54,10 +54,13 @@ export function seedLastWeldFromMachines(machines, lastWeldByMacRef, setLastWeld
     machines.forEach((m) => {
         const ts = parseDbLastWeldMs(m);
         if (ts != null && m.mac) {
-            if (lastWeldByMacRef) {
-                lastWeldByMacRef.current[m.mac] = ts;
+            const prev = lastWeldByMacRef?.current?.[m.mac];
+            if (prev == null || ts > prev) {
+                if (lastWeldByMacRef) {
+                    lastWeldByMacRef.current[m.mac] = ts;
+                }
+                updates[m.mac] = ts;
             }
-            updates[m.mac] = ts;
         }
     });
     if (Object.keys(updates).length > 0 && setLastWeldByMac) {
