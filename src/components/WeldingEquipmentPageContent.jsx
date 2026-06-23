@@ -16,7 +16,6 @@ import {
 import { getAllEmployees } from '../api/employeeApi';
 import { getArchivePanelState } from '../api/archiveDeviceApi';
 import {
-    isWeldingPanelState,
     resolveLastWeldDisplay,
     seedLastWeldFromMachines,
 } from '../utils/weldingMachineLastWeld';
@@ -154,6 +153,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
     const [lastWeldByMac, setLastWeldByMac] = useState({});
     const STATUS_STALE_MS = 10000;
     const STATUS_POLL_INTERVAL_MS = 4000;
+    const LAST_WELD_POLL_INTERVAL_MS = 60000;
     /** Отложить первый опрос статусов после paint (шаг C — не конкурировать с LCP) */
     const STATUS_POLL_DEFER_FALLBACK_MS = 400;
     const STATUS_POLL_IDLE_TIMEOUT_MS = 1500;
@@ -509,6 +509,31 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [equipment, modelFilter, organizationUnitFilter, statusFilter, searchTerm]);
 
+    const refreshLastWeldsFromApi = async () => {
+        if (!Array.isArray(equipment) || equipment.length === 0) return;
+        try {
+            const data = await getAllWeldingMachines();
+            const machines = Array.isArray(data)
+                ? data.filter((item, index, self) => index === self.findIndex((t) => t.id === item.id))
+                : [];
+            seedLastWeldFromMachines(machines, lastWeldByMacRef, setLastWeldByMac);
+        } catch (_) {}
+    };
+
+    // «Последний шов» — раз в минуту с API (lastWeldAt), не из опроса статусов.
+    useEffect(() => {
+        if (!Array.isArray(equipment) || equipment.length === 0) return;
+        let cancelled = false;
+        const intervalId = setInterval(() => {
+            if (!cancelled) refreshLastWeldsFromApi();
+        }, LAST_WELD_POLL_INTERVAL_MS);
+        return () => {
+            cancelled = true;
+            clearInterval(intervalId);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [equipment.length]);
+
     const computeStatusFromState = (machine, stateObj) => {
         // Для CORE используем WeldingMachineState из посылки
         // Для остальных: сварка если ток > 1А (Current или State.I), иначе включен если есть данные, иначе выключен
@@ -546,7 +571,6 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         if (macs.length === 0) return;
 
         // Запрашиваем статусы параллельно
-        const weldUpdates = {};
         const promises = list.map(async (machine) => {
             const now = Date.now();
             const mac = machine.mac;
@@ -566,11 +590,6 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                 const status = computeStatusFromState(machine, resolvedState);
                 const props = resolvedState?.properties || {};
                 const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState || null;
-
-                if (resolvedState && isWeldingPanelState(resolvedState)) {
-                    weldUpdates[mac] = now;
-                    lastWeldByMacRef.current[mac] = now;
-                }
 
                 return [mac, status, rawState];
             } catch {
@@ -600,9 +619,6 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
             });
             return next;
         });
-        if (Object.keys(weldUpdates).length > 0) {
-            setLastWeldByMac((prev) => ({ ...prev, ...weldUpdates }));
-        }
     };
 
     const toggleSort = (field) => {
