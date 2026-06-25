@@ -509,33 +509,6 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [equipment, modelFilter, organizationUnitFilter, statusFilter, searchTerm]);
 
-    const refreshLastWeldsFromApi = async () => {
-        if (!Array.isArray(equipment) || equipment.length === 0) return;
-        try {
-            const data = await getAllWeldingMachines();
-            const uniqueEquipment = Array.isArray(data) ? data.filter((item, index, self) =>
-                index === self.findIndex((t) => t.id === item.id)
-            ) : [];
-            seedLastWeldFromMachines(uniqueEquipment, lastWeldByMacRef, setLastWeldByMac);
-        } catch (_) {
-            // ponytail: если минутное обновление не удалось, оставляем последнее известное значение до следующего poll.
-        }
-    };
-
-    // «Последний шов»: единый источник с бэкенда, обновляем не чаще раза в минуту.
-    useEffect(() => {
-        if (!Array.isArray(equipment) || equipment.length === 0) return;
-        let cancelled = false;
-        const intervalId = setInterval(() => {
-            if (!cancelled) refreshLastWeldsFromApi();
-        }, LAST_WELD_POLL_INTERVAL_MS);
-        return () => {
-            cancelled = true;
-            clearInterval(intervalId);
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [equipment.length]);
-
     const computeStatusFromState = (machine, stateObj) => {
         // Для CORE используем WeldingMachineState из посылки
         // Для остальных: сварка если ток > 1А (Current или State.I), иначе включен если есть данные, иначе выключен
