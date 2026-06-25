@@ -16,7 +16,6 @@ import {
 import { getAllEmployees } from '../api/employeeApi';
 import { getArchivePanelState } from '../api/archiveDeviceApi';
 import {
-    isWeldingPanelState,
     resolveLastWeldDisplay,
     seedLastWeldFromMachines,
 } from '../utils/weldingMachineLastWeld';
@@ -510,42 +509,31 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [equipment, modelFilter, organizationUnitFilter, statusFilter, searchTerm]);
 
-    const refreshLastWeldDisplayFromRef = () => {
-        const snapshot = lastWeldByMacRef.current;
-        if (!snapshot || Object.keys(snapshot).length === 0) return;
-        setLastWeldByMac((prev) => {
-            let changed = false;
-            const next = { ...prev };
-            for (const [mac, ts] of Object.entries(snapshot)) {
-                if (next[mac] !== ts) {
-                    next[mac] = ts;
-                    changed = true;
-                }
-            }
-            return changed ? next : prev;
-        });
-    };
-
-    const noteLastWeldFromPanel = (mac, resolvedState) => {
-        if (!mac || !resolvedState || !isWeldingPanelState(resolvedState)) return;
-        const now = Date.now();
-        const prev = lastWeldByMacRef.current[mac];
-        if (prev == null || now > prev) {
-            lastWeldByMacRef.current[mac] = now;
+    const refreshLastWeldsFromApi = async () => {
+        if (!Array.isArray(equipment) || equipment.length === 0) return;
+        try {
+            const data = await getAllWeldingMachines();
+            const uniqueEquipment = Array.isArray(data) ? data.filter((item, index, self) =>
+                index === self.findIndex((t) => t.id === item.id)
+            ) : [];
+            seedLastWeldFromMachines(uniqueEquipment, lastWeldByMacRef, setLastWeldByMac);
+        } catch (_) {
+            // ponytail: если минутное обновление не удалось, оставляем последнее известное значение до следующего poll.
         }
     };
 
-    // «Последний шов»: панель опрашивается вместе со статусами (4 с), на экран — раз в минуту.
+    // «Последний шов»: единый источник с бэкенда, обновляем не чаще раза в минуту.
     useEffect(() => {
         if (!Array.isArray(equipment) || equipment.length === 0) return;
         let cancelled = false;
         const intervalId = setInterval(() => {
-            if (!cancelled) refreshLastWeldDisplayFromRef();
+            if (!cancelled) refreshLastWeldsFromApi();
         }, LAST_WELD_POLL_INTERVAL_MS);
         return () => {
             cancelled = true;
             clearInterval(intervalId);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [equipment.length]);
 
     const computeStatusFromState = (machine, stateObj) => {
@@ -605,8 +593,6 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                 const props = resolvedState?.properties || {};
                 const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState || null;
 
-                noteLastWeldFromPanel(mac, resolvedState);
-
                 return [mac, status, rawState];
             } catch {
                 const lastSeen = lastGoodSeenAtRef.current[mac];
@@ -615,7 +601,6 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                     const status = computeStatusFromState(machine, cachedState);
                     const props = cachedState?.properties || {};
                     const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState || null;
-                    noteLastWeldFromPanel(mac, cachedState);
                     return [mac, status, rawState];
                 }
                 return [mac, 'off', null];
