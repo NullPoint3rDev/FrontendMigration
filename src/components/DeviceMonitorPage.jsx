@@ -575,17 +575,7 @@ function getMachineActivityModeFromPanelState(state) {
     return 'on';
 }
 
-/** Live + история: дуга по тексту «Сварка» или по газу/току/напряжению (Core при «Аппарат включен»). */
-function isArcWeldingFromPanelState(state) {
-    if (isWeldingFromPanelState(state)) return true;
-    const sample = extractTelemetrySampleFromPanelState(state);
-    const gas = Number(sample.gasFlow) || 0;
-    const current = Number(sample.weldingCurrent) || 0;
-    const voltage = Number(sample.weldingVoltage) || 0;
-    return gas > 0.15 && current > 10 && voltage > 0.5;
-}
-
-function buildHistoryPointFromPanelPoll(state, xPoll, arcWelding) {
+function buildHistoryPointFromPanelPoll(state, xPoll, weldingNow) {
     const { current, voltage } = extractCurrentVoltageFromPanelState(state);
     const yi = Math.round(Number(current) * 10) / 10;
     const yu = Math.round(Number(voltage) * 10) / 10;
@@ -594,13 +584,13 @@ function buildHistoryPointFromPanelPoll(state, xPoll, arcWelding) {
     const rfid = flat['RFID.Hex'] || flat.RFID || flat.Rfid || flat.rfid || null;
     return {
         ts: xPoll,
-        current: arcWelding ? yi : null,
-        voltage: arcWelding ? yu : null,
-        setCurrent: arcWelding ? null : (yi > 0 ? yi : null),
-        setVoltage: arcWelding ? null : (yu > 0 ? yu : null),
+        current: weldingNow ? yi : null,
+        voltage: weldingNow ? yu : null,
+        setCurrent: weldingNow ? null : (yi > 0 ? yi : null),
+        setVoltage: weldingNow ? null : (yu > 0 ? yu : null),
         gasFlowLpm: sample.gasFlow ?? null,
-        status: arcWelding ? 'Welding' : String(flat.status || flat.Status || 'Idle'),
-        isWelding: arcWelding,
+        status: weldingNow ? 'Welding' : String(flat.status || flat.Status || 'Idle'),
+        isWelding: weldingNow,
         machineStateText: pickMachineStateTextFromPanel(state),
         errorCode: parseErrorCodeForTimeline(state),
         rfid: rfid ? String(rfid).trim() : null,
@@ -615,18 +605,9 @@ const isHistoryPointWelding = (p) => {
     const st = String(p.status || '').toLowerCase();
     if (st === 'welding') return true;
     const text = String(p.machineStateText || '').toLowerCase().trim();
-    if (text === 'сварка' || text === 'welding' || text.includes('свароч')) return true;
-    const gas = Number(p.gasFlowLpm);
-    const cur = p.current != null && p.current !== undefined
-        ? Number(p.current)
-        : (p.setCurrent != null && p.setCurrent !== undefined ? Number(p.setCurrent) : 0);
-    let volt = 0;
-    if (p.voltage != null && p.voltage !== undefined) {
-        volt = Number(p.voltage) / 10;
-    } else if (p.setVoltage != null && p.setVoltage !== undefined) {
-        volt = (Number(p.setVoltage) || 0) / 10;
-    }
-    return Number.isFinite(gas) && gas > 0.15 && cur > 10 && volt > 0.5;
+    if (text === 'сварка' || text === 'welding') return true;
+    return text.includes('сварка') || text.includes('welding')
+        || text.includes('свароч') || text.includes('weld');
 };
 
 const isTsInWeldingSegments = (ts, segments) => (
@@ -2384,7 +2365,7 @@ const DeviceMonitorPage = () => {
                 // Реалтайм-графики: одна точка на каждый успешный poll (как WeldingMachinePanel.updateChart)
                 const { current: iRaw, voltage: uRaw } = extractCurrentVoltageFromPanelState(response);
                 const telemetrySample = extractTelemetrySampleFromPanelState(response);
-                const wNow = isArcWeldingFromPanelState(response);
+                const wNow = isWeldingFromPanelState(response);
                 const wasArc = prevWeldingForChartRef.current === true;
                 const yi = Math.round(Number(iRaw) * 10) / 10;
                 const yu = Math.round(Number(uRaw) * 10) / 10;
