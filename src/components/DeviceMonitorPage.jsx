@@ -617,8 +617,15 @@ const isHistoryPointWelding = (p) => {
     const text = String(p.machineStateText || '').toLowerCase().trim();
     if (text === 'сварка' || text === 'welding' || text.includes('свароч')) return true;
     const gas = Number(p.gasFlowLpm);
-    const cur = p.current != null ? Number(p.current) : 0;
-    const volt = p.voltage != null ? Number(p.voltage) / 10 : 0;
+    const cur = p.current != null && p.current !== undefined
+        ? Number(p.current)
+        : (p.setCurrent != null && p.setCurrent !== undefined ? Number(p.setCurrent) : 0);
+    let volt = 0;
+    if (p.voltage != null && p.voltage !== undefined) {
+        volt = Number(p.voltage) / 10;
+    } else if (p.setVoltage != null && p.setVoltage !== undefined) {
+        volt = (Number(p.setVoltage) || 0) / 10;
+    }
     return Number.isFinite(gas) && gas > 0.15 && cur > 10 && volt > 0.5;
 };
 
@@ -685,13 +692,13 @@ function clampWeldingChartSeriesToSegments(series, weldingSegments) {
     });
 }
 
-/** Сортировка: по x; на одном x — сначала больший y (вертикальный спад). */
+/** Сортировка: по x; на одном x — сначала меньший y (0, затем фронт вверх — stepped:'after' и тултип). */
 function finalizeWeldingChartSeries(points) {
     const sorted = [...(points || [])]
         .filter((p) => p && Number.isFinite(p.x) && p.y !== null && p.y !== undefined && !Number.isNaN(Number(p.y)))
         .sort((a, b) => {
             if (a.x !== b.x) return a.x - b.x;
-            return Number(b.y) - Number(a.y);
+            return Number(a.y) - Number(b.y);
         });
     const out = [];
     sorted.forEach((p) => {
@@ -703,13 +710,14 @@ function finalizeWeldingChartSeries(points) {
     return out;
 }
 
-/** Нулевые якоря на каждом опросе вне сварки — иначе stepped: 'after' держит плато до следующей точки. */
-function collectIdleWeldingChartAnchors(timelineSamples, windowStart, windowEnd) {
+/** Нулевые якоря вне сегментов сварки — иначе stepped: 'after' держит плато до следующей точки. */
+function collectIdleWeldingChartAnchors(timelineSamples, windowStart, windowEnd, weldingSegments) {
     const anchors = [];
     (timelineSamples || []).forEach((s) => {
         if (!s || !Number.isFinite(s.x)) return;
         if (s.x < windowStart || s.x > windowEnd) return;
         if (s.isWelding) return;
+        if (isTsInWeldingSegments(s.x, weldingSegments)) return;
         anchors.push({ x: s.x, y: 0 });
     });
     return anchors;
@@ -1084,7 +1092,7 @@ function buildWeldingFactChartSeries(points, mapY, windowStart, windowEnd, weldi
     push(windowStart, 0);
 
     if (!segs.length) {
-        collectIdleWeldingChartAnchors(timelineSamples, windowStart, windowEnd).forEach((p) => push(p.x, p.y));
+        collectIdleWeldingChartAnchors(timelineSamples, windowStart, windowEnd, segs).forEach((p) => push(p.x, p.y));
         push(windowEnd, 0);
         return finalizeWeldingChartSeries(out);
     }
@@ -1127,21 +1135,27 @@ function buildWeldingFactChartSeries(points, mapY, windowStart, windowEnd, weldi
         prevSegEnd = seg.end;
     });
 
-    collectIdleWeldingChartAnchors(timelineSamples, windowStart, windowEnd).forEach((p) => push(p.x, p.y));
+    collectIdleWeldingChartAnchors(timelineSamples, windowStart, windowEnd, segs).forEach((p) => push(p.x, p.y));
 
     if (prevSegEnd < windowEnd || out[out.length - 1]?.x !== windowEnd) {
         push(windowEnd, 0);
     }
 
-    return clampWeldingChartSeriesToSegments(finalizeWeldingChartSeries(out), segs);
+    return finalizeWeldingChartSeries(out);
 }
 
 function mapHistoryCurrentY(p) {
-    return p.current === null || p.current === undefined ? 0 : Number(p.current);
+    if (!isHistoryPointWelding(p)) return 0;
+    if (p.current !== null && p.current !== undefined) return Number(p.current);
+    if (p.setCurrent !== null && p.setCurrent !== undefined) return Number(p.setCurrent);
+    return 0;
 }
 
 function mapHistoryVoltageY(p) {
-    return p.voltage === null || p.voltage === undefined ? 0 : (Number(p.voltage) || 0) / 10;
+    if (!isHistoryPointWelding(p)) return 0;
+    if (p.voltage !== null && p.voltage !== undefined) return (Number(p.voltage) || 0) / 10;
+    if (p.setVoltage !== null && p.setVoltage !== undefined) return (Number(p.setVoltage) || 0) / 10;
+    return 0;
 }
 
 /** Сварочный ток/напряжение в истории: из сырых точек окна, без decimate. */
@@ -1659,11 +1673,18 @@ const DeviceMonitorPage = () => {
             (pts || []).forEach((p) => {
                 const ts = Number(p.ts);
                 if (!Number.isFinite(ts)) return;
-                const normalized = {
+                const existing = cache.pointsByTs.get(ts);
+                const fromApi = {
                     ...p,
                     isWelding: p.isWelding === true || isHistoryPointWelding(p),
                 };
-                cache.pointsByTs.set(ts, normalized);
+                if (existing && (existing.isWelding === true || isHistoryPointWelding(existing))) {
+                    fromApi.isWelding = true;
+                    if (fromApi.current == null && existing.current != null) fromApi.current = existing.current;
+                    if (fromApi.voltage == null && existing.voltage != null) fromApi.voltage = existing.voltage;
+                    if (fromApi.gasFlowLpm == null && existing.gasFlowLpm != null) fromApi.gasFlowLpm = existing.gasFlowLpm;
+                }
+                cache.pointsByTs.set(ts, fromApi);
                 added += 1;
             });
             setHistoryCacheRevision((r) => r + 1);
@@ -2468,7 +2489,7 @@ const DeviceMonitorPage = () => {
                 });
                 prevWeldingForChartRef.current = wNow;
 
-                if (!historyModeRef.current && !todayPinExploreRef.current) {
+                if (!historyModeRef.current) {
                     const todayStr = toLocalDateInput(new Date());
                     const [yyyy, mm, dd] = todayStr.split('-').map((x) => parseInt(x, 10));
                     const dayStart = new Date(yyyy, mm - 1, dd, 0, 0, 0, 0).getTime();
@@ -2485,6 +2506,7 @@ const DeviceMonitorPage = () => {
                         xPoll,
                         buildHistoryPointFromPanelPoll(response, xPoll, wNow)
                     );
+                    setHistoryCacheRevision((r) => r + 1);
                 }
 
                 if (wasArc && !wNow) {
@@ -4056,8 +4078,9 @@ const DeviceMonitorPage = () => {
         if (!graphUsesServerData) return [];
         const windowStart = activeWindow.start;
         const windowEnd = activeWindow.end;
+        const timelineFromCache = buildHistoryTimelineForWindow(windowStart, windowEnd);
         let laneEnd = windowEnd;
-        const samples = (historyTimelineSnapshot || []).filter(
+        const samples = timelineFromCache.filter(
             (s) => Number.isFinite(s?.x) && s.x >= windowStart && s.x <= windowEnd
         );
         let lastTs = null;
@@ -4070,14 +4093,14 @@ const DeviceMonitorPage = () => {
         }
         laneEnd = Math.max(windowStart, laneEnd);
         return buildHistoryWeldingSegmentsForWindow(
-            historyTimelineSnapshot,
+            timelineFromCache,
             windowStart,
             windowEnd,
             laneEnd
         );
     }, [
         graphUsesServerData,
-        historyTimelineSnapshot,
+        buildHistoryTimelineForWindow,
         historyCacheRevision,
         activeWindow.start,
         activeWindow.end,
@@ -4097,9 +4120,7 @@ const DeviceMonitorPage = () => {
                 if (ts >= windowStart && ts <= windowEnd) rawPoints.push(p);
             });
             rawPoints.sort((a, b) => a.ts - b.ts);
-            const timelineSamples = (historyTimelineSnapshot || []).filter(
-                (s) => Number.isFinite(s?.x) && s.x >= windowStart && s.x <= windowEnd
-            );
+            const timelineSamples = buildHistoryTimelineForWindow(windowStart, windowEnd);
             const weldingPair = prepareWeldingHistoryPairForChart(
                 rawPoints,
                 windowStart,
@@ -4129,6 +4150,7 @@ const DeviceMonitorPage = () => {
         HISTORY_CHART_MAX_POINTS,
         historyCacheRevision,
         historyWeldingSegments,
+        buildHistoryTimelineForWindow,
     ]);
 
     const rulerPinBounds = useMemo(() => {
@@ -4314,9 +4336,6 @@ const DeviceMonitorPage = () => {
             const isVoltage = channelKey === 'weldingVoltage';
             const stepped = usesSteppedChartChannel(channelKey);
             let data = raw.map(mapPt);
-            if (graphUsesServerData && (isCurrent || isVoltage)) {
-                data = clampWeldingChartSeriesToSegments(data, historyWeldingSegments).map(mapPt);
-            }
 
             return {
                 label: channel.label,
@@ -4354,10 +4373,19 @@ const DeviceMonitorPage = () => {
         mainsVoltagePhases,
     ]);
 
-    const timelineInWindow = useMemo(
-        () => (graphUsesServerData ? historyTimelineSnapshot : timelineSamples).filter((s) => s.x >= activeWindow.start && s.x <= activeWindow.end),
-        [timelineSamples, historyTimelineSnapshot, graphUsesServerData, activeWindow.start, activeWindow.end]
-    );
+    const timelineInWindow = useMemo(() => {
+        if (graphUsesServerData) {
+            return buildHistoryTimelineForWindow(activeWindow.start, activeWindow.end);
+        }
+        return timelineSamples.filter((s) => s.x >= activeWindow.start && s.x <= activeWindow.end);
+    }, [
+        timelineSamples,
+        graphUsesServerData,
+        activeWindow.start,
+        activeWindow.end,
+        buildHistoryTimelineForWindow,
+        historyCacheRevision,
+    ]);
 
     /** Дорожка «Состояние»: убрать ложные короткие Offline из истории (см. sanitizeBriefOfflineBetweenOnline). */
     const timelineForStateLane = useMemo(
