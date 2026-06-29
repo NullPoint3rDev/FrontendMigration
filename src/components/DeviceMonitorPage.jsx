@@ -575,15 +575,6 @@ function getMachineActivityModeFromPanelState(state) {
     return 'on';
 }
 
-function pickMachineStateTextFromPanel(state) {
-    const data = flattenPanelState(state);
-    return data['Состояние аппарата']
-        || data['WeldingMachineState']
-        || data['State.WeldingMachineState']
-        || data.weldingMachineState
-        || null;
-}
-
 /** Live + история: дуга по тексту «Сварка» или по газу/току/напряжению (Core при «Аппарат включен»). */
 function isArcWeldingFromPanelState(state) {
     if (isWeldingFromPanelState(state)) return true;
