@@ -575,7 +575,61 @@ function getMachineActivityModeFromPanelState(state) {
     return 'on';
 }
 
-const isHistoryPointWelding = (p) => String(p?.status || '').toLowerCase() === 'welding';
+function pickMachineStateTextFromPanel(state) {
+    const data = flattenPanelState(state);
+    return data['Состояние аппарата']
+        || data['WeldingMachineState']
+        || data['State.WeldingMachineState']
+        || data.weldingMachineState
+        || null;
+}
+
+/** Live + история: дуга по тексту «Сварка» или по газу/току/напряжению (Core при «Аппарат включен»). */
+function isArcWeldingFromPanelState(state) {
+    if (isWeldingFromPanelState(state)) return true;
+    const sample = extractTelemetrySampleFromPanelState(state);
+    const gas = Number(sample.gasFlow) || 0;
+    const current = Number(sample.weldingCurrent) || 0;
+    const voltage = Number(sample.weldingVoltage) || 0;
+    return gas > 0.15 && current > 10 && voltage > 0.5;
+}
+
+function buildHistoryPointFromPanelPoll(state, xPoll, arcWelding) {
+    const { current, voltage } = extractCurrentVoltageFromPanelState(state);
+    const yi = Math.round(Number(current) * 10) / 10;
+    const yu = Math.round(Number(voltage) * 10) / 10;
+    const sample = extractTelemetrySampleFromPanelState(state);
+    const flat = flattenPanelState(state);
+    const rfid = flat['RFID.Hex'] || flat.RFID || flat.Rfid || flat.rfid || null;
+    return {
+        ts: xPoll,
+        current: arcWelding ? yi : null,
+        voltage: arcWelding ? yu : null,
+        setCurrent: arcWelding ? null : (yi > 0 ? yi : null),
+        setVoltage: arcWelding ? null : (yu > 0 ? yu : null),
+        gasFlowLpm: sample.gasFlow ?? null,
+        status: arcWelding ? 'Welding' : String(flat.status || flat.Status || 'Idle'),
+        isWelding: arcWelding,
+        machineStateText: pickMachineStateTextFromPanel(state),
+        errorCode: parseErrorCodeForTimeline(state),
+        rfid: rfid ? String(rfid).trim() : null,
+    };
+}
+
+const isHistoryPointWelding = (p) => {
+    if (!p) return false;
+    if (p.isWelding === true) return true;
+    if (p.isWelding === false) return false;
+    if (isStandbyMachineState(p.machineStateText)) return false;
+    const st = String(p.status || '').toLowerCase();
+    if (st === 'welding') return true;
+    const text = String(p.machineStateText || '').toLowerCase().trim();
+    if (text === 'сварка' || text === 'welding' || text.includes('свароч')) return true;
+    const gas = Number(p.gasFlowLpm);
+    const cur = p.current != null ? Number(p.current) : 0;
+    const volt = p.voltage != null ? Number(p.voltage) / 10 : 0;
+    return Number.isFinite(gas) && gas > 0.15 && cur > 10 && volt > 0.5;
+};
 
 const isTsInWeldingSegments = (ts, segments) => (
     Array.isArray(segments)
@@ -1580,7 +1634,7 @@ const DeviceMonitorPage = () => {
             return {
                 x: p.ts,
                 isOnline: st !== 'offline' && !standby,
-                isWelding: st === 'welding' && !standby,
+                isWelding: isHistoryPointWelding(p) && !standby,
                 errorCode: p.errorCode,
                 rfid: p.rfid,
             };
@@ -1609,15 +1663,16 @@ const DeviceMonitorPage = () => {
             const pts = await archiveDeviceApi.getArchiveTelemetryHistory(machineMac, fromMs, toMs);
 
             const cache = historyCacheRef.current;
-            /** Только после успешного ответа: иначе при ошибке/узком окне зума терялись уже загруженные точки и показывалась ложная ошибка. */
-            for (const ts of Array.from(cache.pointsByTs.keys())) {
-                if (ts >= fromMs && ts <= toMs) cache.pointsByTs.delete(ts);
-            }
+            /** Дозаписываем точки API; live-точки в окне не сбрасываем — иначе теряется сварка до появления в БД. */
             let added = 0;
             (pts || []).forEach((p) => {
                 const ts = Number(p.ts);
                 if (!Number.isFinite(ts)) return;
-                cache.pointsByTs.set(ts, p);
+                const normalized = {
+                    ...p,
+                    isWelding: p.isWelding === true || isHistoryPointWelding(p),
+                };
+                cache.pointsByTs.set(ts, normalized);
                 added += 1;
             });
             setHistoryCacheRevision((r) => r + 1);
@@ -2317,8 +2372,8 @@ const DeviceMonitorPage = () => {
                 // Реалтайм-графики: одна точка на каждый успешный poll (как WeldingMachinePanel.updateChart)
                 const { current: iRaw, voltage: uRaw } = extractCurrentVoltageFromPanelState(response);
                 const telemetrySample = extractTelemetrySampleFromPanelState(response);
-                const wNow = isWeldingFromPanelState(response);
-                const wasWelding = prevWeldingForChartRef.current === true;
+                const wNow = isArcWeldingFromPanelState(response);
+                const wasArc = prevWeldingForChartRef.current === true;
                 const yi = Math.round(Number(iRaw) * 10) / 10;
                 const yu = Math.round(Number(uRaw) * 10) / 10;
                 const flatState = flattenPanelState(response);
@@ -2331,7 +2386,7 @@ const DeviceMonitorPage = () => {
                 const wasWelderPresent = prevWelderPresentForChartRef.current === true;
                 const setCurrentY = resolveSetChartY({
                     wNow,
-                    wasWelding,
+                    wasWelding: wasArc,
                     weldingSource: idleControlMetricsRef.current.current,
                     idleSource: yi,
                     holdRef: lastSetWeldingCurrentHoldRef,
@@ -2339,7 +2394,7 @@ const DeviceMonitorPage = () => {
                 });
                 const setVoltageY = resolveSetChartY({
                     wNow,
-                    wasWelding,
+                    wasWelding: wasArc,
                     weldingSource: idleControlMetricsRef.current.voltage,
                     idleSource: yu,
                     holdRef: lastSetWeldingVoltageHoldRef,
@@ -2359,7 +2414,7 @@ const DeviceMonitorPage = () => {
                             const series = appendWeldingPulseSeries(
                                 prev.weldingCurrent || [],
                                 yi,
-                                wasWelding,
+                                wasArc,
                                 wNow,
                                 lastWeldingCurrentChartRef,
                                 xPoll
@@ -2369,7 +2424,7 @@ const DeviceMonitorPage = () => {
                             const series = appendWeldingPulseSeries(
                                 prev.weldingVoltage || [],
                                 yu,
-                                wasWelding,
+                                wasArc,
                                 wNow,
                                 lastWeldingVoltageChartRef,
                                 xPoll
@@ -2421,6 +2476,29 @@ const DeviceMonitorPage = () => {
                     return clipped.length > 6000 ? clipped.slice(-6000) : clipped;
                 });
                 prevWeldingForChartRef.current = wNow;
+
+                if (!historyModeRef.current && !todayPinExploreRef.current) {
+                    const todayStr = toLocalDateInput(new Date());
+                    const [yyyy, mm, dd] = todayStr.split('-').map((x) => parseInt(x, 10));
+                    const dayStart = new Date(yyyy, mm - 1, dd, 0, 0, 0, 0).getTime();
+                    const cache = historyCacheRef.current;
+                    if (cache.date !== todayStr) {
+                        historyCacheRef.current = {
+                            date: todayStr,
+                            dayStart,
+                            dayEnd: dayStart + HISTORY_MAX_MS,
+                            pointsByTs: new Map(),
+                        };
+                    }
+                    historyCacheRef.current.pointsByTs.set(
+                        xPoll,
+                        buildHistoryPointFromPanelPoll(response, xPoll, wNow)
+                    );
+                }
+
+                if (wasArc && !wNow) {
+                    refreshDailyStatsFromServer();
+                }
 
                 if (
                     !historyModeRef.current &&
@@ -4249,42 +4327,23 @@ const DeviceMonitorPage = () => {
                 data = clampWeldingChartSeriesToSegments(data, historyWeldingSegments).map(mapPt);
             }
 
-            const historyWeldingFill = false;
-
             return {
                 label: channel.label,
                 data,
                 borderColor: channel.color,
                 backgroundColor: (isCurrent || isVoltage)
-                    ? (historyWeldingFill
-                        ? ((context) => {
-                            const chart = context.chart;
-                            const { ctx, chartArea } = chart;
-                            if (!chartArea) return isCurrent ? 'rgba(62,199,255,0.2)' : 'rgba(255,97,200,0.2)';
-                            return isCurrent
-                                ? createGradient(ctx, chartArea, 'rgba(62,199,255,0.55)', 'rgba(62,199,255,0.02)')
-                                : createGradient(ctx, chartArea, 'rgba(255,97,200,0.48)', 'rgba(255,97,200,0.02)');
-                        })
-                        : 'transparent')
+                    ? (context) => {
+                        const chart = context.chart;
+                        const { ctx, chartArea } = chart;
+                        if (!chartArea) return isCurrent ? 'rgba(62,199,255,0.2)' : 'rgba(255,97,200,0.2)';
+                        return isCurrent
+                            ? createGradient(ctx, chartArea, 'rgba(62,199,255,0.55)', 'rgba(62,199,255,0.02)')
+                            : createGradient(ctx, chartArea, 'rgba(255,97,200,0.48)', 'rgba(255,97,200,0.02)');
+                    }
                     : (graphUsesServerData ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.04)'),
-                fill: (isCurrent || isVoltage)
-                    ? (graphUsesServerData ? historyWeldingFill : true)
-                    : false,
+                fill: isCurrent || isVoltage ? true : false,
                 yAxisID: resolveChannelYAxisId(channelKey),
                 ...(stepped ? { stepped: 'after' } : {}),
-                ...(graphUsesServerData && (isCurrent || isVoltage) && historyWeldingSegments.length
-                    ? {
-                        segment: {
-                            borderColor: (ctx) => {
-                                const x0 = ctx?.p0?.parsed?.x;
-                                const x1 = ctx?.p1?.parsed?.x;
-                                if (!Number.isFinite(x0) || !Number.isFinite(x1)) return channel.color;
-                                const mid = (x0 + x1) / 2;
-                                return isTsInWeldingSegments(mid, historyWeldingSegments) ? channel.color : 'rgba(0,0,0,0)';
-                            },
-                        },
-                    }
-                    : {}),
             };
         };
 
@@ -5197,6 +5256,7 @@ const DeviceMonitorPage = () => {
 
         try {
             await ensureHistoryIntervalLoaded(todayStr, start, end);
+            setHistoryCacheRevision((r) => r + 1);
             setHistorySeriesSnapshot(buildHistorySeriesForWindow(start, end));
             setHistoryTimelineSnapshot(buildHistoryTimelineForWindow(start, end));
         } catch {
