@@ -1143,9 +1143,10 @@ function mapHistoryCurrentY(p) {
 
 function mapHistoryVoltageY(p) {
     if (!isHistoryPointWelding(p)) return 0;
-    const v = p.voltage !== null && p.voltage !== undefined
-        ? toWeldingVoltageVolts(p.voltage)
-        : toWeldingVoltageVolts(p.setVoltage);
+    let v = toWeldingVoltageVolts(p.voltage);
+    if ((v == null || v === 0) && p.setVoltage != null && p.setVoltage !== undefined) {
+        v = toWeldingVoltageVolts(p.setVoltage);
+    }
     return v != null ? v : 0;
 }
 
