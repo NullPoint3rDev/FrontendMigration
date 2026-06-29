@@ -5334,6 +5334,13 @@ const DeviceMonitorPage = () => {
                     </div>
                 </div>
                 <div className="monitor-page-header-controls">
+                    <span className="monitor-page-header-clock" aria-hidden="true">
+                        {new Date(currentTime).toLocaleTimeString('ru-RU', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false,
+                        })}
+                    </span>
                     <button
                         type="button"
                         className="monitor-page-notifications-btn"

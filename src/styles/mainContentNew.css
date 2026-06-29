@@ -126,6 +126,17 @@
     gap: 10px;
 }
 
+.monitor-page-header-clock {
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: rgba(206, 216, 235, 0.95);
+    letter-spacing: 0.04em;
+    min-width: 3.2em;
+    text-align: center;
+    user-select: none;
+}
+
 .monitor-page-notifications-btn {
     position: relative;
     width: 34px;
