@@ -432,6 +432,15 @@ function extractCurrentVoltageFromPanelState(state) {
     return { current, voltage };
 }
 
+/** История/API: Voltage в десятых вольта (>100) или уже в вольтах — как extractCurrentVoltageFromPanelState. */
+function toWeldingVoltageVolts(raw) {
+    if (raw === null || raw === undefined || raw === '') return null;
+    const n = Number(String(raw).replace(',', '.'));
+    if (!Number.isFinite(n)) return null;
+    if (n > 100) return n / 10;
+    return n;
+}
+
 function extractTelemetrySampleFromPanelState(state) {
     const { current, voltage } = extractCurrentVoltageFromPanelState(state);
 
@@ -1134,9 +1143,10 @@ function mapHistoryCurrentY(p) {
 
 function mapHistoryVoltageY(p) {
     if (!isHistoryPointWelding(p)) return 0;
-    if (p.voltage !== null && p.voltage !== undefined) return (Number(p.voltage) || 0) / 10;
-    if (p.setVoltage !== null && p.setVoltage !== undefined) return (Number(p.setVoltage) || 0) / 10;
-    return 0;
+    const v = p.voltage !== null && p.voltage !== undefined
+        ? toWeldingVoltageVolts(p.voltage)
+        : toWeldingVoltageVolts(p.setVoltage);
+    return v != null ? v : 0;
 }
 
 /** Сварочный ток/напряжение в истории: из сырых точек окна, без decimate. */
@@ -1559,11 +1569,12 @@ const DeviceMonitorPage = () => {
             return Number.isFinite(n) ? n : null;
         };
         const mapCurrentY = (p) => (p.current === null || p.current === undefined ? 0 : Number(p.current));
-        const mapVoltageY = (p) => (p.voltage === null || p.voltage === undefined ? 0 : (Number(p.voltage) || 0) / 10);
+        const mapVoltageY = (p) => {
+            const v = toWeldingVoltageVolts(p.voltage);
+            return v != null ? v : 0;
+        };
         const mapSetCurrentY = (p) => (p.setCurrent === null || p.setCurrent === undefined ? null : Number(p.setCurrent));
-        const mapSetVoltageY = (p) => (
-            p.setVoltage === null || p.setVoltage === undefined ? null : (Number(p.setVoltage) || 0) / 10
-        );
+        const mapSetVoltageY = (p) => toWeldingVoltageVolts(p.setVoltage);
 
         return {
             ...DEFAULT_TELEMETRY_SERIES,
