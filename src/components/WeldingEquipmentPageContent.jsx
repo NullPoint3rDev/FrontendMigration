@@ -832,7 +832,6 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                 weldingMachineType: dataToUse.weldingMachineType,
                 assignedWelders: dataToUse.assignedWelders || [],
                 maintenanceInterval: maintenanceIntervalValue,
-                maintenanceRegulation: maintenanceIntervalValue,
                 userServiceNotifiedBeforeHours: maintenanceReminderValue,
             };
 

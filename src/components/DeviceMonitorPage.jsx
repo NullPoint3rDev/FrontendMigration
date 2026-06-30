@@ -2222,7 +2222,6 @@ const DeviceMonitorPage = () => {
     // Рефы для экземпляров Chart.js
     const currentChartInstanceRef = useRef(null);
     const voltageChartInstanceRef = useRef(null);
-    const liveWindowEndRef = useRef(null);
 
     // Сброс графиков при смене MAC (другой аппарат)
     useEffect(() => {
@@ -2236,7 +2235,6 @@ const DeviceMonitorPage = () => {
         setTelemetryChartZoom({ top: 1, bottom: 1 });
         setTimelineSamples([]);
         setTimeWindow({ start: null, end: null, touched: false });
-        liveWindowEndRef.current = null;
         historyPinWindowsRef.current = {};
         prevGraphDateForPinStorageRef.current = null;
     }, [machineMac]);
@@ -2578,13 +2576,7 @@ const DeviceMonitorPage = () => {
                     !todayPinExploreRef.current &&
                     activeTabRef.current === 'graphs'
                 ) {
-                    const newStart = xPoll - LIVE_WINDOW_MS;
-                    const newEnd = xPoll;
-                    const prevEnd = liveWindowEndRef.current;
-                    if (prevEnd == null || Math.abs(newEnd - prevEnd) >= 3000) {
-                        liveWindowEndRef.current = newEnd;
-                        setTimeWindow({ start: newStart, end: newEnd, touched: true });
-                    }
+                    setTimeWindow({ start: xPoll - LIVE_WINDOW_MS, end: xPoll, touched: true });
                 }
 
                 const store = telemetryHistoryStoreRef.current;

@@ -745,7 +745,6 @@ function EnterpriseMapPageSimpleContent({ initialUser = null }) {
             weldingMachineType: null,
             assignedWelders: data.approvedWelders || [],
             maintenanceInterval: maintenanceIntervalValue,
-            maintenanceRegulation: maintenanceIntervalValue,
             userServiceNotifiedBeforeHours: maintenanceReminderValue,
         };
 
