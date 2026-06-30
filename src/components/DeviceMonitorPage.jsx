@@ -682,16 +682,19 @@ function clampWeldingChartSeriesToSegments(series, weldingSegments) {
     });
 }
 
-/** Сортировка: по x; на одном x — сначала меньший y (0, затем фронт вверх — stepped:'after' и тултип). */
+/** Сортировка по x; на одном x сохраняем порядок вставки (0→y и y→0 для stepped:'after'). */
 function finalizeWeldingChartSeries(points) {
-    const sorted = [...(points || [])]
-        .filter((p) => p && Number.isFinite(p.x) && p.y !== null && p.y !== undefined && !Number.isNaN(Number(p.y)))
-        .sort((a, b) => {
-            if (a.x !== b.x) return a.x - b.x;
-            return Number(a.y) - Number(b.y);
-        });
+    const indexed = (points || [])
+        .map((p, i) => ({ p, i }))
+        .filter(
+            ({ p }) => p && Number.isFinite(p.x) && p.y !== null && p.y !== undefined && !Number.isNaN(Number(p.y))
+        );
+    indexed.sort((a, b) => {
+        if (a.p.x !== b.p.x) return a.p.x - b.p.x;
+        return a.i - b.i;
+    });
     const out = [];
-    sorted.forEach((p) => {
+    indexed.forEach(({ p }) => {
         const y = Math.round(Number(p.y) * 10) / 10;
         const prev = out[out.length - 1];
         if (prev && prev.x === p.x && prev.y === y) return;
