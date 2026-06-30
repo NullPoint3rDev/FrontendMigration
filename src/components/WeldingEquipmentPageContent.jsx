@@ -230,6 +230,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         let maintenanceTechnicianName = '';
         let maintenanceTechnicianPass = '';
         let responsibleUserId = '';
+        let responsiblePerson = '';
         let assignedWelders = Array.isArray(item.assignedWelders) ? item.assignedWelders : [];
         let maintenanceInterval = item.maintenanceInterval ?? item.maintenanceRegulation ?? '';
         let maintenanceReminderHours = item.userServiceNotifiedBeforeHours ?? '';
@@ -257,6 +258,9 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                     }
                     if (parsed.responsibleUserId) {
                         responsibleUserId = String(parsed.responsibleUserId);
+                    }
+                    if (parsed.responsiblePerson) {
+                        responsiblePerson = String(parsed.responsiblePerson);
                     }
                     if (parsed.allowedWelders && Array.isArray(parsed.allowedWelders)) {
                         assignedWelders = parsed.allowedWelders;
@@ -292,6 +296,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
             maintenanceTechnicianName,
             maintenanceTechnicianPass,
             responsibleUserId,
+            responsiblePerson,
             modules: item.modules || null,
         });
         setErrors({});
@@ -851,6 +856,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                         technicianName: dataToUse.maintenanceTechnicianName || '',
                         technicianPass: dataToUse.maintenanceTechnicianPass || '',
                     },
+                    responsiblePerson: dataToUse.responsiblePerson || '',
                     responsibleUserId: dataToUse.responsibleUserId ? Number(dataToUse.responsibleUserId) : null,
                     allowedWelders: dataToUse.assignedWelders || [],
                     maintenanceReminderHours: maintenanceReminderValue,
@@ -1721,9 +1727,16 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                                     deviceModel: deviceModel,
                                     mac: data.macAddress || '',
                                     commissionDate: data.commissioningDate || '',
+                                    lastService: data.lastMaintenanceDate || '',
                                     serialNumber: data.serialNumber || '',
                                     inventoryNumber: data.inventoryNumber || '',
                                     organizationUnit: visibleOrganizationUnits.find(unit => unit.name === data.department) || null,
+                                    maintenanceInterval: data.operatingHours !== '' && data.operatingHours != null
+                                        ? Number(data.operatingHours)
+                                        : '',
+                                    maintenanceTechnicianName: data.maintenancePerson || '',
+                                    maintenanceTechnicianPass: data.maintenancePass || '',
+                                    responsiblePerson: data.responsiblePerson || '',
                                     coreOptions: {
                                         gasControl: data.options?.gasControl || false,
                                         rfid: data.options?.rfid || false,

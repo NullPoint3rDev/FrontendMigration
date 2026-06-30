@@ -1337,6 +1337,36 @@ ChartJS.register(
     thresholdLinePlugin
 );
 
+function parseMachineModules(modulesJson) {
+    if (!modulesJson) return {};
+    try {
+        const parsed = JSON.parse(modulesJson);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+function formatInfoDate(value) {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return d.toLocaleDateString('ru-RU');
+}
+
+function formatMacGroups(mac) {
+    if (!mac) return '—';
+    const clean = String(mac).replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+    if (clean.length !== 12) return mac;
+    return clean.match(/.{1,4}/g).join(' ');
+}
+
+function formatOperatingHours(hours) {
+    if (hours == null || hours === '') return '—';
+    const n = Number(hours);
+    return Number.isFinite(n) ? `${n} ч` : String(hours);
+}
+
 const DeviceMonitorPage = () => {
     const { canWriteEquipment: canWriteEquipmentPerm } = useCurrentUserPermissions();
     const [searchParams] = useSearchParams();
@@ -1378,6 +1408,7 @@ const DeviceMonitorPage = () => {
 
     // Состояние для хранения ID аппарата (для удаления)
     const [machineId, setMachineId] = useState(null);
+    const [machineDetails, setMachineDetails] = useState(null);
     const [isDeletingMachine, setIsDeletingMachine] = useState(false);
     const [rfidLookup, setRfidLookup] = useState({ status: 'idle' });
     /** Кэш поиска по RFID: не перезапрашивать при каждом poll телеметрии, только при смене кода */
@@ -2086,6 +2117,40 @@ const DeviceMonitorPage = () => {
     }, [machineMac]);
 
     useEffect(() => {
+        if (!machineId) {
+            setMachineDetails(null);
+            return undefined;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const machine = await getWeldingMachineById(machineId);
+                if (!cancelled) setMachineDetails(machine);
+            } catch (err) {
+                console.error('Ошибка загрузки данных аппарата:', err);
+                if (!cancelled) setMachineDetails(null);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [machineId]);
+
+    const machineModules = useMemo(
+        () => parseMachineModules(machineDetails?.modules),
+        [machineDetails?.modules]
+    );
+    const infoOptions = machineModules.options || {};
+    const infoMaintenance = machineModules.maintenance || {};
+    const infoResponsiblePerson = machineModules.responsiblePerson || '—';
+    const infoWtModuleMac = machineModules.wtModuleMac || machineDetails?.mac || machineMac;
+    const infoOptionBadge = (enabled) => ({
+        text: enabled ? 'Активно' : 'Неактивно',
+        className: enabled ? 'info-tile-badge-inactive' : 'info-tile-badge-active',
+    });
+    const gasControlBadge = infoOptionBadge(Boolean(infoOptions.gasControl));
+    const rfidBadge = infoOptionBadge(Boolean(infoOptions.rfid));
+    const bvoBadge = infoOptionBadge(Boolean(infoOptions.bvo));
+
+    useEffect(() => {
         const code = telemetryRfidCode;
         if (!code) {
             rfidLookupCacheRef.current = { code: null, snapshot: null };
@@ -2157,6 +2222,7 @@ const DeviceMonitorPage = () => {
     // Рефы для экземпляров Chart.js
     const currentChartInstanceRef = useRef(null);
     const voltageChartInstanceRef = useRef(null);
+    const liveWindowEndRef = useRef(null);
 
     // Сброс графиков при смене MAC (другой аппарат)
     useEffect(() => {
@@ -2170,6 +2236,7 @@ const DeviceMonitorPage = () => {
         setTelemetryChartZoom({ top: 1, bottom: 1 });
         setTimelineSamples([]);
         setTimeWindow({ start: null, end: null, touched: false });
+        liveWindowEndRef.current = null;
         historyPinWindowsRef.current = {};
         prevGraphDateForPinStorageRef.current = null;
     }, [machineMac]);
@@ -2511,7 +2578,13 @@ const DeviceMonitorPage = () => {
                     !todayPinExploreRef.current &&
                     activeTabRef.current === 'graphs'
                 ) {
-                    setTimeWindow({ start: xPoll - LIVE_WINDOW_MS, end: xPoll, touched: true });
+                    const newStart = xPoll - LIVE_WINDOW_MS;
+                    const newEnd = xPoll;
+                    const prevEnd = liveWindowEndRef.current;
+                    if (prevEnd == null || Math.abs(newEnd - prevEnd) >= 3000) {
+                        liveWindowEndRef.current = newEnd;
+                        setTimeWindow({ start: newStart, end: newEnd, touched: true });
+                    }
                 }
 
                 const store = telemetryHistoryStoreRef.current;
@@ -5590,7 +5663,7 @@ const DeviceMonitorPage = () => {
                                     )}
                                 </div>
                             ) : (
-                                <span className="welder-no-rfid-hint">Нет данных RFID</span>
+                                <span className="welder-no-rfid-hint">Для добавления сварщика приложите пропуск к ИП</span>
                             )}
                         </div>
                     </div>
@@ -5777,104 +5850,97 @@ const DeviceMonitorPage = () => {
                                 <div className="info-tile">
                                     <div className="info-tile-row info-tile-row-editable">
                                         <span className="info-tile-label">Ответственное лицо</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">{infoResponsiblePerson}</span>
                                         <span className="info-tile-edit" aria-hidden>✎</span>
                                     </div>
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">Серийный номер ИП</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">{machineDetails?.serialNumber || '—'}</span>
                                     </div>
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">Инвентарный номер</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">{machineDetails?.inventoryNumber || '—'}</span>
                                     </div>
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">Дата ввода в эксплуатацию</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">{formatInfoDate(machineDetails?.commissionDate)}</span>
                                     </div>
                                     <button type="button" className="info-tile-btn">Обновление ПО ИП</button>
                                 </div>
                                 <div className="info-tile">
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">МАС адрес модуля WT</span>
-                                        <span className="info-tile-value">{machineMac || '1223 2323 2356 12'}</span>
+                                        <span className="info-tile-value">{formatMacGroups(infoWtModuleMac)}</span>
                                     </div>
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">Дата выпуска WT</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">{machineDetails?.manufactureYear || '—'}</span>
                                     </div>
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">Серийный номер</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">{machineDetails?.serialNumber || '—'}</span>
                                     </div>
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">Версия ПО модуля WT</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">—</span>
                                     </div>
                                     <button type="button" className="info-tile-btn">Обновление ПО WT</button>
                                 </div>
                                 <div className="info-tile">
                                     <div className="info-tile-status-row">
                                         <span className="info-tile-label">Система контроля газа</span>
-                                        <span className="info-tile-badge info-tile-badge-active">Неактивно</span>
+                                        <span className={`info-tile-badge ${gasControlBadge.className}`}>{gasControlBadge.text}</span>
                                     </div>
                                     <div className="info-tile-status-row">
                                         <span className="info-tile-label">RFID</span>
-                                        <span className="info-tile-badge info-tile-badge-inactive">Активно</span>
+                                        <span className={`info-tile-badge ${rfidBadge.className}`}>{rfidBadge.text}</span>
                                     </div>
                                     <div className="info-tile-status-row">
                                         <span className="info-tile-label">БВО</span>
-                                        <span className="info-tile-badge info-tile-badge-active">Активно</span>
-                                    </div>
-                                    <div className="info-tile-row info-tile-row-editable">
-                                        <span className="info-tile-value"></span>
-                                        <span className="info-tile-edit" aria-hidden>✎</span>
+                                        <span className={`info-tile-badge ${bvoBadge.className}`}>{bvoBadge.text}</span>
                                     </div>
                                 </div>
                                 <div className="info-tile info-tile-software">
-                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
-                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО Лицовой платы</span><span className="info-tile-value"></span></div>
-                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО БВО</span><span className="info-tile-value"></span></div>
-                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
-                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
-                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value"></span></div>
+                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value">—</span></div>
+                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО Лицовой платы</span><span className="info-tile-value">—</span></div>
+                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО БВО</span><span className="info-tile-value">—</span></div>
                                 </div>
                                 <div className="info-tile">
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">Дата последнего ТО</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">{formatInfoDate(machineDetails?.lastService || infoMaintenance.lastServiceDate)}</span>
                                     </div>
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">ФИО проводившего ТО</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">{infoMaintenance.technicianName || '—'}</span>
                                     </div>
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">Пропуск проводившего ТО</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">{infoMaintenance.technicianPass || '—'}</span>
                                     </div>
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">Время до планового ремонта</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">—</span>
                                     </div>
                                 </div>
                                 <div className="info-tile">
                                     <div className="info-tile-row info-tile-row-editable">
                                         <span className="info-tile-label">Наработка между ТО</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">{formatOperatingHours(machineDetails?.maintenanceInterval ?? infoMaintenance.intervalHours)}</span>
                                         <span className="info-tile-edit" aria-hidden>✎</span>
                                     </div>
                                     <div className="info-tile-row info-tile-row-editable">
                                         <span className="info-tile-label">Время между ТО</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">{formatOperatingHours(machineDetails?.maintenanceRegulation ?? infoMaintenance.intervalHours)}</span>
                                         <span className="info-tile-edit" aria-hidden>✎</span>
                                     </div>
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">Наработка до ТО</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">—</span>
                                     </div>
                                     <div className="info-tile-row">
                                         <span className="info-tile-label">Время до ТО</span>
-                                        <span className="info-tile-value"></span>
+                                        <span className="info-tile-value">—</span>
                                     </div>
                                     <button type="button" className="info-tile-btn">История ТО ИП</button>
                                 </div>
@@ -5979,7 +6045,7 @@ const DeviceMonitorPage = () => {
                                                     className={`chart-canvas${chartPlotCursorHidden ? ' chart-canvas--plot-cursor-none' : ''}`}
                                                 >
                                                     <Line
-                                                        key={`history-chart-${activeWindow.start}-${activeWindow.end}-${historyCacheRevision}`}
+                                                        key="monitor-telemetry-chart"
                                                         data={topChartData}
                                                         options={telemetryOverlayChartOptions}
                                                         ref={(chart) => {

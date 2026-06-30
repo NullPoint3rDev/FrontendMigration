@@ -704,8 +704,9 @@ function EnterpriseMapPageSimpleContent({ initialUser = null }) {
             }
         }
 
-        const maintenanceIntervalValue = data.maintenanceInterval !== '' && data.maintenanceInterval != null
-            ? Number(data.maintenanceInterval)
+        const maintenanceIntervalRaw = data.operatingHours ?? data.maintenanceInterval;
+        const maintenanceIntervalValue = maintenanceIntervalRaw !== '' && maintenanceIntervalRaw != null
+            ? Number(maintenanceIntervalRaw)
             : null;
         if (maintenanceIntervalValue != null && (Number.isNaN(maintenanceIntervalValue) || maintenanceIntervalValue < 0)) {
             newErrors.maintenanceInterval = 'Значение должно быть неотрицательным числом';
@@ -760,9 +761,10 @@ function EnterpriseMapPageSimpleContent({ initialUser = null }) {
                 maintenance: {
                     intervalHours: maintenanceIntervalValue,
                     lastServiceDate: lastServiceValue,
-                    technicianName: '',
-                    technicianPass: '',
+                    technicianName: data.maintenancePerson || '',
+                    technicianPass: data.maintenancePass || '',
                 },
+                responsiblePerson: data.responsiblePerson || '',
                 responsibleUserId: null,
                 allowedWelders: data.approvedWelders || [],
                 maintenanceReminderHours: maintenanceReminderValue,
