@@ -1139,6 +1139,79 @@ function buildWeldingFactChartSeries(points, mapY, windowStart, windowEnd, weldi
     return finalizeWeldingChartSeries(out);
 }
 
+/**
+ * История: «прямоугольник» шва по фактическому току/напряжению > 0, не по флагу isWelding.
+ * Иначе внутри жёлтой дорожки нулевые опросы рвут верхнюю линию, а тултип залипает.
+ */
+function buildWeldingArcPulseSeries(points, mapY, windowStart, windowEnd) {
+    if (!Number.isFinite(windowStart) || !Number.isFinite(windowEnd) || windowEnd <= windowStart) {
+        return [];
+    }
+    const sorted = (points || [])
+        .filter((p) => p && Number.isFinite(p.ts))
+        .sort((a, b) => a.ts - b.ts);
+
+    const out = [];
+    const push = (x, yRaw) => {
+        const y = Math.round(Number(yRaw) * 10) / 10;
+        const prev = out[out.length - 1];
+        if (prev && prev.x === x && prev.y === y) return;
+        out.push({ x, y });
+    };
+
+    push(windowStart, 0);
+    let inArc = false;
+    let lastY = 0;
+    let lastArcX = null;
+
+    sorted.forEach((p) => {
+        const x = p.ts;
+        if (x < windowStart || x > windowEnd) return;
+        const y = Math.round(Number(mapY(p)) * 10) / 10;
+        const arcOn = Number.isFinite(y) && y > 0;
+
+        if (!arcOn) {
+            if (inArc) {
+                push(x, lastY);
+                push(x, 0);
+                inArc = false;
+                lastY = 0;
+                lastArcX = null;
+            }
+            return;
+        }
+
+        if (!inArc) {
+            push(x, 0);
+            push(x, y);
+            inArc = true;
+        } else if (y !== lastY) {
+            if (lastY === 0) push(x, 0);
+            push(x, y);
+        }
+        lastY = y;
+        lastArcX = x;
+    });
+
+    if (inArc && lastArcX != null) {
+        let closeX = windowEnd;
+        for (const p of sorted) {
+            if (p.ts > lastArcX && p.ts <= windowEnd) {
+                closeX = p.ts;
+                break;
+            }
+        }
+        if (closeX > lastArcX) {
+            push(closeX, lastY);
+        }
+        push(closeX, 0);
+    }
+    if (out[out.length - 1]?.y !== 0 || out[out.length - 1]?.x !== windowEnd) {
+        push(windowEnd, 0);
+    }
+    return finalizeWeldingChartSeries(out);
+}
+
 function mapHistoryCurrentY(p) {
     if (!isHistoryPointWelding(p)) return 0;
     if (p.current !== null && p.current !== undefined) return Number(p.current);
@@ -1176,33 +1249,14 @@ function mapHistoryVoltageYInWeldingSegment(p) {
     return v != null ? v : 0;
 }
 
-/** История: обрезка stepped-серии по сегментам сварки + нулевые якоря на границах. */
-function sealWeldingHistoryChartSeries(series, weldingSegments, windowStart, windowEnd, timelineSamples) {
-    const clamped = clampWeldingChartSeriesToSegments(series, weldingSegments);
-    const extra = [];
-    (weldingSegments || []).forEach((seg) => {
-        if (Number.isFinite(seg?.end)) extra.push({ x: seg.end, y: 0 });
-    });
-    collectIdleWeldingChartAnchors(timelineSamples, windowStart, windowEnd, weldingSegments).forEach((p) => {
-        extra.push(p);
-    });
-    return finalizeWeldingChartSeries([...clamped, ...extra]);
-}
-
-/** Сварочный ток/напряжение в истории: из сырых точек окна, без decimate. */
-function prepareWeldingHistoryPairForChart(rawPoints, windowStart, windowEnd, weldingSegments, timelineSamples) {
-    const current = buildWeldingFactChartSeries(
-        rawPoints, mapHistoryCurrentYInWeldingSegment, windowStart, windowEnd, weldingSegments, timelineSamples
-    );
-    const voltage = buildWeldingFactChartSeries(
-        rawPoints, mapHistoryVoltageYInWeldingSegment, windowStart, windowEnd, weldingSegments, timelineSamples
-    );
+/** Сварочный ток/напряжение в истории: импульсы по факту дуги (y > 0), без decimate. */
+function prepareWeldingHistoryPairForChart(rawPoints, windowStart, windowEnd) {
     return {
-        weldingCurrent: sealWeldingHistoryChartSeries(
-            current, weldingSegments, windowStart, windowEnd, timelineSamples
+        weldingCurrent: buildWeldingArcPulseSeries(
+            rawPoints, mapHistoryCurrentYInWeldingSegment, windowStart, windowEnd
         ),
-        weldingVoltage: sealWeldingHistoryChartSeries(
-            voltage, weldingSegments, windowStart, windowEnd, timelineSamples
+        weldingVoltage: buildWeldingArcPulseSeries(
+            rawPoints, mapHistoryVoltageYInWeldingSegment, windowStart, windowEnd
         ),
     };
 }
@@ -4219,13 +4273,10 @@ const DeviceMonitorPage = () => {
                 if (ts >= windowStart && ts <= windowEnd) rawPoints.push(p);
             });
             rawPoints.sort((a, b) => a.ts - b.ts);
-            const timelineSamples = buildHistoryTimelineForWindow(windowStart, windowEnd);
             const weldingPair = prepareWeldingHistoryPairForChart(
                 rawPoints,
                 windowStart,
-                windowEnd,
-                historyWeldingSegments,
-                timelineSamples
+                windowEnd
             );
             out.weldingCurrent = weldingPair.weldingCurrent;
             out.weldingVoltage = weldingPair.weldingVoltage;
@@ -4621,14 +4672,8 @@ const DeviceMonitorPage = () => {
         valueAtTsSteppedAfter(series, ts)
     ), [valueAtTsSteppedAfter]);
 
-    /** История: ток/напряжение вне жёлтого сегмента сварки — 0 в тултипе. */
-    const resolveHistoryWeldingTooltipValue = useCallback((channelKey, series, ts, weldingSegments) => {
-        if (channelKey !== 'weldingCurrent' && channelKey !== 'weldingVoltage') {
-            return resolveSteppedTooltipValue(channelKey, series, ts);
-        }
-        if (!isTsInWeldingSegments(ts, weldingSegments)) {
-            return 0;
-        }
+    /** История: тултип = значение с линии графика (stepped), без привязки к дорожке «Состояние». */
+    const resolveHistoryWeldingTooltipValue = useCallback((channelKey, series, ts) => {
         const stepped = resolveSteppedTooltipValue(channelKey, series, ts);
         return stepped == null ? 0 : stepped;
     }, [resolveSteppedTooltipValue]);
@@ -4659,7 +4704,7 @@ const DeviceMonitorPage = () => {
             const stepped = usesSteppedChartChannel(channelKey);
             let value = stepped
                 ? (graphUsesServerData && (channelKey === 'weldingCurrent' || channelKey === 'weldingVoltage')
-                    ? resolveHistoryWeldingTooltipValue(channelKey, raw, hoverCursor.ts, historyWeldingSegments)
+                    ? resolveHistoryWeldingTooltipValue(channelKey, raw, hoverCursor.ts)
                     : resolveSteppedTooltipValue(channelKey, raw, hoverCursor.ts))
                 : findNearestPointValue(raw, hoverCursor.ts);
             if (value == null && channelKey !== 'welderPresence') return;
@@ -4750,7 +4795,7 @@ const DeviceMonitorPage = () => {
             const raw = displaySeries[key] || [];
             const val = usesSteppedChartChannel(key)
                 ? (graphUsesServerData && (key === 'weldingCurrent' || key === 'weldingVoltage')
-                    ? resolveHistoryWeldingTooltipValue(key, raw, ts, historyWeldingSegments)
+                    ? resolveHistoryWeldingTooltipValue(key, raw, ts)
                     : resolveSteppedTooltipValue(key, raw, ts))
                 : findNearestPointValue(raw, ts);
             if (val != null && Number.isFinite(val)) {
