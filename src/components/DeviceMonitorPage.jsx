@@ -151,51 +151,23 @@ const DAILY_STATS_REFRESH_MS = 10000;
 /** Интервал poll panel-state (см. startPolling). */
 const PANEL_STATE_POLL_MS = 1300;
 
-const DAILY_STATS_MONOTONIC_INITIAL = {
-    statDate: null,
-    offMs: 0,
-    errorMs: 0,
-    onMs: 0,
-    weldingMs: 0,
-    wireKg: 0,
-};
-
 function applyDailyStatsDto(
     setDailyActivity,
     setDailyWireConsumptionKg,
     setDailyGasConsumptionL,
     gasDayBaselineRef,
     gasSessionBaselineRef,
-    dailyStatsMonotonicRef,
     dto
 ) {
     if (!dto) return;
-    const statDate = dto.statDate || null;
-    const mono = dailyStatsMonotonicRef?.current || { ...DAILY_STATS_MONOTONIC_INITIAL };
-    if (statDate && mono.statDate !== statDate) {
-        mono.statDate = statDate;
-        mono.offMs = 0;
-        mono.errorMs = 0;
-        mono.onMs = 0;
-        mono.weldingMs = 0;
-        mono.wireKg = 0;
-    }
-    mono.offMs = Math.max(mono.offMs, Math.max(0, Number(dto.offMs) || 0));
-    mono.errorMs = Math.max(mono.errorMs, Math.max(0, Number(dto.errorMs ?? dto.standbyMs) || 0));
-    mono.onMs = Math.max(mono.onMs, Math.max(0, Number(dto.onMs) || 0));
-    mono.weldingMs = Math.max(mono.weldingMs, Math.max(0, Number(dto.weldingMs) || 0));
-    const kg = dto.wireConsumptionKg != null ? Number(dto.wireConsumptionKg) : 0;
-    mono.wireKg = Math.max(mono.wireKg, Math.max(0, Number.isFinite(kg) ? kg : 0));
-    if (dailyStatsMonotonicRef) {
-        dailyStatsMonotonicRef.current = mono;
-    }
     setDailyActivity({
-        offMs: mono.offMs,
-        errorMs: mono.errorMs,
-        onMs: mono.onMs,
-        weldingMs: mono.weldingMs,
+        offMs: Math.max(0, Number(dto.offMs) || 0),
+        errorMs: Math.max(0, Number(dto.errorMs ?? dto.standbyMs) || 0),
+        onMs: Math.max(0, Number(dto.onMs) || 0),
+        weldingMs: Math.max(0, Number(dto.weldingMs) || 0),
     });
-    setDailyWireConsumptionKg(mono.wireKg);
+    const kg = dto.wireConsumptionKg != null ? Number(dto.wireConsumptionKg) : 0;
+    setDailyWireConsumptionKg(Math.max(0, Number.isFinite(kg) ? kg : 0));
     const gasL = dto.gasConsumptionL != null ? Number(dto.gasConsumptionL) : 0;
     setDailyGasConsumptionL(Math.max(0, Number.isFinite(gasL) ? gasL : 0));
     if (gasDayBaselineRef && dto.gasBaselineAtDayStartL != null && Number.isFinite(Number(dto.gasBaselineAtDayStartL))) {
@@ -1547,7 +1519,6 @@ const DeviceMonitorPage = () => {
     const gasSmoothRef = useRef({ anchored: 0, extra: 0, lastPollMs: 0 });
     const lastPanelStateRef = useRef(null);
     const dailyStatsIntervalRef = useRef(null);
-    const dailyStatsMonotonicRef = useRef({ ...DAILY_STATS_MONOTONIC_INITIAL });
     const liveGasCtxRef = useRef(null);
     liveGasCtxRef.current = {
         setLiveDailyGasLiters,
@@ -2111,7 +2082,6 @@ const DeviceMonitorPage = () => {
                 setDailyGasConsumptionL,
                 gasDayBaselineRef,
                 gasSessionBaselineRef,
-                dailyStatsMonotonicRef,
                 dto
             );
             setDailyWireStatsLoaded(true);
@@ -2135,7 +2105,6 @@ const DeviceMonitorPage = () => {
         dailyGasFromServerRef.current = 0;
         gasSmoothRef.current = { anchored: 0, extra: 0, lastPollMs: 0 };
         lastPanelStateRef.current = null;
-        dailyStatsMonotonicRef.current = { ...DAILY_STATS_MONOTONIC_INITIAL };
         setDailyActivity({ ...DAILY_ACTIVITY_INITIAL });
         setLiveDailyGasLiters(0);
         setDailyWireConsumptionKg(0);
