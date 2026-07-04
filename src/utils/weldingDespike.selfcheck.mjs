@@ -3,7 +3,7 @@
  * Падает с ненулевым кодом, если фильтр despike сломан.
  */
 import assert from 'node:assert/strict';
-import { medianOf3, despikeValuesMedian3 } from './weldingDespike.js';
+import { medianOf3, despikeValuesMedian3, despikeValuesMedian3WithinRuns } from './weldingDespike.js';
 
 // median
 assert.equal(medianOf3(1, 2, 3), 2);
@@ -32,5 +32,12 @@ assert.deepEqual(despikeValuesMedian3([25, 25, 25]), [25, 25, 25]);
 
 // Крайние точки не трогаем даже если это выброс.
 assert.deepEqual(despikeValuesMedian3([999, 30, 30, 30]), [999, 30, 30, 30]);
+
+// Медиана не протекает через offline между двумя участками сварки.
+assert.deepEqual(despikeValuesMedian3([53, 65, 0, 48]), [53, 53, 48, 48]);
+assert.deepEqual(
+    despikeValuesMedian3WithinRuns([53, 65, 0, 48], [true, true, false, true]),
+    [53, 65, 0, 48]
+);
 
 console.log('weldingDespike self-check OK');

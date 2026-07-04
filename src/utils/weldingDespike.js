@@ -34,3 +34,35 @@ export function despikeValuesMedian3(values) {
     }
     return out;
 }
+
+/**
+ * Медиана «3 точки» внутри каждого непрерывного isActive-участка.
+ * Offline между сваркой не участвует — иначе медиана «протекает» в паузу
+ * (тултип 48 В, а линия держит 65 В с предыдущего участка).
+ */
+export function despikeValuesMedian3WithinRuns(values, isActive) {
+    const n = values?.length || 0;
+    if (n === 0) return [];
+    const out = values.slice();
+    let runStart = -1;
+    const flush = (runEnd) => {
+        if (runStart < 0) return;
+        const len = runEnd - runStart;
+        if (len >= 3) {
+            const seg = despikeValuesMedian3(out.slice(runStart, runEnd));
+            for (let j = 0; j < len; j += 1) {
+                out[runStart + j] = seg[j];
+            }
+        }
+        runStart = -1;
+    };
+    for (let i = 0; i < n; i += 1) {
+        if (isActive[i]) {
+            if (runStart < 0) runStart = i;
+        } else {
+            flush(i);
+        }
+    }
+    flush(n);
+    return out;
+}

@@ -36,7 +36,7 @@ import {
     isStandbyMachineState,
     STANDBY_MACHINE_STATE_DISPLAY,
 } from '../utils/weldingMachineStateDisplay';
-import { despikeValuesMedian3 } from '../utils/weldingDespike';
+import { despikeValuesMedian3WithinRuns } from '../utils/weldingDespike';
 
 // Названия ошибок по коду 1–23 (синхронно с EquipmentErrorMessages и протоколом аппарата: 1–10, 17–21)
 const EQUIPMENT_ERROR_MESSAGES = [
@@ -1141,6 +1141,7 @@ function buildSimpleWeldingSteppedSeries(points, mapY, windowStart, windowEnd, w
         sorted.forEach((p) => {
             const x = p.ts;
             if (x < seg.start || x > seg.end) return;
+            if (!isHistoryPointWelding(p)) return;
             const y = Math.round(Number(mapY(p)) * 10) / 10;
             if (!Number.isFinite(y) || y <= 0) return;
             if (y !== lastY) {
@@ -1163,32 +1164,16 @@ function buildDespikedHistoryWeldingSamples(rawPoints) {
     const sorted = (rawPoints || [])
         .filter((p) => p && Number.isFinite(p.ts))
         .sort((a, b) => a.ts - b.ts);
-    const despikedCurrent = despikeValuesMedian3(sorted.map(mapHistoryFactCurrentY));
-    const despikedVoltage = despikeValuesMedian3(sorted.map(mapHistoryFactVoltageY));
+    const isWelding = sorted.map((p) => isHistoryPointWelding(p));
+    const rawCurrent = sorted.map((p, i) => (isWelding[i] ? mapHistoryFactCurrentY(p) : 0));
+    const rawVoltage = sorted.map((p, i) => (isWelding[i] ? mapHistoryFactVoltageY(p) : 0));
+    const despikedCurrent = despikeValuesMedian3WithinRuns(rawCurrent, isWelding);
+    const despikedVoltage = despikeValuesMedian3WithinRuns(rawVoltage, isWelding);
     return sorted.map((p, i) => ({
         ts: p.ts,
-        current: despikedCurrent[i],
-        voltage: despikedVoltage[i],
+        current: isWelding[i] ? despikedCurrent[i] : 0,
+        voltage: isWelding[i] ? despikedVoltage[i] : 0,
     }));
-}
-
-/** stepped:'after' по отсчётам опроса: последний poll с ts ≤ cursor внутри сегмента сварки. */
-function weldingFactValueAtTs(samples, weldingSegments, ts, field) {
-    if (!Number.isFinite(ts) || !Array.isArray(samples) || !samples.length) return null;
-    if (!isTsInWeldingSegments(ts, weldingSegments)) return 0;
-    const seg = (weldingSegments || []).find(
-        (s) => Number.isFinite(s?.start) && Number.isFinite(s?.end) && ts >= s.start && ts <= s.end
-    );
-    if (!seg) return 0;
-    let best = null;
-    for (const s of samples) {
-        if (s.ts > ts) break;
-        if (s.ts < seg.start || s.ts > seg.end) continue;
-        best = s;
-    }
-    if (!best) return 0;
-    const v = Number(best[field]);
-    return Number.isFinite(v) ? Math.max(0, v) : 0;
 }
 
 function mapHistoryCurrentY(p) {
@@ -1212,17 +1197,16 @@ function mapHistoryVoltageY(p) {
 }
 
 /**
- * Сварочный ток/напряжение в истории: despiked raw → stepped-серии + samples для тултипа.
+ * Сварочный ток/напряжение в истории: despiked raw → stepped-серии для Chart.js.
  */
 function prepareWeldingHistoryForWindow(rawPoints, windowStart, windowEnd, weldingSegments) {
     const sorted = (rawPoints || [])
         .filter((p) => p && Number.isFinite(p.ts))
         .sort((a, b) => a.ts - b.ts);
-    const hoverSamples = buildDespikedHistoryWeldingSamples(sorted);
-    const currentByTs = new Map(hoverSamples.map((s) => [s.ts, s.current]));
-    const voltageByTs = new Map(hoverSamples.map((s) => [s.ts, s.voltage]));
+    const samples = buildDespikedHistoryWeldingSamples(sorted);
+    const currentByTs = new Map(samples.map((s) => [s.ts, s.current]));
+    const voltageByTs = new Map(samples.map((s) => [s.ts, s.voltage]));
     return {
-        hoverSamples,
         weldingCurrent: buildSimpleWeldingSteppedSeries(
             sorted, (p) => currentByTs.get(p.ts) ?? 0, windowStart, windowEnd, weldingSegments
         ),
@@ -4687,26 +4671,11 @@ const DeviceMonitorPage = () => {
         });
         const addSelectedRow = (channelKey, slotName) => {
             if (!channelKey || channelKey === 'mainsVoltage') return;
-            let value;
-            if (
-                graphUsesServerData
-                && historyWeldingChartBundle?.hoverSamples
-                && (channelKey === 'weldingCurrent' || channelKey === 'weldingVoltage')
-            ) {
-                const field = channelKey === 'weldingCurrent' ? 'current' : 'voltage';
-                value = weldingFactValueAtTs(
-                    historyWeldingChartBundle.hoverSamples,
-                    historyWeldingSegments,
-                    hoverCursor.ts,
-                    field
-                );
-            } else {
-                const raw = displaySeries[channelKey] || [];
-                const stepped = usesSteppedChartChannel(channelKey);
-                value = stepped
-                    ? resolveSteppedTooltipValue(channelKey, raw, hoverCursor.ts)
-                    : findNearestPointValue(raw, hoverCursor.ts);
-            }
+            const raw = displaySeries[channelKey] || [];
+            const stepped = usesSteppedChartChannel(channelKey);
+            const value = stepped
+                ? resolveSteppedTooltipValue(channelKey, raw, hoverCursor.ts)
+                : findNearestPointValue(raw, hoverCursor.ts);
             if (value == null && channelKey !== 'welderPresence') return;
             const channel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === channelKey);
             if (!channel) return;
@@ -4744,8 +4713,6 @@ const DeviceMonitorPage = () => {
         hoverCursor,
         chartDisplaySeries,
         graphUsesServerData,
-        historyWeldingChartBundle,
-        historyWeldingSegments,
         telemetrySelection.slot1,
         telemetrySelection.slot2,
         telemetrySelection.slot3,
