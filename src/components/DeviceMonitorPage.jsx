@@ -36,6 +36,7 @@ import {
     isStandbyMachineState,
     STANDBY_MACHINE_STATE_DISPLAY,
 } from '../utils/weldingMachineStateDisplay';
+import { despikeValuesMedian3 } from '../utils/weldingDespike';
 
 // Названия ошибок по коду 1–23 (синхронно с EquipmentErrorMessages и протоколом аппарата: 1–10, 17–21)
 const EQUIPMENT_ERROR_MESSAGES = [
@@ -1174,14 +1175,31 @@ function mapHistoryVoltageY(p) {
     return v != null ? v : 0;
 }
 
-/** Сварочный ток/напряжение в истории: из сырых точек окна, без decimate. */
+/**
+ * Сварочный ток/напряжение в истории: из сырых точек окна, без decimate.
+ * Перед построением гасим одноточечные выбросы/провалы опроса медианой «3 точки»
+ * (обрыв дуги V→ХХ / I→единицы, полный dropout V=0&I=0) — иначе они рисуются как
+ * резкие вертикали и попадают в тултип как ложные пары (напр. 7 А / 79.7 В).
+ * Фильтруем ток и напряжение по общему порядку отсчётов — пара остаётся согласованной.
+ */
 function prepareWeldingHistoryPairForChart(rawPoints, windowStart, windowEnd, weldingSegments, timelineSamples) {
+    const sorted = (rawPoints || [])
+        .filter((p) => p && Number.isFinite(p.ts))
+        .sort((a, b) => a.ts - b.ts);
+    const currentByTs = new Map();
+    const voltageByTs = new Map();
+    const despikedCurrent = despikeValuesMedian3(sorted.map(mapHistoryCurrentY));
+    const despikedVoltage = despikeValuesMedian3(sorted.map(mapHistoryVoltageY));
+    sorted.forEach((p, i) => {
+        currentByTs.set(p.ts, despikedCurrent[i]);
+        voltageByTs.set(p.ts, despikedVoltage[i]);
+    });
     return {
         weldingCurrent: buildWeldingFactChartSeries(
-            rawPoints, mapHistoryCurrentY, windowStart, windowEnd, weldingSegments, timelineSamples
+            sorted, (p) => currentByTs.get(p.ts) ?? 0, windowStart, windowEnd, weldingSegments, timelineSamples
         ),
         weldingVoltage: buildWeldingFactChartSeries(
-            rawPoints, mapHistoryVoltageY, windowStart, windowEnd, weldingSegments, timelineSamples
+            sorted, (p) => voltageByTs.get(p.ts) ?? 0, windowStart, windowEnd, weldingSegments, timelineSamples
         ),
     };
 }
