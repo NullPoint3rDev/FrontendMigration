@@ -521,6 +521,19 @@ function isStandbyFromPanelState(state) {
     return isStandbyMachineState(pickMachineStateTextFromPanel(state));
 }
 
+/** Есть осмысленный ответ panel-state (даже если hasData ещё не успел обновиться). */
+function hasMonitorPanelPayload(data) {
+    if (!data || typeof data !== 'object') return false;
+    return Boolean(
+        data['Состояние аппарата'] ||
+        data['WeldingMachineState'] ||
+        data.weldingMachineState ||
+        data['Напряжение фазы А'] ||
+        data['VoltagePhaseA'] ||
+        data.voltagePhaseA
+    );
+}
+
 /** Та же логика, что у isWelding(), но по сырому ответу panel-state (синхронно с poll). */
 function isWeldingFromPanelState(state) {
     if (isStandbyFromPanelState(state)) return false;
@@ -2496,6 +2509,11 @@ const DeviceMonitorPage = () => {
                         const clipped = next.filter((s) => (typeof s?.x === 'number' ? s.x >= cutoff : true));
                         return clipped.length > 6000 ? clipped.slice(-6000) : clipped;
                     });
+                    // Дежурный режим — аппарат в сети; иначе hasData=false → «Не в сети» при живой телеметрии.
+                    updateConnectionStatus(true, true);
+                    setLastUpdate(new Date());
+                    setError(null);
+                    setIsConnecting(false);
                     return;
                 }
 
@@ -3601,8 +3619,8 @@ const DeviceMonitorPage = () => {
     };
 
     const getSystemParameters = () => {
-        const isDeviceOff = Object.keys(deviceData).length === 0 || !hasData;
-        const data = isDeviceOff ? null : deviceData[machineMac];
+        const data = deviceData[machineMac];
+        const isDeviceOff = (!hasData && !hasMonitorPanelPayload(data)) || Object.keys(deviceData).length === 0;
 
         const params = [];
 
@@ -4052,7 +4070,8 @@ const DeviceMonitorPage = () => {
     const rfidCode = getRfidCode();
     const hasRfidCode = rfidCode !== null;
     const currentStatusData = deviceData[machineMac] || {};
-    const machineStateValue = (!hasData || !currentStatusData)
+    const hasLivePanel = hasData || hasMonitorPanelPayload(currentStatusData);
+    const machineStateValue = !hasLivePanel
         ? 'Не в сети'
         : (currentStatusData['Состояние аппарата'] || currentStatusData['WeldingMachineState'] || currentStatusData.weldingMachineState || 'Не в сети');
     const machineStateDisplayValue = formatWeldingMachineStateDisplay(machineStateValue);
