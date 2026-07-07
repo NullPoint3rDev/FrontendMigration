@@ -789,9 +789,6 @@ function finalizeWeldingChartSeries(points) {
 /** Держим последнее ненулевое уст. значение при кратком 0 / «не сварка» в успешном poll. */
 const SET_METRIC_HOLD_MS = 6000;
 
-/** #2: короткие провалы уставки (пропуск poll / кратковременный offline) мостим; больший разрыв = реальный Выкл. */
-const SET_METRIC_SPAN_GAP_MS = 30000;
-
 const parseSetMetric = (raw) => {
     const n = parseFloat(String(raw ?? '').replace(',', '.'));
     return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
@@ -4729,9 +4726,9 @@ const DeviceMonitorPage = () => {
                 fill: isCurrent || isVoltage ? true : false,
                 yAxisID: resolveChannelYAxisId(channelKey),
                 ...(stepped ? { stepped: 'after' } : {}),
-                // #2: уставки — мостим короткие провалы (пропущенный poll / кратковременный offline),
-                // разрыв остаётся только при реальном Выкл/Выкл(деж)/Не в сети (>30с без данных).
-                ...(isSetMetric ? { spanGaps: SET_METRIC_SPAN_GAP_MS } : {}),
+                // #2: уставки — мостим любые пропуски между точками (в т.ч. сжатые плато);
+                // реальный Выкл/Выкл(деж)/Не в сети рвёт линию через null-точку.
+                ...(isSetMetric ? { spanGaps: true } : {}),
             };
         };
 
