@@ -2309,16 +2309,16 @@
     line-height: 1;
 }
 
-/* #8: кнопка загрузки суток — справа от дорожки «Состояние». */
+/* #8: кнопка загрузки суток — в правом отступе, справа от дорожки «Состояние». */
 .monitor-lane-load-btn {
     position: absolute;
-    right: 4px;
-    top: 50%;
-    transform: translateY(-50%);
+    right: 0;
+    top: 0;
+    height: 25px;
     z-index: 6;
     white-space: nowrap;
-    padding: 4px 10px;
-    font-size: 12px;
+    padding: 0 6px;
+    font-size: 10px;
     line-height: 1;
     border-radius: 4px;
     border: 1px solid rgba(118, 138, 176, 0.45);

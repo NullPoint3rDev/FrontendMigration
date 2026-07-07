@@ -786,6 +786,9 @@ function finalizeWeldingChartSeries(points) {
 /** Держим последнее ненулевое уст. значение при кратком 0 / «не сварка» в успешном poll. */
 const SET_METRIC_HOLD_MS = 6000;
 
+/** #2: короткие провалы уставки (пропуск poll / кратковременный offline) мостим; больший разрыв = реальный Выкл. */
+const SET_METRIC_SPAN_GAP_MS = 30000;
+
 const parseSetMetric = (raw) => {
     const n = parseFloat(String(raw ?? '').replace(',', '.'));
     return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
@@ -1586,8 +1589,9 @@ const DeviceMonitorPage = () => {
     const latestTimeWindowRef = useRef(timeWindow);
     latestTimeWindowRef.current = timeWindow;
     const [draggingPin, setDraggingPin] = useState(null);
-    /** #8: сутки уже подгружены кнопкой «Загрузить данные» (сброс при смене даты/режима). */
+    /** #8: сутки уже подгружены кнопкой «Загрузить данные» (сброс при смене даты/режима или пинов). */
     const [fullDayLoaded, setFullDayLoaded] = useState(false);
+    const fullDayLoadedWindowRef = useRef(null);
     /** #9: восстановление настроек графика из localStorage (per-MAC). */
     const graphPrefsRef = useRef(undefined);
     if (graphPrefsRef.current === undefined) {
@@ -2411,6 +2415,9 @@ const DeviceMonitorPage = () => {
 
     // Очистка серий при потере связи или дежурном режиме (Выкл(деж) — график как при выключенном аппарате)
     useEffect(() => {
+        // #4: во время просмотра истории не сбрасываем live-серию — она копится в фоне,
+        // чтобы при возврате в live не было пусто.
+        if (graphUsesServerDataRef.current) return;
         if (!hasData) {
             prevWeldingForChartRef.current = null;
             lastWeldingCurrentChartRef.current = 0;
@@ -2419,9 +2426,7 @@ const DeviceMonitorPage = () => {
             setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
             setTelemetryChartZoom({ top: 1, bottom: 1 });
             setTimelineSamples([]);
-            if (!graphUsesServerDataRef.current) {
-                setTimeWindow({ start: null, end: null, touched: false });
-            }
+            setTimeWindow({ start: null, end: null, touched: false });
             return;
         }
         const data = deviceData[machineMac];
@@ -2435,9 +2440,7 @@ const DeviceMonitorPage = () => {
         prevWelderPresentForChartRef.current = false;
         setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
         setTelemetryChartZoom({ top: 1, bottom: 1 });
-        if (!graphUsesServerDataRef.current) {
-            setTimeWindow({ start: null, end: null, touched: false });
-        }
+        setTimeWindow({ start: null, end: null, touched: false });
     }, [hasData, deviceData, machineMac]);
 
     // Отслеживание состояния сварки для таймера
@@ -2523,10 +2526,11 @@ const DeviceMonitorPage = () => {
                 prevWeldingForChartRef.current = null;
                 lastWeldingCurrentChartRef.current = 0;
                 lastWeldingVoltageChartRef.current = 0;
-                setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
-                setTelemetryChartZoom({ top: 1, bottom: 1 });
-                setTimelineSamples([]);
+                // #4: во время истории не сбрасываем live-серию (копится в фоне).
                 if (!graphUsesServerDataRef.current) {
+                    setTelemetrySeries(DEFAULT_TELEMETRY_SERIES);
+                    setTelemetryChartZoom({ top: 1, bottom: 1 });
+                    setTimelineSamples([]);
                     setTimeWindow({ start: null, end: null, touched: false });
                 }
                 disconnectTimeoutRef.current = null;
@@ -4410,13 +4414,39 @@ const DeviceMonitorPage = () => {
         historyWeldingSegments,
     ]);
 
+    /**
+     * #3: история за сегодня (todayPinExplore) — сварочный ток/напряжение из тех же live-точек кэша
+     * (импульсами, как в live), чтобы график совпадал 1-в-1. Для прошлых дат — сегментная реконструкция из БД.
+     */
+    const todayWeldingPulseBundle = useMemo(() => {
+        if (!graphUsesServerData || !todayPinExplore) return null;
+        const windowStart = activeWindow.start;
+        const windowEnd = activeWindow.end;
+        const pts = [];
+        historyCacheRef.current.pointsByTs.forEach((p, ts) => {
+            if (ts >= windowStart && ts <= windowEnd) pts.push(p);
+        });
+        pts.sort((a, b) => a.ts - b.ts);
+        const cur = buildWeldingPulseSeriesFromHistoryPoints(
+            pts, (p) => (p.current == null ? 0 : Number(p.current))
+        );
+        const vol = buildWeldingPulseSeriesFromHistoryPoints(
+            pts, (p) => { const v = toWeldingVoltageVolts(p.voltage); return v != null ? v : 0; }
+        );
+        return {
+            weldingCurrent: decimateWeldingPulseSeries(cur, HISTORY_CHART_MAX_POINTS),
+            weldingVoltage: decimateWeldingPulseSeries(vol, HISTORY_CHART_MAX_POINTS),
+        };
+    }, [graphUsesServerData, todayPinExplore, activeWindow.start, activeWindow.end, historyCacheRevision, HISTORY_CHART_MAX_POINTS]);
+
     /** Те же точки, что рисует Chart.js; тултип сварки — из hoverSamples bundle. */
     const chartDisplaySeries = useMemo(() => {
         const src = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
         const out = { ...src };
-        if (historyWeldingChartBundle) {
-            out.weldingCurrent = historyWeldingChartBundle.weldingCurrent;
-            out.weldingVoltage = historyWeldingChartBundle.weldingVoltage;
+        const weldingBundle = todayWeldingPulseBundle || historyWeldingChartBundle;
+        if (weldingBundle) {
+            out.weldingCurrent = weldingBundle.weldingCurrent;
+            out.weldingVoltage = weldingBundle.weldingVoltage;
         }
         TELEMETRY_CHANNELS_CONFIG.forEach((ch) => {
             if (ch.key === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(ch.key)) return;
@@ -4439,6 +4469,7 @@ const DeviceMonitorPage = () => {
         historyWeldingSegments,
         buildHistoryTimelineForWindow,
         historyWeldingChartBundle,
+        todayWeldingPulseBundle,
     ]);
 
     const rulerPinBounds = useMemo(() => {
@@ -4622,6 +4653,7 @@ const DeviceMonitorPage = () => {
             const raw = src[channelKey] || [];
             const isCurrent = channelKey === 'weldingCurrent';
             const isVoltage = channelKey === 'weldingVoltage';
+            const isSetMetric = channelKey === 'setWeldingCurrent' || channelKey === 'setWeldingVoltage';
             const stepped = usesSteppedChartChannel(channelKey);
             let data = raw.map(mapPt);
 
@@ -4642,6 +4674,9 @@ const DeviceMonitorPage = () => {
                 fill: isCurrent || isVoltage ? true : false,
                 yAxisID: resolveChannelYAxisId(channelKey),
                 ...(stepped ? { stepped: 'after' } : {}),
+                // #2: уставки — мостим короткие провалы (пропущенный poll / кратковременный offline),
+                // разрыв остаётся только при реальном Выкл/Выкл(деж)/Не в сети (>30с без данных).
+                ...(isSetMetric ? { spanGaps: SET_METRIC_SPAN_GAP_MS } : {}),
             };
         };
 
@@ -5561,7 +5596,19 @@ const DeviceMonitorPage = () => {
     /** #8: смена даты/режима — снова час по умолчанию, кнопка «Загрузить данные» опять активна. */
     useEffect(() => {
         setFullDayLoaded(false);
+        fullDayLoadedWindowRef.current = null;
     }, [selectedGraphDate, todayPinExplore, isHistoryMode]);
+
+    /** #8: изменили пины/окно на той же дате после загрузки суток — кнопка снова активна. */
+    useEffect(() => {
+        if (!fullDayLoaded) return;
+        const loaded = fullDayLoadedWindowRef.current;
+        if (!loaded) return;
+        if (timeWindow.start !== loaded.start || timeWindow.end !== loaded.end) {
+            setFullDayLoaded(false);
+            fullDayLoadedWindowRef.current = null;
+        }
+    }, [fullDayLoaded, timeWindow.start, timeWindow.end]);
 
     /** #8: подгрузка выбранных графиков за целые сутки (00:00–сейчас для сегодня, 00:00–24:00 для прошлых). */
     const handleLoadFullDay = useCallback(async () => {
@@ -5577,6 +5624,7 @@ const DeviceMonitorPage = () => {
             setHistorySeriesSnapshot(buildHistorySeriesForWindow(start, end));
             setHistoryTimelineSnapshot(buildHistoryTimelineForWindow(start, end));
             persistHistoryPinWindow(dateStr, start, end);
+            fullDayLoadedWindowRef.current = { start, end };
             setFullDayLoaded(true);
             setHistoryError(null);
         } catch {
@@ -6504,19 +6552,19 @@ const DeviceMonitorPage = () => {
                                                         paddingRight: `${plotArea.rightPx}px`,
                                                     }}
                                                 >
-                                                    <div className="monitor-lane-row" style={{ position: 'relative' }}>
+                                                    {graphUsesServerData && (
+                                                        <button
+                                                            type="button"
+                                                            className="monitor-lane-load-btn"
+                                                            onClick={handleLoadFullDay}
+                                                            disabled={fullDayLoaded || historyLoading}
+                                                            title="Загрузить выбранные графики за сутки"
+                                                        >
+                                                            {fullDayLoaded ? 'Загружено' : 'Загр. данные'}
+                                                        </button>
+                                                    )}
+                                                    <div className="monitor-lane-row">
                                                         <span className="monitor-lane-label">Состояние</span>
-                                                        {graphUsesServerData && (
-                                                            <button
-                                                                type="button"
-                                                                className="monitor-lane-load-btn"
-                                                                onClick={handleLoadFullDay}
-                                                                disabled={fullDayLoaded || historyLoading}
-                                                                title="Загрузить данные за сутки"
-                                                            >
-                                                                {fullDayLoaded ? 'Загружено' : 'Загрузить данные'}
-                                                            </button>
-                                                        )}
                                                         <div className="monitor-lane-track monitor-lane-track--state">
                                                             {timelineRows.offline.map((seg, idx) => (
                                                                 <span
