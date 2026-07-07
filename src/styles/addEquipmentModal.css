@@ -173,16 +173,19 @@
 .operating-hours-row {
     display: flex;
     gap: 8px;
+    align-items: stretch;
 }
 
 .operating-hours-row input[type="text"] {
-    flex: 1;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: auto !important;
 }
 
 .operating-hours-unit {
-    flex: 0 0 auto;
-    width: auto !important;
-    min-width: 120px;
+    flex: 0 0 140px !important;
+    width: 140px !important;
+    min-width: 140px;
 }
 
 .modal-body {

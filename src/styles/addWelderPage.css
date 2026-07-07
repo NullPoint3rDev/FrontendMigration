@@ -708,15 +708,29 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    flex: 1;
+    flex: 0 1 auto;
     min-height: 0;
-    /* ponytail: фиксированный потолок высоты, чтобы список пропусков скроллился внутри плитки,
-       а не растягивал страницу. При необходимости заменить на расчёт от высоты профиля. */
-    max-height: 320px;
+    /* ponytail: показываем ровно 3 пропуска, дальше — скролл внутри плитки.
+       Высота = padding(24) + 3 плитки(~44px) + 2 gap(8px). Плитка фиксированной высоты ниже. */
+    max-height: 196px;
     overflow-y: auto;
     background: #1A1420;
     border-radius: 3px;
     padding: 12px;
+}
+
+.rfid-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.rfid-list::-webkit-scrollbar-track {
+    background: rgba(28, 22, 34, 0.3);
+    border-radius: 3px;
+}
+
+.rfid-list::-webkit-scrollbar-thumb {
+    background: rgba(82, 69, 94, 0.6);
+    border-radius: 3px;
 }
 
 .rfid-item {
@@ -726,6 +740,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    flex: 0 0 auto;
 }
 
 .scrollable-section {

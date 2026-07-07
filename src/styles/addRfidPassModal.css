@@ -16,7 +16,7 @@
     background: #122536;
     border-radius: 8px;
     width: 90%;
-    max-width: 500px;
+    max-width: 600px;
     position: relative;
     padding: 32px;
     box-sizing: border-box;
@@ -191,7 +191,8 @@
 }
 
 .add-rfid-pass-machine-select {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
     padding: 10px 12px;
     background: #1A1420;
     border: none;
@@ -203,6 +204,7 @@
 }
 
 .add-rfid-pass-btn.read {
+    flex: 0 0 auto;
     background: #1A1420;
     color: #F6B243;
     border: 1px solid rgba(246, 178, 67, 0.4);
