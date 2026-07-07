@@ -653,12 +653,15 @@ const isHistoryPointWelding = (p) => {
         || text.includes('свароч') || text.includes('weld');
 };
 
-/** Уставка тока/напряжения не показывается при Выкл / Выкл(деж) / Не в сети. */
+/** Уставка не показывается только при явных Выкл / Выкл(деж) / Не в сети по machineStateText.
+ *  ponytail: status='offline' без machineStateText — кратковременный блip БД, уставку не рвём. */
 const isHistoryPointSetSuppressed = (p) => {
     if (!p) return true;
     if (isStandbyMachineState(p.machineStateText)) return true;
-    const st = String(p.status || '').toLowerCase().trim();
-    if (st === 'offline' || st.includes('не в сети') || st.includes('выкл') || st === 'off') return true;
+    const text = String(p.machineStateText || '').toLowerCase().trim();
+    if (!text) return false;
+    if (text.includes('не в сети') || text.includes('offline')) return true;
+    if (text === 'off' || text === 'выкл' || text.includes('выключ')) return true;
     return false;
 };
 
@@ -824,7 +827,7 @@ const resolveSetChartY = ({
     return candidate;
 };
 
-/** История: уст. ток/напряжение в простое; на интервале сварки — плоская линия последней уставки. */
+/** История: уст. ток/напряжение — forward-fill; разрыв только при явном Выкл/деж/не в сети. */
 function buildSetMetricSeriesFromHistoryPoints(points, mapSetY) {
     const series = [];
     if (!points?.length) return series;
@@ -832,8 +835,8 @@ function buildSetMetricSeriesFromHistoryPoints(points, mapSetY) {
 
     points.forEach((p) => {
         const x = p.ts;
-        // Выкл / Выкл(деж) / Не в сети — уставка не рисуется (разрыв линии).
         if (isHistoryPointSetSuppressed(p)) {
+            lastSet = null;
             series.push({ x, y: null });
             return;
         }
@@ -858,6 +861,55 @@ function buildSetMetricSeriesFromHistoryPoints(points, mapSetY) {
     });
 
     return series;
+}
+
+/** Сжимает плоские участки уставки до пары точек (начало/конец) — линия не рвётся после decimation. */
+function expandSetMetricPlateaus(series) {
+    const out = [];
+    if (!series?.length) return out;
+    let i = 0;
+    while (i < series.length) {
+        const p = series[i];
+        if (p.y === null || p.y === undefined || Number.isNaN(Number(p.y))) {
+            out.push({ x: p.x, y: null });
+            i += 1;
+            continue;
+        }
+        const y = Math.round(Number(p.y) * 10) / 10;
+        let j = i + 1;
+        while (j < series.length) {
+            const q = series[j];
+            if (q.y === null || q.y === undefined || Number.isNaN(Number(q.y))) break;
+            if (Math.round(Number(q.y) * 10) / 10 !== y) break;
+            j += 1;
+        }
+        const endIdx = j - 1;
+        out.push({ x: series[i].x, y });
+        if (endIdx > i) {
+            out.push({ x: series[endIdx].x, y });
+        }
+        i = j;
+    }
+    return out;
+}
+
+function prepareSetMetricSeriesForChart(raw, maxPoints) {
+    const expanded = expandSetMetricPlateaus(raw || []);
+    if (expanded.length <= maxPoints) return expanded;
+    const kept = new Set([0, expanded.length - 1]);
+    for (let i = 0; i < expanded.length - 1; i += 1) {
+        if (expanded[i].y !== expanded[i + 1].y) {
+            kept.add(i);
+            kept.add(i + 1);
+        }
+    }
+    if (kept.size <= maxPoints) {
+        return [...kept].sort((a, b) => a - b).map((j) => expanded[j]);
+    }
+    const stride = Math.ceil(expanded.length / maxPoints);
+    const idxs = new Set([...kept]);
+    for (let i = 0; i < expanded.length; i += stride) idxs.add(i);
+    return [...idxs].sort((a, b) => a - b).map((j) => expanded[j]);
 }
 
 /** Вертикальные фронты на старт/стоп сварки: две точки с одним x (дубликат x = вертикаль в Chart.js). */
@@ -1267,6 +1319,9 @@ function prepareSeriesForChart(raw, channelKey, graphUsesServerData, maxPoints) 
     if (!graphUsesServerData || !pts.length) return pts;
     if (channelKey === 'weldingCurrent' || channelKey === 'weldingVoltage') {
         return pts;
+    }
+    if (channelKey === 'setWeldingCurrent' || channelKey === 'setWeldingVoltage') {
+        return prepareSetMetricSeriesForChart(pts, maxPoints);
     }
     if (usesSteppedChartChannel(channelKey)) {
         return decimateWeldingPulseSeries(pts, maxPoints);
