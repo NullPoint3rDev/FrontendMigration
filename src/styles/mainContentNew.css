@@ -104,6 +104,12 @@
     cursor: default;
 }
 
+.monitor-page-top-tab--disabled,
+.monitor-page-top-tab--disabled:hover {
+    color: rgba(134, 145, 168, 0.45);
+    cursor: not-allowed;
+}
+
 .monitor-page-brand-main {
     color: #f1f5ff;
     font-size: 38px;

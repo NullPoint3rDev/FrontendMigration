@@ -23,6 +23,18 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 60000) {
     }
 }
 
+// Проверка «живости» устройства по MAC (стучится ли аппарат на сервер сейчас)
+export async function getMacLiveness(mac) {
+    const res = await fetch(`${API_URL}/mac-liveness?mac=${encodeURIComponent(mac)}`, {
+        headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `HTTP ${res.status}`);
+    }
+    return res.json();
+}
+
 // Получить все машины
 export async function getAllWeldingMachines() {
     const res = await fetch(API_URL, {

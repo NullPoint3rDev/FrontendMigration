@@ -12,6 +12,17 @@ export const getAllWelders = async () => {
     }
 };
 
+export const getWelderPositions = async (organizationId) => {
+    try {
+        const query = organizationId != null ? `?organizationId=${organizationId}` : '';
+        const response = await api.get(`${API_URL}/positions${query}`);
+        return Array.isArray(response) ? response : [];
+    } catch (error) {
+        console.error('Error fetching welder positions:', error);
+        return [];
+    }
+};
+
 export const getWelderById = async (id) => {
     try {
         const response = await api.get(`${API_URL}/${id}`);

@@ -7,10 +7,12 @@ import { FaTrash } from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
 import AddRfidPassModal from '../components/AddRfidPassModal';
 import AddMachineModal from '../components/AddMachineModal';
-import { createWelder, getWelderById, updateWelder, uploadWelderPhoto, deleteWelderPhoto, getWelderPhoto, getWelderPhotoUrl } from '../api/welderApi';
+import { createWelder, getWelderById, updateWelder, uploadWelderPhoto, deleteWelderPhoto, getWelderPhoto, getWelderPhotoUrl, getWelderPositions } from '../api/welderApi';
 import { getWeldingMachineById } from '../api/weldingMachineApi';
 import { getAllOrganizationUnits } from '../api/organizationUnitApi';
+import { getAllOrganizations } from '../api/organizationApi';
 import { buildOrganizationHierarchy } from '../utils/organizationUnitTree';
+import { groupUnitsByOrganization } from '../utils/organizationUnitFilterGroups';
 import { getCertificationsByWelderId } from '../api/certificationApi';
 import { getArchivePanelState } from '../api/archiveDeviceApi';
 import {
@@ -28,6 +30,106 @@ const STATUS_STALE_MS = 10000;
 const STATUS_POLL_INTERVAL_MS = 4000;
 const STATUS_POLL_IDLE_TIMEOUT_MS = 2000;
 const STATUS_POLL_DEFER_FALLBACK_MS = 150;
+
+// YYYY-MM-DD -> DD.MM.YYYY
+const isoToDisplayDate = (iso) => {
+    if (!iso) return '';
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return '';
+    return `${m[3]}.${m[2]}.${m[1]}`;
+};
+
+// DD.MM.YYYY -> YYYY-MM-DD (только для полной валидной даты, иначе '')
+const displayToIsoDate = (display) => {
+    const m = String(display || '').match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    if (!m) return '';
+    const day = Number(m[1]);
+    const month = Number(m[2]);
+    const year = Number(m[3]);
+    const d = new Date(year, month - 1, day);
+    if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return '';
+    return `${m[3]}-${m[2]}-${m[1]}`;
+};
+
+// Прогрессивное форматирование ввода в DD.MM.YYYY (только цифры и точки).
+const formatDateTyping = (raw) => {
+    const digits = String(raw || '').replace(/\D/g, '').slice(0, 8);
+    const parts = [];
+    if (digits.length >= 2) {
+        parts.push(digits.slice(0, 2));
+        if (digits.length >= 4) {
+            parts.push(digits.slice(2, 4));
+            parts.push(digits.slice(4));
+        } else {
+            parts.push(digits.slice(2));
+        }
+    } else {
+        parts.push(digits);
+    }
+    return parts.filter((p) => p !== '').join('.');
+};
+
+// Поле даты с ручным вводом DD.MM.YYYY и иконкой календаря. value/onChange работают в ISO (YYYY-MM-DD).
+function DateField({ value, onChange, placeholder, disabled }) {
+    const [text, setText] = useState(isoToDisplayDate(value));
+    const hiddenRef = useRef(null);
+
+    useEffect(() => {
+        setText(isoToDisplayDate(value));
+    }, [value]);
+
+    const handleTextChange = (e) => {
+        const formatted = formatDateTyping(e.target.value);
+        setText(formatted);
+        const iso = displayToIsoDate(formatted);
+        if (iso) {
+            onChange(iso);
+        } else if (formatted === '') {
+            onChange('');
+        }
+    };
+
+    const openPicker = () => {
+        if (disabled || !hiddenRef.current) return;
+        if (hiddenRef.current.showPicker) hiddenRef.current.showPicker();
+        else hiddenRef.current.click();
+    };
+
+    return (
+        <div className="welder-date-field">
+            <input
+                type="text"
+                inputMode="numeric"
+                value={text}
+                onChange={handleTextChange}
+                placeholder={placeholder || 'ДД.ММ.ГГГГ'}
+                disabled={disabled}
+                maxLength={10}
+            />
+            <input
+                ref={hiddenRef}
+                type="date"
+                className="welder-date-hidden"
+                value={value || ''}
+                onChange={(e) => onChange(e.target.value)}
+                disabled={disabled}
+                tabIndex={-1}
+            />
+            <svg
+                className="welder-date-icon"
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                onClick={openPicker}
+            >
+                <rect x="3" y="4" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M3 7H13" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M6 2V5M10 2V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+        </div>
+    );
+}
 
 function computeStatusFromPanelState(machine, stateObj) {
     try {
@@ -82,6 +184,9 @@ function AddWelderPage() {
     });
     const [organizationUnits, setOrganizationUnits] = useState([]);
     const [organizationUnitHierarchy, setOrganizationUnitHierarchy] = useState([]);
+    const [organizationGroups, setOrganizationGroups] = useState([]);
+    const [positionOptions, setPositionOptions] = useState([]);
+    const [expandedOrgs, setExpandedOrgs] = useState({});
     const [expandedUnits, setExpandedUnits] = useState({});
     const [unitDropdownOpen, setUnitDropdownOpen] = useState(false);
     const [errors, setErrors] = useState({});
@@ -433,18 +538,49 @@ function AddWelderPage() {
 
     const loadOrganizationUnits = async () => {
         try {
-            const units = await getAllOrganizationUnits();
-            console.log('Загруженные подразделения:', units);
-            setOrganizationUnits(Array.isArray(units) ? units : []);
+            const [units, organizations] = await Promise.all([
+                getAllOrganizationUnits(),
+                getAllOrganizations().catch(() => []),
+            ]);
+            const unitsArr = Array.isArray(units) ? units : [];
+            setOrganizationUnits(unitsArr);
 
             // Построение иерархии подразделений
-            const hierarchy = buildOrganizationHierarchy(units);
+            const hierarchy = buildOrganizationHierarchy(unitsArr);
             setOrganizationUnitHierarchy(hierarchy);
+
+            // Группировка по предприятиям (как на «Карте предприятий»)
+            const orgList = Array.isArray(organizations) ? organizations : [];
+            setOrganizationGroups(groupUnitsByOrganization(unitsArr, orgList));
         } catch (error) {
             console.error('Ошибка загрузки подразделений:', error);
             setOrganizationUnits([]);
             setOrganizationUnitHierarchy([]);
+            setOrganizationGroups([]);
         }
+    };
+
+    // Должности для комбобокса: по предприятию выбранного подразделения (иначе — все доступные)
+    useEffect(() => {
+        let cancelled = false;
+        const unitId = formData.organizationUnitId
+            ? (typeof formData.organizationUnitId === 'string' ? parseInt(formData.organizationUnitId, 10) : formData.organizationUnitId)
+            : null;
+        const unit = unitId != null
+            ? organizationUnits.find((u) => (typeof u.id === 'string' ? parseInt(u.id, 10) : u.id) === unitId)
+            : null;
+        const organizationId = unit ? (unit.organizationId ?? unit.organization?.id ?? null) : null;
+        getWelderPositions(organizationId).then((list) => {
+            if (!cancelled) setPositionOptions(Array.isArray(list) ? list : []);
+        });
+        return () => { cancelled = true; };
+    }, [formData.organizationUnitId, organizationUnits]);
+
+    const toggleOrgExpand = (orgKey) => {
+        setExpandedOrgs(prev => ({
+            ...prev,
+            [orgKey]: !prev[orgKey]
+        }));
     };
 
     const toggleUnitExpand = (unitId) => {
@@ -903,7 +1039,7 @@ function AddWelderPage() {
     // Функции для отображения аппаратов (как на WeldingEquipmentPage)
     const getModelDisplay = (item) => {
         if (item.deviceModel === 'MONITORING_BLOCK') return 'Блок Мониторинга';
-        if (item.deviceModel === 'CORE') return 'CORE PULSE';
+        if (item.deviceModel === 'CORE') return 'Core Synergy';
         return item.model || item.deviceModel?.name || 'Не указана';
     };
 
@@ -1062,13 +1198,6 @@ function AddWelderPage() {
         await saveWelder();
     };
 
-    const positions = [
-        'Электросварщик',
-        'Главный сварщик',
-        'Сварщик',
-        'Монтажник'
-    ];
-
     const Tooltip = ({ text, children }) => {
         const tooltipRef = useRef(null);
         const wrapperRef = useRef(null);
@@ -1194,23 +1323,21 @@ function AddWelderPage() {
                                 </div>
                                 <div className="form-group">
                                     <Tooltip text="Дата рождения">
-                                        <input
-                                            type="date"
-                                            name="birthDate"
+                                        <DateField
                                             value={formData.birthDate}
-                                            onChange={handleInputChange}
-                                            placeholder="Год рождения:"
+                                            onChange={(iso) => setFormData(prev => ({ ...prev, birthDate: iso }))}
+                                            placeholder="Дата рождения ДД.ММ.ГГГГ"
+                                            disabled={readOnlyWelderForm}
                                         />
                                     </Tooltip>
                                 </div>
                                 <div className="form-group">
                                     <Tooltip text="Дата приема на работу">
-                                        <input
-                                            type="date"
-                                            name="hireDate"
+                                        <DateField
                                             value={formData.hireDate}
-                                            onChange={handleInputChange}
-                                            placeholder="Дата приёма:"
+                                            onChange={(iso) => setFormData(prev => ({ ...prev, hireDate: iso }))}
+                                            placeholder="Дата приёма ДД.ММ.ГГГГ"
+                                            disabled={readOnlyWelderForm}
                                         />
                                     </Tooltip>
                                 </div>
@@ -1219,18 +1346,22 @@ function AddWelderPage() {
                             {/* Second Column */}
                             <div className="form-column">
                                 <div className="form-group">
-                                    <select
+                                    <input
+                                        type="text"
                                         name="position"
+                                        list="welder-positions-list"
                                         value={formData.position}
                                         onChange={handleInputChange}
-                                        className={`select-with-label ${errors.position ? 'error' : ''}`}
-                                        data-label="Должность*"
-                                    >
-                                        <option value="" disabled>Должность*</option>
-                                        {positions.map(pos => (
-                                            <option key={pos} value={pos}>{pos}</option>
+                                        placeholder="Должность*"
+                                        className={errors.position ? 'error' : ''}
+                                        autoComplete="off"
+                                        disabled={readOnlyWelderForm}
+                                    />
+                                    <datalist id="welder-positions-list">
+                                        {positionOptions.map(pos => (
+                                            <option key={pos} value={pos} />
                                         ))}
-                                    </select>
+                                    </datalist>
                                     {errors.position && <span className="error-text">{errors.position}</span>}
                                 </div>
                                 <div className="form-group">
@@ -1251,8 +1382,41 @@ function AddWelderPage() {
                                         </div>
                                         {unitDropdownOpen && (
                                             <div className="unit-select-options">
-                                                {organizationUnitHierarchy.length > 0 ? (
-                                                    organizationUnitHierarchy.map(unit => renderUnitOption(unit))
+                                                {organizationGroups.length > 0 ? (
+                                                    organizationGroups.map(group => (
+                                                        <React.Fragment key={group.orgKey}>
+                                                            <div
+                                                                className="unit-option unit-option-org"
+                                                                onClick={() => toggleOrgExpand(group.orgKey)}
+                                                            >
+                                                                <button
+                                                                    className="org-unit-expand-btn"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        toggleOrgExpand(group.orgKey);
+                                                                    }}
+                                                                >
+                                                                    {expandedOrgs[group.orgKey] ? (
+                                                                        <FaChevronDown className="expand-icon" />
+                                                                    ) : (
+                                                                        <FaChevronRight className="expand-icon" />
+                                                                    )}
+                                                                </button>
+                                                                <span className="unit-option-name unit-option-org-name">{group.orgName}</span>
+                                                            </div>
+                                                            {expandedOrgs[group.orgKey] && (
+                                                                group.hierarchy.length > 0 ? (
+                                                                    <div className="unit-children">
+                                                                        {group.hierarchy.map(unit => renderUnitOption(unit, 1))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="unit-option" style={{ marginLeft: '32px', padding: '8px 12px', color: '#7B8BA6' }}>
+                                                                        Нет подразделений
+                                                                    </div>
+                                                                )
+                                                            )}
+                                                        </React.Fragment>
+                                                    ))
                                                 ) : (
                                                     <div className="unit-option" style={{ padding: '8px 12px', color: '#7B8BA6' }}>
                                                         Нет доступных подразделений

@@ -390,7 +390,7 @@ function AddUserPage() {
                 items: [
                     { id: VIEW_ONLY.equipment, label: 'Только просмотр ИП', defaultChecked: false },
                     { id: 'wifi_modules_wt2', label: 'Внесения/удаления модулей Wi-Fi в базу WT2', defaultChecked: false },
-                    { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Pulse)', defaultChecked: true },
+                    { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Synergy)', defaultChecked: true },
                     { id: 'move_equipment_change_info', label: 'Перемещение между подразд., изм. инфор. об оборуд.', defaultChecked: true },
                     { id: 'delete_equipment', label: 'Удаление оборудования', defaultChecked: false },
                     { id: 'view_ip_history', label: 'Доступность просмотра истории работы ИП (графики)', defaultChecked: false },
@@ -456,7 +456,7 @@ function AddUserPage() {
                 title: 'Работа с оборудованием',
                 items: [
                     { id: 'wifi_modules_wt2', label: 'Внесения/удаления модулей Wi-Fi в базу WT2', defaultChecked: false },
-                    { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Pulse)', defaultChecked: true },
+                    { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Synergy)', defaultChecked: true },
                     { id: 'move_equipment_change_info', label: 'Перемещение между подразд., изм. инфор. об оборуд.', defaultChecked: true },
                     { id: 'delete_equipment', label: 'Удаление оборудования', defaultChecked: true },
                     { id: 'view_ip_history', label: 'Доступность просмотра истории работы ИП (графики)', defaultChecked: true },
@@ -520,7 +520,7 @@ function AddUserPage() {
                 title: 'Работа с оборудованием',
                 items: [
                     { id: 'wifi_modules_wt2', label: 'Внесения/удаления модулей Wi-Fi в базу WT2', defaultChecked: false },
-                    { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Pulse)', defaultChecked: true },
+                    { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Synergy)', defaultChecked: true },
                     { id: 'move_equipment_change_info', label: 'Перемещение между подразд., изм. инфор. об оборуд.', defaultChecked: false },
                     { id: 'delete_equipment', label: 'Удаление оборудования', defaultChecked: false },
                     { id: 'view_ip_history', label: 'Доступность просмотра истории работы ИП (графики)', defaultChecked: true },
@@ -574,7 +574,7 @@ function AddUserPage() {
             {
                 title: 'Работа с оборудованием',
                 items: [
-                    { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Pulse)', defaultChecked: true },
+                    { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Synergy)', defaultChecked: true },
                     { id: 'move_equipment_change_info', label: 'Перемещение между подразд., изм. инфор. об оборуд.', defaultChecked: true },
                     { id: 'delete_equipment', label: 'Удаление оборудования', defaultChecked: true },
                     { id: 'view_ip_history', label: 'Доступность просмотра истории работы ИП (графики)', defaultChecked: true },
@@ -633,7 +633,7 @@ function AddUserPage() {
                 title: 'Работа с оборудованием',
                 items: [
                     { id: 'wifi_modules_wt2', label: 'Внесение/удаления модулей Wi-Fi в базу WT2', defaultChecked: true },
-                    { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Pulse)', defaultChecked: true },
+                    { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Synergy)', defaultChecked: true },
                     { id: 'move_equipment_change_info', label: 'Перемещение между подразд., изм. инфор. об оборуд', defaultChecked: true },
                     { id: 'delete_equipment', label: 'Удаление оборудования', defaultChecked: true },
                     { id: 'view_ip_history', label: 'Доступность просмотра истории работы ИП (графики)', defaultChecked: true },
@@ -696,7 +696,7 @@ function AddUserPage() {
                 title: 'Работа с оборудованием',
                 items: [
                     { id: 'wifi_modules_wt2', label: 'Внесения/удаления модулей Wi-Fi в базу WT2', defaultChecked: true },
-                    { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Pulse)', defaultChecked: true },
+                    { id: 'add_equipment_core_pulse', label: 'Добавление оборудования (ИП Core Synergy)', defaultChecked: true },
                     { id: 'move_equipment_change_info', label: 'Перемещение между подразд., изм. инфор. об оборуд.', defaultChecked: true },
                     { id: 'delete_equipment', label: 'Удаление оборудования', defaultChecked: true },
                     { id: 'view_ip_history', label: 'Доступность просмотра истории работы ИП (графики)', defaultChecked: true },

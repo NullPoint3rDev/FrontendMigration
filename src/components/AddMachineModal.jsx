@@ -24,6 +24,17 @@ const AddMachineModal = ({ isOpen, onClose, onAdd, selectedMachineIds = [] }) =>
         [selectedMachineIds]
     );
 
+    // Аппараты с выключенным RFID нельзя привязывать к сварщику.
+    const rfidDisabledIds = useMemo(
+        () => new Set(machines.filter((m) => m.rfidEnabled === false).map((m) => Number(m.id))),
+        [machines]
+    );
+
+    const isBlocked = useCallback(
+        (id) => linkedIds.has(id) || rfidDisabledIds.has(id),
+        [linkedIds, rfidDisabledIds]
+    );
+
     const equipmentHierarchy = useMemo(
         () => buildEquipmentHierarchy(organizationUnits, machines),
         [organizationUnits, machines]
@@ -64,7 +75,7 @@ const AddMachineModal = ({ isOpen, onClose, onAdd, selectedMachineIds = [] }) =>
     };
 
     const toggleMachine = (machineId) => {
-        if (linkedIds.has(machineId)) return;
+        if (isBlocked(machineId)) return;
         setSelectedIds((prev) => {
             const next = new Set(prev);
             if (next.has(machineId)) next.delete(machineId);
@@ -87,7 +98,7 @@ const AddMachineModal = ({ isOpen, onClose, onAdd, selectedMachineIds = [] }) =>
         const unit = findUnit(equipmentHierarchy, unitId);
         if (!unit) return;
 
-        const selectable = getMachinesFromUnit(unit).filter((m) => !linkedIds.has(m.id));
+        const selectable = getMachinesFromUnit(unit).filter((m) => !isBlocked(m.id));
         const selectableIds = selectable.map((m) => m.id);
         if (selectableIds.length === 0) return;
 
@@ -108,7 +119,7 @@ const AddMachineModal = ({ isOpen, onClose, onAdd, selectedMachineIds = [] }) =>
     };
 
     const handleToggleAll = () => {
-        const allIds = getAllEquipmentFromHierarchy(equipmentHierarchy).filter((id) => !linkedIds.has(id));
+        const allIds = getAllEquipmentFromHierarchy(equipmentHierarchy).filter((id) => !isBlocked(id));
         const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
         if (allSelected) {
             setSelectedIds(new Set());
@@ -122,7 +133,7 @@ const AddMachineModal = ({ isOpen, onClose, onAdd, selectedMachineIds = [] }) =>
         const walk = (units) => {
             units.forEach((unit) => {
                 (unit.machines || []).forEach((m) => {
-                    if (selectedIds.has(m.id) && !linkedIds.has(m.id)) {
+                    if (selectedIds.has(m.id) && !isBlocked(m.id)) {
                         picked.push(m.machine || machines.find((x) => x.id === m.id));
                     }
                 });
@@ -137,12 +148,12 @@ const AddMachineModal = ({ isOpen, onClose, onAdd, selectedMachineIds = [] }) =>
     const getModelDisplay = useCallback((item) => {
         if (!item) return 'Не указана';
         if (item.deviceModel === 'MONITORING_BLOCK') return 'Блок Мониторинга';
-        if (item.deviceModel === 'CORE') return 'CORE PULSE';
+        if (item.deviceModel === 'CORE') return 'Core Synergy';
         return item.model || item.deviceModel?.name || 'Не указана';
     }, []);
 
     const getEquipmentUnitState = useCallback((unit) => {
-        const unitMachines = getMachinesFromUnit(unit).filter((m) => !linkedIds.has(m.id));
+        const unitMachines = getMachinesFromUnit(unit).filter((m) => !isBlocked(m.id));
         const selectedCount = unitMachines.filter((m) => selectedIds.has(m.id)).length;
         const allSelected = unitMachines.length > 0 && selectedCount === unitMachines.length;
         const someSelected = selectedCount > 0;
@@ -153,7 +164,7 @@ const AddMachineModal = ({ isOpen, onClose, onAdd, selectedMachineIds = [] }) =>
             const someChildrenChecked = childrenStates.some((s) => s.checked || s.indeterminate);
             let someInChildren = false;
             unit.children.forEach((child) => {
-                const childMachines = getMachinesFromUnit(child).filter((m) => !linkedIds.has(m.id));
+                const childMachines = getMachinesFromUnit(child).filter((m) => !isBlocked(m.id));
                 if (childMachines.some((m) => selectedIds.has(m.id))) someInChildren = true;
             });
             if (allChildrenChecked) {
@@ -173,7 +184,7 @@ const AddMachineModal = ({ isOpen, onClose, onAdd, selectedMachineIds = [] }) =>
             if (someSelected) return { checked: false, indeterminate: true };
         }
         return { checked: false, indeterminate: false };
-    }, [linkedIds, selectedIds]);
+    }, [isBlocked, selectedIds]);
 
     const renderEquipmentUnit = (unit, level = 0) => {
         const unitState = getEquipmentUnitState(unit);
@@ -252,17 +263,18 @@ const AddMachineModal = ({ isOpen, onClose, onAdd, selectedMachineIds = [] }) =>
                         {filteredMachines.map((m) => {
                             const machine = m.machine || machines.find((x) => x.id === m.id);
                             const isLinked = linkedIds.has(m.id);
-                            const isChecked = isLinked || selectedIds.has(m.id);
+                            const rfidOff = rfidDisabledIds.has(Number(m.id));
+                            const isChecked = (isLinked || selectedIds.has(m.id)) && !rfidOff;
                             return (
                                 <label
                                     key={m.id}
-                                    className={`parameter-sub-item add-machine-tree-machine${isLinked ? ' is-linked' : ''}`}
+                                    className={`parameter-sub-item add-machine-tree-machine${isLinked ? ' is-linked' : ''}${rfidOff ? ' is-rfid-off' : ''}`}
                                     style={{ marginLeft: `${indentSize}px`, paddingLeft: '0' }}
                                 >
                                     <input
                                         type="checkbox"
                                         checked={isChecked}
-                                        disabled={isLinked}
+                                        disabled={isLinked || rfidOff}
                                         onChange={() => toggleMachine(m.id)}
                                     />
                                     <span className="add-machine-tree-machine-name">{m.name}</span>
@@ -275,6 +287,9 @@ const AddMachineModal = ({ isOpen, onClose, onAdd, selectedMachineIds = [] }) =>
                                     {isLinked && (
                                         <span className="add-machine-tree-linked-badge">Уже привязан</span>
                                     )}
+                                    {rfidOff && !isLinked && (
+                                        <span className="add-machine-tree-linked-badge">RFID выключен</span>
+                                    )}
                                 </label>
                             );
                         })}
@@ -284,13 +299,13 @@ const AddMachineModal = ({ isOpen, onClose, onAdd, selectedMachineIds = [] }) =>
         );
     };
 
-    const selectableCount = getAllEquipmentFromHierarchy(equipmentHierarchy).filter((id) => !linkedIds.has(id)).length;
+    const selectableCount = getAllEquipmentFromHierarchy(equipmentHierarchy).filter((id) => !isBlocked(id)).length;
     const allSelectableSelected = selectableCount > 0
         && getAllEquipmentFromHierarchy(equipmentHierarchy)
-            .filter((id) => !linkedIds.has(id))
+            .filter((id) => !isBlocked(id))
             .every((id) => selectedIds.has(id));
 
-    const newSelectionCount = [...selectedIds].filter((id) => !linkedIds.has(id)).length;
+    const newSelectionCount = [...selectedIds].filter((id) => !isBlocked(id)).length;
 
     if (!isOpen) return null;
 

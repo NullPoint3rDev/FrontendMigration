@@ -73,6 +73,118 @@
     color: #f2f1f4;
 }
 
+.modal-title {
+    margin: 0 0 20px 0 !important;
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    color: #FCFCFE !important;
+}
+
+.mac-check-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 16px;
+    margin-bottom: 24px;
+    background: rgba(28, 22, 34, 0.5);
+    border: 1px solid rgba(82, 69, 94, 0.4);
+    border-radius: 6px;
+}
+
+.mac-check-field {
+    flex: 1;
+    min-width: 220px;
+}
+
+.mac-check-btn {
+    padding: 10px 18px !important;
+    background: #F6B243 !important;
+    border: none !important;
+    border-radius: 4px !important;
+    color: #1C1622 !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    white-space: nowrap;
+    font-family: 'Roboto', sans-serif !important;
+    box-sizing: border-box !important;
+}
+
+.mac-check-btn.verified {
+    background: rgba(76, 175, 80, 0.2) !important;
+    color: #7BD88F !important;
+    border: 1px solid #7BD88F !important;
+    cursor: default !important;
+}
+
+.mac-check-waiting {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: rgba(246, 178, 67, 0.08);
+    border: 1px solid rgba(246, 178, 67, 0.3);
+    border-radius: 4px;
+}
+
+.mac-check-waiting-text {
+    font-size: 13px;
+    color: #F6B243;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mac-check-waiting-text::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #F6B243;
+    animation: mac-blink 1s ease-in-out infinite;
+}
+
+@keyframes mac-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.mac-check-cancel {
+    padding: 6px 14px !important;
+    background: #1C1622 !important;
+    border: 1px solid rgba(236, 122, 107, 0.5) !important;
+    border-radius: 4px !important;
+    color: #EC7A6B !important;
+    font-size: 12px !important;
+    cursor: pointer !important;
+    font-family: 'Roboto', sans-serif !important;
+}
+
+.mac-check-error {
+    flex-basis: 100%;
+}
+
+.gated {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.operating-hours-row {
+    display: flex;
+    gap: 8px;
+}
+
+.operating-hours-row input[type="text"] {
+    flex: 1;
+}
+
+.operating-hours-unit {
+    flex: 0 0 auto;
+    width: auto !important;
+    min-width: 120px;
+}
+
 .modal-body {
     display: grid;
     grid-template-columns: 280px 1fr;

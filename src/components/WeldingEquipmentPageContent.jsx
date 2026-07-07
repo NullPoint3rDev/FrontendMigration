@@ -613,7 +613,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
     // Вспомогательные функции для сортировки (определяем заранее)
     const getModelDisplayForSort = (item) => {
         if (item.deviceModel === 'MONITORING_BLOCK') return 'Блок Мониторинга';
-        if (item.deviceModel === 'CORE') return 'CORE PULSE';
+        if (item.deviceModel === 'CORE') return 'Core Synergy';
         return item.deviceModel || '';
     };
 
@@ -795,6 +795,11 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
 
             const commissionDateValue = convertDateToISO(dataToUse.commissionDate);
             const lastServiceValue = convertDateToISO(dataToUse.lastService);
+            // Дата изготовления — чистая дата (LocalDate на бэкенде), без времени.
+            const manufactureDateValue = (() => {
+                const iso = convertDateToISO(dataToUse.manufactureDate);
+                return iso ? iso.slice(0, 10) : null;
+            })();
 
             console.log('🟡 handleSave: Преобразованная дата ввода в эксплуатацию:', commissionDateValue);
             console.log('🟡 handleSave: Преобразованная дата последнего ТО:', lastServiceValue);
@@ -832,8 +837,16 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                 weldingMachineType: dataToUse.weldingMachineType,
                 assignedWelders: dataToUse.assignedWelders || [],
                 maintenanceInterval: maintenanceIntervalValue,
+                maintenanceIntervalUnit: dataToUse.maintenanceIntervalUnit || null,
+                manufactureDate: manufactureDateValue,
                 userServiceNotifiedBeforeHours: maintenanceReminderValue,
             };
+
+            // rfidEnabled передаём только когда явно задан (в create-режиме из модалки),
+            // чтобы при редактировании не перезаписать текущее значение на бэкенде.
+            if (dataToUse.rfidEnabled !== undefined && dataToUse.rfidEnabled !== null) {
+                machineData.rfidEnabled = Boolean(dataToUse.rfidEnabled);
+            }
 
             if (!dataToUse.id) {
                 delete machineData.id;
@@ -1024,7 +1037,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
     // Функция для получения модели аппарата для отображения
     const getModelDisplay = (item) => {
         if (item.deviceModel === 'MONITORING_BLOCK') return 'Блок Мониторинга';
-        if (item.deviceModel === 'CORE') return 'CORE PULSE';
+        if (item.deviceModel === 'CORE') return 'Core Synergy';
         return item.model || item.deviceModel?.name || 'Не указана';
     };
 
@@ -1189,7 +1202,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
 
     const models = [
         { id: 'all', label: 'Все' },
-        { id: 'CORE', label: 'CORE PULSE' },
+        { id: 'CORE', label: 'Core Synergy' },
         { id: 'MONITORING_BLOCK', label: 'Блок Мониторинга' }
     ];
 
@@ -1726,6 +1739,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                                     deviceModel: deviceModel,
                                     mac: data.macAddress || '',
                                     commissionDate: data.commissioningDate || '',
+                                    manufactureDate: data.manufactureDate || '',
                                     lastService: data.lastMaintenanceDate || '',
                                     serialNumber: data.serialNumber || '',
                                     inventoryNumber: data.inventoryNumber || '',
@@ -1733,13 +1747,15 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                                     maintenanceInterval: data.operatingHours !== '' && data.operatingHours != null
                                         ? Number(data.operatingHours)
                                         : '',
+                                    maintenanceIntervalUnit: data.operatingHoursUnit || 'HOURS',
                                     maintenanceTechnicianName: data.maintenancePerson || '',
                                     maintenanceTechnicianPass: data.maintenancePass || '',
                                     responsiblePerson: data.responsiblePerson || '',
+                                    rfidEnabled: Boolean(data.options?.rfid),
                                     coreOptions: {
-                                        gasControl: data.options?.gasControl || false,
+                                        gasControl: false,
                                         rfid: data.options?.rfid || false,
-                                        bvo: data.options?.bvo || false
+                                        bvo: false
                                     },
                                     assignedWelders: data.approvedWelders || []
                                 };

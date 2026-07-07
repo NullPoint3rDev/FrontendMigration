@@ -2343,9 +2343,9 @@ const DeviceMonitorPage = () => {
         text: enabled ? 'Активно' : 'Неактивно',
         className: enabled ? 'info-tile-badge-inactive' : 'info-tile-badge-active',
     });
-    const gasControlBadge = infoOptionBadge(Boolean(infoOptions.gasControl));
     const rfidBadge = infoOptionBadge(Boolean(infoOptions.rfid));
-    const bvoBadge = infoOptionBadge(Boolean(infoOptions.bvo));
+    // RFID-считыватель отсутствует/выключен на аппарате: блокируем привязку сварщиков.
+    const machineRfidEnabled = machineDetails ? machineDetails.rfidEnabled !== false : true;
 
     useEffect(() => {
         const code = telemetryRfidCode;
@@ -5861,8 +5861,8 @@ const DeviceMonitorPage = () => {
                     </button>
                     <div className="monitor-page-brand-stack">
                         <div className="monitor-page-brand-title">
-                            <span className="monitor-page-brand-main">CORE</span>
-                            <span className="monitor-page-brand-accent">PULSE</span>
+                            <span className="monitor-page-brand-main">Core</span>
+                            <span className="monitor-page-brand-accent">Synergy</span>
                         </div>
                         <div className="monitor-page-top-tabs" aria-label="Разделы мониторинга">
                             <button
@@ -5881,8 +5881,10 @@ const DeviceMonitorPage = () => {
                             </button>
                             <button
                                 type="button"
-                                className={`monitor-page-top-tab ${activeTab === 'welders' ? 'active' : ''}`}
-                                onClick={() => setActiveTab('welders')}
+                                className={`monitor-page-top-tab ${activeTab === 'welders' ? 'active' : ''}${!machineRfidEnabled ? ' monitor-page-top-tab--disabled' : ''}`}
+                                onClick={() => { if (machineRfidEnabled) setActiveTab('welders'); }}
+                                disabled={!machineRfidEnabled}
+                                title={!machineRfidEnabled ? 'Считыватель пропусков отсутствует на аппарате' : undefined}
                             >
                                 Сварщики
                             </button>
@@ -6126,7 +6128,9 @@ const DeviceMonitorPage = () => {
                 <div className="welder-section">
                     <div className="card welder-header-tile">
                         <div className="welder-header-main">
-                            {hasRfidCode ? (
+                            {!machineRfidEnabled ? (
+                                <span className="welder-no-rfid-hint">Считыватель пропусков отсутствует на аппарате</span>
+                            ) : hasRfidCode ? (
                                 <div className="welder-header-rfid-row">
                                     <div className="rfid-pass-badge" title="RFID">
                                         <RiRfidFill className="rfid-pass-badge-icon" aria-hidden />
@@ -6378,22 +6382,13 @@ const DeviceMonitorPage = () => {
                                 </div>
                                 <div className="info-tile">
                                     <div className="info-tile-status-row">
-                                        <span className="info-tile-label">Система контроля газа</span>
-                                        <span className={`info-tile-badge ${gasControlBadge.className}`}>{gasControlBadge.text}</span>
-                                    </div>
-                                    <div className="info-tile-status-row">
                                         <span className="info-tile-label">RFID</span>
                                         <span className={`info-tile-badge ${rfidBadge.className}`}>{rfidBadge.text}</span>
-                                    </div>
-                                    <div className="info-tile-status-row">
-                                        <span className="info-tile-label">БВО</span>
-                                        <span className={`info-tile-badge ${bvoBadge.className}`}>{bvoBadge.text}</span>
                                     </div>
                                 </div>
                                 <div className="info-tile info-tile-software">
                                     <div className="info-tile-row"><span className="info-tile-label">Версия ПО ИП</span><span className="info-tile-value">—</span></div>
                                     <div className="info-tile-row"><span className="info-tile-label">Версия ПО Лицовой платы</span><span className="info-tile-value">—</span></div>
-                                    <div className="info-tile-row"><span className="info-tile-label">Версия ПО БВО</span><span className="info-tile-value">—</span></div>
                                 </div>
                                 <div className="info-tile">
                                     <div className="info-tile-row">

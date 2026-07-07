@@ -75,6 +75,11 @@
     color: #7B8BA6 !important;
 }
 
+.add-machine-tree-machine.is-rfid-off .add-machine-tree-machine-name,
+.add-machine-tree-machine.is-rfid-off .add-machine-tree-machine-meta {
+    color: #7B8BA6 !important;
+}
+
 .add-machine-tree-linked-badge {
     font-size: 10px;
     color: #F6B243;

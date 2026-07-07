@@ -544,6 +544,48 @@
     border-left: 1px solid rgba(59, 49, 74, 0.55);
 }
 
+.unit-option-org {
+    cursor: pointer;
+}
+
+.unit-option-org-name {
+    font-weight: 600;
+    color: #d9d6df;
+}
+
+.welder-date-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.welder-date-field input[type="text"] {
+    width: 100%;
+    padding-right: 34px;
+}
+
+.welder-date-hidden {
+    position: absolute;
+    right: 0;
+    width: 40px;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.welder-date-icon {
+    position: absolute;
+    right: 12px;
+    color: rgba(188, 183, 197, 0.6);
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.welder-date-icon:hover {
+    color: rgba(188, 183, 197, 0.95);
+}
+
 .rfid-header,
 .section-toolbar {
     display: flex;
@@ -668,6 +710,9 @@
     gap: 8px;
     flex: 1;
     min-height: 0;
+    /* ponytail: фиксированный потолок высоты, чтобы список пропусков скроллился внутри плитки,
+       а не растягивал страницу. При необходимости заменить на расчёт от высоты профиля. */
+    max-height: 320px;
     overflow-y: auto;
     background: #1A1420;
     border-radius: 3px;
