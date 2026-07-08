@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Line } from 'react-chartjs-2';
 import {
@@ -1726,7 +1727,7 @@ const DeviceMonitorPage = () => {
     const welderNameFetchInFlightRef = useRef(new Set());
     const telemetryHistoryStoreRef = useRef({ series: DEFAULT_TELEMETRY_SERIES, timeline: [], lastStoredTs: 0 });
     const historyCacheRef = useRef({ date: null, dayStart: null, dayEnd: null, pointsByTs: new Map() });
-    /** Не сбрасывать todayPinExplore при setSelectedGraphDate(сегодня) — кнопка «История». */
+    /** Не сбрасывать todayPinExplore при setSelectedGraphDate(сегодня) — кнопка «Сегодня». */
     const skipTodayLiveResetRef = useRef(false);
     /** Интервал пинов по дате (YYYY-MM-DD), чтобы при возврате на день восстановить окно. */
     const historyPinWindowsRef = useRef({});
@@ -1743,6 +1744,7 @@ const DeviceMonitorPage = () => {
     }, [todayPinExplore]);
 
     const graphUsesServerData = isHistoryMode || todayPinExplore;
+    const graphHistoryPending = graphUsesServerData && !historyChartReady;
     const graphUsesServerDataRef = useRef(graphUsesServerData);
     useEffect(() => {
         graphUsesServerDataRef.current = graphUsesServerData;
@@ -4484,6 +4486,9 @@ const DeviceMonitorPage = () => {
 
     /** Те же точки, что рисует Chart.js; тултип сварки — из hoverSamples bundle. */
     const chartDisplaySeries = useMemo(() => {
+        if (graphHistoryPending) {
+            return { ...DEFAULT_TELEMETRY_SERIES };
+        }
         const src = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
         const out = { ...src };
         const weldingBundle = todayWeldingPulseBundle || historyWeldingChartBundle;
@@ -4501,6 +4506,7 @@ const DeviceMonitorPage = () => {
         });
         return out;
     }, [
+        graphHistoryPending,
         graphUsesServerData,
         historySeriesSnapshot,
         historyTimelineSnapshot,
@@ -4740,11 +4746,13 @@ const DeviceMonitorPage = () => {
     ]);
 
     const timelineInWindow = useMemo(() => {
+        if (graphHistoryPending) return [];
         if (graphUsesServerData) {
             return buildHistoryTimelineForWindow(activeWindow.start, activeWindow.end);
         }
         return timelineSamples.filter((s) => s.x >= activeWindow.start && s.x <= activeWindow.end);
     }, [
+        graphHistoryPending,
         timelineSamples,
         graphUsesServerData,
         activeWindow.start,
@@ -5550,7 +5558,8 @@ const DeviceMonitorPage = () => {
     }, [activeTab, handleChartWheel]);
 
     const handleTimelinePinMouseDown = (pin) => {
-        // Live: перетаскивание пинов запрещено (история включается кнопками «История» / «Загрузить данные»).
+        if (graphHistoryPending) return;
+        // Live: перетаскивание пинов запрещено (история включается кнопками «История» / «Загр. данные»).
         if (!graphUsesServerDataRef.current) return;
         pinDragSessionDateRef.current = selectedGraphDateRef.current;
         if (selectedGraphDate && isTodayDateStr(selectedGraphDate) && !todayPinExploreRef.current) {
@@ -5707,14 +5716,42 @@ const DeviceMonitorPage = () => {
     }, [selectedGraphDate, getDayBoundsForDateStr, isTodayDateStr, loadHistoryFullDay]);
 
     const graphDateCalendarRef = useRef(null);
+    const graphDatePopupRef = useRef(null);
     const [graphCalendarOpen, setGraphCalendarOpen] = useState(false);
+    const [calendarPopupStyle, setCalendarPopupStyle] = useState(null);
+
+    const updateCalendarPopupPosition = useCallback(() => {
+        const anchor = graphDateCalendarRef.current;
+        if (!anchor) return;
+        const rect = anchor.getBoundingClientRect();
+        const width = Math.max(Math.round(rect.width), 240);
+        setCalendarPopupStyle({
+            top: rect.bottom + 4,
+            left: rect.left + rect.width / 2,
+            width,
+        });
+    }, []);
+
+    useLayoutEffect(() => {
+        if (!graphCalendarOpen) {
+            setCalendarPopupStyle(null);
+            return undefined;
+        }
+        updateCalendarPopupPosition();
+        window.addEventListener('resize', updateCalendarPopupPosition);
+        window.addEventListener('scroll', updateCalendarPopupPosition, true);
+        return () => {
+            window.removeEventListener('resize', updateCalendarPopupPosition);
+            window.removeEventListener('scroll', updateCalendarPopupPosition, true);
+        };
+    }, [graphCalendarOpen, updateCalendarPopupPosition, selectedGraphDate]);
 
     useEffect(() => {
         if (!graphCalendarOpen) return undefined;
         const onDoc = (e) => {
-            if (graphDateCalendarRef.current && !graphDateCalendarRef.current.contains(e.target)) {
-                setGraphCalendarOpen(false);
-            }
+            const inAnchor = graphDateCalendarRef.current?.contains(e.target);
+            const inPopup = graphDatePopupRef.current?.contains(e.target);
+            if (!inAnchor && !inPopup) setGraphCalendarOpen(false);
         };
         document.addEventListener('mousedown', onDoc);
         return () => document.removeEventListener('mousedown', onDoc);
@@ -5730,6 +5767,8 @@ const DeviceMonitorPage = () => {
     const todayDateStr = toLocalDateInput(new Date());
     const currentDateStr = selectedGraphDate || todayDateStr;
     const isNextDayDisabled = currentDateStr >= todayDateStr;
+    const isGraphLiveModeActive = isTodayDateStr(selectedGraphDate || todayDateStr) && !todayPinExplore && !isHistoryMode;
+    const isGraphTodayHistoryActive = todayPinExplore && isTodayDateStr(selectedGraphDate || todayDateStr);
 
     /** Две буквы дня недели (пн…вс) для строки даты календаря графика — локальная дата YYYY-MM-DD. */
     const graphCalendarLabelParts = useMemo(() => {
@@ -5755,8 +5794,6 @@ const DeviceMonitorPage = () => {
         setSelectedGraphDate(iso);
         setGraphCalendarOpen(false);
     };
-
-    const graphHistoryPending = graphUsesServerData && !historyChartReady;
 
     /** Сброс Y-зума: левая max=750, правая max=100. */
     const handleGraphYZoomReset = useCallback(() => {
@@ -5809,14 +5846,20 @@ const DeviceMonitorPage = () => {
         setHistoryError(null);
     }, [getTodayPinExploreDayBounds]);
 
-    /** Переключатель: live ↔ история за сегодня (сутки — через «Загр. данные»). */
-    const handleToggleTodayHistory = useCallback(() => {
+    const handleEnterLiveMode = useCallback(() => {
+        const todayStr = toLocalDateInput(new Date());
         if (todayPinExplore) {
             exitTodayHistoryToLive();
-            return;
         }
+        if (!isTodayDateStr(selectedGraphDateRef.current)) {
+            setSelectedGraphDate(todayStr);
+        }
+    }, [exitTodayHistoryToLive, isTodayDateStr]);
+
+    const handleEnterTodayHistory = useCallback(() => {
+        if (todayPinExploreRef.current && isTodayDateStr(selectedGraphDateRef.current)) return;
         enterTodayPinExplore();
-    }, [todayPinExplore, exitTodayHistoryToLive, enterTodayPinExplore]);
+    }, [enterTodayPinExplore, isTodayDateStr]);
 
     /** #9: применяем сохранённый режим после восстановления даты; F5 с timeWindow — автозагрузка суток. */
     useEffect(() => {
@@ -6327,16 +6370,6 @@ const DeviceMonitorPage = () => {
                                                 <span className="machine-info-icon">›</span>
                                             </button>
                                         </div>
-                                        {graphCalendarOpen && (
-                                            <div className="monitor-graph-date-popup">
-                                                <MiniCalendar
-                                                    selectedIso={selectedGraphDate || todayDateStr}
-                                                    maxDate={new Date()}
-                                                    showYearNav={false}
-                                                    onPick={handleGraphCalendarPick}
-                                                />
-                                            </div>
-                                        )}
                                     </div>
                                     {graphUsesServerData && (
                                         <button
@@ -6523,28 +6556,14 @@ const DeviceMonitorPage = () => {
                         )}
                         {activeTab === 'graphs' && (
                             <div className="chart-stack">
-                                <div className="chart-card large">
-                                    {graphHistoryPending ? (
-                                        <div
-                                            className={`monitor-chart-stub${historyLoading ? ' monitor-chart-stub--loading' : ''}`}
-                                            role="status"
-                                            aria-busy={historyLoading}
-                                        >
-                                            {historyLoading && (
-                                                <>
-                                                    <span className="monitor-history-load-spinner" aria-hidden />
-                                                    <span className="monitor-chart-stub-text">{historyLoadingMessage}</span>
-                                                </>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <>
+                                <div className={`chart-card large${graphHistoryPending ? ' chart-card--history-pending' : ''}`}>
                                     <div
                                         className="chart-wrapper"
                                         ref={chartWrapperRef}
-                                        onMouseMove={handleSharedHoverMove}
-                                        onMouseLeave={handleSharedHoverLeave}
+                                        onMouseMove={graphHistoryPending ? undefined : handleSharedHoverMove}
+                                        onMouseLeave={graphHistoryPending ? undefined : handleSharedHoverLeave}
                                     >
+                                        <div className="monitor-chart-blur-target">
                                         <div className="monitor-overlay-ruler" ref={timelineRulerRef}>
                                             <div className="monitor-overlay-ruler-scale">
                                                 {Array.from({ length: 9 }, (_, idx) => {
@@ -6592,10 +6611,10 @@ const DeviceMonitorPage = () => {
                                             </div>
                                         </div>
                                         <div
-                                            className={`chart-pan-surface${graphUsesServerData ? ' chart-pan-surface--enabled' : ''}${chartPanActive ? ' chart-pan-surface--grabbing' : ''}${graphUsesServerData && historyLoading ? ' chart-pan-surface--history-loading' : ''}`}
-                                            onMouseDown={handleChartPanMouseDown}
+                                            className={`chart-pan-surface${graphUsesServerData ? ' chart-pan-surface--enabled' : ''}${chartPanActive ? ' chart-pan-surface--grabbing' : ''}${graphUsesServerData && historyLoading && !graphHistoryPending ? ' chart-pan-surface--history-loading' : ''}`}
+                                            onMouseDown={graphHistoryPending ? undefined : handleChartPanMouseDown}
                                         >
-                                            {graphUsesServerData && historyLoading && (
+                                            {graphUsesServerData && historyLoading && !graphHistoryPending && (
                                                 <div
                                                     className={`monitor-history-load-overlay${historyChartHasStaleContent ? ' monitor-history-load-overlay--stale' : ''}`}
                                                     role="status"
@@ -6627,7 +6646,7 @@ const DeviceMonitorPage = () => {
                                                             }
                                                         }}
                                                     />
-                                                    {plotDot.visible && !chartPanActive && (
+                                                    {plotDot.visible && !chartPanActive && !graphHistoryPending && (
                                                         <span
                                                             className="monitor-plot-cursor-dot"
                                                             style={{
@@ -6637,7 +6656,7 @@ const DeviceMonitorPage = () => {
                                                             aria-hidden
                                                         />
                                                     )}
-                                                    {hoverCursor.active && !chartPanActive && plotArea.heightPx > 0 && (
+                                                    {hoverCursor.active && !chartPanActive && !graphHistoryPending && plotArea.heightPx > 0 && (
                                                         <div
                                                             className="monitor-hover-crosshair monitor-hover-crosshair--in-chart"
                                                             style={{
@@ -6648,7 +6667,7 @@ const DeviceMonitorPage = () => {
                                                             }}
                                                         />
                                                     )}
-                                                    {hoverCursor.active && !chartPanActive && (hoverCursorTimeLabel || hoverInfo) && (
+                                                    {hoverCursor.active && !chartPanActive && !graphHistoryPending && (hoverCursorTimeLabel || hoverInfo) && (
                                                         <div
                                                             className="monitor-hover-tooltip"
                                                             style={{
@@ -6764,7 +6783,7 @@ const DeviceMonitorPage = () => {
                                                             )}
                                                         </div>
                                                     </div>
-                                                    {hoverCursor.active && !chartPanActive && (
+                                                    {hoverCursor.active && !chartPanActive && !graphHistoryPending && (
                                                         <div
                                                             className="monitor-lanes-crosshair-shell"
                                                             style={{
@@ -6786,6 +6805,15 @@ const DeviceMonitorPage = () => {
                                                 </div>
                                             </div>
                                         </div>
+                                        </div>
+                                        {graphHistoryPending && historyLoading && (
+                                            <div className="monitor-chart-pending-overlay" role="status" aria-live="polite" aria-busy="true">
+                                                <div className="monitor-chart-pending-overlay-panel">
+                                                    <span className="monitor-history-load-spinner" aria-hidden />
+                                                    <span>{historyLoadingMessage}</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="chart-controls" aria-label="Управление графиком">
                                         <button
@@ -6814,11 +6842,19 @@ const DeviceMonitorPage = () => {
                                         </button>
                                         <button
                                             type="button"
-                                            className={`chart-control-btn chart-control-btn--history${todayPinExplore ? ' chart-control-btn--history-active' : ''}`}
-                                            onClick={handleToggleTodayHistory}
-                                            title={todayPinExplore ? 'Вернуться в live-режим' : 'История за сегодня (загрузка через «Загр. данные»)'}
+                                            className={`chart-control-btn chart-control-btn--mode${isGraphLiveModeActive ? ' chart-control-btn--mode-active' : ''}`}
+                                            onClick={handleEnterLiveMode}
+                                            title="Live — поток в реальном времени"
                                         >
-                                            <span className="chart-control-btn-label">{todayPinExplore ? 'Live' : 'История'}</span>
+                                            <span className="chart-control-btn-label">Live</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`chart-control-btn chart-control-btn--mode${isGraphTodayHistoryActive ? ' chart-control-btn--mode-active' : ''}`}
+                                            onClick={handleEnterTodayHistory}
+                                            title="Сегодня — история за текущие сутки (загрузка через «Загр. данные»)"
+                                        >
+                                            <span className="chart-control-btn-label">Сегодня</span>
                                         </button>
                                         <button
                                             type="button"
@@ -6839,8 +6875,6 @@ const DeviceMonitorPage = () => {
                                             )}
                                         </button>
                                     </div>
-                                        </>
-                                    )}
                                 </div>
                             </div>
                         )}
@@ -6867,6 +6901,25 @@ const DeviceMonitorPage = () => {
                 <div style={{ position: 'fixed', bottom: 12, left: 12, zIndex: 11000, color: '#ff8a96', fontSize: 12 }}>
                     {historyError}
                 </div>
+            )}
+            {graphCalendarOpen && calendarPopupStyle && createPortal(
+                <div
+                    ref={graphDatePopupRef}
+                    className="monitor-graph-date-popup monitor-graph-date-popup--fixed"
+                    style={{
+                        top: calendarPopupStyle.top,
+                        left: calendarPopupStyle.left,
+                        width: calendarPopupStyle.width,
+                    }}
+                >
+                    <MiniCalendar
+                        selectedIso={selectedGraphDate || todayDateStr}
+                        maxDate={new Date()}
+                        showYearNav={false}
+                        onPick={handleGraphCalendarPick}
+                    />
+                </div>,
+                document.body
             )}
         </main>
     );

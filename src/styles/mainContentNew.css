@@ -2361,17 +2361,19 @@
 }
 
 .monitor-graph-date-popup {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1200;
     background: #1B1622;
     border: 1px solid rgba(87, 77, 95, 0.6);
     border-radius: 6px;
-    padding: 8px;
+    padding: 10px 10px 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     width: 240px;
+    box-sizing: border-box;
+}
+
+.monitor-graph-date-popup--fixed {
+    position: fixed;
+    transform: translateX(-50%);
+    z-index: 13000;
 }
 
 .monitor-graph-date-popup .welder-cal {
@@ -2435,6 +2437,7 @@
 }
 
 .monitor-graph-date-popup .welder-cal-day {
+    min-height: 28px;
     aspect-ratio: 1;
     border: none;
     border-radius: 4px;
@@ -2443,6 +2446,9 @@
     font-size: 12px;
     cursor: pointer;
     padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .monitor-graph-date-popup .welder-cal-day:hover:not(.empty):not(:disabled) {
@@ -2463,26 +2469,39 @@
     cursor: default;
 }
 
-/* Заглушка графика до «Загр. данные». */
-.monitor-chart-stub {
-    flex: 1;
-    min-height: 320px;
-    background: rgba(36, 30, 42, 0.72);
-    border-radius: 8px;
-    border: 1px solid rgba(70, 62, 78, 0.45);
+/* История до «Загр. данные»: пустой график с blur вместо серой заглушки. */
+.chart-card--history-pending .monitor-chart-blur-target {
+    filter: blur(3px) saturate(0.72);
+    opacity: 0.58;
+    pointer-events: none;
+    user-select: none;
+}
+
+.chart-card--history-pending .chart-wrapper {
+    position: relative;
+}
+
+.monitor-chart-pending-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 12;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
+    pointer-events: none;
+    filter: none;
+    opacity: 1;
+}
+
+.monitor-chart-pending-overlay-panel {
+    display: flex;
+    align-items: center;
     gap: 10px;
-}
-
-.monitor-chart-stub--loading {
-    background: rgba(36, 30, 42, 0.82);
-}
-
-.monitor-chart-stub-text {
-    color: rgba(196, 189, 206, 0.88);
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(17, 26, 44, 0.88);
+    border: 1px solid rgba(118, 138, 176, 0.4);
+    color: rgba(196, 189, 206, 0.92);
     font-size: 13px;
 }
 
@@ -2731,13 +2750,13 @@
     letter-spacing: -0.02em;
 }
 
-.chart-control-btn--history {
+.chart-control-btn--mode {
     height: auto;
     min-height: 32px;
     padding: 4px 2px;
 }
 
-.chart-control-btn--history-active {
+.chart-control-btn--mode-active {
     border-color: rgba(126, 195, 255, 0.65);
     background: rgba(52, 88, 130, 0.35);
 }
