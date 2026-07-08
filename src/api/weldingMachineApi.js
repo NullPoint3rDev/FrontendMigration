@@ -212,7 +212,7 @@ export async function updateWeldingMachine(id, machine) {
     }
 }
 
-// Удалить машину (мягкое удаление — статус Deleted)
+// Удалить машину (мгновенно скрывает; данные очищаются в фоне)
 export async function deleteWeldingMachine(id) {
     const res = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
@@ -227,16 +227,12 @@ export async function deleteWeldingMachine(id) {
     return true;
 }
 
-// Полное удаление аппарата из БД (включая MAC и связанные данные)
+// Удалить аппарат: мгновенный ответ, полная очистка данных — в фоне на сервере
 export async function hardDeleteWeldingMachine(id) {
-    const res = await fetchWithTimeout(
-        `${API_URL}/${id}/hard`,
-        {
-            method: 'DELETE',
-            headers: getAuthHeaders()
-        },
-        180000
-    );
+    const res = await fetch(`${API_URL}/${id}/hard`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+    });
 
     if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: 'Ошибка удаления устройства' }));

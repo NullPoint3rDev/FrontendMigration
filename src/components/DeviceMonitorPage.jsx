@@ -3210,7 +3210,7 @@ const DeviceMonitorPage = () => {
 
         const machineLabel = displayName || equipmentName || machineName || 'аппарат';
         const confirmMessage =
-            `Удалить аппарат «${machineLabel}»?\n\nВсе данные аппарата (включая MAC-адрес) будут безвозвратно удалены из базы данных.`;
+            `Удалить аппарат «${machineLabel}»?\n\nАппарат сразу исчезнет из списка. История телеметрии будет удалена в фоне на сервере.`;
         if (!window.confirm(confirmMessage)) {
             return;
         }
@@ -3221,9 +3221,7 @@ const DeviceMonitorPage = () => {
             navigate('/equipment');
         } catch (err) {
             console.error('Ошибка удаления аппарата:', err);
-            const msg = err?.name === 'AbortError'
-                ? 'Превышено время ожидания удаления (3 мин). Возможно, у аппарата очень много телеметрии — попробуйте ещё раз или обратитесь к администратору.'
-                : (err.message || 'Неизвестная ошибка');
+            const msg = err.message || 'Неизвестная ошибка';
             alert('Ошибка удаления аппарата: ' + msg);
         } finally {
             setIsDeletingMachine(false);
