@@ -3221,7 +3221,10 @@ const DeviceMonitorPage = () => {
             navigate('/equipment');
         } catch (err) {
             console.error('Ошибка удаления аппарата:', err);
-            alert('Ошибка удаления аппарата: ' + (err.message || 'Неизвестная ошибка'));
+            const msg = err?.name === 'AbortError'
+                ? 'Превышено время ожидания удаления (3 мин). Возможно, у аппарата очень много телеметрии — попробуйте ещё раз или обратитесь к администратору.'
+                : (err.message || 'Неизвестная ошибка');
+            alert('Ошибка удаления аппарата: ' + msg);
         } finally {
             setIsDeletingMachine(false);
         }

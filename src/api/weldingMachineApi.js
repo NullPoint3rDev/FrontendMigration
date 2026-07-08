@@ -229,10 +229,14 @@ export async function deleteWeldingMachine(id) {
 
 // Полное удаление аппарата из БД (включая MAC и связанные данные)
 export async function hardDeleteWeldingMachine(id) {
-    const res = await fetch(`${API_URL}/${id}/hard`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-    });
+    const res = await fetchWithTimeout(
+        `${API_URL}/${id}/hard`,
+        {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        },
+        180000
+    );
 
     if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: 'Ошибка удаления устройства' }));
