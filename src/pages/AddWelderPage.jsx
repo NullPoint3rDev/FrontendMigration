@@ -69,51 +69,190 @@ const formatDateTyping = (raw) => {
     return parts.filter((p) => p !== '').join('.');
 };
 
-// Поле даты с ручным вводом DD.MM.YYYY и иконкой календаря. value/onChange работают в ISO (YYYY-MM-DD).
-function DateField({ value, onChange, placeholder, disabled }) {
+const WEEK_DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const RU_MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+
+const isoToDate = (iso) => {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+};
+
+const dateToIso = (d) => {
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${y}-${mo}-${da}`;
+};
+
+const buildMonthGrid = (viewDate) => {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const startOffset = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+    const cells = [];
+    for (let i = 0; i < startOffset; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    return cells;
+};
+
+// Подсказка при наведении. Модульного уровня, чтобы не пересоздавать тип при каждом рендере
+// (иначе инпуты внутри теряют фокус — «курсор выбрасывает из плитки»).
+function Tooltip({ text, children }) {
+    const tooltipRef = useRef(null);
+    const wrapperRef = useRef(null);
+    const handleMouseEnter = () => {
+        if (tooltipRef.current && wrapperRef.current) {
+            const rect = wrapperRef.current.getBoundingClientRect();
+            const tooltipWidth = 300;
+            const spacing = 8;
+            let top = rect.top - (tooltipRef.current.offsetHeight || 100) - spacing;
+            let left = rect.left + rect.width / 2;
+            if (top < 0) top = rect.bottom + spacing;
+            if (left - tooltipWidth / 2 < 0) left = tooltipWidth / 2;
+            else if (left + tooltipWidth / 2 > window.innerWidth) {
+                left = window.innerWidth - tooltipWidth / 2;
+            }
+            tooltipRef.current.style.top = `${top}px`;
+            tooltipRef.current.style.left = `${left}px`;
+        }
+    };
+    return (
+        <div className="tooltip-wrapper" ref={wrapperRef} onMouseEnter={handleMouseEnter}>
+            {children}
+            <span className="tooltip-text" ref={tooltipRef}>{text}</span>
+        </div>
+    );
+}
+
+// Мини-календарь в стиле отчётов. minDate/maxDate — включительные границы (Date | null).
+function MiniCalendar({ selectedIso, minDate, maxDate, onPick }) {
+    const initial = isoToDate(selectedIso) || (maxDate ? new Date(maxDate) : new Date());
+    const [view, setView] = useState(new Date(initial.getFullYear(), initial.getMonth(), 1));
+    const selected = isoToDate(selectedIso);
+
+    const canNext = (() => {
+        if (!maxDate) return true;
+        const next = new Date(view.getFullYear(), view.getMonth() + 1, 1);
+        return next <= startOfDay(maxDate);
+    })();
+
+    const shiftMonth = (dir) => setView(prev => new Date(prev.getFullYear(), prev.getMonth() + dir, 1));
+
+    const isDayDisabled = (day) => {
+        const d = startOfDay(new Date(view.getFullYear(), view.getMonth(), day));
+        if (minDate && d < startOfDay(minDate)) return true;
+        if (maxDate && d > startOfDay(maxDate)) return true;
+        return false;
+    };
+
+    return (
+        <div className="welder-cal" onMouseDown={(e) => e.preventDefault()}>
+            <div className="welder-cal-nav">
+                <button type="button" className="welder-cal-nav-btn" onClick={() => shiftMonth(-1)}>&lt;</button>
+                <span className="welder-cal-title">{RU_MONTHS[view.getMonth()]} {view.getFullYear()}</span>
+                <button type="button" className="welder-cal-nav-btn" onClick={() => shiftMonth(1)} disabled={!canNext}>&gt;</button>
+            </div>
+            <div className="welder-cal-weekdays">
+                {WEEK_DAYS.map(d => <div key={d} className="welder-cal-weekday">{d}</div>)}
+            </div>
+            <div className="welder-cal-days">
+                {buildMonthGrid(view).map((day, idx) => {
+                    if (!day) return <div key={idx} className="welder-cal-day empty" />;
+                    const disabled = isDayDisabled(day);
+                    const isSel = selected && selected.getFullYear() === view.getFullYear()
+                        && selected.getMonth() === view.getMonth() && selected.getDate() === day;
+                    return (
+                        <button
+                            key={idx}
+                            type="button"
+                            className={`welder-cal-day ${isSel ? 'selected' : ''}`}
+                            disabled={disabled}
+                            onClick={() => onPick(dateToIso(new Date(view.getFullYear(), view.getMonth(), day)))}
+                        >
+                            {day}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+// Поле даты: ручной ввод DD.MM.YYYY (автоточки) + кастомный календарь. value/onChange в ISO.
+// validate(iso) -> строка ошибки | ''. Невалидная дата не сохраняется, но показывается ошибка.
+function DateField({ value, onChange, placeholder, disabled, minDate, maxDate, validate }) {
     const [text, setText] = useState(isoToDisplayDate(value));
-    const hiddenRef = useRef(null);
+    const [error, setError] = useState('');
+    const [open, setOpen] = useState(false);
+    const wrapRef = useRef(null);
+    const focusedRef = useRef(false);
 
     useEffect(() => {
+        if (focusedRef.current) return; // не перетираем текст во время ручного ввода
         setText(isoToDisplayDate(value));
     }, [value]);
+
+    useEffect(() => {
+        if (!open) return;
+        const onDoc = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+        document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+    }, [open]);
+
+    const runValidate = (iso) => {
+        const err = validate ? (validate(iso) || '') : '';
+        setError(err);
+        return err;
+    };
 
     const handleTextChange = (e) => {
         const formatted = formatDateTyping(e.target.value);
         setText(formatted);
         const iso = displayToIsoDate(formatted);
         if (iso) {
-            onChange(iso);
-        } else if (formatted === '') {
+            const err = runValidate(iso);
+            onChange(err ? '' : iso);
+        } else {
+            setError('');
             onChange('');
         }
     };
 
-    const openPicker = () => {
-        if (disabled || !hiddenRef.current) return;
-        if (hiddenRef.current.showPicker) hiddenRef.current.showPicker();
-        else hiddenRef.current.click();
+    const handleBlur = () => {
+        focusedRef.current = false;
+        // Неполная/невалидная по формату дата — очищаем (текст и значение).
+        if (text && !displayToIsoDate(text)) {
+            setText('');
+            setError('');
+            onChange('');
+        }
+    };
+
+    const handlePick = (iso) => {
+        setText(isoToDisplayDate(iso));
+        runValidate(iso);
+        onChange(iso);
+        setOpen(false);
     };
 
     return (
-        <div className="welder-date-field">
+        <div className={`welder-date-field ${error ? 'has-error' : ''}`} ref={wrapRef}>
             <input
                 type="text"
                 inputMode="numeric"
                 value={text}
+                onFocus={() => { focusedRef.current = true; }}
                 onChange={handleTextChange}
+                onBlur={handleBlur}
                 placeholder={placeholder || 'ДД.ММ.ГГГГ'}
                 disabled={disabled}
                 maxLength={10}
-            />
-            <input
-                ref={hiddenRef}
-                type="date"
-                className="welder-date-hidden"
-                value={value || ''}
-                onChange={(e) => onChange(e.target.value)}
-                disabled={disabled}
-                tabIndex={-1}
+                className={error ? 'error' : ''}
             />
             <svg
                 className="welder-date-icon"
@@ -121,12 +260,18 @@ function DateField({ value, onChange, placeholder, disabled }) {
                 height="16"
                 viewBox="0 0 16 16"
                 fill="none"
-                onClick={openPicker}
+                onClick={() => { if (!disabled) setOpen(o => !o); }}
             >
                 <rect x="3" y="4" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2" />
                 <path d="M3 7H13" stroke="currentColor" strokeWidth="1.2" />
                 <path d="M6 2V5M10 2V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
             </svg>
+            {open && !disabled && (
+                <div className="welder-date-popup">
+                    <MiniCalendar selectedIso={value} minDate={minDate} maxDate={maxDate} onPick={handlePick} />
+                </div>
+            )}
+            {error && <span className="welder-date-error">{error}</span>}
         </div>
     );
 }
@@ -857,6 +1002,22 @@ function AddWelderPage() {
 
     const isWelderBlocked = String(currentWelderStatus || '').toUpperCase() === 'BLOCKED';
 
+    // Границы дат: рождение — не позднее «сегодня минус 14 лет»; приём — не позднее сегодня.
+    const todayDay = startOfDay(new Date());
+    const birthMaxDate = new Date(todayDay.getFullYear() - 14, todayDay.getMonth(), todayDay.getDate());
+    const validateBirthDate = (iso) => {
+        const d = isoToDate(iso);
+        if (!d) return '';
+        if (startOfDay(d) > birthMaxDate) return 'Сварщику должно быть не менее 14 лет';
+        return '';
+    };
+    const validateHireDate = (iso) => {
+        const d = isoToDate(iso);
+        if (!d) return '';
+        if (startOfDay(d) > todayDay) return 'Дата приёма не может быть в будущем';
+        return '';
+    };
+
     const handleWelderBlockChange = (checked) => {
         if (checked) {
             if (!isWelderBlocked) {
@@ -983,7 +1144,7 @@ function AddWelderPage() {
 
         const welderData = {
             name: fullName,
-            status: isEditMode ? currentWelderStatus : 'ACTIVE',
+            status: currentWelderStatus,
             department: departmentName || null,
             position: formData.position || null,
             employeeId: formData.employeeId || null,
@@ -1125,7 +1286,6 @@ function AddWelderPage() {
                 const response = await updateWelder(id, welderData);
                 console.log('Ответ от сервера при обновлении:', response);
                 welderId = id;
-                alert('Сварщик успешно обновлен');
             } else {
                 // Режим создания - создаем нового сварщика
                 const response = await createWelder(welderData);
@@ -1198,33 +1358,6 @@ function AddWelderPage() {
         await saveWelder();
     };
 
-    const Tooltip = ({ text, children }) => {
-        const tooltipRef = useRef(null);
-        const wrapperRef = useRef(null);
-        const handleMouseEnter = () => {
-            if (tooltipRef.current && wrapperRef.current) {
-                const rect = wrapperRef.current.getBoundingClientRect();
-                const tooltipWidth = 300;
-                const spacing = 8;
-                let top = rect.top - (tooltipRef.current.offsetHeight || 100) - spacing;
-                let left = rect.left + rect.width / 2;
-                if (top < 0) top = rect.bottom + spacing;
-                if (left - tooltipWidth / 2 < 0) left = tooltipWidth / 2;
-                else if (left + tooltipWidth / 2 > window.innerWidth) {
-                    left = window.innerWidth - tooltipWidth / 2;
-                }
-                tooltipRef.current.style.top = `${top}px`;
-                tooltipRef.current.style.left = `${left}px`;
-            }
-        };
-        return (
-            <div className="tooltip-wrapper" ref={wrapperRef} onMouseEnter={handleMouseEnter}>
-                {children}
-                <span className="tooltip-text" ref={tooltipRef}>{text}</span>
-            </div>
-        );
-    };
-
     return (
         <div className="add-welder-page">
             {/* Header */}
@@ -1233,7 +1366,7 @@ function AddWelderPage() {
                     <button className="back-btn" onClick={() => goWithUnsavedGuard('/welders')}>
                         ←
                     </button>
-                    <h1 className="page-title">{isEditMode ? 'Редактирование сварщика' : 'Сварщик'}</h1>
+                    <h1 className="page-title">{isEditMode ? 'Страница сварщика' : 'Добавление нового сварщика'}</h1>
                 </div>
                 <div className="header-right">
                     <button
@@ -1291,35 +1424,41 @@ function AddWelderPage() {
                             {/* First Column */}
                             <div className="form-column">
                                 <div className="form-group">
-                                    <input
-                                        type="text"
-                                        name="lastName"
-                                        value={formData.lastName}
-                                        onChange={handleInputChange}
-                                        placeholder="Фамилия*"
-                                        className={errors.lastName ? 'error' : ''}
-                                    />
+                                    <Tooltip text="Фамилия">
+                                        <input
+                                            type="text"
+                                            name="lastName"
+                                            value={formData.lastName}
+                                            onChange={handleInputChange}
+                                            placeholder="Фамилия*"
+                                            className={errors.lastName ? 'error' : ''}
+                                        />
+                                    </Tooltip>
                                     {errors.lastName && <span className="error-text">{errors.lastName}</span>}
                                 </div>
                                 <div className="form-group">
-                                    <input
-                                        type="text"
-                                        name="firstName"
-                                        value={formData.firstName}
-                                        onChange={handleInputChange}
-                                        placeholder="Имя*"
-                                        className={errors.firstName ? 'error' : ''}
-                                    />
+                                    <Tooltip text="Имя">
+                                        <input
+                                            type="text"
+                                            name="firstName"
+                                            value={formData.firstName}
+                                            onChange={handleInputChange}
+                                            placeholder="Имя*"
+                                            className={errors.firstName ? 'error' : ''}
+                                        />
+                                    </Tooltip>
                                     {errors.firstName && <span className="error-text">{errors.firstName}</span>}
                                 </div>
                                 <div className="form-group">
-                                    <input
-                                        type="text"
-                                        name="middleName"
-                                        value={formData.middleName}
-                                        onChange={handleInputChange}
-                                        placeholder="Отчество"
-                                    />
+                                    <Tooltip text="Отчество">
+                                        <input
+                                            type="text"
+                                            name="middleName"
+                                            value={formData.middleName}
+                                            onChange={handleInputChange}
+                                            placeholder="Отчество"
+                                        />
+                                    </Tooltip>
                                 </div>
                                 <div className="form-group">
                                     <Tooltip text="Дата рождения">
@@ -1328,6 +1467,8 @@ function AddWelderPage() {
                                             onChange={(iso) => setFormData(prev => ({ ...prev, birthDate: iso }))}
                                             placeholder="Дата рождения ДД.ММ.ГГГГ"
                                             disabled={readOnlyWelderForm}
+                                            maxDate={birthMaxDate}
+                                            validate={validateBirthDate}
                                         />
                                     </Tooltip>
                                 </div>
@@ -1338,25 +1479,47 @@ function AddWelderPage() {
                                             onChange={(iso) => setFormData(prev => ({ ...prev, hireDate: iso }))}
                                             placeholder="Дата приёма ДД.ММ.ГГГГ"
                                             disabled={readOnlyWelderForm}
+                                            maxDate={todayDay}
+                                            validate={validateHireDate}
                                         />
                                     </Tooltip>
+                                </div>
+                                <div className="form-group">
+                                    <div className="add-welder-block-row">
+                                        <input
+                                            type="checkbox"
+                                            id="welder-block-checkbox"
+                                            className="block-checkbox"
+                                            checked={isWelderBlocked}
+                                            onChange={(e) => handleWelderBlockChange(e.target.checked)}
+                                            disabled={readOnlyWelderForm}
+                                        />
+                                        <label htmlFor="welder-block-checkbox" className="block-checkbox-label">
+                                            Блокировка
+                                        </label>
+                                        <span className="add-welder-block-status-label">
+                                            {isWelderBlocked ? 'Сварщик заблокирован' : 'Сварщик активен'}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Second Column */}
                             <div className="form-column">
                                 <div className="form-group">
-                                    <input
-                                        type="text"
-                                        name="position"
-                                        list="welder-positions-list"
-                                        value={formData.position}
-                                        onChange={handleInputChange}
-                                        placeholder="Должность*"
-                                        className={errors.position ? 'error' : ''}
-                                        autoComplete="off"
-                                        disabled={readOnlyWelderForm}
-                                    />
+                                    <Tooltip text="Должность">
+                                        <input
+                                            type="text"
+                                            name="position"
+                                            list="welder-positions-list"
+                                            value={formData.position}
+                                            onChange={handleInputChange}
+                                            placeholder="Должность*"
+                                            className={errors.position ? 'error' : ''}
+                                            autoComplete="off"
+                                            disabled={readOnlyWelderForm}
+                                        />
+                                    </Tooltip>
                                     <datalist id="welder-positions-list">
                                         {positionOptions.map(pos => (
                                             <option key={pos} value={pos} />
@@ -1365,6 +1528,7 @@ function AddWelderPage() {
                                     {errors.position && <span className="error-text">{errors.position}</span>}
                                 </div>
                                 <div className="form-group">
+                                    <Tooltip text="Подразделение">
                                     <div className="unit-select-container">
                                         <div
                                             className={`unit-select-dropdown ${unitDropdownOpen ? 'open' : ''} ${errors.organizationUnitId ? 'error' : ''}`}
@@ -1425,25 +1589,30 @@ function AddWelderPage() {
                                             </div>
                                         )}
                                     </div>
+                                    </Tooltip>
                                     {errors.organizationUnitId && <span className="error-text">{errors.organizationUnitId}</span>}
                                 </div>
                                 <div className="form-group">
-                                    <input
-                                        type="text"
-                                        name="employeeId"
-                                        value={formData.employeeId}
-                                        onChange={handleInputChange}
-                                        placeholder="Табельный номер"
-                                    />
+                                    <Tooltip text="Табельный номер">
+                                        <input
+                                            type="text"
+                                            name="employeeId"
+                                            value={formData.employeeId}
+                                            onChange={handleInputChange}
+                                            placeholder="Табельный номер"
+                                        />
+                                    </Tooltip>
                                 </div>
                                 <div className="form-group">
-                                    <input
-                                        type="tel"
-                                        name="phone"
-                                        value={formData.phone}
-                                        onChange={handleInputChange}
-                                        placeholder="Номер телефона"
-                                    />
+                                    <Tooltip text="Номер телефона">
+                                        <input
+                                            type="tel"
+                                            name="phone"
+                                            value={formData.phone}
+                                            onChange={handleInputChange}
+                                            placeholder="Номер телефона"
+                                        />
+                                    </Tooltip>
                                 </div>
                                 <div className="form-group">
                                     <button type="button" className="save-btn" onClick={handleSave} disabled={readOnlyWelderForm}>
@@ -1452,24 +1621,6 @@ function AddWelderPage() {
                                 </div>
                             </div>
                         </div>
-
-                        {isEditMode && (
-                            <div className="add-welder-block-row">
-                                <input
-                                    type="checkbox"
-                                    id="welder-block-checkbox"
-                                    className="block-checkbox"
-                                    checked={isWelderBlocked}
-                                    onChange={(e) => handleWelderBlockChange(e.target.checked)}
-                                />
-                                <label htmlFor="welder-block-checkbox" className="block-checkbox-label">
-                                    Блокировка
-                                </label>
-                                <span className="add-welder-block-status-label">
-                                    {isWelderBlocked ? 'Сварщик заблокирован' : 'Сварщик активен'}
-                                </span>
-                            </div>
-                        )}
                     </div>
 
                     {/* RFID Passes Section */}

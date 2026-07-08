@@ -1,8 +1,42 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
+import { FaChevronRight, FaChevronDown } from 'react-icons/fa'
 import '../styles/addEquipmentModal.css'
 import machineImage from '../images/2 копия.png'
-import { getMacLiveness } from '../api/weldingMachineApi'
+import { getMacLiveness, getMacExists } from '../api/weldingMachineApi'
 import { getAllUserAccounts } from '../api/userAccountApi'
+import { getAllOrganizations } from '../api/organizationApi'
+import { groupUnitsByOrganization } from '../utils/organizationUnitFilterGroups'
+
+// ФИО -> «И.И. Фамилия», если полное длиннее 20 символов.
+const welderDisplayName = (name) => {
+    const full = String(name || '').trim()
+    if (full.length <= 20) return full
+    const parts = full.split(/\s+/)
+    if (parts.length >= 2) {
+        const last = parts[0]
+        const initials = parts.slice(1).map((p) => p.charAt(0).toUpperCase() + '.').join('')
+        return `${initials} ${last}`
+    }
+    return full
+}
+
+const welderUnitId = (w) => {
+    const uid = w.organizationUnit?.id ?? w.organizationUnitId ?? null
+    return uid == null ? null : String(uid)
+}
+
+const welderFio = (w) => {
+    const full = String(w?.name || [w?.lastName, w?.firstName, w?.middleName].filter(Boolean).join(' ') || '').trim()
+    return full || (w?.id != null ? `Сварщик #${w.id}` : '')
+}
+
+const isWelderBlockedStatus = (w) => {
+    const s = w?.status
+    const raw = typeof s === 'string' ? s.trim() : String(s?.name || s?.value || '').trim()
+    return raw.toUpperCase() === 'BLOCKED'
+}
+
+const unitOrgId = (u) => String(u?.organizationId ?? u?.organization?.id ?? u?.organization_id ?? '')
 
 const defaultFormData = () => ({
     name: '',
@@ -14,6 +48,7 @@ const defaultFormData = () => ({
     serialNumber: '',
     inventoryNumber: '',
     responsiblePerson: '',
+    responsibleWelderId: '',
     lastMaintenanceDate: '',
     operatingHours: '',
     operatingHoursUnit: 'HOURS',
@@ -30,7 +65,7 @@ const MODELS = [
 
 const MAC_POLL_INTERVAL_MS = 1500
 
-const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organizationUnits = [], editMode = false, initialData = null }) => {
+const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organizationUnits = [], isAlloyWideAccess = false, editMode = false, initialData = null }) => {
     const [selectedModel, setSelectedModel] = useState('Core Synergy')
     const [formData, setFormData] = useState(defaultFormData())
     const [isSaving, setIsSaving] = useState(false)
@@ -51,6 +86,13 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
     // Пользователи для «лицо, проводившее ТО»
     const [users, setUsers] = useState([])
 
+    // Дерево «ответственный сварщик»
+    const [organizations, setOrganizations] = useState([])
+    const [respOpen, setRespOpen] = useState(false)
+    const [respExpandedOrgs, setRespExpandedOrgs] = useState({})
+    const [respExpandedUnits, setRespExpandedUnits] = useState({})
+    const respRef = useRef(null)
+
     const commissioningDateInputRef = useRef(null)
     const manufactureDateInputRef = useRef(null)
     const lastMaintenanceDateInputRef = useRef(null)
@@ -61,15 +103,26 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         setMacChecking(false)
     }
 
-    // Загрузка пользователей при открытии (для create-режима)
+    // Загрузка пользователей и предприятий при открытии (для create-режима)
     useEffect(() => {
         if (isOpen && !editMode) {
             getAllUserAccounts()
                 .then((data) => setUsers(Array.isArray(data) ? data : []))
                 .catch(() => setUsers([]))
+            getAllOrganizations()
+                .then((data) => setOrganizations(Array.isArray(data) ? data : []))
+                .catch(() => setOrganizations([]))
         }
         return () => stopMacCheck()
     }, [isOpen, editMode])
+
+    // Закрытие дерева по клику вне него
+    useEffect(() => {
+        if (!respOpen) return
+        const onDoc = (e) => { if (respRef.current && !respRef.current.contains(e.target)) setRespOpen(false) }
+        document.addEventListener('mousedown', onDoc)
+        return () => document.removeEventListener('mousedown', onDoc)
+    }, [respOpen])
 
     // Режим редактирования: подставляем имя и подразделение (по id и/или по имени после загрузки списка подразделений).
     useEffect(() => {
@@ -102,8 +155,6 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         initialData?.organizationUnitId,
         organizationUnits,
     ]);
-
-    if (!isOpen) return null
 
     const formatDateToDDMMYYYY = (dateString) => {
         if (!dateString) return ''
@@ -236,6 +287,133 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         stopMacCheck()
     }
 
+    const handleDepartmentChange = (deptName) => {
+        const prevUnit = organizationUnits.find((u) => u.name === formData.department)
+        const newUnit = organizationUnits.find((u) => u.name === deptName)
+        const prevOrgId = prevUnit ? unitOrgId(prevUnit) : ''
+        const newOrgId = newUnit ? unitOrgId(newUnit) : ''
+        const orgChanged = prevOrgId !== newOrgId
+
+        setFormData((prev) => ({
+            ...prev,
+            department: deptName,
+            organizationUnitId: newUnit?.id != null ? String(newUnit.id) : '',
+            ...(prev.responsiblePerson && orgChanged
+                ? { responsiblePerson: '', responsibleWelderId: '' }
+                : {}),
+        }))
+        if (errors.department) {
+            setErrors((prev) => {
+                const n = { ...prev }
+                delete n.department
+                delete n.organizationUnit
+                return n
+            })
+        }
+        if (apiError) setApiError('')
+    }
+
+    const selectResponsibleWelder = (welder) => {
+        setFormData((prev) => ({
+            ...prev,
+            responsiblePerson: welderFio(welder),
+            responsibleWelderId: welder.id != null ? String(welder.id) : '',
+        }))
+        setRespOpen(false)
+    }
+
+    const respTreeData = useMemo(() => {
+        const activeWelders = welders.filter((w) => !isWelderBlockedStatus(w))
+        if (!formData.department) {
+            return { groups: [], byUnit: new Map(), byOrg: new Map() }
+        }
+
+        let unitsForTree = organizationUnits
+        let orgsForTree = organizations
+        const selectedUnit = organizationUnits.find((u) => u.name === formData.department)
+        const selectedOrgId = selectedUnit ? unitOrgId(selectedUnit) : ''
+
+        if (!isAlloyWideAccess && selectedOrgId) {
+            unitsForTree = organizationUnits.filter((u) => unitOrgId(u) === selectedOrgId)
+            orgsForTree = organizations.filter((o) => String(o.id) === selectedOrgId)
+        }
+
+        const groups = groupUnitsByOrganization(unitsForTree, orgsForTree)
+        const byUnit = new Map()
+        const byOrg = new Map()
+
+        activeWelders.forEach((w) => {
+            const uid = welderUnitId(w)
+            if (uid) {
+                const unit = organizationUnits.find((u) => String(u.id) === uid)
+                if (!isAlloyWideAccess && selectedOrgId && unit && unitOrgId(unit) !== selectedOrgId) return
+                if (!byUnit.has(uid)) byUnit.set(uid, [])
+                byUnit.get(uid).push(w)
+            } else {
+                let orgKey = '__NO_ORG__'
+                if (w.department) {
+                    const u = organizationUnits.find((ou) => ou.name === w.department)
+                    if (u) orgKey = unitOrgId(u) || '__NO_ORG__'
+                } else if (w.organizationId != null) {
+                    orgKey = String(w.organizationId)
+                }
+                if (!isAlloyWideAccess && selectedOrgId && orgKey !== selectedOrgId && orgKey !== '__NO_ORG__') return
+                if (!byOrg.has(orgKey)) byOrg.set(orgKey, [])
+                byOrg.get(orgKey).push(w)
+            }
+        })
+
+        return { groups, byUnit, byOrg }
+    }, [welders, organizations, organizationUnits, formData.department, isAlloyWideAccess])
+
+    const toggleRespOrg = (orgKey) => {
+        setRespExpandedOrgs((prev) => ({ ...prev, [orgKey]: !prev[orgKey] }))
+    }
+
+    const toggleRespUnit = (orgKey, unitId) => {
+        const key = `${orgKey}-${unitId}`
+        setRespExpandedUnits((prev) => ({ ...prev, [key]: !prev[key] }))
+    }
+
+    const renderRespWelderLeaf = (welder, depth) => (
+        <div
+            key={`w-${welder.id}`}
+            className={`resp-welder-leaf ${String(formData.responsibleWelderId) === String(welder.id) ? 'selected' : ''}`}
+            style={{ paddingLeft: `${12 + depth * 16}px` }}
+            onClick={() => selectResponsibleWelder(welder)}
+        >
+            {welderDisplayName(welderFio(welder))}
+        </div>
+    )
+
+    const renderRespUnitNode = (unit, orgKey, depth) => {
+        const unitKey = `${orgKey}-${unit.id}`
+        const unitWelders = respTreeData.byUnit.get(String(unit.id)) || []
+        const hasChildren = (unit.children || []).length > 0
+        const expanded = respExpandedUnits[unitKey] !== false
+
+        return (
+            <React.Fragment key={unit.id}>
+                {(hasChildren || unitWelders.length > 0) && (
+                    <div
+                        className="resp-welder-unit"
+                        style={{ paddingLeft: `${12 + depth * 16}px` }}
+                        onClick={() => hasChildren && toggleRespUnit(orgKey, unit.id)}
+                    >
+                        {hasChildren && (
+                            <span className="resp-welder-chevron">
+                                {expanded ? <FaChevronDown size={10} /> : <FaChevronRight size={10} />}
+                            </span>
+                        )}
+                        <span className="resp-welder-unit-name">{unit.name}</span>
+                    </div>
+                )}
+                {expanded && unitWelders.map((w) => renderRespWelderLeaf(w, depth + 1))}
+                {expanded && (unit.children || []).map((ch) => renderRespUnitNode(ch, orgKey, depth + 1))}
+            </React.Fragment>
+        )
+    }
+
     const startMacCheck = async () => {
         const mac = (formData.macAddress || '').trim()
         if (!mac) {
@@ -245,6 +423,13 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         setMacCheckError('')
         setMacChecking(true)
         try {
+            const existsResp = await getMacExists(mac)
+            if (existsResp?.exists) {
+                setMacCheckError('Аппарат с таким MAC-адресом уже существует')
+                setMacChecking(false)
+                return
+            }
+
             const first = await getMacLiveness(mac)
             macCheckRef.current.baseline = first?.serverTimeMs ?? Date.now()
             // Если аппарат уже стучался прямо сейчас — сразу успех.
@@ -402,6 +587,8 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         </div>
     )
 
+    if (!isOpen) return null
+
     return (
         <div className="modal-overlay">
             <div className="modal-content">
@@ -495,7 +682,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                                 handleInputChange('organizationUnitId', unitId);
                                                 handleInputChange('department', unit?.name || '');
                                             } else {
-                                                handleInputChange('department', e.target.value);
+                                                handleDepartmentChange(e.target.value);
                                             }
                                         }}
                                         className={errors.department ? 'error' : ''}
@@ -540,16 +727,51 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                 <div className="form-column">
                                     <div className="form-field">
                                         <label>Ответственный сварщик</label>
-                                        <select
-                                            value={formData.responsiblePerson}
-                                            onChange={(e) => handleInputChange('responsiblePerson', e.target.value)}
-                                            disabled={gated}
-                                        >
-                                            <option value="">Выберите сварщика</option>
-                                            {welders.map(welder => (
-                                                <option key={welder.id} value={welder.name}>{welder.name}</option>
-                                            ))}
-                                        </select>
+                                        <div className="resp-welder-select" ref={respRef}>
+                                            <div
+                                                className={`resp-welder-trigger ${!formData.department ? 'disabled' : ''} ${respOpen ? 'open' : ''}`}
+                                                onClick={() => {
+                                                    if (gated || !formData.department) return
+                                                    setRespOpen((o) => !o)
+                                                }}
+                                            >
+                                                <span className="resp-welder-trigger-text">
+                                                    {formData.responsiblePerson
+                                                        ? welderDisplayName(formData.responsiblePerson)
+                                                        : (!formData.department
+                                                            ? 'Сначала выберите подразделение'
+                                                            : 'Выберите сварщика')}
+                                                </span>
+                                                <FaChevronDown className={`resp-welder-arrow ${respOpen ? 'open' : ''}`} />
+                                            </div>
+                                            {respOpen && (
+                                                <div className="resp-welder-dropdown">
+                                                    {respTreeData.groups.length === 0 ? (
+                                                        <div className="resp-welder-empty">Нет доступных сварщиков</div>
+                                                    ) : (
+                                                        respTreeData.groups.map((group) => {
+                                                            const orgWelders = respTreeData.byOrg.get(group.orgKey) || []
+                                                            const orgExpanded = respExpandedOrgs[group.orgKey] !== false
+                                                            return (
+                                                                <React.Fragment key={group.orgKey}>
+                                                                    <div
+                                                                        className="resp-welder-org"
+                                                                        onClick={() => toggleRespOrg(group.orgKey)}
+                                                                    >
+                                                                        <span className="resp-welder-chevron">
+                                                                            {orgExpanded ? <FaChevronDown size={10} /> : <FaChevronRight size={10} />}
+                                                                        </span>
+                                                                        <span>{group.orgName}</span>
+                                                                    </div>
+                                                                    {orgExpanded && orgWelders.map((w) => renderRespWelderLeaf(w, 1))}
+                                                                    {orgExpanded && group.hierarchy.map((unit) => renderRespUnitNode(unit, group.orgKey, 1))}
+                                                                </React.Fragment>
+                                                            )
+                                                        })
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                     {renderDateField('lastMaintenanceDate', 'Дата последнего ТО', lastMaintenanceDateInputRef)}
                                     <div className="form-field">
@@ -588,45 +810,6 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                                 return <option key={u.id} value={label} />
                                             })}
                                         </datalist>
-                                    </div>
-                                    <div className="form-field">
-                                        <label>Допущенные сварщики:</label>
-                                        <div className="welders-tags">
-                                            {formData.approvedWelders.map((welder, index) => (
-                                                <span
-                                                    key={index}
-                                                    className="welder-tag"
-                                                    onClick={() => {
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            approvedWelders: prev.approvedWelders.filter((_, i) => i !== index)
-                                                        }))
-                                                    }}
-                                                >
-                                                {welder}
-                                            </span>
-                                            ))}
-                                            <select
-                                                className="welder-select"
-                                                disabled={gated}
-                                                onChange={(e) => {
-                                                    if (e.target.value && !formData.approvedWelders.includes(e.target.value)) {
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            approvedWelders: [...prev.approvedWelders, e.target.value]
-                                                        }))
-                                                    }
-                                                    e.target.value = ''
-                                                }}
-                                            >
-                                                <option value="">+</option>
-                                                {welders.map(welder => (
-                                                    <option key={welder.id} value={welder.name}>
-                                                        {welder.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
                                     </div>
                                 </div>
                             )}

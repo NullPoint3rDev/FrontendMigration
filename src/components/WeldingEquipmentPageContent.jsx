@@ -869,6 +869,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                         technicianPass: dataToUse.maintenanceTechnicianPass || '',
                     },
                     responsiblePerson: dataToUse.responsiblePerson || '',
+                    responsibleWelderId: dataToUse.responsibleWelderId ? Number(dataToUse.responsibleWelderId) : null,
                     responsibleUserId: dataToUse.responsibleUserId ? Number(dataToUse.responsibleUserId) : null,
                     allowedWelders: dataToUse.assignedWelders || [],
                     maintenanceReminderHours: maintenanceReminderValue,
@@ -1703,6 +1704,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                     <AddEquipmentModal
                         isOpen={modalOpen}
                         onClose={closeModal}
+                        isAlloyWideAccess={!isEnterpriseScopedRole || currentUserOrgId == null}
                         welders={welders.filter((w) => {
                             if (!isEnterpriseScopedRole || currentUserOrgId == null) return true;
                             const unitId = w.organizationUnit?.id ?? w.organizationUnitId ?? null;
@@ -1751,6 +1753,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                                     maintenanceTechnicianName: data.maintenancePerson || '',
                                     maintenanceTechnicianPass: data.maintenancePass || '',
                                     responsiblePerson: data.responsiblePerson || '',
+                                    responsibleWelderId: data.responsibleWelderId || '',
                                     rfidEnabled: Boolean(data.options?.rfid),
                                     coreOptions: {
                                         gasControl: false,

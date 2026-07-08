@@ -35,6 +35,20 @@ export async function getMacLiveness(mac) {
     return res.json();
 }
 
+// Проверка, существует ли уже аппарат с данным MAC (excludeId — исключить текущий при редактировании)
+export async function getMacExists(mac, excludeId = null) {
+    const params = new URLSearchParams({ mac });
+    if (excludeId != null) params.set('excludeId', String(excludeId));
+    const res = await fetch(`${API_URL}/mac-exists?${params.toString()}`, {
+        headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || `HTTP ${res.status}`);
+    }
+    return res.json();
+}
+
 // Получить все машины
 export async function getAllWeldingMachines() {
     const res = await fetch(API_URL, {

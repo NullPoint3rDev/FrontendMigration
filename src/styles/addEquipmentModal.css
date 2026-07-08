@@ -449,7 +449,10 @@
 }
 
 .option-btn.active {
-    color: #FC6D0D !important;
+    background: rgba(246, 184, 67, 0.15) !important;
+    border-color: #F6B843 !important;
+    color: #F6B843 !important;
+    font-weight: 600 !important;
 }
 
 .option-icon {
@@ -531,5 +534,115 @@
     margin-bottom: 8px !important;
     font-weight: 500 !important;
     font-family: 'Roboto', sans-serif !important;
+}
+
+/* Дерево выбора ответственного сварщика */
+.resp-welder-select {
+    position: relative;
+}
+
+.resp-welder-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    background: rgba(28, 22, 34, 0.6);
+    border: 1px solid rgba(82, 69, 94, 0.4);
+    border-radius: 4px;
+    color: #f0f4ff;
+    font-size: 13px;
+    cursor: pointer;
+    min-height: 38px;
+    box-sizing: border-box;
+}
+
+.resp-welder-trigger.disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    color: #7B8BA6;
+}
+
+.resp-welder-trigger-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.resp-welder-arrow {
+    flex-shrink: 0;
+    font-size: 11px;
+    transition: transform 0.2s ease;
+}
+
+.resp-welder-arrow.open {
+    transform: rotate(180deg);
+}
+
+.resp-welder-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 200;
+    max-height: 260px;
+    overflow-y: auto;
+    background: #1B1622;
+    border: 1px solid rgba(87, 77, 95, 0.6);
+    border-radius: 6px;
+    padding: 6px 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.resp-welder-empty {
+    padding: 10px 12px;
+    color: #7B8BA6;
+    font-size: 12px;
+}
+
+.resp-welder-org,
+.resp-welder-unit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    color: #d9d6df;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.resp-welder-org:hover,
+.resp-welder-unit:hover {
+    background: rgba(178, 172, 182, 0.08);
+}
+
+.resp-welder-unit-name {
+    flex: 1;
+}
+
+.resp-welder-chevron {
+    display: inline-flex;
+    width: 14px;
+    flex-shrink: 0;
+    color: #b2acb6;
+}
+
+.resp-welder-leaf {
+    padding: 8px 12px;
+    color: #f0f4ff;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.resp-welder-leaf:hover {
+    background: rgba(178, 172, 182, 0.1);
+}
+
+.resp-welder-leaf.selected {
+    background: rgba(246, 184, 67, 0.15);
+    color: #F6B843;
 }
 

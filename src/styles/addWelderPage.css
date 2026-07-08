@@ -206,11 +206,9 @@
 .add-welder-block-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(59, 49, 74, 0.35);
+    gap: 10px;
     width: 100%;
+    padding: 6px 0;
 }
 
 .add-welder-page .block-checkbox {
@@ -325,6 +323,8 @@
 
 .form-group input,
 .form-group select {
+    width: 100%;
+    box-sizing: border-box;
     padding: 8px 12px;
     background: #1A1420;
     border: none;
@@ -333,6 +333,11 @@
     font-size: 13px;
     outline: none;
     transition: all 0.2s ease;
+}
+
+/* Чекбокс блокировки не растягиваем на всю ширину */
+.form-group .add-welder-block-row input[type="checkbox"] {
+    width: 16px;
 }
 
 .form-group input::placeholder {
@@ -555,27 +560,22 @@
 
 .welder-date-field {
     position: relative;
-    display: flex;
-    align-items: center;
     width: 100%;
 }
 
 .welder-date-field input[type="text"] {
     width: 100%;
+    box-sizing: border-box;
     padding-right: 34px;
 }
 
-.welder-date-hidden {
-    position: absolute;
-    right: 0;
-    width: 40px;
-    height: 100%;
-    opacity: 0;
-    pointer-events: none;
+.welder-date-field input[type="text"].error {
+    border: 1px solid #EC2B3C;
 }
 
 .welder-date-icon {
     position: absolute;
+    top: 9px;
     right: 12px;
     color: rgba(188, 183, 197, 0.6);
     cursor: pointer;
@@ -584,6 +584,121 @@
 
 .welder-date-icon:hover {
     color: rgba(188, 183, 197, 0.95);
+}
+
+.welder-date-error {
+    display: block;
+    margin-top: 4px;
+    color: #EC2B3C;
+    font-size: 12px;
+}
+
+.welder-date-popup {
+    position: absolute;
+    top: 40px;
+    left: 0;
+    z-index: 1000;
+    background: #1B1622;
+    border: 1px solid rgba(87, 77, 95, 0.6);
+    border-radius: 6px;
+    padding: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    width: 240px;
+}
+
+/* Мини-календарь (стиль как в отчётах) */
+.welder-cal {
+    width: 100%;
+}
+
+.welder-cal-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(79, 70, 90, 0.4);
+}
+
+.welder-cal-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #f0f4ff;
+}
+
+.welder-cal-nav-btn {
+    background: transparent;
+    border: none;
+    color: #b2acb6;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.welder-cal-nav-btn:hover:not(:disabled) {
+    background: rgba(178, 172, 182, 0.1);
+    color: #f0f4ff;
+}
+
+.welder-cal-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.welder-cal-weekdays,
+.welder-cal-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.welder-cal-weekdays {
+    margin-bottom: 2px;
+}
+
+.welder-cal-weekday {
+    text-align: center;
+    font-size: 10px;
+    color: rgba(178, 172, 182, 0.6);
+    font-weight: 500;
+}
+
+.welder-cal-day {
+    aspect-ratio: 1;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: #b8b2bf;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.welder-cal-day:hover:not(.empty):not(:disabled) {
+    background: rgba(52, 43, 59, 0.5);
+    border-color: rgba(178, 172, 182, 0.3);
+}
+
+.welder-cal-day.selected {
+    background: rgba(246, 178, 67, 0.2);
+    border-color: #F6B243;
+    color: #F6B243;
+    font-weight: 600;
+}
+
+.welder-cal-day.empty {
+    background: transparent;
+    cursor: default;
+}
+
+.welder-cal-day:disabled {
+    cursor: not-allowed;
+    opacity: 0.3;
 }
 
 .rfid-header,
