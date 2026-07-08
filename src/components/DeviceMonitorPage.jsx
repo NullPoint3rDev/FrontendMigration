@@ -5801,19 +5801,45 @@ const DeviceMonitorPage = () => {
         setYAxisRightMax(Y_AXIS_RIGHT.MAX);
     }, []);
 
-    const exitTodayHistoryToLive = useCallback(() => {
+    const resetGraphToLiveState = useCallback(() => {
         const todayStr = toLocalDateInput(new Date());
         const tw = latestTimeWindowRef.current;
-        if (Number.isFinite(tw.start) && Number.isFinite(tw.end) && tw.end > tw.start) {
-            persistHistoryPinWindow(todayStr, tw.start, tw.end);
+        if (
+            (todayPinExploreRef.current || historyModeRef.current)
+            && Number.isFinite(tw.start)
+            && Number.isFinite(tw.end)
+            && tw.end > tw.start
+        ) {
+            persistHistoryPinWindow(selectedGraphDateRef.current || todayStr, tw.start, tw.end);
         }
-        setTodayPinExplore(false);
+
         todayPinExploreRef.current = false;
         todayDayBoundsRef.current = null;
+        historyModeRef.current = false;
+
+        setTodayPinExplore(false);
+        setIsHistoryMode(false);
         setHistoryDayBounds({ start: null, end: null });
+        setHistoryChartReady(false);
+        setFullDayLoaded(false);
+        fullDayLoadedWindowRef.current = null;
+        setHistorySeriesSnapshot(DEFAULT_TELEMETRY_SERIES);
+        setHistoryTimelineSnapshot([]);
+        historyCacheRef.current = { date: null, dayStart: null, dayEnd: null, pointsByTs: new Map() };
+        pinDragPreviewRef.current = null;
+        setPinDragPreview(null);
+        setDraggingPin(null);
         setTimeWindow({ start: null, end: null, touched: false });
         setHistoryError(null);
+
+        if (selectedGraphDateRef.current !== todayStr) {
+            setSelectedGraphDate(todayStr);
+        }
     }, [persistHistoryPinWindow]);
+
+    const handleEnterLiveMode = useCallback(() => {
+        resetGraphToLiveState();
+    }, [resetGraphToLiveState]);
 
     const enterTodayPinExplore = useCallback((options = {}) => {
         const { skipDateSet = false } = options;
@@ -5845,16 +5871,6 @@ const DeviceMonitorPage = () => {
         setDraggingPin(null);
         setHistoryError(null);
     }, [getTodayPinExploreDayBounds]);
-
-    const handleEnterLiveMode = useCallback(() => {
-        const todayStr = toLocalDateInput(new Date());
-        if (todayPinExplore) {
-            exitTodayHistoryToLive();
-        }
-        if (!isTodayDateStr(selectedGraphDateRef.current)) {
-            setSelectedGraphDate(todayStr);
-        }
-    }, [exitTodayHistoryToLive, isTodayDateStr]);
 
     const handleEnterTodayHistory = useCallback(() => {
         if (todayPinExploreRef.current && isTodayDateStr(selectedGraphDateRef.current)) return;
