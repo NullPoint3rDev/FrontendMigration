@@ -51,22 +51,22 @@ const displayToIsoDate = (display) => {
     return `${m[3]}-${m[2]}-${m[1]}`;
 };
 
-// Прогрессивное форматирование ввода в DD.MM.YYYY (только цифры и точки).
+// Прогрессивное форматирование ввода в DD.MM.YYYY: точка сразу после 2 цифр дня и месяца.
 const formatDateTyping = (raw) => {
     const digits = String(raw || '').replace(/\D/g, '').slice(0, 8);
-    const parts = [];
-    if (digits.length >= 2) {
-        parts.push(digits.slice(0, 2));
-        if (digits.length >= 4) {
-            parts.push(digits.slice(2, 4));
-            parts.push(digits.slice(4));
-        } else {
-            parts.push(digits.slice(2));
-        }
-    } else {
-        parts.push(digits);
-    }
-    return parts.filter((p) => p !== '').join('.');
+    if (digits.length === 0) return '';
+    if (digits.length === 1) return digits;
+
+    const day = digits.slice(0, 2);
+    if (digits.length === 2) return `${day}.`;
+
+    const monthPart = digits.slice(2);
+    if (digits.length === 3) return `${day}.${monthPart}`;
+
+    const month = digits.slice(2, 4);
+    if (digits.length === 4) return `${day}.${month}.`;
+
+    return `${day}.${month}.${digits.slice(4)}`;
 };
 
 const WEEK_DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -141,7 +141,11 @@ function MiniCalendar({ selectedIso, minDate, maxDate, onPick }) {
         return next <= startOfDay(maxDate);
     })();
 
+    const canPrevYear = !minDate || view.getFullYear() > minDate.getFullYear();
+    const canNextYear = !maxDate || view.getFullYear() < maxDate.getFullYear();
+
     const shiftMonth = (dir) => setView(prev => new Date(prev.getFullYear(), prev.getMonth() + dir, 1));
+    const shiftYear = (dir) => setView(prev => new Date(prev.getFullYear() + dir, prev.getMonth(), 1));
 
     const isDayDisabled = (day) => {
         const d = startOfDay(new Date(view.getFullYear(), view.getMonth(), day));
@@ -153,9 +157,11 @@ function MiniCalendar({ selectedIso, minDate, maxDate, onPick }) {
     return (
         <div className="welder-cal" onMouseDown={(e) => e.preventDefault()}>
             <div className="welder-cal-nav">
-                <button type="button" className="welder-cal-nav-btn" onClick={() => shiftMonth(-1)}>&lt;</button>
+                <button type="button" className="welder-cal-nav-btn welder-cal-nav-btn-year" onClick={() => shiftYear(-1)} disabled={!canPrevYear} aria-label="Предыдущий год">&lt;&lt;</button>
+                <button type="button" className="welder-cal-nav-btn" onClick={() => shiftMonth(-1)} aria-label="Предыдущий месяц">&lt;</button>
                 <span className="welder-cal-title">{RU_MONTHS[view.getMonth()]} {view.getFullYear()}</span>
-                <button type="button" className="welder-cal-nav-btn" onClick={() => shiftMonth(1)} disabled={!canNext}>&gt;</button>
+                <button type="button" className="welder-cal-nav-btn" onClick={() => shiftMonth(1)} disabled={!canNext} aria-label="Следующий месяц">&gt;</button>
+                <button type="button" className="welder-cal-nav-btn welder-cal-nav-btn-year" onClick={() => shiftYear(1)} disabled={!canNextYear} aria-label="Следующий год">&gt;&gt;</button>
             </div>
             <div className="welder-cal-weekdays">
                 {WEEK_DAYS.map(d => <div key={d} className="welder-cal-weekday">{d}</div>)}
