@@ -2469,7 +2469,7 @@
     cursor: default;
 }
 
-/* История до «Загр. данные»: пустой график с blur вместо серой заглушки. */
+/* История до «Загр. данные»: blur на шкале и области графика (без лишней обёртки — flex-цепочка). */
 .chart-card--history-pending .monitor-chart-blur-target {
     filter: blur(3px) saturate(0.72);
     opacity: 0.58;

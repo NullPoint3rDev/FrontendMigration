@@ -6563,8 +6563,7 @@ const DeviceMonitorPage = () => {
                                         onMouseMove={graphHistoryPending ? undefined : handleSharedHoverMove}
                                         onMouseLeave={graphHistoryPending ? undefined : handleSharedHoverLeave}
                                     >
-                                        <div className="monitor-chart-blur-target">
-                                        <div className="monitor-overlay-ruler" ref={timelineRulerRef}>
+                                        <div className={`monitor-overlay-ruler${graphHistoryPending ? ' monitor-chart-blur-target' : ''}`} ref={timelineRulerRef}>
                                             <div className="monitor-overlay-ruler-scale">
                                                 {Array.from({ length: 9 }, (_, idx) => {
                                                     const ratio = idx / 8;
@@ -6611,7 +6610,7 @@ const DeviceMonitorPage = () => {
                                             </div>
                                         </div>
                                         <div
-                                            className={`chart-pan-surface${graphUsesServerData ? ' chart-pan-surface--enabled' : ''}${chartPanActive ? ' chart-pan-surface--grabbing' : ''}${graphUsesServerData && historyLoading && !graphHistoryPending ? ' chart-pan-surface--history-loading' : ''}`}
+                                            className={`chart-pan-surface${graphUsesServerData ? ' chart-pan-surface--enabled' : ''}${chartPanActive ? ' chart-pan-surface--grabbing' : ''}${graphUsesServerData && historyLoading && !graphHistoryPending ? ' chart-pan-surface--history-loading' : ''}${graphHistoryPending ? ' monitor-chart-blur-target' : ''}`}
                                             onMouseDown={graphHistoryPending ? undefined : handleChartPanMouseDown}
                                         >
                                             {graphUsesServerData && historyLoading && !graphHistoryPending && (
@@ -6804,7 +6803,6 @@ const DeviceMonitorPage = () => {
                                                     )}
                                                 </div>
                                             </div>
-                                        </div>
                                         </div>
                                         {graphHistoryPending && historyLoading && (
                                             <div className="monitor-chart-pending-overlay" role="status" aria-live="polite" aria-busy="true">
