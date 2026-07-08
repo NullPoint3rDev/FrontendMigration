@@ -66,7 +66,7 @@ const buildMonthGrid = (view) => {
     return cells;
 };
 
-function MiniCalendar({ selectedIso, minDate, maxDate, onPick }) {
+export function MiniCalendar({ selectedIso, minDate, maxDate, onPick, showYearNav = true }) {
     const initial = isoToDate(selectedIso) || (maxDate ? new Date(maxDate) : new Date());
     const [view, setView] = useState(new Date(initial.getFullYear(), initial.getMonth(), 1));
     const selected = isoToDate(selectedIso);
@@ -93,11 +93,15 @@ function MiniCalendar({ selectedIso, minDate, maxDate, onPick }) {
     return (
         <div className="welder-cal" onMouseDown={(e) => e.preventDefault()}>
             <div className="welder-cal-nav">
-                <button type="button" className="welder-cal-nav-btn welder-cal-nav-btn-year" onClick={() => shiftYear(-1)} disabled={!canPrevYear} aria-label="Предыдущий год">&lt;&lt;</button>
+                {showYearNav ? (
+                    <button type="button" className="welder-cal-nav-btn welder-cal-nav-btn-year" onClick={() => shiftYear(-1)} disabled={!canPrevYear} aria-label="Предыдущий год">&lt;&lt;</button>
+                ) : null}
                 <button type="button" className="welder-cal-nav-btn" onClick={() => shiftMonth(-1)} aria-label="Предыдущий месяц">&lt;</button>
                 <span className="welder-cal-title">{RU_MONTHS[view.getMonth()]} {view.getFullYear()}</span>
                 <button type="button" className="welder-cal-nav-btn" onClick={() => shiftMonth(1)} disabled={!canNext} aria-label="Следующий месяц">&gt;</button>
-                <button type="button" className="welder-cal-nav-btn welder-cal-nav-btn-year" onClick={() => shiftYear(1)} disabled={!canNextYear} aria-label="Следующий год">&gt;&gt;</button>
+                {showYearNav ? (
+                    <button type="button" className="welder-cal-nav-btn welder-cal-nav-btn-year" onClick={() => shiftYear(1)} disabled={!canNextYear} aria-label="Следующий год">&gt;&gt;</button>
+                ) : null}
             </div>
             <div className="welder-cal-weekdays">
                 {WEEK_DAYS.map(d => <div key={d} className="welder-cal-weekday">{d}</div>)}

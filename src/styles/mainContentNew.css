@@ -2330,7 +2330,163 @@
     line-height: 1;
 }
 
-/* #8: кнопка загрузки суток — в правом отступе, справа от дорожки «Состояние». */
+/* #8: кнопка загрузки суток — под датой в левой колонке. */
+.monitor-history-load-sidebar-btn {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    font-size: 14px;
+    line-height: 1.2;
+    border-radius: 6px;
+    border: 1px solid rgba(87, 77, 95, 0.6);
+    background: rgba(44, 36, 53, 0.95);
+    color: rgba(242, 241, 244, 0.85);
+    cursor: pointer;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.monitor-history-load-sidebar-btn:hover:not(:disabled) {
+    background: rgba(54, 46, 63, 0.98);
+    border-color: rgba(118, 138, 176, 0.45);
+}
+
+.monitor-history-load-sidebar-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.monitor-graph-date-row {
+    position: relative;
+}
+
+.monitor-graph-date-popup {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1200;
+    background: #1B1622;
+    border: 1px solid rgba(87, 77, 95, 0.6);
+    border-radius: 6px;
+    padding: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    width: 240px;
+}
+
+.monitor-graph-date-popup .welder-cal {
+    width: 100%;
+}
+
+.monitor-graph-date-popup .welder-cal-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(79, 70, 90, 0.4);
+    gap: 2px;
+}
+
+.monitor-graph-date-popup .welder-cal-title {
+    flex: 1;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #f0f4ff;
+}
+
+.monitor-graph-date-popup .welder-cal-nav-btn {
+    background: transparent;
+    border: none;
+    color: #b2acb6;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.monitor-graph-date-popup .welder-cal-nav-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+    color: #f0f4ff;
+}
+
+.monitor-graph-date-popup .welder-cal-nav-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.monitor-graph-date-popup .welder-cal-weekdays,
+.monitor-graph-date-popup .welder-cal-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.monitor-graph-date-popup .welder-cal-weekdays {
+    margin-bottom: 4px;
+}
+
+.monitor-graph-date-popup .welder-cal-weekday {
+    text-align: center;
+    font-size: 10px;
+    color: rgba(178, 172, 182, 0.85);
+    padding: 2px 0;
+}
+
+.monitor-graph-date-popup .welder-cal-day {
+    aspect-ratio: 1;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: rgba(240, 244, 255, 0.92);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0;
+}
+
+.monitor-graph-date-popup .welder-cal-day:hover:not(.empty):not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.monitor-graph-date-popup .welder-cal-day.selected {
+    background: rgba(60, 199, 255, 0.28);
+    color: #fff;
+}
+
+.monitor-graph-date-popup .welder-cal-day.empty {
+    pointer-events: none;
+}
+
+.monitor-graph-date-popup .welder-cal-day:disabled {
+    opacity: 0.28;
+    cursor: default;
+}
+
+/* Заглушка графика до «Загр. данные». */
+.monitor-chart-stub {
+    flex: 1;
+    min-height: 320px;
+    background: rgba(36, 30, 42, 0.72);
+    border-radius: 8px;
+    border: 1px solid rgba(70, 62, 78, 0.45);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.monitor-chart-stub--loading {
+    background: rgba(36, 30, 42, 0.82);
+}
+
+.monitor-chart-stub-text {
+    color: rgba(196, 189, 206, 0.88);
+    font-size: 13px;
+}
+
+/* legacy: кнопка у дорожки (удалена из UI, стиль оставлен на случай отката). */
 .monitor-lane-load-btn {
     position: absolute;
     right: 0;

@@ -31,6 +31,7 @@ import UserProfile from '../components/UserProfile';
 import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
 import MonitorWeldersTab from './MonitorWeldersTab';
 import '../styles/monitorWeldersTab.css';
+import { MiniCalendar, isoToDisplayDate } from './WelderDateField';
 import {
     formatWeldingMachineStateDisplay,
     isStandbyMachineState,
@@ -1645,6 +1646,8 @@ const DeviceMonitorPage = () => {
     /** #8: сутки уже подгружены кнопкой «Загрузить данные» (сброс при смене даты/режима или пинов). */
     const [fullDayLoaded, setFullDayLoaded] = useState(false);
     const fullDayLoadedWindowRef = useRef(null);
+    /** История: график отрисован после «Загр. данные» или восстановления из localStorage. */
+    const [historyChartReady, setHistoryChartReady] = useState(false);
     /** #9: восстановление настроек графика из localStorage (per-MAC). */
     const graphPrefsRef = useRef(undefined);
     if (graphPrefsRef.current === undefined) {
@@ -2042,7 +2045,7 @@ const DeviceMonitorPage = () => {
             if (todayPinExploreRef.current) {
                 return undefined;
             }
-            // Live режим по умолчанию (пятиминутка); суточный просмотр — только через пины / «История».
+            // Live режим по умолчанию (пятиминутка); суточный просмотр — только через «История» + «Загр. данные».
             setTodayPinExplore(false);
             todayPinExploreRef.current = false;
             todayDayBoundsRef.current = null;
@@ -2053,67 +2056,28 @@ const DeviceMonitorPage = () => {
             setDraggingPin(null);
             return undefined;
         }
-        let cancelled = false;
-        (async () => {
-            setIsHistoryMode(true);
-            setTodayPinExplore(false);
-            todayPinExploreRef.current = false;
-            todayDayBoundsRef.current = null;
-            setHistoryError(null);
-            const [yyyy, mm, dd] = String(selectedGraphDate).split('-').map((x) => parseInt(x, 10));
-            const dayStart = new Date(yyyy, mm - 1, dd, 0, 0, 0, 0).getTime();
-            const dayEnd = dayStart + HISTORY_MAX_MS;
-            setHistoryDayBounds({ start: dayStart, end: dayEnd });
-
-            const minGap = 60 * 1000;
-            const saved = historyPinWindowsRef.current[selectedGraphDate];
-            let window;
-            const savedUsable = saved
-                && Number.isFinite(saved.start)
-                && Number.isFinite(saved.end)
-                && saved.end > saved.start
-                && isPinWindowInsideDay(selectedGraphDate, saved.start, saved.end, minGap)
-                && !isCollapsedPinWindowArtifact(selectedGraphDate, saved.start, saved.end, minGap);
-            if (savedUsable) {
-                window = { start: saved.start, end: saved.end };
-            } else {
-                if (saved) {
-                    delete historyPinWindowsRef.current[selectedGraphDate];
-                }
-                window = await pickDefaultHourWithData(selectedGraphDate);
-            }
-            if (cancelled) return;
-            try {
-                await ensureHistoryIntervalLoaded(selectedGraphDate, window.start, window.end);
-            } catch {
-                if (!cancelled) setHistoryError('Не удалось загрузить историю с сервера.');
-                return;
-            }
-            if (cancelled) return;
-            setTimeWindow({ start: window.start, end: window.end, touched: true });
-            setHistorySeriesSnapshot(buildHistorySeriesForWindow(window.start, window.end));
-            setHistoryTimelineSnapshot(buildHistoryTimelineForWindow(window.start, window.end));
-        })().catch(() => {
-            if (!cancelled) setHistoryError('Не удалось загрузить историю с сервера.');
-        });
-        return () => {
-            cancelled = true;
+        setIsHistoryMode(true);
+        setTodayPinExplore(false);
+        todayPinExploreRef.current = false;
+        todayDayBoundsRef.current = null;
+        setHistoryError(null);
+        const { dayStart, dayEnd } = getDayBoundsForDateStr(selectedGraphDate);
+        setHistoryDayBounds({ start: dayStart, end: dayEnd });
+        setHistoryChartReady(false);
+        setHistorySeriesSnapshot(DEFAULT_TELEMETRY_SERIES);
+        setHistoryTimelineSnapshot([]);
+        historyCacheRef.current = {
+            date: selectedGraphDate,
+            dayStart,
+            dayEnd,
+            pointsByTs: new Map(),
         };
-    }, [
-        selectedGraphDate,
-        isTodayDateStr,
-        HISTORY_MAX_MS,
-        pickDefaultHourWithData,
-        buildHistorySeriesForWindow,
-        buildHistoryTimelineForWindow,
-        ensureHistoryIntervalLoaded,
-        isPinWindowInsideDay,
-        isCollapsedPinWindowArtifact,
-    ]);
+        return undefined;
+    }, [selectedGraphDate, isTodayDateStr, getDayBoundsForDateStr]);
 
     const historyFetchDebounceRef = useRef(null);
     useEffect(() => {
-        if (!graphUsesServerData) return;
+        if (!graphUsesServerData || !historyChartReady) return;
         if (draggingPin) return;
         const start = timeWindow.start;
         const end = timeWindow.end;
@@ -2149,7 +2113,7 @@ const DeviceMonitorPage = () => {
         return () => {
             if (historyFetchDebounceRef.current) clearTimeout(historyFetchDebounceRef.current);
         };
-    }, [graphUsesServerData, draggingPin, timeWindow.start, timeWindow.end, ensureHistoryIntervalLoaded, selectedGraphDate, buildHistorySeriesForWindow, buildHistoryTimelineForWindow]);
+    }, [graphUsesServerData, historyChartReady, draggingPin, timeWindow.start, timeWindow.end, ensureHistoryIntervalLoaded, selectedGraphDate, buildHistorySeriesForWindow, buildHistoryTimelineForWindow]);
 
     /** Как в archive WeldingMachinePanel: при >200 точек оставляем последние 100 */
     const trimChartSeries = (prev, point) => {
@@ -4824,7 +4788,7 @@ const DeviceMonitorPage = () => {
         const welding = buildSegments(timelineForStateLane, (s) => Boolean(s.isWelding), null, wEnd);
         const errors = buildSegments(
             timelineInWindow,
-            (s) => Number.isFinite(Number(s.errorCode)) && Number(s.errorCode) > 0,
+            (s) => Boolean(s.isOnline) && Number.isFinite(Number(s.errorCode)) && Number(s.errorCode) > 0,
             (s) => Number(s.errorCode),
             wEnd
         ).map((seg) => ({ ...seg, label: formatErrorCodeLabel(seg.value) }));
@@ -5672,11 +5636,12 @@ const DeviceMonitorPage = () => {
         };
     }, [draggingPin, chartBounds.dayStart, chartBounds.dayEnd, activeWindow.start, activeWindow.end, persistHistoryPinWindow]);
 
-    /** #8: смена даты/режима — снова час по умолчанию, кнопка «Загрузить данные» опять активна. */
+    /** #8: смена даты/режима — снова заглушка, кнопка «Загр. данные» опять активна. */
     useEffect(() => {
         setFullDayLoaded(false);
         fullDayLoadedWindowRef.current = null;
-    }, [selectedGraphDate, todayPinExplore, isHistoryMode]);
+        setHistoryChartReady(false);
+    }, [selectedGraphDate, todayPinExplore]);
 
     /** #8: изменили пины/окно на той же дате после загрузки суток — кнопка снова активна. */
     useEffect(() => {
@@ -5689,37 +5654,71 @@ const DeviceMonitorPage = () => {
         }
     }, [fullDayLoaded, timeWindow.start, timeWindow.end]);
 
-    /** #8: подгрузка выбранных графиков за целые сутки (00:00–сейчас для сегодня, 00:00–24:00 для прошлых). */
-    const handleLoadFullDay = useCallback(async () => {
-        const dateStr = selectedGraphDate;
-        if (!dateStr) return;
+    /** Подгрузка суток с сервера; viewWindow — окно пинов после загрузки (F5), иначе весь день. */
+    const loadHistoryFullDay = useCallback(async (dateStr, viewWindow = null) => {
+        if (!dateStr) return false;
         const { dayStart, dayEnd } = getDayBoundsForDateStr(dateStr);
-        const start = dayStart;
-        const end = isTodayDateStr(dateStr) ? Math.min(Date.now(), dayEnd) : dayEnd;
-        setTimeWindow({ start, end, touched: true });
+        const loadEnd = isTodayDateStr(dateStr) ? Math.min(Date.now(), dayEnd) : dayEnd;
         try {
-            await ensureHistoryIntervalLoaded(dateStr, start, end);
+            await ensureHistoryIntervalLoaded(dateStr, dayStart, loadEnd);
             setHistoryCacheRevision((r) => r + 1);
+            const restored = viewWindow
+                ? clampPinWindowToDay(dateStr, viewWindow.start, viewWindow.end)
+                : null;
+            const start = restored?.start ?? dayStart;
+            const end = restored?.end ?? loadEnd;
+            setTimeWindow({ start, end, touched: true });
             setHistorySeriesSnapshot(buildHistorySeriesForWindow(start, end));
             setHistoryTimelineSnapshot(buildHistoryTimelineForWindow(start, end));
             persistHistoryPinWindow(dateStr, start, end);
-            fullDayLoadedWindowRef.current = { start, end };
-            setFullDayLoaded(true);
+            const isFullSpan = start <= dayStart + 60_000 && end >= loadEnd - 60_000;
+            if (isFullSpan) {
+                fullDayLoadedWindowRef.current = { start: dayStart, end: loadEnd };
+                setFullDayLoaded(true);
+            } else {
+                fullDayLoadedWindowRef.current = null;
+                setFullDayLoaded(false);
+            }
+            setHistoryChartReady(true);
             setHistoryError(null);
+            return true;
         } catch {
             setHistoryError('Не удалось загрузить историю с сервера.');
+            return false;
         }
     }, [
-        selectedGraphDate,
         getDayBoundsForDateStr,
         isTodayDateStr,
         ensureHistoryIntervalLoaded,
         buildHistorySeriesForWindow,
         buildHistoryTimelineForWindow,
         persistHistoryPinWindow,
+        clampPinWindowToDay,
     ]);
 
-    const datePickerInputRef = useRef(null);
+    /** #8: подгрузка выбранных графиков за целые сутки (00:00–сейчас для сегодня, 00:00–24:00 для прошлых). */
+    const handleLoadFullDay = useCallback(async () => {
+        const dateStr = selectedGraphDate;
+        if (!dateStr) return;
+        const { dayStart, dayEnd } = getDayBoundsForDateStr(dateStr);
+        const loadEnd = isTodayDateStr(dateStr) ? Math.min(Date.now(), dayEnd) : dayEnd;
+        setTimeWindow({ start: dayStart, end: loadEnd, touched: true });
+        await loadHistoryFullDay(dateStr);
+    }, [selectedGraphDate, getDayBoundsForDateStr, isTodayDateStr, loadHistoryFullDay]);
+
+    const graphDateCalendarRef = useRef(null);
+    const [graphCalendarOpen, setGraphCalendarOpen] = useState(false);
+
+    useEffect(() => {
+        if (!graphCalendarOpen) return undefined;
+        const onDoc = (e) => {
+            if (graphDateCalendarRef.current && !graphDateCalendarRef.current.contains(e.target)) {
+                setGraphCalendarOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+    }, [graphCalendarOpen]);
     const shiftDateByDays = useCallback((dateStr, deltaDays) => {
         if (!dateStr) return toLocalDateInput(new Date());
         const [yyyy, mm, dd] = String(dateStr).split('-').map((x) => parseInt(x, 10));
@@ -5739,10 +5738,10 @@ const DeviceMonitorPage = () => {
         const [y, m, d] = ds.split('-').map((x) => parseInt(x, 10));
         const dt = new Date(y, (m || 1) - 1, d || 1);
         if (dt.getFullYear() !== y || dt.getMonth() !== (m || 1) - 1 || dt.getDate() !== (d || 1)) {
-            return { dateStr: ds, weekday: '' };
+            return { dateStr: isoToDisplayDate(ds) || ds, weekday: '' };
         }
         const ruShort = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
-        return { dateStr: ds, weekday: ruShort[dt.getDay()] || '' };
+        return { dateStr: isoToDisplayDate(ds), weekday: ruShort[dt.getDay()] || '' };
     }, [selectedGraphDate, todayDateStr]);
 
     const handlePrevDay = () => setSelectedGraphDate((d) => shiftDateByDays(d || toLocalDateInput(new Date()), -1));
@@ -5750,7 +5749,14 @@ const DeviceMonitorPage = () => {
         if (isNextDayDisabled) return;
         setSelectedGraphDate((d) => shiftDateByDays(d || toLocalDateInput(new Date()), 1));
     };
-    const handleOpenCalendar = () => datePickerInputRef.current?.showPicker?.() || datePickerInputRef.current?.click?.();
+    const handleOpenCalendar = () => setGraphCalendarOpen((open) => !open);
+    const handleGraphCalendarPick = (iso) => {
+        if (!iso) return;
+        setSelectedGraphDate(iso);
+        setGraphCalendarOpen(false);
+    };
+
+    const graphHistoryPending = graphUsesServerData && !historyChartReady;
 
     /** Сброс Y-зума: левая max=750, правая max=100. */
     const handleGraphYZoomReset = useCallback(() => {
@@ -5772,66 +5778,80 @@ const DeviceMonitorPage = () => {
         setHistoryError(null);
     }, [persistHistoryPinWindow]);
 
-    /** Переключатель: live ↔ история за сегодня (последний час). */
-    const handleToggleTodayHistory = useCallback(async () => {
-        if (todayPinExplore) {
-            exitTodayHistoryToLive();
-            return;
-        }
+    const enterTodayPinExplore = useCallback((options = {}) => {
+        const { skipDateSet = false } = options;
         const todayStr = toLocalDateInput(new Date());
-        const db = getTodayPinExploreDayBounds(todayStr);
-        const defaultEnd = db.dayEnd;
-        const defaultStart = Math.max(db.dayStart, defaultEnd - 60 * 60 * 1000);
-        const saved = historyPinWindowsRef.current[todayStr];
-        const restored = saved ? clampPinWindowToDay(todayStr, saved.start, saved.end) : null;
-        const start = restored?.start ?? defaultStart;
-        const end = restored?.end ?? defaultEnd;
-
-        if (selectedGraphDateRef.current !== todayStr) {
+        if (!skipDateSet && selectedGraphDateRef.current !== todayStr) {
             skipTodayLiveResetRef.current = true;
             setSelectedGraphDate(todayStr);
         }
-
+        const db = getTodayPinExploreDayBounds(todayStr);
         todayPinExploreRef.current = true;
         todayDayBoundsRef.current = db;
         setTodayPinExplore(true);
         setIsHistoryMode(false);
         setHistoryDayBounds({ start: db.dayStart, end: db.dayEnd });
-        setTimeWindow({ start, end, touched: true });
+        setHistoryChartReady(false);
+        setFullDayLoaded(false);
+        fullDayLoadedWindowRef.current = null;
+        setTimeWindow({ start: null, end: null, touched: false });
+        setHistorySeriesSnapshot(DEFAULT_TELEMETRY_SERIES);
+        setHistoryTimelineSnapshot([]);
+        historyCacheRef.current = {
+            date: todayStr,
+            dayStart: db.dayStart,
+            dayEnd: db.dayEnd,
+            pointsByTs: new Map(),
+        };
+        pinDragPreviewRef.current = null;
+        setPinDragPreview(null);
+        setDraggingPin(null);
         setHistoryError(null);
+    }, [getTodayPinExploreDayBounds]);
 
-        try {
-            await ensureHistoryIntervalLoaded(todayStr, start, end);
-            setHistoryCacheRevision((r) => r + 1);
-            setHistorySeriesSnapshot(buildHistorySeriesForWindow(start, end));
-            setHistoryTimelineSnapshot(buildHistoryTimelineForWindow(start, end));
-        } catch {
-            setHistoryError('Не удалось загрузить историю с сервера.');
+    /** Переключатель: live ↔ история за сегодня (сутки — через «Загр. данные»). */
+    const handleToggleTodayHistory = useCallback(() => {
+        if (todayPinExplore) {
+            exitTodayHistoryToLive();
+            return;
         }
-    }, [
-        todayPinExplore,
-        exitTodayHistoryToLive,
-        getTodayPinExploreDayBounds,
-        clampPinWindowToDay,
-        ensureHistoryIntervalLoaded,
-        buildHistorySeriesForWindow,
-        buildHistoryTimelineForWindow,
-    ]);
+        enterTodayPinExplore();
+    }, [todayPinExplore, exitTodayHistoryToLive, enterTodayPinExplore]);
 
-    /** #9: применяем сохранённый режим (история за сегодня) после восстановления даты. Прошлые даты входят в историю сами. */
+    /** #9: применяем сохранённый режим после восстановления даты; F5 с timeWindow — автозагрузка суток. */
     useEffect(() => {
         const pending = pendingRestoreRef.current;
-        if (!pending || pending.applied || !selectedGraphDate) return;
+        if (!pending || pending.applied || !selectedGraphDate || !prefsRestoredRef.current) return;
+
+        const prefs = graphPrefsRef.current;
+        const savedWindow = prefs?.timeWindow;
+        const hasSavedLoad = savedWindow
+            && Number.isFinite(savedWindow.start)
+            && Number.isFinite(savedWindow.end)
+            && savedWindow.end > savedWindow.start
+            && isPinWindowInsideDay(selectedGraphDate, savedWindow.start, savedWindow.end);
+
+        pending.applied = true;
+
         if (pending.mode === 'todayHistory' && isTodayDateStr(selectedGraphDate)) {
-            if (!todayPinExploreRef.current) {
-                pending.applied = true;
-                handleToggleTodayHistory();
+            enterTodayPinExplore({ skipDateSet: true });
+            if (hasSavedLoad) {
+                loadHistoryFullDay(selectedGraphDate, savedWindow);
             }
-        } else {
-            // 'history' (прошлая дата) грузится эффектом смены даты; 'live' — состояние по умолчанию.
-            pending.applied = true;
+            return;
         }
-    }, [selectedGraphDate, isTodayDateStr, handleToggleTodayHistory]);
+        if (pending.mode === 'history' && !isTodayDateStr(selectedGraphDate)) {
+            if (hasSavedLoad) {
+                loadHistoryFullDay(selectedGraphDate, savedWindow);
+            }
+        }
+    }, [
+        selectedGraphDate,
+        isTodayDateStr,
+        enterTodayPinExplore,
+        loadHistoryFullDay,
+        isPinWindowInsideDay,
+    ]);
 
     /** #9: сохраняем настройки графика в localStorage (per-MAC). Первый прогон пропускаем, чтобы не затереть prefs дефолтами до restore. */
     const saveSkipFirstRef = useRef(true);
@@ -6269,7 +6289,11 @@ const DeviceMonitorPage = () => {
                                             </div>
                                         </div>
                                     )}
-                                    <div className="machine-info-row" style={{ marginBottom: 10, justifyContent: 'center' }}>
+                                    <div
+                                        className="machine-info-row monitor-graph-date-row"
+                                        style={{ marginBottom: 10, justifyContent: 'center' }}
+                                        ref={graphDateCalendarRef}
+                                    >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             <button type="button" className="machine-info-icon-tile" onClick={handlePrevDay} title="Предыдущий день">
                                                 <span className="machine-info-icon">‹</span>
@@ -6302,17 +6326,29 @@ const DeviceMonitorPage = () => {
                                             >
                                                 <span className="machine-info-icon">›</span>
                                             </button>
-                                            <input
-                                                ref={datePickerInputRef}
-                                                type="date"
-                                                value={selectedGraphDate || ''}
-                                                onChange={(e) => setSelectedGraphDate(e.target.value)}
-                                                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 1, height: 1 }}
-                                                aria-hidden
-                                                tabIndex={-1}
-                                            />
                                         </div>
+                                        {graphCalendarOpen && (
+                                            <div className="monitor-graph-date-popup">
+                                                <MiniCalendar
+                                                    selectedIso={selectedGraphDate || todayDateStr}
+                                                    maxDate={new Date()}
+                                                    showYearNav={false}
+                                                    onPick={handleGraphCalendarPick}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
+                                    {graphUsesServerData && (
+                                        <button
+                                            type="button"
+                                            className="monitor-history-load-sidebar-btn"
+                                            onClick={handleLoadFullDay}
+                                            disabled={fullDayLoaded || historyLoading}
+                                            title="Загрузить выбранные графики за сутки"
+                                        >
+                                            {fullDayLoaded ? 'Загружено' : 'Загр. данные'}
+                                        </button>
+                                    )}
                                     <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
                                         {activeTab === 'graphs' && telemetryChannels.map((channel) => (
                                             <div
@@ -6488,6 +6524,21 @@ const DeviceMonitorPage = () => {
                         {activeTab === 'graphs' && (
                             <div className="chart-stack">
                                 <div className="chart-card large">
+                                    {graphHistoryPending ? (
+                                        <div
+                                            className={`monitor-chart-stub${historyLoading ? ' monitor-chart-stub--loading' : ''}`}
+                                            role="status"
+                                            aria-busy={historyLoading}
+                                        >
+                                            {historyLoading && (
+                                                <>
+                                                    <span className="monitor-history-load-spinner" aria-hidden />
+                                                    <span className="monitor-chart-stub-text">{historyLoadingMessage}</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <>
                                     <div
                                         className="chart-wrapper"
                                         ref={chartWrapperRef}
@@ -6634,17 +6685,6 @@ const DeviceMonitorPage = () => {
                                                         paddingRight: `${plotArea.rightPx}px`,
                                                     }}
                                                 >
-                                                    {graphUsesServerData && (
-                                                        <button
-                                                            type="button"
-                                                            className="monitor-lane-load-btn"
-                                                            onClick={handleLoadFullDay}
-                                                            disabled={fullDayLoaded || historyLoading}
-                                                            title="Загрузить выбранные графики за сутки"
-                                                        >
-                                                            {fullDayLoaded ? 'Загружено' : 'Загр. данные'}
-                                                        </button>
-                                                    )}
                                                     <div className="monitor-lane-row">
                                                         <span className="monitor-lane-label">Состояние</span>
                                                         <div className="monitor-lane-track monitor-lane-track--state">
@@ -6776,7 +6816,7 @@ const DeviceMonitorPage = () => {
                                             type="button"
                                             className={`chart-control-btn chart-control-btn--history${todayPinExplore ? ' chart-control-btn--history-active' : ''}`}
                                             onClick={handleToggleTodayHistory}
-                                            title={todayPinExplore ? 'Вернуться в live-режим' : 'История за сегодня (последний час)'}
+                                            title={todayPinExplore ? 'Вернуться в live-режим' : 'История за сегодня (загрузка через «Загр. данные»)'}
                                         >
                                             <span className="chart-control-btn-label">{todayPinExplore ? 'Live' : 'История'}</span>
                                         </button>
@@ -6799,6 +6839,8 @@ const DeviceMonitorPage = () => {
                                             )}
                                         </button>
                                     </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         )}
