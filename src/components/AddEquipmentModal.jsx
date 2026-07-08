@@ -6,6 +6,7 @@ import { getMacLiveness, getMacExists } from '../api/weldingMachineApi'
 import { getAllUserAccounts } from '../api/userAccountApi'
 import { getAllOrganizations } from '../api/organizationApi'
 import { groupUnitsByOrganization } from '../utils/organizationUnitFilterGroups'
+import WelderDateField from './WelderDateField'
 
 // ФИО -> «И.И. Фамилия», если полное длиннее 20 символов.
 const welderDisplayName = (name) => {
@@ -32,7 +33,7 @@ const welderFio = (w) => {
 
 const isWelderBlockedStatus = (w) => {
     const s = w?.status
-    const raw = typeof s === 'string' ? s.trim() : String(s?.name || s?.value || '').trim()
+    const raw = typeof s === 'string' ? s.trim() : String(s?.name || s?.value || s || '').trim()
     return raw.toUpperCase() === 'BLOCKED'
 }
 
@@ -93,9 +94,11 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
     const [respExpandedUnits, setRespExpandedUnits] = useState({})
     const respRef = useRef(null)
 
-    const commissioningDateInputRef = useRef(null)
-    const manufactureDateInputRef = useRef(null)
-    const lastMaintenanceDateInputRef = useRef(null)
+    // Дерево «подразделение»
+    const [unitDropdownOpen, setUnitDropdownOpen] = useState(false)
+    const [expandedOrgs, setExpandedOrgs] = useState({})
+    const [expandedUnits, setExpandedUnits] = useState({})
+    const unitSelectRef = useRef(null)
 
     const stopMacCheck = () => {
         if (macCheckRef.current.interval) clearInterval(macCheckRef.current.interval)
@@ -103,12 +106,14 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         setMacChecking(false)
     }
 
-    // Загрузка пользователей и предприятий при открытии (для create-режима)
+    // Загрузка пользователей и предприятий при открытии
     useEffect(() => {
-        if (isOpen && !editMode) {
-            getAllUserAccounts()
-                .then((data) => setUsers(Array.isArray(data) ? data : []))
-                .catch(() => setUsers([]))
+        if (isOpen) {
+            if (!editMode) {
+                getAllUserAccounts()
+                    .then((data) => setUsers(Array.isArray(data) ? data : []))
+                    .catch(() => setUsers([]))
+            }
             getAllOrganizations()
                 .then((data) => setOrganizations(Array.isArray(data) ? data : []))
                 .catch(() => setOrganizations([]))
@@ -116,13 +121,16 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         return () => stopMacCheck()
     }, [isOpen, editMode])
 
-    // Закрытие дерева по клику вне него
+    // Закрытие dropdown по клику вне
     useEffect(() => {
-        if (!respOpen) return
-        const onDoc = (e) => { if (respRef.current && !respRef.current.contains(e.target)) setRespOpen(false) }
+        if (!respOpen && !unitDropdownOpen) return
+        const onDoc = (e) => {
+            if (respOpen && respRef.current && !respRef.current.contains(e.target)) setRespOpen(false)
+            if (unitDropdownOpen && unitSelectRef.current && !unitSelectRef.current.contains(e.target)) setUnitDropdownOpen(false)
+        }
         document.addEventListener('mousedown', onDoc)
         return () => document.removeEventListener('mousedown', onDoc)
-    }, [respOpen])
+    }, [respOpen, unitDropdownOpen])
 
     // Режим редактирования: подставляем имя и подразделение (по id и/или по имени после загрузки списка подразделений).
     useEffect(() => {
@@ -156,68 +164,32 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         organizationUnits,
     ]);
 
-    const formatDateToDDMMYYYY = (dateString) => {
-        if (!dateString) return ''
-        const date = new Date(dateString)
-        if (isNaN(date.getTime())) return ''
-        const day = String(date.getDate()).padStart(2, '0')
-        const month = String(date.getMonth() + 1).padStart(2, '0')
-        const year = date.getFullYear()
-        return `${day}.${month}.${year}`
-    }
+    const organizationGroups = useMemo(
+        () => groupUnitsByOrganization(organizationUnits, organizations),
+        [organizationUnits, organizations]
+    )
 
-    const convertDateToYYYYMMDD = (dateString) => {
-        if (!dateString) return ''
-        const parts = dateString.split('.')
-        if (parts.length !== 3) return ''
-        const [day, month, year] = parts
-        if (day.length === 2 && month.length === 2 && year.length === 4) {
-            return `${year}-${month}-${day}`
-        }
+    const dateLimits = useMemo(() => {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const tenYearsAgo = new Date(today)
+        tenYearsAgo.setFullYear(today.getFullYear() - 10)
+        return { minDate: tenYearsAgo, maxDate: today }
+    }, [])
+
+    const validateEquipmentDate = (iso) => {
+        if (!iso) return ''
+        const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/)
+        if (!m) return 'Некорректная дата'
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+        d.setHours(0, 0, 0, 0)
+        if (d > dateLimits.maxDate) return 'Дата не может быть в будущем'
+        if (d < dateLimits.minDate) return 'Дата не может быть старше 10 лет'
         return ''
     }
 
-    const validateDate = (dateString) => {
-        if (!dateString) return { isValid: true, error: '' }
-        const dateObj = convertDateToYYYYMMDD(dateString)
-        if (!dateObj) return { isValid: true, error: '' }
-        const parts = dateObj.split('-')
-        if (parts.length !== 3) return { isValid: true, error: '' }
-        const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
-        if (isNaN(date.getTime())) return { isValid: true, error: '' }
-        date.setHours(0, 0, 0, 0)
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const tenYearsAgo = new Date()
-        tenYearsAgo.setFullYear(today.getFullYear() - 10)
-        tenYearsAgo.setHours(0, 0, 0, 0)
-        if (date > today) {
-            return { isValid: false, error: 'Дата не может быть в будущем' }
-        }
-        if (date < tenYearsAgo) {
-            return { isValid: false, error: 'Дата не может быть старше 10 лет' }
-        }
-        return { isValid: true, error: '' }
-    }
-
-    const handleDateInputChange = (field, value) => {
-        const filteredValue = value.replace(/[^\d.]/g, '')
-        handleInputChange(field, filteredValue)
-        if (filteredValue.length === 10) {
-            const validation = validateDate(filteredValue)
-            if (!validation.isValid) {
-                setErrors(prev => ({ ...prev, [field]: validation.error }))
-            } else {
-                setErrors(prev => { const n = { ...prev }; delete n[field]; return n })
-            }
-        } else if (filteredValue.length < 10) {
-            setErrors(prev => { const n = { ...prev }; delete n[field]; return n })
-        }
-    }
-
-    const handleNameInputChange = (field, value) => {
-        const filteredValue = value.replace(/[^а-яА-ЯёЁa-zA-Z\s.,-]/g, '')
-        handleInputChange(field, filteredValue)
+    const handleDateFieldChange = (field, iso) => {
+        handleInputChange(field, iso)
     }
 
     const handleOperatingHoursChange = (field, value) => {
@@ -230,37 +202,6 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         filteredValue = filteredValue.replace(/-/g, '')
         if (filteredValue === '.') filteredValue = '0.'
         handleInputChange(field, filteredValue)
-    }
-
-    const handleDatePickerChange = (field, dateString) => {
-        const formattedDate = formatDateToDDMMYYYY(dateString)
-        handleInputChange(field, formattedDate)
-        const validation = validateDate(formattedDate)
-        if (!validation.isValid) {
-            setErrors(prev => ({ ...prev, [field]: validation.error }))
-        } else {
-            setErrors(prev => { const n = { ...prev }; delete n[field]; return n })
-        }
-    }
-
-    const getDateLimits = () => {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const maxDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-        const tenYearsAgo = new Date()
-        tenYearsAgo.setFullYear(today.getFullYear() - 10)
-        const minDate = `${tenYearsAgo.getFullYear()}-${String(tenYearsAgo.getMonth() + 1).padStart(2, '0')}-${String(tenYearsAgo.getDate()).padStart(2, '0')}`
-        return { minDate, maxDate }
-    }
-
-    const handleCalendarIconClick = (field) => {
-        const ref = field === 'commissioningDate' ? commissioningDateInputRef
-            : field === 'manufactureDate' ? manufactureDateInputRef
-            : lastMaintenanceDateInputRef
-        if (ref.current) {
-            if (ref.current.showPicker) ref.current.showPicker()
-            else ref.current.click()
-        }
     }
 
     const handleInputChange = (field, value) => {
@@ -287,30 +228,78 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         stopMacCheck()
     }
 
-    const handleDepartmentChange = (deptName) => {
-        const prevUnit = organizationUnits.find((u) => u.name === formData.department)
-        const newUnit = organizationUnits.find((u) => u.name === deptName)
+    const handleUnitSelect = (unitId) => {
+        const unit = organizationUnits.find((u) => String(u.id) === String(unitId))
+        const prevUnit = organizationUnits.find((u) => String(u.id) === String(formData.organizationUnitId))
         const prevOrgId = prevUnit ? unitOrgId(prevUnit) : ''
-        const newOrgId = newUnit ? unitOrgId(newUnit) : ''
+        const newOrgId = unit ? unitOrgId(unit) : ''
         const orgChanged = prevOrgId !== newOrgId
 
         setFormData((prev) => ({
             ...prev,
-            department: deptName,
-            organizationUnitId: newUnit?.id != null ? String(newUnit.id) : '',
+            department: unit?.name || '',
+            organizationUnitId: unitId != null ? String(unitId) : '',
             ...(prev.responsiblePerson && orgChanged
                 ? { responsiblePerson: '', responsibleWelderId: '' }
                 : {}),
         }))
-        if (errors.department) {
+        setUnitDropdownOpen(false)
+        if (errors.department || errors.organizationUnitId) {
             setErrors((prev) => {
                 const n = { ...prev }
                 delete n.department
                 delete n.organizationUnit
+                delete n.organizationUnitId
                 return n
             })
         }
         if (apiError) setApiError('')
+    }
+
+    const toggleOrgExpand = (orgKey) => {
+        setExpandedOrgs((prev) => ({ ...prev, [orgKey]: !prev[orgKey] }))
+    }
+
+    const toggleUnitExpand = (unitId) => {
+        setExpandedUnits((prev) => ({ ...prev, [unitId]: !prev[unitId] }))
+    }
+
+    const renderUnitOption = (unit, level = 0) => {
+        const isExpanded = expandedUnits[unit.id]
+        const hasChildren = unit.children && unit.children.length > 0
+        const indent = level * 32
+        const isSelected = String(formData.organizationUnitId) === String(unit.id)
+
+        return (
+            <React.Fragment key={unit.id}>
+                <div
+                    className={`unit-option ${isSelected ? 'selected' : ''} ${level > 0 ? 'unit-option-child' : ''}`}
+                    style={{ marginLeft: `${indent}px`, paddingLeft: '12px' }}
+                    onClick={() => handleUnitSelect(unit.id)}
+                >
+                    {hasChildren ? (
+                        <button
+                            type="button"
+                            className="org-unit-expand-btn"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                toggleUnitExpand(unit.id)
+                            }}
+                        >
+                            {isExpanded ? <FaChevronDown className="expand-icon" /> : <FaChevronRight className="expand-icon" />}
+                        </button>
+                    ) : (
+                        <span className="org-unit-spacer" style={{ width: '16px', display: 'inline-block' }} />
+                    )}
+                    <span className="unit-option-name">{unit.name}</span>
+                </div>
+                {hasChildren && isExpanded && (
+                    <div className="unit-children">
+                        {unit.children.map((child) => renderUnitOption(child, level + 1))}
+                    </div>
+                )}
+            </React.Fragment>
+        )
     }
 
     const selectResponsibleWelder = (welder) => {
@@ -324,13 +313,13 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
 
     const respTreeData = useMemo(() => {
         const activeWelders = welders.filter((w) => !isWelderBlockedStatus(w))
-        if (!formData.department) {
+        if (!formData.organizationUnitId) {
             return { groups: [], byUnit: new Map(), byOrg: new Map() }
         }
 
         let unitsForTree = organizationUnits
         let orgsForTree = organizations
-        const selectedUnit = organizationUnits.find((u) => u.name === formData.department)
+        const selectedUnit = organizationUnits.find((u) => String(u.id) === String(formData.organizationUnitId))
         const selectedOrgId = selectedUnit ? unitOrgId(selectedUnit) : ''
 
         if (!isAlloyWideAccess && selectedOrgId) {
@@ -349,22 +338,36 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                 if (!isAlloyWideAccess && selectedOrgId && unit && unitOrgId(unit) !== selectedOrgId) return
                 if (!byUnit.has(uid)) byUnit.set(uid, [])
                 byUnit.get(uid).push(w)
-            } else {
-                let orgKey = '__NO_ORG__'
-                if (w.department) {
-                    const u = organizationUnits.find((ou) => ou.name === w.department)
-                    if (u) orgKey = unitOrgId(u) || '__NO_ORG__'
-                } else if (w.organizationId != null) {
-                    orgKey = String(w.organizationId)
-                }
-                if (!isAlloyWideAccess && selectedOrgId && orgKey !== selectedOrgId && orgKey !== '__NO_ORG__') return
-                if (!byOrg.has(orgKey)) byOrg.set(orgKey, [])
-                byOrg.get(orgKey).push(w)
+                return
             }
+
+            // ponytail: в API у сварщика часто только department (имя), без organizationUnitId
+            if (w.department) {
+                const dept = String(w.department).trim().toLowerCase()
+                const unit = organizationUnits.find((ou) => String(ou.name || '').trim().toLowerCase() === dept)
+                if (unit) {
+                    const unitId = String(unit.id)
+                    if (!isAlloyWideAccess && selectedOrgId && unitOrgId(unit) !== selectedOrgId) return
+                    if (!byUnit.has(unitId)) byUnit.set(unitId, [])
+                    byUnit.get(unitId).push(w)
+                    return
+                }
+            }
+
+            let orgKey = '__NO_ORG__'
+            if (w.department) {
+                const u = organizationUnits.find((ou) => ou.name === w.department)
+                if (u) orgKey = unitOrgId(u) || '__NO_ORG__'
+            } else if (w.organizationId != null) {
+                orgKey = String(w.organizationId)
+            }
+            if (!isAlloyWideAccess && selectedOrgId && orgKey !== selectedOrgId && orgKey !== '__NO_ORG__') return
+            if (!byOrg.has(orgKey)) byOrg.set(orgKey, [])
+            byOrg.get(orgKey).push(w)
         })
 
         return { groups, byUnit, byOrg }
-    }, [welders, organizations, organizationUnits, formData.department, isAlloyWideAccess])
+    }, [welders, organizations, organizationUnits, formData.organizationUnitId, isAlloyWideAccess])
 
     const toggleRespOrg = (orgKey) => {
         setRespExpandedOrgs((prev) => ({ ...prev, [orgKey]: !prev[orgKey] }))
@@ -394,20 +397,20 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
 
         return (
             <React.Fragment key={unit.id}>
-                {(hasChildren || unitWelders.length > 0) && (
-                    <div
-                        className="resp-welder-unit"
-                        style={{ paddingLeft: `${12 + depth * 16}px` }}
-                        onClick={() => hasChildren && toggleRespUnit(orgKey, unit.id)}
-                    >
-                        {hasChildren && (
-                            <span className="resp-welder-chevron">
-                                {expanded ? <FaChevronDown size={10} /> : <FaChevronRight size={10} />}
-                            </span>
-                        )}
-                        <span className="resp-welder-unit-name">{unit.name}</span>
-                    </div>
-                )}
+                <div
+                    className="resp-welder-unit"
+                    style={{ paddingLeft: `${12 + depth * 16}px` }}
+                    onClick={() => hasChildren && toggleRespUnit(orgKey, unit.id)}
+                >
+                    {hasChildren ? (
+                        <span className="resp-welder-chevron">
+                            {expanded ? <FaChevronDown size={10} /> : <FaChevronRight size={10} />}
+                        </span>
+                    ) : (
+                        <span className="resp-welder-chevron" style={{ visibility: 'hidden' }} />
+                    )}
+                    <span className="resp-welder-unit-name">{unit.name}</span>
+                </div>
                 {expanded && unitWelders.map((w) => renderRespWelderLeaf(w, depth + 1))}
                 {expanded && (unit.children || []).map((ch) => renderRespUnitNode(ch, orgKey, depth + 1))}
             </React.Fragment>
@@ -551,38 +554,17 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         onClose()
     }
 
-    const renderDateField = (field, label, ref) => (
+    const renderDateField = (field, label, required = false) => (
         <div className="form-field">
             <label>{label}</label>
-            <div className="date-input-wrapper">
-                <input
-                    type="text"
-                    value={formData[field]}
-                    onChange={(e) => handleDateInputChange(field, e.target.value)}
-                    placeholder="DD.MM.YYYY"
-                    className={errors[field] ? 'error' : ''}
-                    disabled={gated}
-                />
-                <input
-                    ref={ref}
-                    type="date"
-                    className="date-picker-hidden"
-                    value={convertDateToYYYYMMDD(formData[field])}
-                    onChange={(e) => handleDatePickerChange(field, e.target.value)}
-                    max={getDateLimits().maxDate}
-                    min={getDateLimits().minDate}
-                    disabled={gated}
-                />
-                <svg
-                    className="calendar-icon calendar-icon-clickable"
-                    width="16" height="16" viewBox="0 0 16 16" fill="none"
-                    onClick={() => !gated && handleCalendarIconClick(field)}
-                >
-                    <rect x="3" y="4" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-                    <path d="M3 7H13" stroke="currentColor" strokeWidth="1.2"/>
-                    <path d="M6 2V5M10 2V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-            </div>
+            <WelderDateField
+                value={formData[field]}
+                onChange={(iso) => handleDateFieldChange(field, iso)}
+                disabled={gated}
+                minDate={dateLimits.minDate}
+                maxDate={dateLimits.maxDate}
+                validate={validateEquipmentDate}
+            />
             {errors[field] && <span className="error-message">{errors[field]}</span>}
         </div>
     )
@@ -673,34 +655,72 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                 </div>
                                 <div className="form-field">
                                     <label>Подразделение*</label>
-                                    <select
-                                        value={editMode ? (formData.organizationUnitId || '') : formData.department}
-                                        onChange={(e) => {
-                                            if (editMode) {
-                                                const unitId = e.target.value;
-                                                const unit = organizationUnits.find((u) => String(u.id) === String(unitId));
-                                                handleInputChange('organizationUnitId', unitId);
-                                                handleInputChange('department', unit?.name || '');
-                                            } else {
-                                                handleDepartmentChange(e.target.value);
-                                            }
-                                        }}
-                                        className={errors.department ? 'error' : ''}
-                                        disabled={gated}
-                                    >
-                                        <option value="">Выберите подразделение</option>
-                                        {organizationUnits.map(unit => (
-                                            <option key={unit.id} value={editMode ? String(unit.id) : unit.name}>
-                                                {unit.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div className="unit-select-container" ref={unitSelectRef}>
+                                        <div
+                                            className={`unit-select-dropdown ${unitDropdownOpen ? 'open' : ''} ${errors.department ? 'error' : ''}`}
+                                            onClick={() => { if (!gated) setUnitDropdownOpen((o) => !o) }}
+                                        >
+                                            <span className="unit-select-label">
+                                                {formData.organizationUnitId
+                                                    ? organizationUnits.find((u) => String(u.id) === String(formData.organizationUnitId))?.name || 'Выберите подразделение'
+                                                    : 'Выберите подразделение'}
+                                            </span>
+                                            <span className={`unit-select-arrow ${unitDropdownOpen ? 'open' : ''}`}>
+                                                <FaChevronDown />
+                                            </span>
+                                        </div>
+                                        {unitDropdownOpen && !gated && (
+                                            <div className="unit-select-options">
+                                                {organizationGroups.length > 0 ? (
+                                                    organizationGroups.map((group) => (
+                                                        <React.Fragment key={group.orgKey}>
+                                                            <div
+                                                                className="unit-option unit-option-org"
+                                                                onClick={() => toggleOrgExpand(group.orgKey)}
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    className="org-unit-expand-btn"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        toggleOrgExpand(group.orgKey)
+                                                                    }}
+                                                                >
+                                                                    {expandedOrgs[group.orgKey] ? (
+                                                                        <FaChevronDown className="expand-icon" />
+                                                                    ) : (
+                                                                        <FaChevronRight className="expand-icon" />
+                                                                    )}
+                                                                </button>
+                                                                <span className="unit-option-name unit-option-org-name">{group.orgName}</span>
+                                                            </div>
+                                                            {expandedOrgs[group.orgKey] && (
+                                                                group.hierarchy.length > 0 ? (
+                                                                    <div className="unit-children">
+                                                                        {group.hierarchy.map((unit) => renderUnitOption(unit, 1))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="unit-option" style={{ marginLeft: '32px', padding: '8px 12px', color: '#7B8BA6' }}>
+                                                                        Нет подразделений
+                                                                    </div>
+                                                                )
+                                                            )}
+                                                        </React.Fragment>
+                                                    ))
+                                                ) : (
+                                                    <div className="unit-option" style={{ padding: '8px 12px', color: '#7B8BA6' }}>
+                                                        Нет доступных подразделений
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                     {errors.department && <span className="error-message">{errors.department}</span>}
                                 </div>
                                 {!editMode && (
                                     <>
-                                        {renderDateField('manufactureDate', 'Дата изготовления', manufactureDateInputRef)}
-                                        {renderDateField('commissioningDate', 'Ввод в эксплуатацию*', commissioningDateInputRef)}
+                                        {renderDateField('manufactureDate', 'Дата изготовления')}
+                                        {renderDateField('commissioningDate', 'Ввод в эксплуатацию*')}
                                         <div className="form-field">
                                             <label>Серийный номер</label>
                                             <input
@@ -729,16 +749,16 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                         <label>Ответственный сварщик</label>
                                         <div className="resp-welder-select" ref={respRef}>
                                             <div
-                                                className={`resp-welder-trigger ${!formData.department ? 'disabled' : ''} ${respOpen ? 'open' : ''}`}
+                                                className={`resp-welder-trigger ${!formData.organizationUnitId ? 'disabled' : ''} ${respOpen ? 'open' : ''}`}
                                                 onClick={() => {
-                                                    if (gated || !formData.department) return
+                                                    if (gated || !formData.organizationUnitId) return
                                                     setRespOpen((o) => !o)
                                                 }}
                                             >
                                                 <span className="resp-welder-trigger-text">
                                                     {formData.responsiblePerson
                                                         ? welderDisplayName(formData.responsiblePerson)
-                                                        : (!formData.department
+                                                        : (!formData.organizationUnitId
                                                             ? 'Сначала выберите подразделение'
                                                             : 'Выберите сварщика')}
                                                 </span>
@@ -773,7 +793,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                             )}
                                         </div>
                                     </div>
-                                    {renderDateField('lastMaintenanceDate', 'Дата последнего ТО', lastMaintenanceDateInputRef)}
+                                    {renderDateField('lastMaintenanceDate', 'Дата последнего ТО')}
                                     <div className="form-field">
                                         <label>Наработка между ТО</label>
                                         <div className="operating-hours-row">

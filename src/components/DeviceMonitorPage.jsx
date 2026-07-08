@@ -1564,6 +1564,7 @@ const DeviceMonitorPage = () => {
     const [machineId, setMachineId] = useState(null);
     const [machineDetails, setMachineDetails] = useState(null);
     const [isDeletingMachine, setIsDeletingMachine] = useState(false);
+    const [rfidSaving, setRfidSaving] = useState(false);
     const [rfidLookup, setRfidLookup] = useState({ status: 'idle' });
     /** Кэш поиска по RFID: не перезапрашивать при каждом poll телеметрии, только при смене кода */
     const rfidLookupCacheRef = useRef({ code: null, snapshot: null });
@@ -2343,9 +2344,34 @@ const DeviceMonitorPage = () => {
         text: enabled ? 'Активно' : 'Неактивно',
         className: enabled ? 'info-tile-badge-inactive' : 'info-tile-badge-active',
     });
-    const rfidBadge = infoOptionBadge(Boolean(infoOptions.rfid));
+    const rfidEnabledForInfo = machineDetails ? machineDetails.rfidEnabled !== false : Boolean(infoOptions.rfid);
+    const rfidBadge = infoOptionBadge(rfidEnabledForInfo);
     // RFID-считыватель отсутствует/выключен на аппарате: блокируем привязку сварщиков.
     const machineRfidEnabled = machineDetails ? machineDetails.rfidEnabled !== false : true;
+
+    const handleRfidToggle = async () => {
+        if (!canWriteEquipmentPerm || !machineId || rfidSaving) return;
+        const nextEnabled = !rfidEnabledForInfo;
+        setRfidSaving(true);
+        try {
+            const machine = await getWeldingMachineById(machineId);
+            if (!machine?.id) throw new Error('Аппарат не найден');
+            const modules = parseMachineModules(machine.modules);
+            modules.options = { ...(modules.options || {}), rfid: nextEnabled };
+            const updateData = {
+                ...machine,
+                rfidEnabled: nextEnabled,
+                modules: JSON.stringify(modules),
+            };
+            const updated = await updateWeldingMachine(machineId, updateData);
+            setMachineDetails(updated || { ...machine, rfidEnabled: nextEnabled, modules: JSON.stringify(modules) });
+        } catch (err) {
+            console.error('Ошибка сохранения RFID:', err);
+            alert('Ошибка сохранения RFID: ' + (err.message || 'неизвестная ошибка'));
+        } finally {
+            setRfidSaving(false);
+        }
+    };
 
     useEffect(() => {
         const code = telemetryRfidCode;
@@ -6384,7 +6410,15 @@ const DeviceMonitorPage = () => {
                                 <div className="info-tile">
                                     <div className="info-tile-status-row">
                                         <span className="info-tile-label">RFID</span>
-                                        <span className={`info-tile-badge ${rfidBadge.className}`}>{rfidBadge.text}</span>
+                                        <button
+                                            type="button"
+                                            className={`info-tile-badge info-tile-badge-toggle ${rfidBadge.className}`}
+                                            onClick={handleRfidToggle}
+                                            disabled={!canWriteEquipmentPerm || rfidSaving}
+                                            title={canWriteEquipmentPerm ? 'Нажмите, чтобы переключить' : 'Недостаточно прав'}
+                                        >
+                                            {rfidSaving ? '…' : rfidBadge.text}
+                                        </button>
                                     </div>
                                 </div>
                                 <div className="info-tile info-tile-software">

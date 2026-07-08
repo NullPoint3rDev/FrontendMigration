@@ -14,6 +14,7 @@ import {
     getAllWeldingMachineTypes
 } from '../api/weldingMachineApi';
 import { getAllEmployees } from '../api/employeeApi';
+import { getAllWelders } from '../api/welderApi';
 import { getArchivePanelState } from '../api/archiveDeviceApi';
 import {
     resolveLastWeldDisplay,
@@ -199,12 +200,19 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         return root || visibleOrganizationUnits[0];
     };
 
-    // Load welders from localStorage
-    useEffect(() => {
-        const savedWelders = localStorage.getItem('welders');
-        if (savedWelders) {
-            setWelders(JSON.parse(savedWelders));
+    // Load welders from API
+    const loadWelders = async () => {
+        try {
+            const data = await getAllWelders();
+            setWelders(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Ошибка загрузки сварщиков:', err);
+            setWelders([]);
         }
+    };
+
+    useEffect(() => {
+        loadWelders();
     }, []);
 
     // Navigation logic
@@ -1745,7 +1753,9 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                                     lastService: data.lastMaintenanceDate || '',
                                     serialNumber: data.serialNumber || '',
                                     inventoryNumber: data.inventoryNumber || '',
-                                    organizationUnit: visibleOrganizationUnits.find(unit => unit.name === data.department) || null,
+                                    organizationUnit: visibleOrganizationUnits.find(
+                                        (unit) => String(unit.id) === String(data.organizationUnitId)
+                                    ) || visibleOrganizationUnits.find(unit => unit.name === data.department) || null,
                                     maintenanceInterval: data.operatingHours !== '' && data.operatingHours != null
                                         ? Number(data.operatingHours)
                                         : '',

@@ -1620,6 +1620,21 @@
     font-weight: 600;
 }
 
+.info-tile-badge-toggle {
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+
+.info-tile-badge-toggle:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.info-tile-badge-toggle:not(:disabled):hover {
+    opacity: 0.85;
+}
+
 .info-tile-badge-active {
     background: #F6B243;
     border: none;
