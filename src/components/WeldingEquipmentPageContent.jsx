@@ -641,7 +641,15 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         return Number.isFinite(parsed) ? parsed : 0;
     };
 
-    const getStatusRankForSort = (item) => {
+    const getOnlineStatusRankForSort = (item) => {
+        const status = deviceStatusesByMac[item.mac] || 'off';
+        if (status === 'welding') return 3;
+        if (status === 'on') return 2;
+        if (status === 'error') return 1;
+        return 0;
+    };
+
+    const getStateRankForSort = (item) => {
         const status = deviceStatusesByMac[item.mac] || 'off';
         const rawState = deviceStatesByMac[item.mac] || null;
         const statusBadge = getMachineStatusBadgeShort(status, rawState);
@@ -665,7 +673,8 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                     case 'unit': return (item.organizationUnit?.name || '').toLowerCase();
                     case 'inventory': return (item.inventoryNumber || '').toLowerCase();
                     case 'welder': return getWelderDisplayForSort(item).toLowerCase();
-                    case 'status': return getStatusRankForSort(item);
+                    case 'status': return getOnlineStatusRankForSort(item);
+                    case 'state': return getStateRankForSort(item);
                     case 'lastWeld':
                     case 'lastActivation':
                         return getLastWeldTimestampForSort(item);
@@ -1593,6 +1602,15 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                                 <thead>
                                 <tr>
                                     <th
+                                        onClick={() => toggleSort('status')}
+                                        className={sortField === 'status' ? 'sort-active' : ''}
+                                    >
+                                        <span>Статус</span>
+                                        <span className={`sort-arrow ${sortField === 'status' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                            {sortField === 'status' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                        </span>
+                                    </th>
+                                    <th
                                         onClick={() => toggleSort('model')}
                                         className={sortField === 'model' ? 'sort-active' : ''}
                                     >
@@ -1647,12 +1665,12 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                                         </span>
                                     </th>
                                     <th
-                                        onClick={() => toggleSort('status')}
-                                        className={sortField === 'status' ? 'sort-active' : ''}
+                                        onClick={() => toggleSort('state')}
+                                        className={sortField === 'state' ? 'sort-active' : ''}
                                     >
-                                        <span>Статус</span>
-                                        <span className={`sort-arrow ${sortField === 'status' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
-                                            {sortField === 'status' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                        <span>Состояние</span>
+                                        <span className={`sort-arrow ${sortField === 'state' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                            {sortField === 'state' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
                                         </span>
                                     </th>
                                 </tr>
@@ -1672,9 +1690,11 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                                             className="table-row table-row-compact"
                                             onClick={() => handleControl(item)}
                                         >
+                                            <td className="equipment-status-cell">
+                                                <span className={`equipment-status-dot ${status}`}></span>
+                                            </td>
                                             <td>
                                                 <div className="model-cell-table">
-                                                    <span className={`equipment-status-dot ${status}`}></span>
                                                     <img
                                                         src={machineImage}
                                                         alt={modelDisplay}

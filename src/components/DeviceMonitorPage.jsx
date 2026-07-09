@@ -2324,13 +2324,25 @@ const DeviceMonitorPage = () => {
             if (!machine?.id) throw new Error('Аппарат не найден');
             const modules = parseMachineModules(machine.modules);
             modules.options = { ...(modules.options || {}), rfid: nextEnabled };
+            const modulesJson = JSON.stringify(modules);
+            // ponytail: не шлём весь machine — lastWeldAt приходит с +03:00 и ломает LocalDateTime на PUT
             const updateData = {
-                ...machine,
+                id: machine.id,
+                name: machine.name,
+                mac: machine.mac,
+                deviceModel: machine.deviceModel,
+                serialNumber: machine.serialNumber ?? null,
+                inventoryNumber: machine.inventoryNumber ?? null,
+                organizationUnit: machine.organizationUnit
+                    ? { id: machine.organizationUnit.id, name: machine.organizationUnit.name }
+                    : null,
+                weldingMachineType: machine.weldingMachineType ?? null,
+                status: machine.status ?? null,
                 rfidEnabled: nextEnabled,
-                modules: JSON.stringify(modules),
+                modules: modulesJson,
             };
             const updated = await updateWeldingMachine(machineId, updateData);
-            setMachineDetails(updated || { ...machine, rfidEnabled: nextEnabled, modules: JSON.stringify(modules) });
+            setMachineDetails(updated || { ...machine, rfidEnabled: nextEnabled, modules: modulesJson });
         } catch (err) {
             console.error('Ошибка сохранения RFID:', err);
             alert('Ошибка сохранения RFID: ' + (err.message || 'неизвестная ошибка'));
@@ -3202,7 +3214,7 @@ const DeviceMonitorPage = () => {
 
         const machineLabel = displayName || equipmentName || machineName || 'аппарат';
         const confirmMessage =
-            `Удалить аппарат «${machineLabel}»?\n\nАппарат сразу исчезнет из списка. История телеметрии будет удалена в фоне на сервере.`;
+            `Удалить аппарат «${machineLabel}»?\n\nАппарат сразу исчезнет из списка. История телеметрии будет удалена с сервера через 7 дней.`;
         if (!window.confirm(confirmMessage)) {
             return;
         }

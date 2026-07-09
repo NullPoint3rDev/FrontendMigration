@@ -575,6 +575,18 @@
 
 .welding-equipment-page .equipment-table tbody tr.table-row-compact td:first-child {
     padding: 0 10px !important;
+    text-align: center !important;
+    width: 56px !important;
+}
+
+.welding-equipment-page .equipment-status-cell {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+.welding-equipment-page .equipment-status-cell .equipment-status-dot {
+    display: inline-block !important;
+    margin: 0 auto !important;
 }
 
 .welding-equipment-page .model-cell-table {
