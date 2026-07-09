@@ -703,12 +703,16 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
             newErrors.deviceModel = 'Выберите модель устройства';
             console.log('❌ handleSave: Ошибка валидации - нет модели');
         }
-        // Приводим MAC к формату: только заглавные буквы, без двоеточий
-        let mac = (dataToUse.mac || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
-        if (!mac || mac.length !== 12) {
-            newErrors.mac = 'MAC-адрес должен содержать 12 символов (только 0-9, A-F)';
-            console.log('❌ handleSave: Ошибка валидации - некорректный MAC:', mac);
-        }
+    // Приводим MAC к формату: только заглавные буквы, без двоеточий.
+    // Отладочный xxxxxxxxxxxx сохраняем как XXXXXXXXXXXX (иначе x вырежется как не-hex).
+    const rawMac = (dataToUse.mac || '').trim();
+    const cleanedRaw = rawMac.replace(/[^0-9A-Fa-fxX]/g, '');
+    const isDebugMac = /^x{12}$/i.test(cleanedRaw);
+    let mac = isDebugMac ? 'XXXXXXXXXXXX' : cleanedRaw.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+    if (!mac || mac.length !== 12 || (!isDebugMac && !/^[0-9A-F]{12}$/.test(mac))) {
+        newErrors.mac = 'MAC-адрес должен содержать 12 символов (только 0-9, A-F)';
+        console.log('❌ handleSave: Ошибка валидации - некорректный MAC:', mac);
+    }
         if (!dataToUse.organizationUnit) {
             newErrors.organizationUnit = 'Выберите подразделение';
             console.log('❌ handleSave: Ошибка валидации - нет подразделения');

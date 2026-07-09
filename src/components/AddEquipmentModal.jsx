@@ -433,6 +433,13 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                 return
             }
 
+            // Отладочный MAC (xxxxxxxxxxxx) — соединение сразу «успешно», без ожидания железа
+            if (/^x{12}$/i.test(mac.replace(/[^0-9A-Fa-fxX]/g, ''))) {
+                setConnectionVerified(true)
+                stopMacCheck()
+                return
+            }
+
             const first = await getMacLiveness(mac)
             macCheckRef.current.baseline = first?.serverTimeMs ?? Date.now()
             // Если аппарат уже стучался прямо сейчас — сразу успех.
