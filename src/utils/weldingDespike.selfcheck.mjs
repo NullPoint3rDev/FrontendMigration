@@ -40,4 +40,10 @@ assert.deepEqual(
     [53, 65, 0, 48]
 );
 
+// Игла напряжения посреди дуги (соседи близки) — гасится вторым проходом.
+assert.deepEqual(
+    despikeValuesMedian3WithinRuns([25, 25, 160, 25, 25], [true, true, true, true, true]),
+    [25, 25, 25, 25, 25]
+);
+
 console.log('weldingDespike self-check OK');

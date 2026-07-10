@@ -115,11 +115,19 @@ const graphPrefsStorageKey = (mac) => `deviceMonitorGraphPrefs:${mac}`;
 const TELEMETRY_LIST_HIDDEN_KEYS = new Set(['welderPresence']);
 
 /**
- * «Умная» обработка истории: склейка коротких offline/welding, despike одиночных выбросов.
- * Выкл: график сварки и дорожка «Состояние» расходятся (склейка сегментов держит Y без isWelding).
- * ponytail: код склейки/despike оставлен — вернуть true, если снова понадобятся.
+ * «Умная» обработка истории (offline-склейка и пр.).
+ * Сварку: склейка коротких пауз и despike выбросов — всегда (см. WELDING_GLUE_GAP_MS).
  */
 const HISTORY_SMART_PROCESSING = false;
+
+/**
+ * Склеивать !isWelding между двумя дугами, если пауза ≤ этого.
+ * ponytail: 45с — иначе при мигании статуса «Сварка» шов дробится на «короткие частые» импульсы.
+ */
+const WELDING_GLUE_GAP_MS = 45000;
+
+/** Одиночные вспышки isWelding короче этого — шум опроса, не шов. */
+const WELDING_MIN_ISLAND_MS = 4000;
 
 /** Сколько каналов (кроме сети по фазам) одновременно на основном графике — при заполнении остальные в списке тусклые, переключение только после снятия выбора. */
 const TELEMETRY_GRAPH_SLOT_COUNT = 3;
@@ -790,11 +798,10 @@ function buildTimelineSegments(samples, predicate, valueGetter, windowEnd, maxGa
 }
 
 /**
- * Короткий !isWelding между двумя isWelding (1 опрос Offline посреди дуги) режет сегменты
- * и даёт лишние вертикали на графике — склеиваем, как sanitizeBriefOfflineBetweenOnline.
+ * Короткий !isWelding между двумя isWelding режет шов на «дробь» — склеиваем.
+ * Всегда включено (не зависит от HISTORY_SMART_PROCESSING).
  */
 function sanitizeBriefWeldingBetweenActive(samples, maxGapMs) {
-    if (!HISTORY_SMART_PROCESSING) return samples;
     if (!Array.isArray(samples) || samples.length < 2 || !Number.isFinite(maxGapMs) || maxGapMs <= 0) {
         return samples;
     }
@@ -824,14 +831,76 @@ function sanitizeBriefWeldingBetweenActive(samples, maxGapMs) {
     return changed ? out : samples;
 }
 
+/** Убрать вспышки isWelding короче minDurationMs (шум, не шов). */
+function sanitizeBriefWeldingIslands(samples, minDurationMs) {
+    if (!Array.isArray(samples) || samples.length < 1 || !Number.isFinite(minDurationMs) || minDurationMs <= 0) {
+        return samples;
+    }
+    const n = samples.length;
+    const out = samples.map((s) => ({ ...s }));
+    let changed = false;
+    let i = 0;
+    while (i < n) {
+        if (!out[i].isWelding) {
+            i += 1;
+            continue;
+        }
+        const runStart = i;
+        while (i < n && out[i].isWelding) i += 1;
+        const runEnd = i;
+        const t0 = out[runStart].x;
+        const t1 = out[runEnd - 1].x;
+        const dur = Number.isFinite(t0) && Number.isFinite(t1) ? t1 - t0 : 0;
+        // Одна точка / короче порога — не шов.
+        if (runEnd - runStart <= 1 || dur < minDurationMs) {
+            for (let k = runStart; k < runEnd; k += 1) {
+                out[k].isWelding = false;
+            }
+            changed = true;
+        }
+    }
+    return changed ? out : samples;
+}
+
+/** Склеить соседние жёлтые сегменты, если пауза между ними ≤ maxGapMs. */
+function mergeCloseWeldingSegments(segments, maxGapMs) {
+    if (!Array.isArray(segments) || segments.length < 2 || !Number.isFinite(maxGapMs) || maxGapMs <= 0) {
+        return segments || [];
+    }
+    const sorted = segments
+        .filter((s) => Number.isFinite(s?.start) && Number.isFinite(s?.end) && s.end > s.start)
+        .sort((a, b) => a.start - b.start);
+    if (!sorted.length) return [];
+    const out = [{ ...sorted[0] }];
+    for (let i = 1; i < sorted.length; i += 1) {
+        const prev = out[out.length - 1];
+        const cur = sorted[i];
+        if (cur.start - prev.end <= maxGapMs) {
+            prev.end = Math.max(prev.end, cur.end);
+        } else {
+            out.push({ ...cur });
+        }
+    }
+    return out;
+}
+
+/** Одинаковая подготовка маски сварки для дорожки и графика: сначала склейка пауз, потом отсев вспышек. */
+function sanitizeWeldingTimelineSamples(samples) {
+    const glued = sanitizeBriefWeldingBetweenActive(samples, WELDING_GLUE_GAP_MS);
+    return sanitizeBriefWeldingIslands(glued, WELDING_MIN_ISLAND_MS);
+}
+
 function buildHistoryWeldingSegmentsForWindow(timelineSnapshot, windowStart, windowEnd, laneWindowEnd) {
     const samples = (timelineSnapshot || []).filter(
         (s) => Number.isFinite(s?.x) && s.x >= windowStart && s.x <= windowEnd
     );
     const laneEnd = Number.isFinite(laneWindowEnd) ? laneWindowEnd : windowEnd;
     const onlineSanitized = sanitizeBriefOfflineBetweenOnline(samples, laneEnd, 5000);
-    const sanitized = sanitizeBriefWeldingBetweenActive(onlineSanitized, 12000);
-    return buildTimelineSegments(sanitized, (s) => Boolean(s.isWelding), null, laneEnd, WELDING_SERIES_MAX_GAP_MS);
+    const sanitized = sanitizeWeldingTimelineSamples(onlineSanitized);
+    return mergeCloseWeldingSegments(
+        buildTimelineSegments(sanitized, (s) => Boolean(s.isWelding), null, laneEnd, WELDING_SERIES_MAX_GAP_MS),
+        WELDING_GLUE_GAP_MS
+    );
 }
 
 /** Жёстко обнуляем Y вне зелёных сегментов сварки (страховка для stepped: 'after'). */
@@ -985,7 +1054,7 @@ function prepareSetMetricSeriesForChart(raw, maxPoints) {
 
 /** Вертикальные фронты на старт/стоп сварки: две точки с одним x (дубликат x = вертикаль в Chart.js). */
 function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, xPoll) {
-    const y = Math.round(Number(yRaw) * 10) / 10;
+    let y = Math.round(Number(yRaw) * 10) / 10;
     let next = [...prev];
 
     if (!wasWelding && !nowWelding) {
@@ -996,6 +1065,10 @@ function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, 
         lastYRef.current = y;
     } else if (wasWelding && nowWelding) {
         const prevY = lastYRef.current ?? 0;
+        // ponytail: одноточечная игла U/I (скачок ≫ плато) — держим prevY до подтверждения следующим опросом.
+        if (prevY > 0 && Number.isFinite(y) && y > 0 && y > prevY * 2 && (y - prevY) > 15) {
+            y = prevY;
+        }
         if (prevY === 0 && y > 0) {
             next.push({ x: xPoll, y: 0 });
             next.push({ x: xPoll, y: y });
@@ -1011,6 +1084,51 @@ function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, 
     }
 
     return next;
+}
+
+/**
+ * Live: между двумя плато Y>0 пауза нулей ≤ maxGapMs — заполнить lastY (как склейка жёлтой дорожки).
+ * Иначе график дробится, а «Состояние» уже склеена.
+ */
+function glueLiveWeldingSeriesGaps(series, maxGapMs) {
+    if (!Array.isArray(series) || series.length < 3 || !Number.isFinite(maxGapMs) || maxGapMs <= 0) {
+        return series || [];
+    }
+    const pts = series
+        .filter((p) => p && Number.isFinite(p.x))
+        .map((p) => ({ x: p.x, y: Number(p.y) || 0 }))
+        .sort((a, b) => a.x - b.x);
+    if (pts.length < 3) return series;
+
+    // Найти границы «активных» плато (y>0), склеить близкие.
+    const runs = [];
+    let i = 0;
+    while (i < pts.length) {
+        if (!(pts[i].y > 0)) {
+            i += 1;
+            continue;
+        }
+        const start = i;
+        let lastY = pts[i].y;
+        while (i < pts.length && pts[i].y > 0) {
+            lastY = pts[i].y;
+            i += 1;
+        }
+        runs.push({ startIdx: start, endIdx: i - 1, lastY, startX: pts[start].x, endX: pts[i - 1].x });
+    }
+    if (runs.length < 2) return series;
+
+    const out = pts.map((p) => ({ ...p }));
+    for (let r = 0; r < runs.length - 1; r += 1) {
+        const a = runs[r];
+        const b = runs[r + 1];
+        if (b.startX - a.endX > maxGapMs) continue;
+        const fillY = a.lastY > 0 ? a.lastY : b.lastY;
+        for (let k = a.endIdx + 1; k < b.startIdx; k += 1) {
+            out[k].y = fillY;
+        }
+    }
+    return out;
 }
 
 /**
@@ -1045,16 +1163,17 @@ function buildWeldingSeriesForSegments(points, mapY, segments) {
         let lastY = 0;
         sorted.forEach((p) => {
             if (p.ts < seg.start || p.ts >= seg.end) return;
-            if (!isHistoryPointWelding(p)) return;
+            // Внутри склеенного сегмента держим дугу даже на кратком !isWelding (Y из despike/mapY).
             const raw = Number(mapY(p));
             const y = Number.isFinite(raw) && raw > 0 ? Math.round(raw * 10) / 10 : 0;
-            if (!(y > 0)) return;
+            if (!(y > 0)) {
+                // Не рвём плато нулём внутри сегмента — только границы seg.
+                return;
+            }
             if (lastY === 0) {
                 push(p.ts, 0);
                 push(p.ts, y);
             } else if (y !== lastY) {
-                push(p.ts, y);
-            } else {
                 push(p.ts, y);
             }
             lastY = y;
@@ -1400,12 +1519,15 @@ function buildDespikedHistoryWeldingSamples(rawPoints) {
     const sorted = (rawPoints || [])
         .filter((p) => p && Number.isFinite(p.ts))
         .sort((a, b) => a.ts - b.ts);
-    const isWelding = sorted.map((p) => isHistoryPointWelding(p));
+    // Маска дуги со склейкой коротких пауз — иначе медиана рвётся и иглы U остаются.
+    const glueMask = sanitizeWeldingTimelineSamples(
+        sorted.map((p) => ({ x: p.ts, isWelding: isHistoryPointWelding(p) }))
+    );
+    const isWelding = glueMask.map((s) => Boolean(s.isWelding));
     const rawCurrent = sorted.map((p, i) => (isWelding[i] ? mapHistoryFactCurrentY(p) : 0));
     const rawVoltage = sorted.map((p, i) => (isWelding[i] ? mapHistoryFactVoltageY(p) : 0));
-    // Despike одиночных выбросов/провалов внутри сварочных участков.
-    const despikedCurrent = HISTORY_SMART_PROCESSING ? despikeValuesMedian3WithinRuns(rawCurrent, isWelding) : rawCurrent;
-    const despikedVoltage = HISTORY_SMART_PROCESSING ? despikeValuesMedian3WithinRuns(rawVoltage, isWelding) : rawVoltage;
+    const despikedCurrent = despikeValuesMedian3WithinRuns(rawCurrent, isWelding);
+    const despikedVoltage = despikeValuesMedian3WithinRuns(rawVoltage, isWelding);
     return sorted.map((p, i) => ({
         ts: p.ts,
         current: isWelding[i] ? despikedCurrent[i] : 0,
@@ -4673,7 +4795,9 @@ const DeviceMonitorPage = () => {
         const windowStart = activeWindow.start;
         const windowEnd = activeWindow.end;
         const timeline = buildHistoryTimelineForWindow(windowStart, windowEnd);
-        const sanitized = sanitizeBriefOfflineBetweenOnline(timeline, windowEnd, 5000);
+        const offlineSanitized = sanitizeBriefOfflineBetweenOnline(timeline, windowEnd, 5000);
+        // Склеить краткие паузы isWelding — иначе шов дробится на «короткие частые» импульсы.
+        const sanitized = sanitizeWeldingTimelineSamples(offlineSanitized);
         let lastTs = null;
         sanitized.forEach((s) => {
             if (Number.isFinite(s?.x)) lastTs = lastTs == null ? s.x : Math.max(lastTs, s.x);
@@ -4684,12 +4808,15 @@ const DeviceMonitorPage = () => {
             laneEnd = Math.min(laneEnd, Date.now());
         }
         laneEnd = Math.max(windowStart, laneEnd);
-        const segs = buildTimelineSegments(
-            sanitized,
-            (s) => Boolean(s.isWelding),
-            null,
-            laneEnd,
-            WELDING_SERIES_MAX_GAP_MS
+        const segs = mergeCloseWeldingSegments(
+            buildTimelineSegments(
+                sanitized,
+                (s) => Boolean(s.isWelding),
+                null,
+                laneEnd,
+                WELDING_SERIES_MAX_GAP_MS
+            ),
+            WELDING_GLUE_GAP_MS
         );
 
         const pts = [];
@@ -4698,8 +4825,13 @@ const DeviceMonitorPage = () => {
         });
         pts.sort((a, b) => a.ts - b.ts);
 
-        const cur = buildWeldingSeriesForSegments(pts, mapHistoryFactCurrentY, segs);
-        const vol = buildWeldingSeriesForSegments(pts, mapHistoryFactVoltageY, segs);
+        // Despike U/I внутринутри дуги; сегменты уже склеены — график = жёлтая дорожка без игл.
+        const despiked = buildDespikedHistoryWeldingSamples(pts);
+        const byTs = new Map(despiked.map((s) => [s.ts, s]));
+        const mapCurrent = (p) => byTs.get(p.ts)?.current ?? 0;
+        const mapVoltage = (p) => byTs.get(p.ts)?.voltage ?? 0;
+        const cur = buildWeldingSeriesForSegments(pts, mapCurrent, segs);
+        const vol = buildWeldingSeriesForSegments(pts, mapVoltage, segs);
         return {
             weldingCurrent: decimateWeldingPulseSeriesSafe(cur, HISTORY_CHART_MAX_POINTS),
             weldingVoltage: decimateWeldingPulseSeriesSafe(vol, HISTORY_CHART_MAX_POINTS),
@@ -4726,10 +4858,17 @@ const DeviceMonitorPage = () => {
         if (historyWeldingChartBundle) {
             out.weldingCurrent = historyWeldingChartBundle.weldingCurrent;
             out.weldingVoltage = historyWeldingChartBundle.weldingVoltage;
+        } else if (!graphUsesServerData) {
+            out.weldingCurrent = glueLiveWeldingSeriesGaps(src.weldingCurrent || [], WELDING_GLUE_GAP_MS);
+            out.weldingVoltage = glueLiveWeldingSeriesGaps(src.weldingVoltage || [], WELDING_GLUE_GAP_MS);
         }
         TELEMETRY_CHANNELS_CONFIG.forEach((ch) => {
             if (TELEMETRY_NO_DRAW_KEYS.has(ch.key)) return;
-            if (graphUsesServerData && (ch.key === 'weldingCurrent' || ch.key === 'weldingVoltage')) return;
+            if (ch.key === 'weldingCurrent' || ch.key === 'weldingVoltage') {
+                if (graphUsesServerData) return;
+                out[ch.key] = prepareSeriesForChart(out[ch.key] || [], ch.key, false, HISTORY_CHART_MAX_POINTS);
+                return;
+            }
             out[ch.key] = prepareSeriesForChart(src[ch.key] || [], ch.key, graphUsesServerData, HISTORY_CHART_MAX_POINTS);
         });
         return out;
@@ -4999,12 +5138,17 @@ const DeviceMonitorPage = () => {
         const wEnd = stateLaneWindowEnd;
         const offline = buildSegments(timelineForStateLane, (s) => !s.isOnline, null, wEnd);
         const online = buildSegments(timelineForStateLane, (s) => Boolean(s.isOnline), null, wEnd);
-        const welding = buildSegments(
-            timelineForStateLane,
-            (s) => Boolean(s.isWelding),
-            null,
-            wEnd,
-            WELDING_SERIES_MAX_GAP_MS
+        // Та же склейка коротких пауз сварки, что и для графика.
+        const weldingSamples = sanitizeWeldingTimelineSamples(timelineForStateLane);
+        const welding = mergeCloseWeldingSegments(
+            buildSegments(
+                weldingSamples,
+                (s) => Boolean(s.isWelding),
+                null,
+                wEnd,
+                WELDING_SERIES_MAX_GAP_MS
+            ),
+            WELDING_GLUE_GAP_MS
         );
         const errors = buildSegments(
             timelineInWindow,

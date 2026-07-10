@@ -36,6 +36,33 @@ export function despikeValuesMedian3(values) {
 }
 
 /**
+ * Гасит одиночный пик, если оба соседа близки, а середина резко выше/ниже.
+ * Работает и на краях окна (один сосед) — для игл U на старте/конце импульса.
+ */
+export function despikeIsolatedPeaks(values, isActive, minJump = 15) {
+    const n = values?.length || 0;
+    if (n < 2) return values ? values.slice() : [];
+    const out = values.slice();
+    for (let i = 0; i < n; i += 1) {
+        if (!isActive?.[i]) continue;
+        const b = Number(out[i]);
+        if (!Number.isFinite(b)) continue;
+        const a = i > 0 && isActive[i - 1] ? Number(out[i - 1]) : null;
+        const c = i < n - 1 && isActive[i + 1] ? Number(out[i + 1]) : null;
+        if (Number.isFinite(a) && Number.isFinite(c)) {
+            if (Math.abs(a - c) <= minJump && Math.abs(b - a) > minJump && Math.abs(b - c) > minJump) {
+                out[i] = medianOf3(a, b, c);
+            }
+        } else if (Number.isFinite(a) && !Number.isFinite(c)) {
+            if (Math.abs(b - a) > minJump * 2) out[i] = a;
+        } else if (Number.isFinite(c) && !Number.isFinite(a)) {
+            if (Math.abs(b - c) > minJump * 2) out[i] = c;
+        }
+    }
+    return out;
+}
+
+/**
  * Медиана «3 точки» внутри каждого непрерывного isActive-участка.
  * Offline между сваркой не участвует — иначе медиана «протекает» в паузу
  * (тултип 48 В, а линия держит 65 В с предыдущего участка).
@@ -64,5 +91,5 @@ export function despikeValuesMedian3WithinRuns(values, isActive) {
         }
     }
     flush(n);
-    return out;
+    return despikeIsolatedPeaks(out, isActive, 15);
 }
