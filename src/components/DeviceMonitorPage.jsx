@@ -159,6 +159,32 @@ const getDefaultChannelColor = (channelKey) => {
     return ch?.color || '#a07dff';
 };
 
+/** Индекс ряда оттенка в GRAPH_COLOR_PALETTE (0..10); null если цвет не из палитры. */
+const paletteHueFamilyIndex = (hex) => {
+    if (typeof hex !== 'string') return null;
+    const needle = hex.toLowerCase();
+    const idx = GRAPH_COLOR_PALETTE.findIndex((h) => h.toLowerCase() === needle);
+    if (idx < 0) return null;
+    return Math.floor(idx / 4);
+};
+
+/**
+ * Автоцвет при включении канала: mid1 из свободного ряда оттенка
+ * (весь ряд занят, если любой его оттенок уже сохранён у канала — в т.ч. выключенного).
+ */
+const pickAutoChannelColor = (overrides) => {
+    const usedHues = new Set();
+    Object.values(overrides || {}).forEach((hex) => {
+        const hue = paletteHueFamilyIndex(hex);
+        if (hue != null) usedHues.add(hue);
+    });
+    for (let hue = 0; hue < 11; hue += 1) {
+        if (usedHues.has(hue)) continue;
+        return GRAPH_COLOR_PALETTE[hue * 4 + 1];
+    }
+    return GRAPH_COLOR_PALETTE[1] || GRAPH_COLOR_PALETTE[0];
+};
+
 /**
  * Левая ось Y: на графике от 0 (ток в простое), зум меняет max: 750 → … → 50.
  * MIN_ZOOM_MAX — нижний предел max при полном приближении, не нижняя граница шкалы.
@@ -1602,10 +1628,12 @@ const DeviceMonitorPage = () => {
     const [colorEditChannelKey, setColorEditChannelKey] = useState(null);
     const [colorPreviewHex, setColorPreviewHex] = useState(null);
     const [channelColorOverrides, setChannelColorOverrides] = useState({});
-    /** both | y | x | null — null = старое вертикальное растягивание; в live всегда null */
+    /** both | y | x | null — null = прежний drag (Y / pan); XY/X/Y = только прямоугольник */
     const [chartDragZoomMode, setChartDragZoomMode] = useState(null);
     const [chartBoxSelect, setChartBoxSelect] = useState(null);
     const chartBoxSelectRef = useRef(null);
+    /** Вид на момент входа в историю после «Загр. данные» — цель Reset. */
+    const zoomViewBaselineRef = useRef(null);
 
     // Состояние для активной вкладки (Графики/Информация)
     const [activeTab, setActiveTab] = useState('graphs');
@@ -2115,11 +2143,39 @@ const DeviceMonitorPage = () => {
             if (todayPinExploreRef.current) {
                 return undefined;
             }
-            // Live режим по умолчанию (пятиминутка); суточный просмотр — только через «История» + «Загр. данные».
+            // Выбор сегодняшней даты из истории прошлого дня → «Ист.» за сегодня, не Live.
+            if (historyModeRef.current) {
+                historyModeRef.current = false;
+                const db = getTodayPinExploreDayBounds(selectedGraphDate);
+                todayPinExploreRef.current = true;
+                todayDayBoundsRef.current = db;
+                setTodayPinExplore(true);
+                setHistoryDayBounds({ start: db.dayStart, end: db.dayEnd });
+                setHistoryChartReady(false);
+                setFullDayLoaded(false);
+                fullDayLoadedWindowRef.current = null;
+                zoomViewBaselineRef.current = null;
+                setTimeWindow({ start: null, end: null, touched: false });
+                setHistorySeriesSnapshot(DEFAULT_TELEMETRY_SERIES);
+                setHistoryTimelineSnapshot([]);
+                historyCacheRef.current = {
+                    date: selectedGraphDate,
+                    dayStart: db.dayStart,
+                    dayEnd: db.dayEnd,
+                    pointsByTs: new Map(),
+                };
+                pinDragPreviewRef.current = null;
+                setPinDragPreview(null);
+                setDraggingPin(null);
+                setHistoryError(null);
+                return undefined;
+            }
+            // Live режим по умолчанию (пятиминутка); суточный просмотр — только через «Ист.» + «Загр. данные».
             setTodayPinExplore(false);
             todayPinExploreRef.current = false;
             todayDayBoundsRef.current = null;
             setHistoryDayBounds({ start: null, end: null });
+            zoomViewBaselineRef.current = null;
             historyCacheRef.current = { date: null, dayStart: null, dayEnd: null, pointsByTs: new Map() };
             pinDragPreviewRef.current = null;
             setPinDragPreview(null);
@@ -2131,6 +2187,7 @@ const DeviceMonitorPage = () => {
         todayPinExploreRef.current = false;
         todayDayBoundsRef.current = null;
         setHistoryError(null);
+        zoomViewBaselineRef.current = null;
         const { dayStart, dayEnd } = getDayBoundsForDateStr(selectedGraphDate);
         setHistoryDayBounds({ start: dayStart, end: dayEnd });
         setHistoryChartReady(false);
@@ -2143,7 +2200,7 @@ const DeviceMonitorPage = () => {
             pointsByTs: new Map(),
         };
         return undefined;
-    }, [selectedGraphDate, isTodayDateStr, getDayBoundsForDateStr]);
+    }, [selectedGraphDate, isTodayDateStr, getDayBoundsForDateStr, getTodayPinExploreDayBounds]);
 
     const historyFetchDebounceRef = useRef(null);
     useEffect(() => {
@@ -4244,8 +4301,13 @@ const DeviceMonitorPage = () => {
             const occupied = TELEMETRY_SLOT_KEYS.find((s) => prev[s] === channelKey);
             if (occupied) return shiftTelemetrySlotsRemove(prev, occupied);
             const empty = TELEMETRY_SLOT_KEYS.find((s) => !prev[s]);
-            if (empty) return { ...prev, [empty]: channelKey };
-            return prev;
+            if (!empty) return prev;
+            // Автоцвет только при включении, если ещё нет сохранённого (кастом/авто).
+            setChannelColorOverrides((colors) => {
+                if (colors[channelKey]) return colors;
+                return { ...colors, [channelKey]: pickAutoChannelColor(colors) };
+            });
+            return { ...prev, [empty]: channelKey };
         });
     };
 
@@ -4267,20 +4329,18 @@ const DeviceMonitorPage = () => {
         };
     });
 
-    const usedChannelColors = useMemo(() => {
-        const used = new Set();
-        TELEMETRY_CHANNELS_CONFIG.forEach((ch) => {
-            if (TELEMETRY_LIST_HIDDEN_KEYS.has(ch.key) || TELEMETRY_NO_DRAW_KEYS.has(ch.key)) return;
-            if (colorEditChannelKey && ch.key === colorEditChannelKey) return;
-            used.add(resolveChannelColor(ch.key).toLowerCase());
+    const availablePaletteColors = useMemo(() => {
+        const usedHues = new Set();
+        Object.entries(channelColorOverrides).forEach(([key, hex]) => {
+            if (colorEditChannelKey && key === colorEditChannelKey) return;
+            const hue = paletteHueFamilyIndex(hex);
+            if (hue != null) usedHues.add(hue);
         });
-        return used;
-    }, [resolveChannelColor, colorEditChannelKey, channelColorOverrides, colorPreviewHex]);
-
-    const availablePaletteColors = useMemo(
-        () => GRAPH_COLOR_PALETTE.filter((hex) => !usedChannelColors.has(hex.toLowerCase())),
-        [usedChannelColors]
-    );
+        return GRAPH_COLOR_PALETTE.filter((hex) => {
+            const hue = paletteHueFamilyIndex(hex);
+            return hue == null || !usedHues.has(hue);
+        });
+    }, [channelColorOverrides, colorEditChannelKey]);
 
     /** Плитка «Газ»: суточный итог из БД + live; не ниже пересчитанного gas_consumption_l. */
     const displayedDailyGasLiters = useMemo(
@@ -5847,6 +5907,14 @@ const DeviceMonitorPage = () => {
             }
             setHistoryChartReady(true);
             setHistoryError(null);
+            zoomViewBaselineRef.current = {
+                start,
+                end,
+                leftMax: Y_AXIS_LEFT.MAX,
+                rightMax: Y_AXIS_RIGHT.MAX,
+            };
+            setYAxisLeftMax(Y_AXIS_LEFT.MAX);
+            setYAxisRightMax(Y_AXIS_RIGHT.MAX);
             return true;
         } catch {
             setHistoryError('Не удалось загрузить историю с сервера.');
@@ -5959,12 +6027,16 @@ const DeviceMonitorPage = () => {
     }, []);
 
     const handleGraphZoomReset = useCallback(() => {
-        setYAxisLeftMax(Y_AXIS_LEFT.MAX);
-        setYAxisRightMax(Y_AXIS_RIGHT.MAX);
-        if (!graphUsesServerDataRef.current) {
-            setTimeWindow({ start: null, end: null, touched: false });
+        if (!graphUsesServerDataRef.current) return;
+        const base = zoomViewBaselineRef.current;
+        if (base && Number.isFinite(base.start) && Number.isFinite(base.end) && base.end > base.start) {
+            setYAxisLeftMax(clampLeftYMax(base.leftMax));
+            setYAxisRightMax(clampRightYMax(base.rightMax));
+            setTimeWindow({ start: base.start, end: base.end, touched: true });
             return;
         }
+        setYAxisLeftMax(Y_AXIS_LEFT.MAX);
+        setYAxisRightMax(Y_AXIS_RIGHT.MAX);
         const dateStr = selectedGraphDateRef.current;
         if (!dateStr) return;
         const { dayStart, dayEnd } = getDayBoundsForDateStr(dateStr);
@@ -5979,7 +6051,10 @@ const DeviceMonitorPage = () => {
 
     useEffect(() => {
         if (!graphUsesServerData) setChartDragZoomMode(null);
-        else setChartDragZoomMode((prev) => (prev == null ? 'both' : prev));
+    }, [graphUsesServerData]);
+
+    useEffect(() => {
+        if (!graphUsesServerData) setGraphCalendarOpen(false);
     }, [graphUsesServerData]);
 
     const resetGraphToLiveState = useCallback(() => {
@@ -5997,6 +6072,7 @@ const DeviceMonitorPage = () => {
         todayPinExploreRef.current = false;
         todayDayBoundsRef.current = null;
         historyModeRef.current = false;
+        zoomViewBaselineRef.current = null;
 
         setTodayPinExplore(false);
         setIsHistoryMode(false);
@@ -6032,6 +6108,7 @@ const DeviceMonitorPage = () => {
         const db = getTodayPinExploreDayBounds(todayStr);
         todayPinExploreRef.current = true;
         todayDayBoundsRef.current = db;
+        zoomViewBaselineRef.current = null;
         setTodayPinExplore(true);
         setIsHistoryMode(false);
         setHistoryDayBounds({ start: db.dayStart, end: db.dayEnd });
@@ -6540,23 +6617,25 @@ const DeviceMonitorPage = () => {
                                         >
                                             <span aria-hidden>{isTelemetryListExpanded ? '‹' : '›'}</span>
                                         </button>
-                                        <button
-                                            type="button"
-                                            className="telemetry-toolbar-date"
-                                            onClick={handleOpenCalendar}
-                                            title="Выбрать дату"
-                                        >
-                                            <span className="telemetry-toolbar-date-text">{graphCalendarLabelParts.dateStr}</span>
-                                            {graphCalendarLabelParts.weekday ? (
-                                                <span className="telemetry-toolbar-date-weekday">{graphCalendarLabelParts.weekday}</span>
-                                            ) : null}
-                                        </button>
-                                        {telemetryColorUiMode !== 'palette' && (
+                                        {graphUsesServerData && (
                                             <button
                                                 type="button"
-                                                className={`telemetry-toolbar-btn${graphUsesServerData && !fullDayLoaded && !historyLoading ? ' telemetry-toolbar-btn--accent' : ''}`}
+                                                className="telemetry-toolbar-date"
+                                                onClick={handleOpenCalendar}
+                                                title="Выбрать дату"
+                                            >
+                                                <span className="telemetry-toolbar-date-text">{graphCalendarLabelParts.dateStr}</span>
+                                                {graphCalendarLabelParts.weekday ? (
+                                                    <span className="telemetry-toolbar-date-weekday">{graphCalendarLabelParts.weekday}</span>
+                                                ) : null}
+                                            </button>
+                                        )}
+                                        {graphUsesServerData && telemetryColorUiMode !== 'palette' && (
+                                            <button
+                                                type="button"
+                                                className={`telemetry-toolbar-btn${!fullDayLoaded && !historyLoading ? ' telemetry-toolbar-btn--accent' : ''}`}
                                                 onClick={handleLoadFullDay}
-                                                disabled={!graphUsesServerData || fullDayLoaded || historyLoading}
+                                                disabled={fullDayLoaded || historyLoading}
                                                 title="Загрузить данные за сутки"
                                             >
                                                 <FaDownload aria-hidden style={{ width: 12, height: 12 }} />
@@ -6951,6 +7030,7 @@ const DeviceMonitorPage = () => {
                                                             type="button"
                                                             className="chart-control-btn"
                                                             onClick={handleGraphZoomReset}
+                                                            disabled={!graphUsesServerData || !historyChartReady}
                                                             title="Сброс масштаба"
                                                         >
                                                             <FaRedo aria-hidden style={{ width: 11, height: 11 }} />
