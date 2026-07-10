@@ -116,9 +116,10 @@ const TELEMETRY_LIST_HIDDEN_KEYS = new Set(['welderPresence']);
 
 /**
  * «Умная» обработка истории: склейка коротких offline/welding, despike одиночных выбросов.
- * Без этого на графике остаются краткие провалы в 0 и длинные одноточечные всплески.
+ * Выкл: график сварки и дорожка «Состояние» расходятся (склейка сегментов держит Y без isWelding).
+ * ponytail: код склейки/despike оставлен — вернуть true, если снова понадобятся.
  */
-const HISTORY_SMART_PROCESSING = true;
+const HISTORY_SMART_PROCESSING = false;
 
 /** Сколько каналов (кроме сети по фазам) одновременно на основном графике — при заполнении остальные в списке тусклые, переключение только после снятия выбора. */
 const TELEMETRY_GRAPH_SLOT_COUNT = 3;
@@ -627,9 +628,8 @@ function isWeldingFromPanelState(state) {
         data.properties?.['Состояние аппарата'];
     if (weldingMachineState) {
         const stateLower = String(weldingMachineState).toLowerCase().trim();
-        if (stateLower === 'сварка' || stateLower === 'welding' ||
-            stateLower.includes('сварка') || stateLower.includes('welding') ||
-            stateLower.includes('сварочн') || stateLower.includes('weld')) {
+        if (stateLower === 'сварка' || stateLower === 'welding'
+            || stateLower.includes('сварка') || stateLower.includes('welding')) {
             return true;
         }
         if (stateLower.includes('ожидан') || stateLower.includes('waiting') ||
@@ -643,17 +643,12 @@ function isWeldingFromPanelState(state) {
     const status = data.status || data.Status;
     if (status) {
         const statusLower = String(status).toLowerCase().trim();
-        if (statusLower === 'welding' || statusLower === 'сварка' ||
-            statusLower === 'weld' ||
-            statusLower.includes('сварка') ||
-            statusLower.includes('welding')) {
+        if (statusLower === 'welding' || statusLower === 'сварка'
+            || statusLower.includes('сварка') || statusLower.includes('welding')) {
             return true;
         }
     }
-    const { current: weldCurrent } = extractCurrentVoltageFromPanelState(state);
-    if (weldCurrent > 1 && !weldingMachineState) {
-        return true;
-    }
+    // ponytail: без текста состояния не угадываем сварку по току (уставка в State.I даёт ложные дуги).
     return false;
 }
 
@@ -709,25 +704,27 @@ function buildHistoryPointFromPanelPoll(state, xPoll, weldingNow) {
     };
 }
 
+/** Сварка только по явному флагу/статусу/тексту «Сварка» — без эвристик по току и «свароч*». */
 const isHistoryPointWelding = (p) => {
     if (!p) return false;
     if (p.isWelding === true) return true;
     if (p.isWelding === false) return false;
     if (isStandbyMachineState(p.machineStateText)) return false;
-    const st = String(p.status || '').toLowerCase();
-    if (st === 'welding') return true;
+    const st = String(p.status || '').toLowerCase().trim();
+    if (st === 'welding' || st === 'сварка') return true;
     const text = String(p.machineStateText || '').toLowerCase().trim();
-    if (text === 'сварка' || text === 'welding') return true;
-    return text.includes('сварка') || text.includes('welding')
-        || text.includes('свароч') || text.includes('weld');
+    if (!text) return false;
+    return text === 'сварка' || text === 'welding'
+        || text.includes('сварка') || text.includes('welding');
 };
 
-/** Уставка не рисуется при Выкл / Выкл(деж) / Не в сети — как серый участок на дорожке «Состояние». */
+/**
+ * Уставка не рисуется только при явном Выкл / Выкл(деж) / Не в сети по machineStateText.
+ * ponytail: status=offline без текста — краткий блик БД; дорожка его склеивает, линию уставки не рвём.
+ */
 const isHistoryPointSetSuppressed = (p) => {
     if (!p) return true;
     if (isStandbyMachineState(p.machineStateText)) return true;
-    const st = String(p.status || '').toLowerCase().trim();
-    if (st === 'offline') return true;
     const text = String(p.machineStateText || '').toLowerCase().trim();
     if (!text) return false;
     if (text.includes('не в сети') || text.includes('offline')) return true;
@@ -909,21 +906,13 @@ function buildSetMetricSeriesFromHistoryPoints(points, mapSetY) {
         const rawSet = mapSetY(p);
         if (rawSet !== null && rawSet !== undefined) {
             const n = Math.round(Number(rawSet) * 10) / 10;
+            // 0 / NaN = нет уставки в точке, не рвём линию и не затираем lastSet.
             if (Number.isFinite(n) && n > 0) {
                 lastSet = n;
             }
         }
-        const nowWelding = isHistoryPointWelding(p);
-        let y;
-        if (nowWelding) {
-            y = lastSet ?? 0;
-        } else if (rawSet !== null && rawSet !== undefined) {
-            const n = Math.round(Number(rawSet) * 10) / 10;
-            y = Number.isFinite(n) ? n : (lastSet ?? 0);
-        } else {
-            y = lastSet ?? 0;
-        }
-        series.push({ x, y });
+        // Во время сварки в API setCurrent=null — держим последнюю уставку; без lastSet не рисуем 0.
+        series.push({ x, y: lastSet });
     });
 
     return series;
@@ -2019,14 +2008,9 @@ const DeviceMonitorPage = () => {
                 }
                 const fromApi = {
                     ...p,
-                    isWelding: p.isWelding === true || isHistoryPointWelding(p),
+                    // Явный boolean из API; иначе — только по статусу/тексту «Сварка».
+                    isWelding: typeof p.isWelding === 'boolean' ? p.isWelding : isHistoryPointWelding(p),
                 };
-                if (existing && (existing.isWelding === true || isHistoryPointWelding(existing))) {
-                    fromApi.isWelding = true;
-                    if (fromApi.current == null && existing.current != null) fromApi.current = existing.current;
-                    if (fromApi.voltage == null && existing.voltage != null) fromApi.voltage = existing.voltage;
-                    if (fromApi.gasFlowLpm == null && existing.gasFlowLpm != null) fromApi.gasFlowLpm = existing.gasFlowLpm;
-                }
                 cache.pointsByTs.set(ts, fromApi);
                 added += 1;
             });
@@ -4597,61 +4581,37 @@ const DeviceMonitorPage = () => {
         return { start, end, minGap };
     }, [chartBounds, timeWindow.start, timeWindow.end, graphUsesServerData, LIVE_WINDOW_MS]);
 
-    const historyWeldingSegments = useMemo(() => {
-        if (!graphUsesServerData) return [];
-        const windowStart = activeWindow.start;
-        const windowEnd = activeWindow.end;
-        const timelineFromCache = buildHistoryTimelineForWindow(windowStart, windowEnd);
-        const samples = timelineFromCache.filter(
-            (s) => Number.isFinite(s?.x) && s.x >= windowStart && s.x <= windowEnd
-        );
-        const sanitized = sanitizeBriefOfflineBetweenOnline(samples, windowEnd, 5000);
-        let laneEnd = windowEnd;
-        let lastTs = null;
-        sanitized.forEach((s) => {
-            lastTs = lastTs == null ? s.x : Math.max(lastTs, s.x);
-        });
-        if (lastTs != null) laneEnd = Math.min(laneEnd, lastTs);
-        if (selectedGraphDate && isTodayDateStr(selectedGraphDate)) {
-            laneEnd = Math.min(laneEnd, Date.now());
-        }
-        laneEnd = Math.max(windowStart, laneEnd);
-        return buildHistoryWeldingSegmentsForWindow(
-            timelineFromCache,
-            windowStart,
-            windowEnd,
-            laneEnd
-        );
-    }, [
-        graphUsesServerData,
-        buildHistoryTimelineForWindow,
-        historyCacheRevision,
-        activeWindow.start,
-        activeWindow.end,
-        selectedGraphDate,
-        isTodayDateStr,
-    ]);
-
+    /**
+     * Сварочный ток/напряжение в истории — только импульсы по isWelding (как live / сегодня).
+     * Сегментная реконструкция с hold до seg.end рисовала «дугу» там, где на дорожке сварки нет.
+     */
     const historyWeldingChartBundle = useMemo(() => {
         if (!graphUsesServerData) return null;
         const windowStart = activeWindow.start;
         const windowEnd = activeWindow.end;
-        const rawPoints = [];
+        const pts = [];
         historyCacheRef.current.pointsByTs.forEach((p, ts) => {
-            if (ts >= windowStart && ts <= windowEnd) rawPoints.push(p);
+            if (ts >= windowStart && ts <= windowEnd) pts.push(p);
         });
-        return prepareWeldingHistoryForWindow(
-            rawPoints,
-            windowStart,
-            windowEnd,
-            historyWeldingSegments
+        pts.sort((a, b) => a.ts - b.ts);
+        const despiked = buildDespikedHistoryWeldingSamples(pts);
+        const byTs = new Map(despiked.map((s) => [s.ts, s]));
+        const cur = buildWeldingPulseSeriesFromHistoryPoints(
+            pts, (p) => byTs.get(p.ts)?.current ?? 0
         );
+        const vol = buildWeldingPulseSeriesFromHistoryPoints(
+            pts, (p) => byTs.get(p.ts)?.voltage ?? 0
+        );
+        return {
+            weldingCurrent: decimateWeldingPulseSeriesSafe(cur, HISTORY_CHART_MAX_POINTS),
+            weldingVoltage: decimateWeldingPulseSeriesSafe(vol, HISTORY_CHART_MAX_POINTS),
+        };
     }, [
         graphUsesServerData,
         activeWindow.start,
         activeWindow.end,
         historyCacheRevision,
-        historyWeldingSegments,
+        HISTORY_CHART_MAX_POINTS,
     ]);
 
     /**
@@ -4711,8 +4671,6 @@ const DeviceMonitorPage = () => {
         activeWindow.end,
         HISTORY_CHART_MAX_POINTS,
         historyCacheRevision,
-        historyWeldingSegments,
-        buildHistoryTimelineForWindow,
         historyWeldingChartBundle,
         todayWeldingPulseBundle,
     ]);
@@ -5090,22 +5048,44 @@ const DeviceMonitorPage = () => {
     /**
      * Тултип по X с учётом покрытия: строку показываем только если T попадает в диапазон данных канала.
      * covered=false — данных в T нет (строку скрываем). value=null — разрыв (для уставок → 0).
+     * При duplicate-x (вертикальный фронт) для горизонтали берём последний y на x — как Chart.js stepped:'after'.
      */
     const steppedTooltipCoverage = useCallback((series, ts, tolerance = 0) => {
         if (!Array.isArray(series) || !Number.isFinite(ts)) return { covered: false, value: null };
+        const raw = series.filter((p) => p && Number.isFinite(p.x));
+        if (!raw.length) return { covered: false, value: null };
+
         const byX = new Map();
-        series.forEach((p) => {
-            if (!p || !Number.isFinite(p.x)) return;
+        raw.forEach((p, idx) => {
             const y = (p.y === null || p.y === undefined || Number.isNaN(Number(p.y))) ? null : Number(p.y);
-            byX.set(p.x, y);
+            if (!byX.has(p.x)) byX.set(p.x, []);
+            byX.get(p.x).push({ y, idx });
         });
-        const distinct = [...byX.entries()].map(([x, y]) => ({ x, y })).sort((a, b) => a.x - b.x);
+        const distinct = [...byX.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([x, arr]) => {
+                arr.sort((a, b) => a.idx - b.idx);
+                return { x, y: arr[arr.length - 1].y };
+            });
         if (!distinct.length) return { covered: false, value: null };
         const tol = Number.isFinite(tolerance) ? tolerance : 0;
         const first = distinct[0].x;
         const last = distinct[distinct.length - 1].x;
         if (ts < first - tol || ts > last + tol) return { covered: false, value: null };
         const clamped = Math.max(first, Math.min(last, ts));
+        // На точном x с вертикальным сбросом  y→0: значение «до» фронта — предпоследняя y на этом x.
+        const atExact = byX.get(clamped);
+        if (atExact && atExact.length >= 2 && clamped === ts) {
+            const ordered = [...atExact].sort((a, b) => a.idx - b.idx);
+            const lastY = ordered[ordered.length - 1].y;
+            const prevY = ordered[ordered.length - 2].y;
+            if (lastY === 0 && prevY != null && Number(prevY) > 0) {
+                return { covered: true, value: prevY };
+            }
+            if (lastY != null && Number(lastY) > 0 && prevY === 0) {
+                return { covered: true, value: lastY };
+            }
+        }
         let seg = distinct[distinct.length - 1];
         for (let i = 0; i < distinct.length - 1; i += 1) {
             if (clamped < distinct[i + 1].x) { seg = distinct[i]; break; }
@@ -5180,6 +5160,10 @@ const DeviceMonitorPage = () => {
             if (value == null) {
                 if (!SET_METRIC_KEYS.has(channelKey)) return;
                 value = 0;
+            }
+            // Сварка: 0 = нет дуги в T — строку не показываем (не путаем с «нарисовано, а в тултипе ноль»).
+            if ((channelKey === 'weldingCurrent' || channelKey === 'weldingVoltage') && !(Number(value) > 0)) {
+                return;
             }
             selectedRows.push({
                 key: `${slotName}-${channelKey}`,
