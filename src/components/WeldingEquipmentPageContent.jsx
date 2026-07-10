@@ -1743,6 +1743,7 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
                             return unitId != null && visibleUnitIdSet.has(String(unitId));
                         })}
                         organizationUnits={visibleOrganizationUnits}
+                        existingMachines={visibleEquipment}
                         onSave={async (data) => {
                             try {
                                 console.log('🟢 WeldingEquipmentPage: onSave вызван с данными:', data);

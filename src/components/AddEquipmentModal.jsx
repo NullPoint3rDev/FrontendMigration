@@ -66,7 +66,7 @@ const MODELS = [
 
 const MAC_POLL_INTERVAL_MS = 1500
 
-const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organizationUnits = [], isAlloyWideAccess = false, editMode = false, initialData = null }) => {
+const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organizationUnits = [], existingMachines = [], isAlloyWideAccess = false, editMode = false, initialData = null }) => {
     const [selectedModel, setSelectedModel] = useState('Core Synergy')
     const [formData, setFormData] = useState(defaultFormData())
     const [isSaving, setIsSaving] = useState(false)
@@ -98,7 +98,13 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
     const [unitDropdownOpen, setUnitDropdownOpen] = useState(false)
     const [expandedOrgs, setExpandedOrgs] = useState({})
     const [expandedUnits, setExpandedUnits] = useState({})
+    const [orgSelectHint, setOrgSelectHint] = useState('')
     const unitSelectRef = useRef(null)
+
+    // Пользователь ТО — dropdown как у ответственного сварщика
+    const [maintOpen, setMaintOpen] = useState(false)
+    const [maintExpandedOrgs, setMaintExpandedOrgs] = useState({})
+    const maintRef = useRef(null)
 
     const stopMacCheck = () => {
         if (macCheckRef.current.interval) clearInterval(macCheckRef.current.interval)
@@ -123,14 +129,18 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
 
     // Закрытие dropdown по клику вне
     useEffect(() => {
-        if (!respOpen && !unitDropdownOpen) return
+        if (!respOpen && !unitDropdownOpen && !maintOpen) return
         const onDoc = (e) => {
             if (respOpen && respRef.current && !respRef.current.contains(e.target)) setRespOpen(false)
-            if (unitDropdownOpen && unitSelectRef.current && !unitSelectRef.current.contains(e.target)) setUnitDropdownOpen(false)
+            if (unitDropdownOpen && unitSelectRef.current && !unitSelectRef.current.contains(e.target)) {
+                setUnitDropdownOpen(false)
+                setOrgSelectHint('')
+            }
+            if (maintOpen && maintRef.current && !maintRef.current.contains(e.target)) setMaintOpen(false)
         }
         document.addEventListener('mousedown', onDoc)
         return () => document.removeEventListener('mousedown', onDoc)
-    }, [respOpen, unitDropdownOpen])
+    }, [respOpen, unitDropdownOpen, maintOpen])
 
     // Режим редактирования: подставляем имя и подразделение (по id и/или по имени после загрузки списка подразделений).
     useEffect(() => {
@@ -239,11 +249,12 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
             ...prev,
             department: unit?.name || '',
             organizationUnitId: unitId != null ? String(unitId) : '',
-            ...(prev.responsiblePerson && orgChanged
-                ? { responsiblePerson: '', responsibleWelderId: '' }
+            ...(orgChanged
+                ? { responsiblePerson: '', responsibleWelderId: '', maintenancePerson: '' }
                 : {}),
         }))
         setUnitDropdownOpen(false)
+        setOrgSelectHint('')
         if (errors.department || errors.organizationUnitId) {
             setErrors((prev) => {
                 const n = { ...prev }
@@ -256,9 +267,59 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         if (apiError) setApiError('')
     }
 
+    const handleOrgSelect = (group) => {
+        const roots = group?.hierarchy || []
+        if (roots.length !== 1) {
+            setOrgSelectHint('нет корневого подразделения')
+            return
+        }
+        setOrgSelectHint('')
+        handleUnitSelect(roots[0].id)
+    }
+
     const toggleOrgExpand = (orgKey) => {
+        setOrgSelectHint('')
         setExpandedOrgs((prev) => ({ ...prev, [orgKey]: !prev[orgKey] }))
     }
+
+    // Живая проверка уникальности имени в предприятии (~300ms)
+    useEffect(() => {
+        const name = (formData.name || '').trim()
+        const unitId = formData.organizationUnitId
+        if (!name || !unitId) {
+            setErrors((prev) => {
+                if (!prev.name) return prev
+                const n = { ...prev }
+                delete n.name
+                return n
+            })
+            return undefined
+        }
+        const t = setTimeout(() => {
+            const unit = organizationUnits.find((u) => String(u.id) === String(unitId))
+            const orgId = unit ? unitOrgId(unit) : ''
+            if (!orgId) return
+            const excludeId = editMode && initialData?.machineId != null ? String(initialData.machineId) : null
+            const taken = (existingMachines || []).some((m) => {
+                if (excludeId && String(m.id) === excludeId) return false
+                const mUnitId = m.organizationUnit?.id ?? m.organizationUnitId ?? null
+                const mUnit = organizationUnits.find((u) => String(u.id) === String(mUnitId))
+                const mOrg = mUnit
+                    ? unitOrgId(mUnit)
+                    : String(m.organizationUnit?.organizationId ?? m.organizationId ?? '')
+                if (mOrg !== orgId) return false
+                return String(m.name || '').trim().toLowerCase() === name.toLowerCase()
+            })
+            setErrors((prev) => {
+                if (taken) return { ...prev, name: 'Наименование уже используется в этом предприятии' }
+                if (!prev.name) return prev
+                const n = { ...prev }
+                delete n.name
+                return n
+            })
+        }, 300)
+        return () => clearTimeout(t)
+    }, [formData.name, formData.organizationUnitId, existingMachines, organizationUnits, editMode, initialData])
 
     const toggleUnitExpand = (unitId) => {
         setExpandedUnits((prev) => ({ ...prev, [unitId]: !prev[unitId] }))
@@ -392,18 +453,23 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
     const renderRespUnitNode = (unit, orgKey, depth) => {
         const unitKey = `${orgKey}-${unit.id}`
         const unitWelders = respTreeData.byUnit.get(String(unit.id)) || []
-        const hasChildren = (unit.children || []).length > 0
-        const expanded = respExpandedUnits[unitKey] !== false
+        const hasChildren = (unit.children || []).length > 0 || unitWelders.length > 0
+        const expanded = !!respExpandedUnits[unitKey]
 
         return (
             <React.Fragment key={unit.id}>
                 <div
                     className="resp-welder-unit"
                     style={{ paddingLeft: `${12 + depth * 16}px` }}
-                    onClick={() => hasChildren && toggleRespUnit(orgKey, unit.id)}
                 >
                     {hasChildren ? (
-                        <span className="resp-welder-chevron">
+                        <span
+                            className="resp-welder-chevron"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                toggleRespUnit(orgKey, unit.id)
+                            }}
+                        >
                             {expanded ? <FaChevronDown size={10} /> : <FaChevronRight size={10} />}
                         </span>
                     ) : (
@@ -415,6 +481,41 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                 {expanded && (unit.children || []).map((ch) => renderRespUnitNode(ch, orgKey, depth + 1))}
             </React.Fragment>
         )
+    }
+
+    const maintTreeData = useMemo(() => {
+        const byOrg = new Map()
+        ;(users || []).forEach((u) => {
+            const orgKey = u.organizationId != null
+                ? String(u.organizationId)
+                : (u.organizationUnit?.organizationId != null
+                    ? String(u.organizationUnit.organizationId)
+                    : '__NO_ORG__')
+            if (!byOrg.has(orgKey)) byOrg.set(orgKey, [])
+            byOrg.get(orgKey).push(u)
+        })
+        const groups = (organizations || []).map((o) => ({
+            orgKey: String(o.id),
+            orgName: o.name || `Предприятие #${o.id}`,
+        }))
+        if (byOrg.has('__NO_ORG__')) {
+            groups.push({ orgKey: '__NO_ORG__', orgName: 'Без предприятия' })
+        }
+        // предприятия, которых нет в organizations, но есть у пользователей
+        byOrg.forEach((_, key) => {
+            if (key === '__NO_ORG__') return
+            if (!groups.some((g) => g.orgKey === key)) {
+                groups.push({ orgKey: key, orgName: `Предприятие #${key}` })
+            }
+        })
+        return { groups: groups.filter((g) => (byOrg.get(g.orgKey) || []).length > 0), byOrg }
+    }, [users, organizations])
+
+    const userLabel = (u) => u.fullName || u.name || u.login || u.userName || u.email || String(u.id)
+
+    const selectMaintenanceUser = (u) => {
+        handleInputChange('maintenancePerson', userLabel(u))
+        setMaintOpen(false)
     }
 
     const startMacCheck = async () => {
@@ -474,23 +575,32 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
 
     const handleSave = async () => {
         if (isSaving) return
-        setErrors({})
         setApiError('')
+
+        // ponytail: не затираем live-ошибку имени — только докидываем обязательные поля
+        const nextErrors = { ...errors }
 
         if (editMode && initialData) {
             const name = formData.name?.trim() ?? ''
             const department = formData.department ?? ''
-            const editErrors = {}
-            if (!name) editErrors.name = 'Это поле обязательно'
-            if (!formData.organizationUnitId && !department) editErrors.department = 'Выберите подразделение'
-            if (Object.keys(editErrors).length > 0) {
-                setErrors(editErrors)
+            if (!name) nextErrors.name = 'Это поле обязательно'
+            if (!formData.organizationUnitId && !department) nextErrors.department = 'Выберите подразделение'
+            if (Object.keys(nextErrors).length > 0) {
+                setErrors(nextErrors)
                 return
             }
         } else {
             // Create-режим: соединение должно быть подтверждено.
             if (!connectionVerified) {
                 setApiError('Сначала проверьте соединение с устройством по MAC-адресу')
+                return
+            }
+            for (const field of ['manufactureDate', 'commissioningDate', 'lastMaintenanceDate']) {
+                const err = validateEquipmentDate(formData[field])
+                if (err) nextErrors[field] = err
+            }
+            if (Object.keys(nextErrors).length > 0) {
+                setErrors(nextErrors)
                 return
             }
         }
@@ -631,16 +741,23 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                             <div className={`model-selection ${gated ? 'gated' : ''}`}>
                                 <label className="model-label">Модель*</label>
                                 <div className="model-list">
-                                    {MODELS.map(model => (
+                                    {MODELS.map(model => {
+                                        const isMonitoringBlock = model.value === 'Блок мониторинга'
+                                        return (
                                         <button
                                             key={model.value}
-                                            className={`model-item ${selectedModel === model.value ? 'active' : ''}`}
-                                            onClick={() => setSelectedModel(model.value)}
-                                            disabled={gated}
+                                            type="button"
+                                            className={`model-item ${selectedModel === model.value ? 'active' : ''} ${isMonitoringBlock ? 'disabled' : ''}`}
+                                            onClick={() => {
+                                                if (isMonitoringBlock) return
+                                                setSelectedModel(model.value)
+                                            }}
+                                            disabled={gated || isMonitoringBlock}
                                         >
                                             {model.label}
                                         </button>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             </div>
                         )}
@@ -681,10 +798,7 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                                 {organizationGroups.length > 0 ? (
                                                     organizationGroups.map((group) => (
                                                         <React.Fragment key={group.orgKey}>
-                                                            <div
-                                                                className="unit-option unit-option-org"
-                                                                onClick={() => toggleOrgExpand(group.orgKey)}
-                                                            >
+                                                            <div className="unit-option unit-option-org">
                                                                 <button
                                                                     type="button"
                                                                     className="org-unit-expand-btn"
@@ -699,7 +813,15 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                                                         <FaChevronRight className="expand-icon" />
                                                                     )}
                                                                 </button>
-                                                                <span className="unit-option-name unit-option-org-name">{group.orgName}</span>
+                                                                <span
+                                                                    className="unit-option-name unit-option-org-name"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        handleOrgSelect(group)
+                                                                    }}
+                                                                >
+                                                                    {group.orgName}
+                                                                </span>
                                                             </div>
                                                             {expandedOrgs[group.orgKey] && (
                                                                 group.hierarchy.length > 0 ? (
@@ -718,6 +840,9 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                                     <div className="unit-option" style={{ padding: '8px 12px', color: '#7B8BA6' }}>
                                                         Нет доступных подразделений
                                                     </div>
+                                                )}
+                                                {orgSelectHint && (
+                                                    <div className="unit-option-org-error">{orgSelectHint}</div>
                                                 )}
                                             </div>
                                         )}
@@ -778,14 +903,17 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                                     ) : (
                                                         respTreeData.groups.map((group) => {
                                                             const orgWelders = respTreeData.byOrg.get(group.orgKey) || []
-                                                            const orgExpanded = respExpandedOrgs[group.orgKey] !== false
+                                                            const orgExpanded = !!respExpandedOrgs[group.orgKey]
                                                             return (
                                                                 <React.Fragment key={group.orgKey}>
-                                                                    <div
-                                                                        className="resp-welder-org"
-                                                                        onClick={() => toggleRespOrg(group.orgKey)}
-                                                                    >
-                                                                        <span className="resp-welder-chevron">
+                                                                    <div className="resp-welder-org">
+                                                                        <span
+                                                                            className="resp-welder-chevron"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation()
+                                                                                toggleRespOrg(group.orgKey)
+                                                                            }}
+                                                                        >
                                                                             {orgExpanded ? <FaChevronDown size={10} /> : <FaChevronRight size={10} />}
                                                                         </span>
                                                                         <span>{group.orgName}</span>
@@ -823,20 +951,61 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                                     </div>
                                     <div className="form-field">
                                         <label>Лицо, проводившее ТО</label>
-                                        <input
-                                            type="text"
-                                            list="maintenance-users-list"
-                                            value={formData.maintenancePerson}
-                                            onChange={(e) => handleInputChange('maintenancePerson', e.target.value)}
-                                            disabled={gated}
-                                            autoComplete="off"
-                                        />
-                                        <datalist id="maintenance-users-list">
-                                            {users.map((u) => {
-                                                const label = u.fullName || u.name || u.login || u.email || String(u.id)
-                                                return <option key={u.id} value={label} />
-                                            })}
-                                        </datalist>
+                                        <div className="resp-welder-select" ref={maintRef}>
+                                            <div
+                                                className={`resp-welder-trigger ${gated ? 'disabled' : ''} ${maintOpen ? 'open' : ''}`}
+                                                onClick={() => {
+                                                    if (gated) return
+                                                    setMaintOpen((o) => !o)
+                                                }}
+                                            >
+                                                <span className="resp-welder-trigger-text">
+                                                    {formData.maintenancePerson || 'Выберите пользователя'}
+                                                </span>
+                                                <FaChevronDown className={`resp-welder-arrow ${maintOpen ? 'open' : ''}`} />
+                                            </div>
+                                            {maintOpen && (
+                                                <div className="resp-welder-dropdown">
+                                                    {maintTreeData.groups.length === 0 ? (
+                                                        <div className="resp-welder-empty">Нет доступных пользователей</div>
+                                                    ) : (
+                                                        maintTreeData.groups.map((group) => {
+                                                            const orgUsers = maintTreeData.byOrg.get(group.orgKey) || []
+                                                            const orgExpanded = !!maintExpandedOrgs[group.orgKey]
+                                                            return (
+                                                                <React.Fragment key={group.orgKey}>
+                                                                    <div className="resp-welder-org">
+                                                                        <span
+                                                                            className="resp-welder-chevron"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation()
+                                                                                setMaintExpandedOrgs((prev) => ({
+                                                                                    ...prev,
+                                                                                    [group.orgKey]: !prev[group.orgKey],
+                                                                                }))
+                                                                            }}
+                                                                        >
+                                                                            {orgExpanded ? <FaChevronDown size={10} /> : <FaChevronRight size={10} />}
+                                                                        </span>
+                                                                        <span>{group.orgName}</span>
+                                                                    </div>
+                                                                    {orgExpanded && orgUsers.map((u) => (
+                                                                        <div
+                                                                            key={`mu-${u.id}`}
+                                                                            className={`resp-welder-leaf ${formData.maintenancePerson === userLabel(u) ? 'selected' : ''}`}
+                                                                            style={{ paddingLeft: '28px' }}
+                                                                            onClick={() => selectMaintenanceUser(u)}
+                                                                        >
+                                                                            {userLabel(u)}
+                                                                        </div>
+                                                                    ))}
+                                                                </React.Fragment>
+                                                            )
+                                                        })
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}

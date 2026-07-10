@@ -38,7 +38,9 @@ export function parseDbLastWeldMs(item) {
 
 export function formatLastWeldDisplay(timestampMs) {
     if (timestampMs == null || !Number.isFinite(timestampMs)) return null;
+    // Список оборудования: всегда московское время (как на сервере/телеметрии).
     return new Date(timestampMs).toLocaleString('ru-RU', {
+        timeZone: 'Europe/Moscow',
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',

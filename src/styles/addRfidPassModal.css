@@ -257,3 +257,83 @@
     color: #EC7A6B;
 }
 
+
+.add-rfid-pass-machine-tree {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+
+.add-rfid-pass-machine-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #1A1420;
+    border-radius: 3px;
+    color: #f0f4ff;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.add-rfid-pass-machine-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 280px;
+    overflow-y: auto;
+    background: #1B1622;
+    border-radius: 3px;
+    z-index: 20;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.add-rfid-pass-tree-org,
+.add-rfid-pass-tree-unit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    color: #d9d6df;
+    font-size: 13px;
+}
+
+.add-rfid-pass-tree-org { font-weight: 600; }
+
+.add-rfid-pass-tree-chevron {
+    background: none;
+    border: none;
+    color: #7B8BA6;
+    cursor: pointer;
+    padding: 0;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.add-rfid-pass-tree-chevron-spacer {
+    width: 16px;
+    display: inline-block;
+}
+
+.add-rfid-pass-tree-leaf {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    color: #f0f4ff;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.add-rfid-pass-tree-leaf:hover { background: rgba(178, 172, 182, 0.1); }
+.add-rfid-pass-tree-leaf.selected { background: rgba(246, 178, 67, 0.15); color: #F6B843; }
+.add-rfid-pass-tree-leaf.offline { color: #7B8BA6; }
+.add-rfid-pass-tree-leaf-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.add-rfid-pass-offline-tag { color: #EC7A6B; font-size: 11px; flex-shrink: 0; }
+.add-rfid-pass-tree-empty { padding: 12px; color: #7B8BA6; font-size: 13px; }

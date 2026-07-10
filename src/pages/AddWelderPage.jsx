@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useReportsUnsaved } from '../contexts/ReportsUnsavedContext';
 import { FaBell, FaChevronRight, FaChevronDown } from 'react-icons/fa';
@@ -25,6 +25,7 @@ import { getMachineStatusBadge } from '../utils/weldingMachineStateDisplay';
 import machineImage from '../images/Untitled 3 копия.png';
 import '../styles/addWelderPage.css';
 import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
+import LabeledField from '../components/LabeledField';
 
 const STATUS_STALE_MS = 10000;
 const STATUS_POLL_INTERVAL_MS = 4000;
@@ -191,7 +192,7 @@ function MiniCalendar({ selectedIso, minDate, maxDate, onPick }) {
 
 // Поле даты: ручной ввод DD.MM.YYYY (автоточки) + кастомный календарь. value/onChange в ISO.
 // validate(iso) -> строка ошибки | ''. Невалидная дата не сохраняется, но показывается ошибка.
-function DateField({ value, onChange, placeholder, disabled, minDate, maxDate, validate }) {
+function DateField({ value, onChange, placeholder, disabled, minDate, maxDate, validate, fieldLabel, required }) {
     const [text, setText] = useState(isoToDisplayDate(value));
     const [error, setError] = useState('');
     const [open, setOpen] = useState(false);
@@ -199,7 +200,7 @@ function DateField({ value, onChange, placeholder, disabled, minDate, maxDate, v
     const focusedRef = useRef(false);
 
     useEffect(() => {
-        if (focusedRef.current) return; // не перетираем текст во время ручного ввода
+        if (focusedRef.current) return;
         setText(isoToDisplayDate(value));
     }, [value]);
 
@@ -224,29 +225,42 @@ function DateField({ value, onChange, placeholder, disabled, minDate, maxDate, v
             const err = runValidate(iso);
             onChange(err ? '' : iso);
         } else {
-            setError('');
+            if (/^\d{2}\.\d{2}\.\d{4}$/.test(formatted)) {
+                setError('Некорректная дата');
+            } else {
+                setError('');
+            }
             onChange('');
         }
     };
 
     const handleBlur = () => {
         focusedRef.current = false;
-        // Неполная/невалидная по формату дата — очищаем (текст и значение).
-        if (text && !displayToIsoDate(text)) {
-            setText('');
+        if (!text) {
             setError('');
-            onChange('');
+            return;
+        }
+        const iso = displayToIsoDate(text);
+        if (!iso) {
+            if (/^\d{2}\.\d{2}\.\d{4}$/.test(text)) {
+                setError('Некорректная дата');
+                onChange('');
+            } else {
+                setText('');
+                setError('');
+                onChange('');
+            }
         }
     };
 
     const handlePick = (iso) => {
         setText(isoToDisplayDate(iso));
-        runValidate(iso);
-        onChange(iso);
+        const err = runValidate(iso);
+        onChange(err ? '' : iso);
         setOpen(false);
     };
 
-    return (
+    const field = (
         <div className={`welder-date-field ${error ? 'has-error' : ''}`} ref={wrapRef}>
             <input
                 type="text"
@@ -255,7 +269,7 @@ function DateField({ value, onChange, placeholder, disabled, minDate, maxDate, v
                 onFocus={() => { focusedRef.current = true; }}
                 onChange={handleTextChange}
                 onBlur={handleBlur}
-                placeholder={placeholder || 'ДД.ММ.ГГГГ'}
+                placeholder=""
                 disabled={disabled}
                 maxLength={10}
                 className={error ? 'error' : ''}
@@ -280,6 +294,11 @@ function DateField({ value, onChange, placeholder, disabled, minDate, maxDate, v
             {error && <span className="welder-date-error">{error}</span>}
         </div>
     );
+
+    if (fieldLabel) {
+        return <LabeledField label={fieldLabel} required={required}>{field}</LabeledField>;
+    }
+    return field;
 }
 
 function computeStatusFromPanelState(machine, stateObj) {
@@ -340,6 +359,8 @@ function AddWelderPage() {
     const [expandedOrgs, setExpandedOrgs] = useState({});
     const [expandedUnits, setExpandedUnits] = useState({});
     const [unitDropdownOpen, setUnitDropdownOpen] = useState(false);
+    const [positionDropdownOpen, setPositionDropdownOpen] = useState(false);
+    const [orgSelectHint, setOrgSelectHint] = useState('');
     const [errors, setErrors] = useState({});
     const [profileImage, setProfileImage] = useState(null);
     const [selectedImageFile, setSelectedImageFile] = useState(null);
@@ -654,17 +675,21 @@ function AddWelderPage() {
         const handleClickOutside = (event) => {
             if (unitDropdownOpen && !event.target.closest('.unit-select-container')) {
                 setUnitDropdownOpen(false);
+                setOrgSelectHint('');
+            }
+            if (positionDropdownOpen && !event.target.closest('.position-select-container')) {
+                setPositionDropdownOpen(false);
             }
         };
 
-        if (unitDropdownOpen) {
+        if (unitDropdownOpen || positionDropdownOpen) {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [unitDropdownOpen]);
+    }, [unitDropdownOpen, positionDropdownOpen]);
 
     // Перезагружаем аттестации при возврате на страницу (например, после добавления новой)
     useEffect(() => {
@@ -747,7 +772,7 @@ function AddWelderPage() {
             organizationUnitId: unitId.toString()
         }));
         setUnitDropdownOpen(false);
-        // Очищаем ошибку при выборе
+        setOrgSelectHint('');
         if (errors.organizationUnitId) {
             setErrors(prev => {
                 const newErrors = { ...prev };
@@ -1008,9 +1033,15 @@ function AddWelderPage() {
 
     const isWelderBlocked = String(currentWelderStatus || '').toUpperCase() === 'BLOCKED';
 
-    // Границы дат: рождение — не позднее «сегодня минус 14 лет»; приём — не позднее сегодня.
+    // Границы дат: рождение — не позднее «сегодня минус 14 лет»; приём — не позднее сегодня;
+    // приём не раньше рождения + 14 лет.
     const todayDay = startOfDay(new Date());
     const birthMaxDate = new Date(todayDay.getFullYear() - 14, todayDay.getMonth(), todayDay.getDate());
+    const hireMinDate = (() => {
+        const birth = isoToDate(formData.birthDate);
+        if (!birth) return null;
+        return startOfDay(new Date(birth.getFullYear() + 14, birth.getMonth(), birth.getDate()));
+    })();
     const validateBirthDate = (iso) => {
         const d = isoToDate(iso);
         if (!d) return '';
@@ -1021,7 +1052,39 @@ function AddWelderPage() {
         const d = isoToDate(iso);
         if (!d) return '';
         if (startOfDay(d) > todayDay) return 'Дата приёма не может быть в будущем';
+        if (hireMinDate && startOfDay(d) < hireMinDate) {
+            return 'Дата приёма не ранее чем через 14 лет после рождения';
+        }
         return '';
+    };
+
+    const filteredPositionOptions = useMemo(() => {
+        const q = String(formData.position || '').trim().toLowerCase();
+        if (!q) return positionOptions;
+        return positionOptions.filter((p) => String(p).toLowerCase().startsWith(q));
+    }, [positionOptions, formData.position]);
+
+    const getSelectedUnitDisplayName = () => {
+        if (!formData.organizationUnitId) return '';
+        const unit = organizationUnits.find((u) => String(u.id) === String(formData.organizationUnitId));
+        if (!unit) return '';
+        const orgId = String(unit.organizationId ?? unit.organization?.id ?? '');
+        const group = organizationGroups.find((g) => String(g.orgKey) === orgId);
+        const roots = group?.hierarchy || [];
+        if (roots.length === 1 && String(roots[0].id) === String(unit.id)) {
+            return group.orgName || unit.name;
+        }
+        return unit.name || '';
+    };
+
+    const handleOrgSelect = (group) => {
+        const roots = group?.hierarchy || [];
+        if (roots.length !== 1) {
+            setOrgSelectHint('нет корневого подразделения');
+            return;
+        }
+        setOrgSelectHint('');
+        handleUnitSelect(roots[0].id);
     };
 
     const handleWelderBlockChange = (checked) => {
@@ -1430,65 +1493,62 @@ function AddWelderPage() {
                             {/* First Column */}
                             <div className="form-column">
                                 <div className="form-group">
-                                    <Tooltip text="Фамилия">
+                                    <LabeledField label="Фамилия" required>
                                         <input
                                             type="text"
                                             name="lastName"
                                             value={formData.lastName}
                                             onChange={handleInputChange}
-                                            placeholder="Фамилия*"
+                                            placeholder=""
                                             className={errors.lastName ? 'error' : ''}
                                         />
-                                    </Tooltip>
+                                    </LabeledField>
                                     {errors.lastName && <span className="error-text">{errors.lastName}</span>}
                                 </div>
                                 <div className="form-group">
-                                    <Tooltip text="Имя">
+                                    <LabeledField label="Имя" required>
                                         <input
                                             type="text"
                                             name="firstName"
                                             value={formData.firstName}
                                             onChange={handleInputChange}
-                                            placeholder="Имя*"
+                                            placeholder=""
                                             className={errors.firstName ? 'error' : ''}
                                         />
-                                    </Tooltip>
+                                    </LabeledField>
                                     {errors.firstName && <span className="error-text">{errors.firstName}</span>}
                                 </div>
                                 <div className="form-group">
-                                    <Tooltip text="Отчество">
+                                    <LabeledField label="Отчество">
                                         <input
                                             type="text"
                                             name="middleName"
                                             value={formData.middleName}
                                             onChange={handleInputChange}
-                                            placeholder="Отчество"
+                                            placeholder=""
                                         />
-                                    </Tooltip>
+                                    </LabeledField>
                                 </div>
                                 <div className="form-group">
-                                    <Tooltip text="Дата рождения">
-                                        <DateField
-                                            value={formData.birthDate}
-                                            onChange={(iso) => setFormData(prev => ({ ...prev, birthDate: iso }))}
-                                            placeholder="Дата рождения ДД.ММ.ГГГГ"
-                                            disabled={readOnlyWelderForm}
-                                            maxDate={birthMaxDate}
-                                            validate={validateBirthDate}
-                                        />
-                                    </Tooltip>
+                                    <DateField
+                                        value={formData.birthDate}
+                                        onChange={(iso) => setFormData(prev => ({ ...prev, birthDate: iso }))}
+                                        disabled={readOnlyWelderForm}
+                                        maxDate={birthMaxDate}
+                                        validate={validateBirthDate}
+                                        fieldLabel="Дата рождения"
+                                    />
                                 </div>
                                 <div className="form-group">
-                                    <Tooltip text="Дата приема на работу">
-                                        <DateField
-                                            value={formData.hireDate}
-                                            onChange={(iso) => setFormData(prev => ({ ...prev, hireDate: iso }))}
-                                            placeholder="Дата приёма ДД.ММ.ГГГГ"
-                                            disabled={readOnlyWelderForm}
-                                            maxDate={todayDay}
-                                            validate={validateHireDate}
-                                        />
-                                    </Tooltip>
+                                    <DateField
+                                        value={formData.hireDate}
+                                        onChange={(iso) => setFormData(prev => ({ ...prev, hireDate: iso }))}
+                                        disabled={readOnlyWelderForm}
+                                        minDate={hireMinDate}
+                                        maxDate={todayDay}
+                                        validate={validateHireDate}
+                                        fieldLabel="Дата приёма"
+                                    />
                                 </div>
                                 <div className="form-group">
                                     <div className="add-welder-block-row">
@@ -1513,56 +1573,85 @@ function AddWelderPage() {
                             {/* Second Column */}
                             <div className="form-column">
                                 <div className="form-group">
-                                    <Tooltip text="Должность">
-                                        <input
-                                            type="text"
-                                            name="position"
-                                            list="welder-positions-list"
-                                            value={formData.position}
-                                            onChange={handleInputChange}
-                                            placeholder="Должность*"
-                                            className={errors.position ? 'error' : ''}
-                                            autoComplete="off"
-                                            disabled={readOnlyWelderForm}
-                                        />
-                                    </Tooltip>
-                                    <datalist id="welder-positions-list">
-                                        {positionOptions.map(pos => (
-                                            <option key={pos} value={pos} />
-                                        ))}
-                                    </datalist>
+                                    <div className="position-select-container">
+                                        <LabeledField label="Должность" required>
+                                            <input
+                                                type="text"
+                                                name="position"
+                                                value={formData.position}
+                                                onChange={(e) => {
+                                                    handleInputChange(e);
+                                                    setPositionDropdownOpen(true);
+                                                }}
+                                                onFocus={() => setPositionDropdownOpen(true)}
+                                                className={`position-select-trigger ${errors.position ? 'error' : ''}`}
+                                                autoComplete="off"
+                                                disabled={readOnlyWelderForm}
+                                                placeholder=""
+                                            />
+                                        </LabeledField>
+                                        {positionDropdownOpen && !readOnlyWelderForm && (
+                                            <div className="position-select-dropdown">
+                                                {filteredPositionOptions.length > 0 ? (
+                                                    filteredPositionOptions.map((pos) => (
+                                                        <div
+                                                            key={pos}
+                                                            className={`position-select-option ${formData.position === pos ? 'selected' : ''}`}
+                                                            onMouseDown={(e) => {
+                                                                e.preventDefault();
+                                                                setFormData((prev) => ({ ...prev, position: pos }));
+                                                                setPositionDropdownOpen(false);
+                                                                if (errors.position) {
+                                                                    setErrors((prev) => {
+                                                                        const n = { ...prev };
+                                                                        delete n.position;
+                                                                        return n;
+                                                                    });
+                                                                }
+                                                            }}
+                                                        >
+                                                            {pos}
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="position-select-empty">
+                                                        {formData.position?.trim()
+                                                            ? 'Нет совпадений — будет сохранена новая должность'
+                                                            : 'Нет должностей в предприятии'}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                     {errors.position && <span className="error-text">{errors.position}</span>}
                                 </div>
                                 <div className="form-group">
-                                    <Tooltip text="Подразделение">
                                     <div className="unit-select-container">
-                                        <div
-                                            className={`unit-select-dropdown ${unitDropdownOpen ? 'open' : ''} ${errors.organizationUnitId ? 'error' : ''}`}
-                                            onClick={() => setUnitDropdownOpen(!unitDropdownOpen)}
-                                        >
-                                            <span className="unit-select-label">
-                                                {formData.organizationUnitId
-                                                    ? organizationUnits.find(u => u.id.toString() === formData.organizationUnitId)?.name || 'Подразделение*'
-                                                    : 'Подразделение*'
-                                                }
-                                            </span>
-                                            <span className={`unit-select-arrow ${unitDropdownOpen ? 'open' : ''}`}>
-                                                <FaChevronDown />
-                                            </span>
-                                        </div>
+                                        <LabeledField label="Подразделение" required>
+                                            <div
+                                                className={`unit-select-dropdown ${unitDropdownOpen ? 'open' : ''} ${errors.organizationUnitId ? 'error' : ''}`}
+                                                onClick={() => !readOnlyWelderForm && setUnitDropdownOpen(!unitDropdownOpen)}
+                                            >
+                                                <span className="unit-select-label">
+                                                    {getSelectedUnitDisplayName()}
+                                                </span>
+                                                <span className={`unit-select-arrow ${unitDropdownOpen ? 'open' : ''}`}>
+                                                    <FaChevronDown />
+                                                </span>
+                                            </div>
+                                        </LabeledField>
                                         {unitDropdownOpen && (
                                             <div className="unit-select-options">
                                                 {organizationGroups.length > 0 ? (
                                                     organizationGroups.map(group => (
                                                         <React.Fragment key={group.orgKey}>
-                                                            <div
-                                                                className="unit-option unit-option-org"
-                                                                onClick={() => toggleOrgExpand(group.orgKey)}
-                                                            >
+                                                            <div className="unit-option unit-option-org">
                                                                 <button
+                                                                    type="button"
                                                                     className="org-unit-expand-btn"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
+                                                                        setOrgSelectHint('');
                                                                         toggleOrgExpand(group.orgKey);
                                                                     }}
                                                                 >
@@ -1572,8 +1661,17 @@ function AddWelderPage() {
                                                                         <FaChevronRight className="expand-icon" />
                                                                     )}
                                                                 </button>
-                                                                <span className="unit-option-name unit-option-org-name">{group.orgName}</span>
+                                                                <span
+                                                                    className="unit-option-name unit-option-org-name"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleOrgSelect(group);
+                                                                    }}
+                                                                >
+                                                                    {group.orgName}
+                                                                </span>
                                                             </div>
+                                                            {orgSelectHint && expandedOrgs[group.orgKey] === undefined ? null : null}
                                                             {expandedOrgs[group.orgKey] && (
                                                                 group.hierarchy.length > 0 ? (
                                                                     <div className="unit-children">
@@ -1592,33 +1690,35 @@ function AddWelderPage() {
                                                         Нет доступных подразделений
                                                     </div>
                                                 )}
+                                                {orgSelectHint && (
+                                                    <div className="unit-option-org-error">{orgSelectHint}</div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
-                                    </Tooltip>
                                     {errors.organizationUnitId && <span className="error-text">{errors.organizationUnitId}</span>}
                                 </div>
                                 <div className="form-group">
-                                    <Tooltip text="Табельный номер">
+                                    <LabeledField label="Табельный номер">
                                         <input
                                             type="text"
                                             name="employeeId"
                                             value={formData.employeeId}
                                             onChange={handleInputChange}
-                                            placeholder="Табельный номер"
+                                            placeholder=""
                                         />
-                                    </Tooltip>
+                                    </LabeledField>
                                 </div>
                                 <div className="form-group">
-                                    <Tooltip text="Номер телефона">
+                                    <LabeledField label="Номер телефона">
                                         <input
                                             type="tel"
                                             name="phone"
                                             value={formData.phone}
                                             onChange={handleInputChange}
-                                            placeholder="Номер телефона"
+                                            placeholder=""
                                         />
-                                    </Tooltip>
+                                    </LabeledField>
                                 </div>
                                 <div className="form-group">
                                     <button type="button" className="save-btn" onClick={handleSave} disabled={readOnlyWelderForm}>

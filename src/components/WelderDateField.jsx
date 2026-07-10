@@ -170,11 +170,17 @@ export default function WelderDateField({ value, onChange, placeholder, disabled
 
     const handleBlur = () => {
         focusedRef.current = false;
-        if (text && !displayToIsoDate(text)) {
-            setText('');
+        if (!text) {
             setError('');
-            onChange('');
+            return;
         }
+        const iso = displayToIsoDate(text);
+        if (!iso) {
+            setError('Некорректная дата');
+            onChange('');
+            return;
+        }
+        runValidate(iso);
     };
 
     const handlePick = (iso) => {

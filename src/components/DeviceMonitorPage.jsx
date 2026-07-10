@@ -2703,7 +2703,7 @@ const DeviceMonitorPage = () => {
     const infoWtModuleMac = machineModules.wtModuleMac || machineDetails?.mac || machineMac;
     const infoOptionBadge = (enabled) => ({
         text: enabled ? 'Активно' : 'Неактивно',
-        className: enabled ? 'info-tile-badge-inactive' : 'info-tile-badge-active',
+        className: enabled ? 'info-tile-badge-active' : 'info-tile-badge-inactive',
     });
     const rfidEnabledForInfo = machineDetails ? machineDetails.rfidEnabled !== false : Boolean(infoOptions.rfid);
     const rfidBadge = infoOptionBadge(rfidEnabledForInfo);

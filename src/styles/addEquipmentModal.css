@@ -268,6 +268,22 @@
     font-weight: 600 !important;
 }
 
+.model-item:disabled,
+.model-item.disabled {
+    opacity: 0.45 !important;
+    cursor: not-allowed !important;
+    color: rgba(123, 139, 166, 0.85) !important;
+    background: rgba(28, 22, 34, 0.35) !important;
+    border-color: rgba(82, 69, 94, 0.25) !important;
+}
+
+.model-item:disabled:hover,
+.model-item.disabled:hover {
+    border-color: rgba(82, 69, 94, 0.25) !important;
+    background: rgba(28, 22, 34, 0.35) !important;
+    color: rgba(123, 139, 166, 0.85) !important;
+}
+
 .modal-right {
     display: flex;
     flex-direction: column;
@@ -727,6 +743,14 @@
 .modal-content .unit-option-org-name {
     font-weight: 600;
     color: #d9d6df;
+    cursor: pointer;
+}
+
+.modal-content .unit-option-org-error {
+    margin-left: 32px;
+    padding: 6px 12px;
+    color: #EC7A6B;
+    font-size: 12px;
 }
 
 .modal-content .org-unit-expand-btn {
