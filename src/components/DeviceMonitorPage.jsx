@@ -27,7 +27,19 @@ import machineImage from '../images/Untitled 3 копия.png';
 import WelderIcon from '../images/WelderIcon.png';
 import AddEquipmentModal from './AddEquipmentModal';
 import { RiRfidFill } from 'react-icons/ri';
-import { FaBell, FaCompress, FaExpand } from 'react-icons/fa';
+import {
+    FaBell,
+    FaCompress,
+    FaExpand,
+    FaDownload,
+    FaFillDrip,
+    FaTimes,
+    FaSave,
+    FaSearchPlus,
+    FaArrowsAltV,
+    FaArrowsAltH,
+    FaRedo,
+} from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
 import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
 import MonitorWeldersTab from './MonitorWeldersTab';
@@ -70,7 +82,9 @@ const TELEMETRY_CHANNELS_CONFIG = [
     /** Мгновенный расход, л/мин — State.GasFlow с бэка (не «Расход газа с включения»). */
     { key: 'gasFlow', label: 'Расход газа', color: '#2fe4a8' },
     { key: 'wireConsumption', label: 'Расход проволоки', color: '#ffae64' },
-    { key: 'mainsVoltage', label: 'Напряжение сети', color: '#a07dff' },
+    { key: 'mainsVoltageA', label: 'Напряжение сети. Фаза А', color: '#a07dff' },
+    { key: 'mainsVoltageB', label: 'Напряжение сети. Фаза В', color: '#c4a0ff' },
+    { key: 'mainsVoltageC', label: 'Напряжение сети. Фаза С', color: '#8b6fd4' },
     { key: 'radiatorTemp', label: 'Темп. первич.', color: '#66d1ff' },
     { key: 'inverterTemp', label: 'Темп. вторич.', color: '#7cffb2' },
     { key: 'chillerTempIn', label: 'Вход. темп. охл. жидкости', color: '#f1ca06' },
@@ -78,6 +92,20 @@ const TELEMETRY_CHANNELS_CONFIG = [
 ];
 
 const TELEMETRY_NO_DRAW_KEYS = new Set(['wireConsumption']);
+
+/** Палитра: 11 оттенков × 4 яркости (ряд = один тон). */
+const GRAPH_COLOR_PALETTE = (() => {
+    const lights = ['#ec7475', '#efb274', '#ede979', '#b4d16f', '#89c066', '#8ac8a2', '#8acfd9', '#7ab1e0', '#6c72b5', '#9878b4', '#c680b4'];
+    const mid1 = ['#e8393a', '#f29738', '#f3e829', '#a4c500', '#6fb31a', '#72bc7e', '#69c6db', '#4d8fcd', '#3852a1', '#6d4d9c', '#b85ea1'];
+    const mid2 = ['#e71a20', '#ef7e1e', '#f2e614', '#91be05', '#65b11d', '#6ab660', '#41bed9', '#3276bb', '#244d9f', '#5c4799', '#b4539c'];
+    const darks = ['#880c0f', '#894c0c', '#88880d', '#478824', '#0e882b', '#0f884b', '#0d8181', '#0c4b89', '#252c70', '#4a1a83', '#880e86'];
+    const out = [];
+    for (let i = 0; i < 11; i += 1) out.push(lights[i], mid1[i], mid2[i], darks[i]);
+    return out;
+})();
+
+const MAINS_PHASE_CHANNEL_KEYS = new Set(['mainsVoltageA', 'mainsVoltageB', 'mainsVoltageC']);
+const isMainsPhaseChannelKey = (key) => MAINS_PHASE_CHANNEL_KEYS.has(key);
 
 /** #9: ключ настроек графика в localStorage — свой на каждый аппарат (MAC). */
 const graphPrefsStorageKey = (mac) => `deviceMonitorGraphPrefs:${mac}`;
@@ -116,6 +144,18 @@ const resolveMainsPhaseSeriesKey = (phase) => {
     if (phase === 'C') return 'mainsVoltageC';
     if (phase === 'B') return 'mainsVoltageB';
     return 'mainsVoltageA';
+};
+
+const channelKeyToMainsPhase = (key) => {
+    if (key === 'mainsVoltageA') return 'A';
+    if (key === 'mainsVoltageB') return 'B';
+    if (key === 'mainsVoltageC') return 'C';
+    return null;
+};
+
+const getDefaultChannelColor = (channelKey) => {
+    const ch = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === channelKey);
+    return ch?.color || '#a07dff';
 };
 
 /**
@@ -1556,6 +1596,15 @@ const DeviceMonitorPage = () => {
 
     // Состояние для отображения списка телеметрии
     const [isTelemetryListExpanded, setIsTelemetryListExpanded] = useState(true);
+    /** off | swatches | palette */
+    const [telemetryColorUiMode, setTelemetryColorUiMode] = useState('off');
+    const [colorEditChannelKey, setColorEditChannelKey] = useState(null);
+    const [colorPreviewHex, setColorPreviewHex] = useState(null);
+    const [channelColorOverrides, setChannelColorOverrides] = useState({});
+    /** both | y | x | null — null = старое вертикальное растягивание; в live всегда null */
+    const [chartDragZoomMode, setChartDragZoomMode] = useState(null);
+    const [chartBoxSelect, setChartBoxSelect] = useState(null);
+    const chartBoxSelectRef = useRef(null);
 
     // Состояние для активной вкладки (Графики/Информация)
     const [activeTab, setActiveTab] = useState('graphs');
@@ -1630,9 +1679,27 @@ const DeviceMonitorPage = () => {
             return changed ? next : prev;
         });
     }, [telemetrySelection.slot1, telemetrySelection.slot2, telemetrySelection.slot3]);
+
+    /** Фазы сети на графике = слоты с mainsVoltageA/B/C. */
+    useEffect(() => {
+        const phases = [];
+        TELEMETRY_SLOT_KEYS.forEach((slot) => {
+            const phase = channelKeyToMainsPhase(telemetrySelection[slot]);
+            if (phase && !phases.includes(phase)) phases.push(phase);
+        });
+        setMainsVoltagePhases(phases);
+    }, [telemetrySelection.slot1, telemetrySelection.slot2, telemetrySelection.slot3]);
+
+    const resolveChannelColor = useCallback((channelKey) => {
+        if (colorEditChannelKey === channelKey && colorPreviewHex) return colorPreviewHex;
+        if (channelColorOverrides[channelKey]) return channelColorOverrides[channelKey];
+        return getDefaultChannelColor(channelKey);
+    }, [channelColorOverrides, colorEditChannelKey, colorPreviewHex]);
+
     const prevWelderPresentForChartRef = useRef(false);
-    /** Выбранные фазы сети (до 3) — по умолчанию ни одна, пока пользователь не включит A/B/C. */
+    /** Выбранные фазы сети — из слотов (каждая фаза = отдельный слот). */
     const [mainsVoltagePhases, setMainsVoltagePhases] = useState([]);
+    // ponytail: оставляем state для prefs-миграции; актуальные фазы считаем из слотов ниже.
     /** Масштаб по оси X: 1 — весь диапазон; больше — «приближение» к последним точкам (окно справа). */
     const [telemetryChartZoom, setTelemetryChartZoom] = useState({ top: 1, bottom: 1 });
     const [yAxisLeftMax, setYAxisLeftMax] = useState(Y_AXIS_LEFT.MAX);
@@ -2448,12 +2515,28 @@ const DeviceMonitorPage = () => {
                 const sel = { slot1: null, slot2: null, slot3: null };
                 TELEMETRY_SLOT_KEYS.forEach((s) => {
                     const key = prefs.telemetrySelection[s];
+                    if (key === 'mainsVoltage') return;
                     if (key && !TELEMETRY_LIST_HIDDEN_KEYS.has(key)) sel[s] = key;
                 });
+                // Миграция старых prefs: фазы сети → отдельные слоты.
+                if (Array.isArray(prefs.mainsVoltagePhases)) {
+                    prefs.mainsVoltagePhases.forEach((phase) => {
+                        if (!MAINS_VOLTAGE_PHASES.includes(phase)) return;
+                        const key = resolveMainsPhaseSeriesKey(phase);
+                        if (TELEMETRY_SLOT_KEYS.some((s) => sel[s] === key)) return;
+                        const empty = TELEMETRY_SLOT_KEYS.find((s) => !sel[s]);
+                        if (empty) sel[empty] = key;
+                    });
+                }
                 setTelemetrySelection(sel);
-            }
-            if (Array.isArray(prefs.mainsVoltagePhases)) {
-                setMainsVoltagePhases(prefs.mainsVoltagePhases.filter((p) => MAINS_VOLTAGE_PHASES.includes(p)));
+            } else if (Array.isArray(prefs.mainsVoltagePhases)) {
+                const sel = { slot1: null, slot2: null, slot3: null };
+                prefs.mainsVoltagePhases.forEach((phase) => {
+                    if (!MAINS_VOLTAGE_PHASES.includes(phase)) return;
+                    const empty = TELEMETRY_SLOT_KEYS.find((s) => !sel[s]);
+                    if (empty) sel[empty] = resolveMainsPhaseSeriesKey(phase);
+                });
+                setTelemetrySelection(sel);
             }
             if (Number.isFinite(prefs.yAxisLeftMax)) setYAxisLeftMax(clampLeftYMax(prefs.yAxisLeftMax));
             if (Number.isFinite(prefs.yAxisRightMax)) setYAxisRightMax(clampRightYMax(prefs.yAxisRightMax));
@@ -2710,13 +2793,15 @@ const DeviceMonitorPage = () => {
                 setTelemetrySeries(prev => {
                     const next = { ...prev };
                     TELEMETRY_CHANNELS_CONFIG.forEach(channel => {
-                        if (channel.key === 'mainsVoltage') {
+                        if (channel.key === 'mainsVoltageA') {
                             const yA = Math.round(Number(telemetrySample.mainsVoltageA ?? 0) * 10) / 10;
                             const yB = Math.round(Number(telemetrySample.mainsVoltageB ?? 0) * 10) / 10;
                             const yC = Math.round(Number(telemetrySample.mainsVoltageC ?? 0) * 10) / 10;
                             next.mainsVoltageA = trimSeriesByTime(prev.mainsVoltageA || [], { x: xPoll, y: yA }, LIVE_WINDOW_MS);
                             next.mainsVoltageB = trimSeriesByTime(prev.mainsVoltageB || [], { x: xPoll, y: yB }, LIVE_WINDOW_MS);
                             next.mainsVoltageC = trimSeriesByTime(prev.mainsVoltageC || [], { x: xPoll, y: yC }, LIVE_WINDOW_MS);
+                        } else if (channel.key === 'mainsVoltageB' || channel.key === 'mainsVoltageC') {
+                            /* обновлено вместе с mainsVoltageA */
                         } else if (channel.key === 'weldingCurrent') {
                             const series = appendWeldingPulseSeries(
                                 prev.weldingCurrent || [],
@@ -4141,7 +4226,7 @@ const DeviceMonitorPage = () => {
     };
 
     const handleTelemetryTileClick = (channelKey) => {
-        if (channelKey === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(channelKey)) return;
+        if (TELEMETRY_NO_DRAW_KEYS.has(channelKey)) return;
         if (TELEMETRY_LIST_HIDDEN_KEYS.has(channelKey)) return;
         setTelemetrySelection((prev) => {
             const occupied = TELEMETRY_SLOT_KEYS.find((s) => prev[s] === channelKey);
@@ -4152,18 +4237,6 @@ const DeviceMonitorPage = () => {
         });
     };
 
-    const handleMainsVoltagePhaseToggle = (phase) => {
-        setMainsVoltagePhases((prev) => {
-            if (prev.includes(phase)) return prev.filter((p) => p !== phase);
-            if (prev.length >= 3) return prev;
-            return [...prev, phase];
-        });
-    };
-
-    const handleMainsPhaseChange = (slotName, phase) => {
-        setTelemetryPhaseSelection((prev) => ({ ...prev, [slotName]: phase }));
-    };
-
     const graphTelemetrySlotsFull =
         TELEMETRY_SLOT_KEYS.filter((s) => telemetrySelection[s]).length >= TELEMETRY_GRAPH_SLOT_COUNT;
 
@@ -4171,22 +4244,31 @@ const DeviceMonitorPage = () => {
         (channel) => !TELEMETRY_LIST_HIDDEN_KEYS.has(channel.key)
     ).map((channel) => {
         const channelDisabled = TELEMETRY_NO_DRAW_KEYS.has(channel.key);
-        const onGraph =
-            channel.key === 'mainsVoltage'
-                ? mainsVoltagePhases.length > 0
-                : !channelDisabled && TELEMETRY_SLOT_KEYS.some((s) => telemetrySelection[s] === channel.key);
-        const graphPickBlocked =
-            !channelDisabled && channel.key !== 'mainsVoltage' && graphTelemetrySlotsFull && !onGraph;
+        const onGraph = !channelDisabled && TELEMETRY_SLOT_KEYS.some((s) => telemetrySelection[s] === channel.key);
+        const graphPickBlocked = !channelDisabled && graphTelemetrySlotsFull && !onGraph;
         return {
             ...channel,
+            color: resolveChannelColor(channel.key),
             channelDisabled,
             active: onGraph,
-            tile1: telemetrySelection.slot1 === channel.key,
-            tile2: telemetrySelection.slot2 === channel.key,
-            tile3: telemetrySelection.slot3 === channel.key,
             graphPickBlocked,
         };
     });
+
+    const usedChannelColors = useMemo(() => {
+        const used = new Set();
+        TELEMETRY_CHANNELS_CONFIG.forEach((ch) => {
+            if (TELEMETRY_LIST_HIDDEN_KEYS.has(ch.key) || TELEMETRY_NO_DRAW_KEYS.has(ch.key)) return;
+            if (colorEditChannelKey && ch.key === colorEditChannelKey) return;
+            used.add(resolveChannelColor(ch.key).toLowerCase());
+        });
+        return used;
+    }, [resolveChannelColor, colorEditChannelKey, channelColorOverrides, colorPreviewHex]);
+
+    const availablePaletteColors = useMemo(
+        () => GRAPH_COLOR_PALETTE.filter((hex) => !usedChannelColors.has(hex.toLowerCase())),
+        [usedChannelColors]
+    );
 
     /** Плитка «Газ»: суточный итог из БД + live; не ниже пересчитанного gas_consumption_l. */
     const displayedDailyGasLiters = useMemo(
@@ -4349,7 +4431,8 @@ const DeviceMonitorPage = () => {
         mainsVoltagePhases.forEach((phase) => pushSeriesKey(resolveMainsPhaseSeriesKey(phase)));
         TELEMETRY_SLOT_KEYS.forEach((slot) => {
             const channelKey = telemetrySelection[slot];
-            if (!channelKey || channelKey === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(channelKey)) return;
+            if (!channelKey || TELEMETRY_NO_DRAW_KEYS.has(channelKey)) return;
+            if (isMainsPhaseChannelKey(channelKey)) return; // уже через phases
             pushSeriesKey(channelKey);
         });
 
@@ -4509,13 +4592,11 @@ const DeviceMonitorPage = () => {
             out.weldingVoltage = weldingBundle.weldingVoltage;
         }
         TELEMETRY_CHANNELS_CONFIG.forEach((ch) => {
-            if (ch.key === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(ch.key)) return;
+            if (TELEMETRY_NO_DRAW_KEYS.has(ch.key)) return;
             if (graphUsesServerData && (ch.key === 'weldingCurrent' || ch.key === 'weldingVoltage')) return;
             out[ch.key] = prepareSeriesForChart(src[ch.key] || [], ch.key, graphUsesServerData, HISTORY_CHART_MAX_POINTS);
         });
-        ['mainsVoltageA', 'mainsVoltageB', 'mainsVoltageC'].forEach((key) => {
-            out[key] = prepareSeriesForChart(src[key] || [], key, graphUsesServerData, HISTORY_CHART_MAX_POINTS);
-        });
+        // mains A/B/C уже в TELEMETRY_CHANNELS_CONFIG — дублирующий цикл не нужен.
         return out;
     }, [
         graphHistoryPending,
@@ -4691,37 +4772,23 @@ const DeviceMonitorPage = () => {
             const ny = y === null || y === undefined || Number.isNaN(Number(y)) ? null : Number(y);
             return { x: d.x, y: ny };
         };
-        const mainsChannel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === 'mainsVoltage');
-
-        const buildMainsDataset = (phase) => {
-            if (!mainsChannel) return null;
-            const sourceKey = resolveMainsPhaseSeriesKey(phase);
-            const raw = src[sourceKey] || [];
-            return {
-                label: `${mainsChannel.label} (${phase})`,
-                data: raw.map(mapPt),
-                borderColor: mainsChannel.color,
-                backgroundColor: 'rgba(255,255,255,0.04)',
-                fill: false,
-                yAxisID: 'y',
-            };
-        };
 
         const buildDataset = (channelKey) => {
-            if (!channelKey || channelKey === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(channelKey)) return null;
+            if (!channelKey || TELEMETRY_NO_DRAW_KEYS.has(channelKey)) return null;
             const channel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === channelKey);
             if (!channel) return null;
+            const color = resolveChannelColor(channelKey);
             const raw = src[channelKey] || [];
             const isCurrent = channelKey === 'weldingCurrent';
             const isVoltage = channelKey === 'weldingVoltage';
             const isSetMetric = channelKey === 'setWeldingCurrent' || channelKey === 'setWeldingVoltage';
             const stepped = usesSteppedChartChannel(channelKey);
-            let data = raw.map(mapPt);
+            const data = raw.map(mapPt);
 
             return {
                 label: channel.label,
                 data,
-                borderColor: channel.color,
+                borderColor: color,
                 backgroundColor: (isCurrent || isVoltage)
                     ? (context) => {
                         const chart = context.chart;
@@ -4732,29 +4799,23 @@ const DeviceMonitorPage = () => {
                             : createGradient(ctx, chartArea, 'rgba(255,97,200,0.48)', 'rgba(255,97,200,0.02)');
                     }
                     : (graphUsesServerData ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.04)'),
-                fill: isCurrent || isVoltage ? true : false,
+                fill: isCurrent || isVoltage,
                 yAxisID: resolveChannelYAxisId(channelKey),
                 ...(stepped ? { stepped: 'after' } : {}),
-                // #2: уставки — мостим любые пропуски между точками (в т.ч. сжатые плато);
-                // реальный Выкл/Выкл(деж)/Не в сети рвёт линию через null-точку.
                 ...(isSetMetric ? { spanGaps: true } : {}),
             };
         };
 
-        const datasets = [
-            ...mainsVoltagePhases.map(buildMainsDataset),
-            ...TELEMETRY_SLOT_KEYS.map((slot) => buildDataset(telemetrySelection[slot])),
-        ].filter(Boolean);
+        const datasets = TELEMETRY_SLOT_KEYS.map((slot) => buildDataset(telemetrySelection[slot])).filter(Boolean);
 
         return { datasets };
     }, [
         graphUsesServerData,
         chartDisplaySeries,
-        historyWeldingSegments,
         telemetrySelection.slot1,
         telemetrySelection.slot2,
         telemetrySelection.slot3,
-        mainsVoltagePhases,
+        resolveChannelColor,
     ]);
 
     const timelineInWindow = useMemo(() => {
@@ -4961,20 +5022,8 @@ const DeviceMonitorPage = () => {
         const tooltipTolerance = Math.max((activeWindow.end - activeWindow.start) * 0.02, 1500);
         const SET_METRIC_KEYS = new Set(['setWeldingCurrent', 'setWeldingVoltage']);
 
-        const mainsChannel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === 'mainsVoltage');
-        mainsVoltagePhases.forEach((phase) => {
-            const sourceKey = resolveMainsPhaseSeriesKey(phase);
-            const res = nearestTooltipCoverage(displaySeries[sourceKey] || [], hoverCursor.ts, tooltipTolerance);
-            if (!res.covered || res.value == null || !mainsChannel) return;
-            selectedRows.push({
-                key: `mains-${phase}`,
-                label: `${mainsChannel.label} (${phase})`,
-                color: mainsChannel.color,
-                value: res.value,
-            });
-        });
         const addSelectedRow = (channelKey, slotName) => {
-            if (!channelKey || channelKey === 'mainsVoltage') return;
+            if (!channelKey || TELEMETRY_NO_DRAW_KEYS.has(channelKey)) return;
             const raw = displaySeries[channelKey] || [];
             const stepped = usesSteppedChartChannel(channelKey);
             const res = stepped
@@ -4982,29 +5031,28 @@ const DeviceMonitorPage = () => {
                 : nearestTooltipCoverage(raw, hoverCursor.ts, tooltipTolerance);
             const channel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === channelKey);
             if (!channel) return;
+            const color = resolveChannelColor(channelKey);
             if (channelKey === 'welderPresence') {
                 if (!res.covered) return;
                 selectedRows.push({
                     key: `${slotName}-welderPresence`,
                     label: channel.label,
-                    color: channel.color,
+                    color,
                     value: res.value ?? 0,
                     displayText: welderLabel || '—',
                 });
                 return;
             }
-            // Нет данных в T — строку не показываем (только X).
             if (!res.covered) return;
             let value = res.value;
             if (value == null) {
-                // Разрыв: у уставок при Выкл/деж/не в сети в тултипе показываем 0, остальные скрываем.
                 if (!SET_METRIC_KEYS.has(channelKey)) return;
                 value = 0;
             }
             selectedRows.push({
                 key: `${slotName}-${channelKey}`,
                 label: channel.label,
-                color: channel.color,
+                color,
                 value,
             });
         };
@@ -5030,7 +5078,7 @@ const DeviceMonitorPage = () => {
         telemetrySelection.slot1,
         telemetrySelection.slot2,
         telemetrySelection.slot3,
-        mainsVoltagePhases,
+        resolveChannelColor,
         steppedTooltipCoverage,
         nearestTooltipCoverage,
         timelineRows,
@@ -5072,7 +5120,7 @@ const DeviceMonitorPage = () => {
         let yAxisId = 'y';
         for (const slot of TELEMETRY_SLOT_KEYS) {
             const key = telemetrySelection[slot];
-            if (!key || key === 'mainsVoltage' || TELEMETRY_NO_DRAW_KEYS.has(key)) continue;
+            if (!key || TELEMETRY_NO_DRAW_KEYS.has(key)) continue;
             const raw = displaySeries[key] || [];
             const val = usesSteppedChartChannel(key)
                 ? resolveSteppedTooltipValue(key, raw, ts)
@@ -5264,9 +5312,91 @@ const DeviceMonitorPage = () => {
         if (event.button !== 0) return;
         if (isEventOnChartAxis(event)) return;
         if (chartPanSessionRef.current) return;
+        if (chartBoxSelectRef.current) return;
+
+        const dragMode = graphUsesServerDataRef.current ? chartDragZoomMode : null;
+        if (dragMode) {
+            const canvasEl = chartCanvasRef.current;
+            if (!canvasEl) return;
+            const rect = canvasEl.getBoundingClientRect();
+            const left = Number.isFinite(plotArea.leftPx) ? plotArea.leftPx : 0;
+            const top = Number.isFinite(plotArea.topPx) ? plotArea.topPx : 0;
+            const width = Number.isFinite(plotArea.widthPx) && plotArea.widthPx > 0 ? plotArea.widthPx : rect.width;
+            const height = Number.isFinite(plotArea.heightPx) && plotArea.heightPx > 0 ? plotArea.heightPx : rect.height;
+            const x0 = Math.max(left, Math.min(left + width, event.clientX - rect.left));
+            const y0 = Math.max(top, Math.min(top + height, event.clientY - rect.top));
+            const session = {
+                mode: dragMode,
+                x0,
+                y0,
+                x1: x0,
+                y1: y0,
+                left,
+                top,
+                width,
+                height,
+                originStart: activeWindow.start,
+                originEnd: activeWindow.end,
+                originLeftMax: yAxisLeftMax,
+                originRightMax: yAxisRightMax,
+                dayStart: chartBounds.dayStart,
+                dayEnd: chartBounds.dayEnd,
+                minGap: activeWindow.minGap,
+            };
+            chartBoxSelectRef.current = session;
+            setChartBoxSelect({ ...session });
+            event.preventDefault();
+
+            const onMove = (ev) => {
+                const s = chartBoxSelectRef.current;
+                if (!s) return;
+                const r = chartCanvasRef.current?.getBoundingClientRect();
+                if (!r) return;
+                s.x1 = Math.max(s.left, Math.min(s.left + s.width, ev.clientX - r.left));
+                s.y1 = Math.max(s.top, Math.min(s.top + s.height, ev.clientY - r.top));
+                setChartBoxSelect({ ...s });
+            };
+            const onUp = () => {
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+                const s = chartBoxSelectRef.current;
+                chartBoxSelectRef.current = null;
+                setChartBoxSelect(null);
+                if (!s) return;
+                const xMin = Math.min(s.x0, s.x1);
+                const xMax = Math.max(s.x0, s.x1);
+                const yMin = Math.min(s.y0, s.y1);
+                const yMax = Math.max(s.y0, s.y1);
+                if (xMax - xMin < 4 && yMax - yMin < 4) return;
+
+                if (s.mode === 'both' || s.mode === 'x') {
+                    const span = Math.max(s.originEnd - s.originStart, s.minGap);
+                    const start = s.originStart + ((xMin - s.left) / s.width) * span;
+                    const end = s.originStart + ((xMax - s.left) / s.width) * span;
+                    let nextStart = Math.max(s.dayStart, Math.min(start, s.dayEnd - s.minGap));
+                    let nextEnd = Math.min(s.dayEnd, Math.max(end, nextStart + s.minGap));
+                    if (nextEnd - nextStart < s.minGap) nextEnd = Math.min(s.dayEnd, nextStart + s.minGap);
+                    setTimeWindow({ start: nextStart, end: nextEnd, touched: true });
+                }
+                if (s.mode === 'both' || s.mode === 'y') {
+                    const leftRange = s.originLeftMax - Y_AXIS_LEFT.AXIS_MIN;
+                    const rightRange = s.originRightMax - Y_AXIS_RIGHT.MIN;
+                    const yTopRatio = (yMin - s.top) / s.height;
+                    const yBotRatio = (yMax - s.top) / s.height;
+                    // Выделение сверху = большие значения оси; сжимаем max пропорционально высоте выделения.
+                    const selH = Math.max(yBotRatio - yTopRatio, 0.05);
+                    setYAxisLeftMax(clampLeftYMax(Y_AXIS_LEFT.AXIS_MIN + leftRange * selH));
+                    setYAxisRightMax(clampRightYMax(Y_AXIS_RIGHT.MIN + rightRange * selH));
+                }
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+            return;
+        }
+
         event.preventDefault();
 
-        // Live: pan только по оси Y (по времени — запрещён, чтобы график не «прыгал»).
+        // Live / режим без выделения: pan только по оси Y (в live по времени запрещён).
         const yOnly = !graphUsesServerDataRef.current;
         const plotWidth = Number.isFinite(plotArea.widthPx) && plotArea.widthPx > 0 ? plotArea.widthPx : 1;
         const plotHeight = Number.isFinite(plotArea.heightPx) && plotArea.heightPx > 0 ? plotArea.heightPx : 1;
@@ -5297,6 +5427,8 @@ const DeviceMonitorPage = () => {
         handleChartPanUp,
         plotArea.widthPx,
         plotArea.heightPx,
+        plotArea.leftPx,
+        plotArea.topPx,
         activeWindow.start,
         activeWindow.end,
         activeWindow.minGap,
@@ -5304,6 +5436,7 @@ const DeviceMonitorPage = () => {
         chartBounds.dayEnd,
         yAxisLeftMax,
         yAxisRightMax,
+        chartDragZoomMode,
     ]);
 
     useEffect(() => () => endChartPanSession(), [endChartPanSession]);
@@ -5812,6 +5945,30 @@ const DeviceMonitorPage = () => {
         setYAxisLeftMax(Y_AXIS_LEFT.MAX);
         setYAxisRightMax(Y_AXIS_RIGHT.MAX);
     }, []);
+
+    const handleGraphZoomReset = useCallback(() => {
+        setYAxisLeftMax(Y_AXIS_LEFT.MAX);
+        setYAxisRightMax(Y_AXIS_RIGHT.MAX);
+        if (!graphUsesServerDataRef.current) {
+            setTimeWindow({ start: null, end: null, touched: false });
+            return;
+        }
+        const dateStr = selectedGraphDateRef.current;
+        if (!dateStr) return;
+        const { dayStart, dayEnd } = getDayBoundsForDateStr(dateStr);
+        const end = isTodayDateStr(dateStr) ? Math.min(Date.now(), dayEnd) : dayEnd;
+        setTimeWindow({ start: dayStart, end, touched: true });
+    }, [getDayBoundsForDateStr, isTodayDateStr]);
+
+    const toggleChartDragZoomMode = useCallback((mode) => {
+        if (!graphUsesServerDataRef.current) return;
+        setChartDragZoomMode((prev) => (prev === mode ? null : mode));
+    }, []);
+
+    useEffect(() => {
+        if (!graphUsesServerData) setChartDragZoomMode(null);
+        else setChartDragZoomMode((prev) => (prev == null ? 'both' : prev));
+    }, [graphUsesServerData]);
 
     const resetGraphToLiveState = useCallback(() => {
         const todayStr = toLocalDateInput(new Date());
@@ -6322,11 +6479,11 @@ const DeviceMonitorPage = () => {
                     />
                 ) : (
                     <div className="bottom-panel__body">
-                        <div className="telemetry-controls">
+                        <div className={`telemetry-controls${activeTab === 'graphs' && !isTelemetryListExpanded ? ' telemetry-controls--collapsed' : ''}`}>
 
-                            {isTelemetryListExpanded && (
+                            {activeTab === 'graphs' && (
                                 <>
-                                    {activeTab === 'graphs' && graphExpandedLayout && (
+                                    {graphExpandedLayout && isTelemetryListExpanded && (
                                         <div className="telemetry-controls__machine-meta">
                                             <div className="machine-info-row machine-info-row--multiline">
                                                 <span className="machine-info-label">Имя:</span>
@@ -6360,107 +6517,142 @@ const DeviceMonitorPage = () => {
                                             </div>
                                         </div>
                                     )}
-                                    <div
-                                        className="machine-info-row monitor-graph-date-row"
-                                        style={{ marginBottom: 10, justifyContent: 'center' }}
-                                        ref={graphDateCalendarRef}
-                                    >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <button type="button" className="machine-info-icon-tile" onClick={handlePrevDay} title="Предыдущий день">
-                                                <span className="machine-info-icon">‹</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="machine-info-text"
-                                                onClick={handleOpenCalendar}
-                                                style={{
-                                                    background: 'transparent',
-                                                    border: 'none',
-                                                    padding: 0,
-                                                    cursor: 'pointer',
-                                                    textDecoration: 'none',
-                                                }}
-                                                title="Выбрать дату"
-                                            >
-                                                <span style={{ textDecoration: 'underline' }}>{graphCalendarLabelParts.dateStr}</span>
-                                                {graphCalendarLabelParts.weekday ? (
-                                                    <span style={{ marginLeft: '0.35em', opacity: 0.92 }}>{graphCalendarLabelParts.weekday}</span>
-                                                ) : null}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="machine-info-icon-tile"
-                                                onClick={handleNextDay}
-                                                title={isNextDayDisabled ? 'Будущие даты недоступны' : 'Следующий день'}
-                                                disabled={isNextDayDisabled}
-                                                style={isNextDayDisabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
-                                            >
-                                                <span className="machine-info-icon">›</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    {graphUsesServerData && (
+                                    <div className="telemetry-graph-toolbar" ref={graphDateCalendarRef}>
                                         <button
                                             type="button"
-                                            className="monitor-history-load-sidebar-btn"
-                                            onClick={handleLoadFullDay}
-                                            disabled={fullDayLoaded || historyLoading}
-                                            title="Загрузить выбранные графики за сутки"
+                                            className="telemetry-toolbar-btn"
+                                            onClick={() => setIsTelemetryListExpanded((v) => !v)}
+                                            title={isTelemetryListExpanded ? 'Свернуть список' : 'Развернуть список'}
                                         >
-                                            {fullDayLoaded ? 'Загружено' : 'Загр. данные'}
+                                            <span aria-hidden>{isTelemetryListExpanded ? '‹' : '›'}</span>
                                         </button>
-                                    )}
-                                    <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
-                                        {activeTab === 'graphs' && telemetryChannels.map((channel) => (
-                                            <div
-                                                key={channel.key}
-                                                className={`telemetry-item ${channel.active ? 'active' : ''}${channel.key === 'mainsVoltage' ? ' telemetry-item--mains' : ''}${channel.graphPickBlocked ? ' telemetry-item--graph-pool-full' : ''}${channel.channelDisabled ? ' telemetry-item--disabled' : ''}`}
+                                        <button
+                                            type="button"
+                                            className="telemetry-toolbar-date"
+                                            onClick={handleOpenCalendar}
+                                            title="Выбрать дату"
+                                        >
+                                            <span className="telemetry-toolbar-date-text">{graphCalendarLabelParts.dateStr}</span>
+                                            {graphCalendarLabelParts.weekday ? (
+                                                <span className="telemetry-toolbar-date-weekday">{graphCalendarLabelParts.weekday}</span>
+                                            ) : null}
+                                        </button>
+                                        {telemetryColorUiMode !== 'palette' && (
+                                            <button
+                                                type="button"
+                                                className={`telemetry-toolbar-btn${graphUsesServerData && !fullDayLoaded && !historyLoading ? ' telemetry-toolbar-btn--accent' : ''}`}
+                                                onClick={handleLoadFullDay}
+                                                disabled={!graphUsesServerData || fullDayLoaded || historyLoading}
+                                                title="Загрузить данные за сутки"
                                             >
-                                                <span className="telemetry-label">{channel.label}</span>
-                                                <div className="telemetry-tiles">
-                                                    {channel.key === 'mainsVoltage' ? (
-                                                        MAINS_VOLTAGE_PHASES.map((phase) => (
-                                                            <button
-                                                                key={`mains_phase_${phase}`}
-                                                                type="button"
-                                                                className={`telemetry-tile ${mainsVoltagePhases.includes(phase) ? 'active' : ''}`}
-                                                                style={{ color: mainsVoltagePhases.includes(phase) ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
-                                                                onClick={() => handleMainsVoltagePhaseToggle(phase)}
-                                                            >
-                                                                <span className="tile-number">{phase}</span>
-                                                            </button>
-                                                        ))
+                                                <FaDownload aria-hidden style={{ width: 12, height: 12 }} />
+                                            </button>
+                                        )}
+                                        {telemetryColorUiMode === 'palette' && (
+                                            <button
+                                                type="button"
+                                                className="telemetry-toolbar-btn telemetry-toolbar-btn--accent"
+                                                onClick={() => {
+                                                    if (!colorEditChannelKey || !colorPreviewHex) return;
+                                                    setChannelColorOverrides((prev) => ({
+                                                        ...prev,
+                                                        [colorEditChannelKey]: colorPreviewHex,
+                                                    }));
+                                                    setColorPreviewHex(null);
+                                                    setColorEditChannelKey(null);
+                                                    setTelemetryColorUiMode('swatches');
+                                                }}
+                                                disabled={!colorPreviewHex}
+                                                title="Сохранить цвет"
+                                            >
+                                                <FaSave aria-hidden style={{ width: 12, height: 12 }} />
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            className={`telemetry-toolbar-btn${telemetryColorUiMode !== 'off' ? ' telemetry-toolbar-btn--active' : ''}`}
+                                            onClick={() => {
+                                                if (telemetryColorUiMode !== 'off') {
+                                                    setColorPreviewHex(null);
+                                                    setColorEditChannelKey(null);
+                                                    setTelemetryColorUiMode('off');
+                                                    return;
+                                                }
+                                                setTelemetryColorUiMode('swatches');
+                                            }}
+                                            title={telemetryColorUiMode !== 'off' ? 'Выйти из выбора цвета' : 'Цвета каналов'}
+                                        >
+                                            {telemetryColorUiMode !== 'off'
+                                                ? <FaTimes aria-hidden style={{ width: 12, height: 12 }} />
+                                                : <FaFillDrip aria-hidden style={{ width: 12, height: 12 }} />}
+                                        </button>
+                                    </div>
+                                    {isTelemetryListExpanded && telemetryColorUiMode === 'palette' && (
+                                        <div className="telemetry-color-palette" aria-label="Палитра цвета канала">
+                                            {availablePaletteColors.map((hex) => (
+                                                <button
+                                                    key={hex}
+                                                    type="button"
+                                                    className={`telemetry-color-palette-swatch${colorPreviewHex === hex ? ' selected' : ''}`}
+                                                    style={{ background: hex }}
+                                                    onClick={() => setColorPreviewHex(hex)}
+                                                    title={hex}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                    {isTelemetryListExpanded && telemetryColorUiMode !== 'palette' && (
+                                        <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
+                                            {telemetryChannels.map((channel) => (
+                                                <div
+                                                    key={channel.key}
+                                                    className={`telemetry-item telemetry-item--slider${channel.active ? ' active' : ''}${channel.graphPickBlocked ? ' telemetry-item--graph-pool-full' : ''}${channel.channelDisabled ? ' telemetry-item--disabled' : ''}`}
+                                                >
+                                                    <span className="telemetry-label">{channel.label}</span>
+                                                    {telemetryColorUiMode === 'swatches' ? (
+                                                        <button
+                                                            type="button"
+                                                            className="telemetry-color-swatch"
+                                                            style={{ background: channel.color }}
+                                                            onClick={() => {
+                                                                setColorEditChannelKey(channel.key);
+                                                                setColorPreviewHex(null);
+                                                                setTelemetryColorUiMode('palette');
+                                                            }}
+                                                            title="Выбрать цвет"
+                                                        />
                                                     ) : (
                                                         <button
                                                             type="button"
-                                                            className={`telemetry-tile ${channel.active ? 'active' : ''}`}
-                                                            style={{ color: channel.active ? channel.color : 'rgba(188, 183, 197, 0.4)' }}
+                                                            className={`telemetry-slider${channel.active ? ' on' : ''}`}
+                                                            style={channel.active ? { background: channel.color } : undefined}
                                                             disabled={channel.channelDisabled || channel.graphPickBlocked}
                                                             title={
                                                                 channel.channelDisabled
                                                                     ? 'Параметр недоступен на графике'
                                                                     : channel.graphPickBlocked
-                                                                    ? 'На графике уже три параметра. Снимите выбор с одного, чтобы добавить этот.'
-                                                                    : channel.active
-                                                                        ? 'Снять с графика'
-                                                                        : 'Показать на графике'
+                                                                        ? 'На графике уже три параметра. Снимите выбор с одного, чтобы добавить этот.'
+                                                                        : channel.active
+                                                                            ? 'Снять с графика'
+                                                                            : 'Показать на графике'
                                                             }
                                                             onClick={() => handleTelemetryTileClick(channel.key)}
+                                                            role="switch"
+                                                            aria-checked={channel.active}
                                                         >
-                                                        <span className="telemetry-tile-check" aria-hidden>
-                                                            ✓
-                                                        </span>
+                                                            <span className="telemetry-slider-knob" aria-hidden />
                                                         </button>
                                                     )}
                                                 </div>
-                                            </div>
-                                        ))}
-                                        {activeTab === 'info' && (
-                                            <div className="info-content info-content-placeholder">
-                                            </div>
-                                        )}
-                                    </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </>
+                            )}
+                            {activeTab === 'info' && isTelemetryListExpanded && (
+                                <div className="telemetry-list" aria-label="Перечень каналов телеметрии">
+                                    <div className="info-content info-content-placeholder" />
+                                </div>
                             )}
                         </div>
                         {activeTab === 'info' && (
@@ -6683,6 +6875,83 @@ const DeviceMonitorPage = () => {
                                                             aria-hidden
                                                         />
                                                     )}
+                                                    {chartBoxSelect && (
+                                                        <div
+                                                            className="monitor-chart-box-select"
+                                                            style={{
+                                                                left: `${Math.min(chartBoxSelect.x0, chartBoxSelect.x1)}px`,
+                                                                top: `${Math.min(chartBoxSelect.y0, chartBoxSelect.y1)}px`,
+                                                                width: `${Math.abs(chartBoxSelect.x1 - chartBoxSelect.x0)}px`,
+                                                                height: `${Math.abs(chartBoxSelect.y1 - chartBoxSelect.y0)}px`,
+                                                            }}
+                                                            aria-hidden
+                                                        />
+                                                    )}
+                                                    <div className="monitor-chart-overlay-controls monitor-chart-overlay-controls--left" aria-label="Масштаб графика">
+                                                        <button
+                                                            type="button"
+                                                            className={`chart-control-btn${chartDragZoomMode === 'both' ? ' chart-control-btn--mode-active' : ''}`}
+                                                            onClick={() => toggleChartDragZoomMode('both')}
+                                                            disabled={!graphUsesServerData}
+                                                            title="Зум по обеим осям"
+                                                        >
+                                                            <FaSearchPlus aria-hidden style={{ width: 12, height: 12 }} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={`chart-control-btn${chartDragZoomMode === 'y' ? ' chart-control-btn--mode-active' : ''}`}
+                                                            onClick={() => toggleChartDragZoomMode('y')}
+                                                            disabled={!graphUsesServerData}
+                                                            title="Зум только по вертикали"
+                                                        >
+                                                            <FaArrowsAltV aria-hidden style={{ width: 12, height: 12 }} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={`chart-control-btn${chartDragZoomMode === 'x' ? ' chart-control-btn--mode-active' : ''}`}
+                                                            onClick={() => toggleChartDragZoomMode('x')}
+                                                            disabled={!graphUsesServerData}
+                                                            title="Зум только по горизонтали"
+                                                        >
+                                                            <FaArrowsAltH aria-hidden style={{ width: 12, height: 12 }} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="chart-control-btn"
+                                                            onClick={handleGraphZoomReset}
+                                                            title="Сброс масштаба"
+                                                        >
+                                                            <FaRedo aria-hidden style={{ width: 11, height: 11 }} />
+                                                        </button>
+                                                    </div>
+                                                    <div className="monitor-chart-overlay-controls monitor-chart-overlay-controls--right" aria-label="Режим графика">
+                                                        <button
+                                                            type="button"
+                                                            className={`chart-control-btn chart-control-btn--mode${isGraphLiveModeActive ? ' chart-control-btn--mode-active' : ''}`}
+                                                            onClick={handleEnterLiveMode}
+                                                            title="Текущий (live)"
+                                                        >
+                                                            <span className="chart-control-btn-label">Тек.</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={`chart-control-btn chart-control-btn--mode${isGraphTodayHistoryActive ? ' chart-control-btn--mode-active' : ''}`}
+                                                            onClick={handleEnterTodayHistory}
+                                                            title="История за сегодня"
+                                                        >
+                                                            <span className="chart-control-btn-label">Ист.</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={`chart-control-btn${graphExpandedLayout ? ' chart-control-btn--mode-active' : ''}`}
+                                                            onClick={() => setGraphExpandedLayout((v) => !v)}
+                                                            title={graphExpandedLayout ? 'Свернуть' : 'На весь экран'}
+                                                        >
+                                                            {graphExpandedLayout
+                                                                ? <FaCompress aria-hidden style={{ width: 11, height: 11 }} />
+                                                                : <FaExpand aria-hidden style={{ width: 11, height: 11 }} />}
+                                                        </button>
+                                                    </div>
                                                     {hoverCursor.active && !chartPanActive && !graphHistoryPending && plotArea.heightPx > 0 && (
                                                         <div
                                                             className="monitor-hover-crosshair monitor-hover-crosshair--in-chart"
@@ -6840,66 +7109,6 @@ const DeviceMonitorPage = () => {
                                                 </div>
                                             </div>
                                         )}
-                                    </div>
-                                    <div className="chart-controls" aria-label="Управление графиком">
-                                        <button
-                                            type="button"
-                                            className="chart-control-btn"
-                                            onClick={() => setYAxisLeftMax((prev) => stepLeftYMax(prev, true))}
-                                            title="Приблизить левую ось Y (−50 к max)"
-                                        >
-                                            <span aria-hidden>＋</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="chart-control-btn"
-                                            onClick={() => setYAxisLeftMax((prev) => stepLeftYMax(prev, false))}
-                                            title="Отдалить левую ось Y (+50 к max)"
-                                        >
-                                            <span aria-hidden>－</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="chart-control-btn"
-                                            onClick={handleGraphYZoomReset}
-                                            title="Сброс Y-зума (левая max 750, правая max 100)"
-                                        >
-                                            <span aria-hidden>⟲</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`chart-control-btn chart-control-btn--mode${isGraphLiveModeActive ? ' chart-control-btn--mode-active' : ''}`}
-                                            onClick={handleEnterLiveMode}
-                                            title="Live — поток в реальном времени"
-                                        >
-                                            <span className="chart-control-btn-label">Live</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`chart-control-btn chart-control-btn--mode${isGraphTodayHistoryActive ? ' chart-control-btn--mode-active' : ''}`}
-                                            onClick={handleEnterTodayHistory}
-                                            title="Сегодня — история за текущие сутки (загрузка через «Загр. данные»)"
-                                        >
-                                            <span className="chart-control-btn-label">Сегодня</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`chart-control-btn chart-control-btn--graph-expand${graphExpandedLayout ? ' chart-control-btn--graph-expand-active' : ''}`}
-                                            onClick={() => setGraphExpandedLayout((v) => !v)}
-                                            title={graphExpandedLayout ? 'Свернуть' : 'На весь экран'}
-                                        >
-                                            {graphExpandedLayout ? (
-                                                <>
-                                                    <FaCompress aria-hidden style={{ width: 11, height: 11, flexShrink: 0 }} />
-                                                    <span className="chart-control-btn-label">Свернуть</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <FaExpand aria-hidden style={{ width: 11, height: 11, flexShrink: 0 }} />
-                                                    <span className="chart-control-btn-label">На весь экран</span>
-                                                </>
-                                            )}
-                                        </button>
                                     </div>
                                 </div>
                             </div>
