@@ -1612,6 +1612,54 @@
     left: 20px;
 }
 
+/* Слайдеры из ассетов «Кнопки графиков» (34×28 трек, 13×24 бегунок). */
+.telemetry-slider--asset {
+    width: 34px;
+    height: 28px;
+    border-radius: 0;
+    background: transparent !important;
+    overflow: visible;
+}
+
+.telemetry-slider--asset .telemetry-slider-track {
+    position: absolute;
+    inset: 0;
+    width: 34px;
+    height: 28px;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+}
+
+.telemetry-slider--asset .telemetry-slider-shadow {
+    position: absolute;
+    top: 0;
+    left: 12px;
+    width: 14px;
+    height: 28px;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+    z-index: 1;
+}
+
+.telemetry-slider--asset .telemetry-slider-knob-img {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 13px;
+    height: 24px;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+    z-index: 2;
+    transition: left 0.12s ease;
+}
+
+.telemetry-slider--asset.on .telemetry-slider-knob-img {
+    left: 19px;
+}
+
 .telemetry-color-swatch {
     width: 36px;
     height: 18px;
@@ -2164,10 +2212,11 @@
     flex-direction: column;
     flex: 1 1 auto;
     min-width: 0;
+    min-height: 0;
     height: 100%;
     max-width: 100%;
     gap: 0;
-    overflow: visible;
+    overflow: hidden;
 }
 
 .chart-monitor-stack {
@@ -2177,6 +2226,11 @@
     min-height: 0;
     width: 100%;
     position: relative;
+}
+
+.monitor-lanes {
+    flex: 0 0 auto;
+    flex-shrink: 0;
 }
 
 .monitor-lanes-crosshair-shell {
@@ -2209,8 +2263,9 @@
 
 .chart-canvas {
     position: relative;
-    flex: 1;
-    min-height: clamp(180px, 24vh, 320px);
+    flex: 1 1 auto;
+    /* ponytail: без жёсткого min-height — иначе при низкой нижней панели обрезаются дорожки «Сварщик» */
+    min-height: 0;
     border-radius: 14px;
     overflow: hidden;
     background: linear-gradient(180deg, rgba(30, 25, 37, 0.95), rgba(26, 21, 32, 0.96));
@@ -2541,12 +2596,17 @@
 }
 
 .main-panel:not(.main-panel--graph-expanded-layout) .chart-pan-surface {
-    padding-bottom: 10px;
+    padding-bottom: 4px;
     box-sizing: border-box;
+    min-height: 0;
 }
 
 .main-panel:not(.main-panel--graph-expanded-layout) .chart-card.large {
-    padding: 19px 19px 11px 19px;
+    padding: 12px 19px 8px 19px;
+}
+
+.main-panel:not(.main-panel--graph-expanded-layout) .chart-canvas {
+    min-height: 0;
 }
 
 /* Руль + график + полосы: колонка подписей слева (76px), область графика совпадает по ширине с chartArea */

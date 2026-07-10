@@ -51,6 +51,7 @@ import {
     STANDBY_MACHINE_STATE_DISPLAY,
 } from '../utils/weldingMachineStateDisplay';
 import { despikeValuesMedian3WithinRuns } from '../utils/weldingDespike';
+import { resolveSliderTrackUrl, trackOff, knobOn, knobOff, shadow as sliderShadow } from '../utils/graphSliderAssets';
 
 // Названия ошибок по коду 1–23 (синхронно с EquipmentErrorMessages и протоколом аппарата: 1–10, 17–21)
 const EQUIPMENT_ERROR_MESSAGES = [
@@ -6637,8 +6638,7 @@ const DeviceMonitorPage = () => {
                                                     ) : (
                                                         <button
                                                             type="button"
-                                                            className={`telemetry-slider${channel.active ? ' on' : ''}`}
-                                                            style={channel.active ? { background: channel.color } : undefined}
+                                                            className={`telemetry-slider telemetry-slider--asset${channel.active ? ' on' : ''}`}
                                                             disabled={channel.channelDisabled || channel.graphPickBlocked}
                                                             title={
                                                                 channel.channelDisabled
@@ -6653,7 +6653,26 @@ const DeviceMonitorPage = () => {
                                                             role="switch"
                                                             aria-checked={channel.active}
                                                         >
-                                                            <span className="telemetry-slider-knob" aria-hidden />
+                                                            <img
+                                                                className="telemetry-slider-track"
+                                                                src={channel.active ? resolveSliderTrackUrl(channel.color) : trackOff}
+                                                                alt=""
+                                                                draggable={false}
+                                                            />
+                                                            {channel.active && (
+                                                                <img
+                                                                    className="telemetry-slider-shadow"
+                                                                    src={sliderShadow}
+                                                                    alt=""
+                                                                    draggable={false}
+                                                                />
+                                                            )}
+                                                            <img
+                                                                className="telemetry-slider-knob-img"
+                                                                src={channel.active ? knobOn : knobOff}
+                                                                alt=""
+                                                                draggable={false}
+                                                            />
                                                         </button>
                                                     )}
                                                 </div>
