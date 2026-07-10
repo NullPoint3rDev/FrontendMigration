@@ -115,10 +115,13 @@ const graphPrefsStorageKey = (mac) => `deviceMonitorGraphPrefs:${mac}`;
 const TELEMETRY_LIST_HIDDEN_KEYS = new Set(['welderPresence']);
 
 /**
- * «Умная» обработка истории (offline-склейка и пр.).
- * Сварку: склейка коротких пауз и despike выбросов — всегда (см. WELDING_GLUE_GAP_MS).
+ * Временно отключаем прочий «умный» despike непрерывных каналов.
+ * Сварка (склейка/despike) и краткий offline на «Состояние» — всегда включены.
  */
 const HISTORY_SMART_PROCESSING = false;
+
+/** Склеивать краткий Offline между двумя online (шум опроса), иначе серая «дырка» на включённом аппарате. */
+const OFFLINE_GLUE_GAP_MS = 8000;
 
 /**
  * Склеивать !isWelding между двумя дугами, если пауза ≤ этого.
@@ -897,7 +900,7 @@ function buildHistoryWeldingSegmentsForWindow(timelineSnapshot, windowStart, win
         (s) => Number.isFinite(s?.x) && s.x >= windowStart && s.x <= windowEnd
     );
     const laneEnd = Number.isFinite(laneWindowEnd) ? laneWindowEnd : windowEnd;
-    const onlineSanitized = sanitizeBriefOfflineBetweenOnline(samples, laneEnd, 5000);
+    const onlineSanitized = sanitizeBriefOfflineBetweenOnline(samples, laneEnd, OFFLINE_GLUE_GAP_MS);
     const sanitized = sanitizeWeldingTimelineSamples(onlineSanitized);
     return mergeCloseWeldingSegments(
         buildTimelineSegments(sanitized, (s) => Boolean(s.isWelding), null, laneEnd, WELDING_SERIES_MAX_GAP_MS),
@@ -977,15 +980,26 @@ const resolveSetChartY = ({
     return candidate;
 };
 
-/** История: уст. ток/напряжение — forward-fill; разрыв только при явном Выкл/деж/не в сети. */
+/** История: уст. ток/напряжение — forward-fill; разрыв при Выкл, с склейкой краткого offline-шума. */
 function buildSetMetricSeriesFromHistoryPoints(points, mapSetY) {
     const series = [];
     if (!points?.length) return series;
-    let lastSet = null;
 
+    // Та же склейка краткого offline, что у дорожки «Состояние» — иначе дырка в уставке на шуме.
+    const onlineMask = sanitizeBriefOfflineBetweenOnline(
+        points.map((p) => ({
+            x: p.ts,
+            isOnline: !isHistoryPointSetSuppressed(p),
+        })),
+        points[points.length - 1].ts,
+        OFFLINE_GLUE_GAP_MS
+    );
+    const isOnlineAt = new Map(onlineMask.map((s) => [s.x, Boolean(s.isOnline)]));
+
+    let lastSet = null;
     points.forEach((p) => {
         const x = p.ts;
-        if (isHistoryPointSetSuppressed(p)) {
+        if (!isOnlineAt.get(x)) {
             lastSet = null;
             series.push({ x, y: null });
             return;
@@ -1618,9 +1632,9 @@ function despikeContinuousSeriesPoints(points) {
 /**
  * В истории иногда попадает короткий Offline между Welding/Idle и следующим Online — на дорожке «Состояние»
  * серый зазор при включённом аппарате. Такие всплески до maxOfflineMs между двумя онлайн-участками убираем.
+ * Всегда включено (не зависит от HISTORY_SMART_PROCESSING).
  */
 function sanitizeBriefOfflineBetweenOnline(samples, windowEnd, maxOfflineMs) {
-    if (!HISTORY_SMART_PROCESSING) return samples;
     if (!Array.isArray(samples) || samples.length < 2 || !Number.isFinite(maxOfflineMs) || maxOfflineMs <= 0) {
         return samples;
     }
@@ -4791,7 +4805,7 @@ const DeviceMonitorPage = () => {
         const windowStart = activeWindow.start;
         const windowEnd = activeWindow.end;
         const timeline = buildHistoryTimelineForWindow(windowStart, windowEnd);
-        const offlineSanitized = sanitizeBriefOfflineBetweenOnline(timeline, windowEnd, 5000);
+        const offlineSanitized = sanitizeBriefOfflineBetweenOnline(timeline, windowEnd, OFFLINE_GLUE_GAP_MS);
         // Склеить краткие паузы isWelding — иначе шов дробится на «короткие частые» импульсы.
         const sanitized = sanitizeWeldingTimelineSamples(offlineSanitized);
         let lastTs = null;
@@ -5106,7 +5120,7 @@ const DeviceMonitorPage = () => {
 
     /** Дорожка «Состояние»: убрать ложные короткие Offline из истории (см. sanitizeBriefOfflineBetweenOnline). */
     const timelineForStateLane = useMemo(
-        () => sanitizeBriefOfflineBetweenOnline(timelineInWindow, activeWindow.end, 5000),
+        () => sanitizeBriefOfflineBetweenOnline(timelineInWindow, activeWindow.end, OFFLINE_GLUE_GAP_MS),
         [timelineInWindow, activeWindow.end]
     );
 
@@ -5358,12 +5372,17 @@ const DeviceMonitorPage = () => {
                 if (!SET_METRIC_KEYS.has(channelKey)) return;
                 value = 0;
             }
-            // Сварка: только над жёлтым сегментом и только при Y>0 (график = дорожка = тултип).
+    // Сварка: только над жёлтым сегментом и только при Y>0 (график = дорожка = тултип).
             if (WELD_METRIC_KEYS.has(channelKey)) {
                 const segs = graphUsesServerData
                     ? (historyWeldingChartBundle?.segments || timelineRows.welding)
                     : timelineRows.welding;
                 if (!isTsInWeldingSegments(hoverCursor.ts, segs)) return;
+                if (!(Number(value) > 0)) return;
+            }
+            // Уставка: не показываем на сером «выкл» (линия там разорвана; stepped иначе тянет соседнее Y).
+            if (SET_METRIC_KEYS.has(channelKey)) {
+                if (findSegmentAtTs(timelineRows.offline, hoverCursor.ts)) return;
                 if (!(Number(value) > 0)) return;
             }
             selectedRows.push({
