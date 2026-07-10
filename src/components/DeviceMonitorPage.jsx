@@ -733,12 +733,14 @@ const isHistoryPointWelding = (p) => {
 const WELDING_SERIES_MAX_GAP_MS = 20000;
 
 /**
- * Уставка не рисуется только при явном Выкл / Выкл(деж) / Не в сети по machineStateText.
- * ponytail: status=offline без текста — краткий блик БД; дорожка его склеивает, линию уставки не рвём.
+ * Уставка не рисуется, когда на «Состояние» серый/выкл: offline, дежурный, явный Выкл.
+ * Те же критерии, что isOnline у дорожки (иначе линия тянется через выключенный аппарат).
  */
 const isHistoryPointSetSuppressed = (p) => {
     if (!p) return true;
     if (isStandbyMachineState(p.machineStateText)) return true;
+    const st = String(p.status || '').toLowerCase().trim();
+    if (st === 'offline') return true;
     const text = String(p.machineStateText || '').toLowerCase().trim();
     if (!text) return false;
     if (text.includes('не в сети') || text.includes('offline')) return true;
