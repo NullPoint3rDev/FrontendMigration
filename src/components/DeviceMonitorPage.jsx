@@ -779,8 +779,11 @@ function buildTimelineSegments(samples, predicate, valueGetter, windowEnd, maxGa
         }
     });
     if (current) {
-        // Online/offline тянем до windowEnd; сварку — нет (иначе жёлтый через дыру без опросов).
-        if (gapLimit == null && Number.isFinite(windowEnd)) {
+        // Online/offline тянем до windowEnd; сварку — на MAX_GAP после последнего отсчёта (как импульс на графике).
+        if (gapLimit != null) {
+            current.end = current.end + gapLimit;
+            if (Number.isFinite(windowEnd)) current.end = Math.min(current.end, windowEnd);
+        } else if (Number.isFinite(windowEnd)) {
             current.end = Math.max(current.end, windowEnd);
         }
         segments.push(current);
@@ -1013,15 +1016,17 @@ function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, 
 }
 
 /**
- * Сварка на истории: одна точка на каждый опрос.
- * y>0 только если isWelding и значение >0. Пауза > MAX_GAP — явный сброс в 0
- * (иначе Chart.js stepped:'after' заливает часы между первой и последней точкой плоского участка).
+ * Сварка на истории (stepped:'after', как дорожка «Состояние»):
+ * точка опроса держит Y до следующей; y>0 только при isWelding.
+ * Не закрываем дугу в том же x (иначе «игла» без тултипа, а жёлтый ещё тянется вперёд).
+ * Пауза > MAX_GAP — гасим в 0 в prevX+MAX_GAP.
  */
 function buildWeldingPulseSeriesFromHistoryPoints(points, mapY) {
     const series = [];
     if (!points?.length) return series;
 
     const push = (x, yRaw) => {
+        if (!Number.isFinite(x)) return;
         const y = Math.round(Number(yRaw) * 10) / 10;
         const prev = series[series.length - 1];
         if (prev && prev.x === x && prev.y === y) return;
@@ -1040,8 +1045,11 @@ function buildWeldingPulseSeriesFromHistoryPoints(points, mapY) {
         const y = welding && Number.isFinite(raw) && raw > 0 ? Math.round(raw * 10) / 10 : 0;
 
         if (prevX != null && x - prevX > WELDING_SERIES_MAX_GAP_MS) {
-            if (prevY > 0) push(prevX, 0);
-            if (y > 0) push(x, 0);
+            if (prevY > 0) {
+                const zeroAt = prevX + WELDING_SERIES_MAX_GAP_MS;
+                push(zeroAt, prevY);
+                push(zeroAt, 0);
+            }
             prevY = 0;
         }
 
@@ -1050,8 +1058,11 @@ function buildWeldingPulseSeriesFromHistoryPoints(points, mapY) {
         prevY = y;
     });
 
+    // Последняя дуга: держим до MAX_GAP, затем 0 (совпадает с удлинением жёлтого сегмента).
     if (prevX != null && prevY > 0) {
-        push(prevX, 0);
+        const zeroAt = prevX + WELDING_SERIES_MAX_GAP_MS;
+        push(zeroAt, prevY);
+        push(zeroAt, 0);
     }
 
     return series;
@@ -4634,14 +4645,9 @@ const DeviceMonitorPage = () => {
         const mapCurrent = (p) => (weldTs.has(p.ts) ? mapHistoryFactCurrentY(p) : 0);
         const mapVoltage = (p) => (weldTs.has(p.ts) ? mapHistoryFactVoltageY(p) : 0);
 
-        const gate = (series) => (series || []).map((pt) => {
-            if (!pt || !(Number(pt.y) > 0)) return pt;
-            if (weldTs.has(pt.x)) return pt;
-            return { x: pt.x, y: 0 };
-        });
-
-        const cur = gate(buildWeldingPulseSeriesFromHistoryPoints(pts, mapCurrent));
-        const vol = gate(buildWeldingPulseSeriesFromHistoryPoints(pts, mapVoltage));
+        // Без gate по weldTs: синтетические точки prevX+MAX_GAP (сброс дуги) должны остаться.
+        const cur = buildWeldingPulseSeriesFromHistoryPoints(pts, mapCurrent);
+        const vol = buildWeldingPulseSeriesFromHistoryPoints(pts, mapVoltage);
         return {
             weldingCurrent: decimateWeldingPulseSeriesSafe(cur, HISTORY_CHART_MAX_POINTS),
             weldingVoltage: decimateWeldingPulseSeriesSafe(vol, HISTORY_CHART_MAX_POINTS),
@@ -5045,16 +5051,19 @@ const DeviceMonitorPage = () => {
     ), [valueAtTsSteppedAfter]);
 
     /**
-     * Тултип stepped:'after': y на [x_i, x_{i+1}) — тот же ряд, что рисует Chart.js.
+     * Тултип stepped:'after': y на [x_i, x_{i+1}) — строго внутри нарисованного ряда.
+     * Не clamp к last при ts > last (иначе значения «висят» справа от иглы, где линии уже нет).
      */
     const steppedTooltipCoverage = useCallback((series, ts, tolerance = 0) => {
         if (!Array.isArray(series) || !Number.isFinite(ts)) return { covered: false, value: null };
-        const raw = series.filter((p) => p && Number.isFinite(p.x));
+        const raw = series.filter(
+            (p) => p && Number.isFinite(p.x) && p.y !== null && p.y !== undefined && !Number.isNaN(Number(p.y))
+        );
         if (!raw.length) return { covered: false, value: null };
 
         const byX = new Map();
         raw.forEach((p, idx) => {
-            const y = (p.y === null || p.y === undefined || Number.isNaN(Number(p.y))) ? null : Number(p.y);
+            const y = Number(p.y);
             if (!byX.has(p.x)) byX.set(p.x, []);
             byX.get(p.x).push({ y, idx });
         });
@@ -5062,30 +5071,19 @@ const DeviceMonitorPage = () => {
             .sort((a, b) => a[0] - b[0])
             .map(([x, arr]) => {
                 arr.sort((a, b) => a.idx - b.idx);
-                // Для тултипа на вертикали  y→0 берём y до сброса, если курсор на этом x.
-                const last = arr[arr.length - 1];
-                const prev = arr.length >= 2 ? arr[arr.length - 2] : null;
-                let y = last.y;
-                if (x === ts && prev && last.y === 0 && prev.y != null && Number(prev.y) > 0) {
-                    y = prev.y;
-                } else if (x === ts && prev && prev.y === 0 && last.y != null && Number(last.y) > 0) {
-                    y = last.y;
-                } else {
-                    y = last.y;
-                }
-                return { x, y };
+                return { x, y: arr[arr.length - 1].y };
             });
         if (!distinct.length) return { covered: false, value: null };
-        const tol = Number.isFinite(tolerance) ? tolerance : 0;
+
         const first = distinct[0].x;
         const last = distinct[distinct.length - 1].x;
-        if (ts < first - tol || ts > last + tol) return { covered: false, value: null };
-        const clamped = Math.max(first, Math.min(last, ts));
+        // Вне [first, last] Chart.js ничего не рисует — тултип молчит (tolerance не расширяет hold).
+        if (ts < first || ts > last) return { covered: false, value: null };
+
         let seg = distinct[distinct.length - 1];
         for (let i = 0; i < distinct.length - 1; i += 1) {
-            if (clamped < distinct[i + 1].x) {
-                // Не тянем значение через дыру без точек (как на графике после gap-break).
-                if (distinct[i + 1].x - distinct[i].x > WELDING_SERIES_MAX_GAP_MS && clamped > distinct[i].x) {
+            if (ts < distinct[i + 1].x) {
+                if (distinct[i + 1].x - distinct[i].x > WELDING_SERIES_MAX_GAP_MS && ts > distinct[i].x) {
                     return { covered: true, value: 0 };
                 }
                 seg = distinct[i];
