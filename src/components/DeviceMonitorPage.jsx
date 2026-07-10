@@ -50,7 +50,7 @@ import {
     isStandbyMachineState,
     STANDBY_MACHINE_STATE_DISPLAY,
 } from '../utils/weldingMachineStateDisplay';
-import { despikeValuesMedian3WithinRuns } from '../utils/weldingDespike';
+import { despikeValuesMedian3, despikeValuesMedian3WithinRuns } from '../utils/weldingDespike';
 import { resolveSliderTrackUrl, trackOff, knobOn, knobOff, shadow as sliderShadow } from '../utils/graphSliderAssets';
 
 // Названия ошибок по коду 1–23 (синхронно с EquipmentErrorMessages и протоколом аппарата: 1–10, 17–21)
@@ -115,10 +115,10 @@ const graphPrefsStorageKey = (mac) => `deviceMonitorGraphPrefs:${mac}`;
 const TELEMETRY_LIST_HIDDEN_KEYS = new Set(['welderPresence']);
 
 /**
- * Временно отключаем «умную» обработку истории (склейка коротких offline/welding, despike):
- * оставляем только прореживание по количеству точек. Вернуть = true, чтобы восстановить прежнее поведение.
+ * «Умная» обработка истории: склейка коротких offline/welding, despike одиночных выбросов.
+ * Без этого на графике остаются краткие провалы в 0 и длинные одноточечные всплески.
  */
-const HISTORY_SMART_PROCESSING = false;
+const HISTORY_SMART_PROCESSING = true;
 
 /** Сколько каналов (кроме сети по фазам) одновременно на основном графике — при заполнении остальные в списке тусклые, переключение только после снятия выбора. */
 const TELEMETRY_GRAPH_SLOT_COUNT = 3;
@@ -722,11 +722,12 @@ const isHistoryPointWelding = (p) => {
         || text.includes('свароч') || text.includes('weld');
 };
 
-/** Уставка не показывается только при явных Выкл / Выкл(деж) / Не в сети по machineStateText.
- *  ponytail: status='offline' без machineStateText — кратковременный блip БД, уставку не рвём. */
+/** Уставка не рисуется при Выкл / Выкл(деж) / Не в сети — как серый участок на дорожке «Состояние». */
 const isHistoryPointSetSuppressed = (p) => {
     if (!p) return true;
     if (isStandbyMachineState(p.machineStateText)) return true;
+    const st = String(p.status || '').toLowerCase().trim();
+    if (st === 'offline') return true;
     const text = String(p.machineStateText || '').toLowerCase().trim();
     if (!text) return false;
     if (text.includes('не в сети') || text.includes('offline')) return true;
@@ -780,7 +781,6 @@ function buildTimelineSegments(samples, predicate, valueGetter, windowEnd) {
  * и даёт лишние вертикали на графике — склеиваем, как sanitizeBriefOfflineBetweenOnline.
  */
 function sanitizeBriefWeldingBetweenActive(samples, maxGapMs) {
-    // ponytail: временно отключено (#5) — только прореживание, без склейки коротких welding.
     if (!HISTORY_SMART_PROCESSING) return samples;
     if (!Array.isArray(samples) || samples.length < 2 || !Number.isFinite(maxGapMs) || maxGapMs <= 0) {
         return samples;
@@ -1330,7 +1330,7 @@ function buildDespikedHistoryWeldingSamples(rawPoints) {
     const isWelding = sorted.map((p) => isHistoryPointWelding(p));
     const rawCurrent = sorted.map((p, i) => (isWelding[i] ? mapHistoryFactCurrentY(p) : 0));
     const rawVoltage = sorted.map((p, i) => (isWelding[i] ? mapHistoryFactVoltageY(p) : 0));
-    // ponytail: despike временно отключён (#5) — оставляем сырые значения, только прореживание.
+    // Despike одиночных выбросов/провалов внутри сварочных участков.
     const despikedCurrent = HISTORY_SMART_PROCESSING ? despikeValuesMedian3WithinRuns(rawCurrent, isWelding) : rawCurrent;
     const despikedVoltage = HISTORY_SMART_PROCESSING ? despikeValuesMedian3WithinRuns(rawVoltage, isWelding) : rawVoltage;
     return sorted.map((p, i) => ({
@@ -1382,7 +1382,19 @@ function prepareWeldingHistoryForWindow(rawPoints, windowStart, windowEnd, weldi
 
 function prepareSeriesForChart(raw, channelKey, graphUsesServerData, maxPoints) {
     const pts = raw || [];
-    if (!graphUsesServerData || !pts.length) return pts;
+    if (!pts.length) return pts;
+    if (!graphUsesServerData) {
+        // Live: гасим одиночные spike/0 на непрерывных каналах; stepped/welding не трогаем.
+        if (
+            HISTORY_SMART_PROCESSING
+            && !usesSteppedChartChannel(channelKey)
+            && channelKey !== 'weldingCurrent'
+            && channelKey !== 'weldingVoltage'
+        ) {
+            return despikeContinuousSeriesPoints(pts);
+        }
+        return pts;
+    }
     if (channelKey === 'weldingCurrent' || channelKey === 'weldingVoltage') {
         return pts;
     }
@@ -1390,9 +1402,26 @@ function prepareSeriesForChart(raw, channelKey, graphUsesServerData, maxPoints) 
         return prepareSetMetricSeriesForChart(pts, maxPoints);
     }
     if (usesSteppedChartChannel(channelKey)) {
-        return decimateWeldingPulseSeries(pts, maxPoints);
+        return decimateWeldingPulseSeriesSafe(pts, maxPoints);
     }
-    return decimateSeriesPoints(pts, maxPoints);
+    // Непрерывные каналы: сначала гасим одиночные spike/0, затем прореживаем.
+    const cleaned = HISTORY_SMART_PROCESSING ? despikeContinuousSeriesPoints(pts) : pts;
+    return decimateSeriesPoints(cleaned, maxPoints);
+}
+
+/** Медиана-3 по Y для непрерывных рядов (сеть, температуры и т.п.). */
+function despikeContinuousSeriesPoints(points) {
+    if (!Array.isArray(points) || points.length < 3) return points || [];
+    const values = points.map((p) => {
+        if (!p || p.y === null || p.y === undefined || Number.isNaN(Number(p.y))) return NaN;
+        return Number(p.y);
+    });
+    const despiked = despikeValuesMedian3(values);
+    return points.map((p, i) => {
+        const y = despiked[i];
+        if (!Number.isFinite(y)) return p;
+        return { ...p, y: Math.round(y * 10) / 10 };
+    });
 }
 
 /**
@@ -1400,7 +1429,6 @@ function prepareSeriesForChart(raw, channelKey, graphUsesServerData, maxPoints) 
  * серый зазор при включённом аппарате. Такие всплески до maxOfflineMs между двумя онлайн-участками убираем.
  */
 function sanitizeBriefOfflineBetweenOnline(samples, windowEnd, maxOfflineMs) {
-    // ponytail: временно отключено (#5) — только прореживание, без склейки коротких offline.
     if (!HISTORY_SMART_PROCESSING) return samples;
     if (!Array.isArray(samples) || samples.length < 2 || !Number.isFinite(maxOfflineMs) || maxOfflineMs <= 0) {
         return samples;
@@ -4639,15 +4667,18 @@ const DeviceMonitorPage = () => {
             if (ts >= windowStart && ts <= windowEnd) pts.push(p);
         });
         pts.sort((a, b) => a.ts - b.ts);
+        const despiked = buildDespikedHistoryWeldingSamples(pts);
+        const byTs = new Map(despiked.map((s) => [s.ts, s]));
         const cur = buildWeldingPulseSeriesFromHistoryPoints(
-            pts, (p) => (p.current == null ? 0 : Number(p.current))
+            pts, (p) => byTs.get(p.ts)?.current ?? 0
         );
         const vol = buildWeldingPulseSeriesFromHistoryPoints(
-            pts, (p) => { const v = toWeldingVoltageVolts(p.voltage); return v != null ? v : 0; }
+            pts, (p) => byTs.get(p.ts)?.voltage ?? 0
         );
+        // Safe-decimate: без min/max по корзинам — иначе одноточечные выбросы остаются «иглами».
         return {
-            weldingCurrent: decimateWeldingPulseSeries(cur, HISTORY_CHART_MAX_POINTS),
-            weldingVoltage: decimateWeldingPulseSeries(vol, HISTORY_CHART_MAX_POINTS),
+            weldingCurrent: decimateWeldingPulseSeriesSafe(cur, HISTORY_CHART_MAX_POINTS),
+            weldingVoltage: decimateWeldingPulseSeriesSafe(vol, HISTORY_CHART_MAX_POINTS),
         };
     }, [graphUsesServerData, todayPinExplore, activeWindow.start, activeWindow.end, historyCacheRevision, HISTORY_CHART_MAX_POINTS]);
 
@@ -4874,7 +4905,8 @@ const DeviceMonitorPage = () => {
                 fill: isCurrent || isVoltage,
                 yAxisID: resolveChannelYAxisId(channelKey),
                 ...(stepped ? { stepped: 'after' } : {}),
-                ...(isSetMetric ? { spanGaps: true } : {}),
+                // Уставки: null = разрыв (выкл/деж/offline). spanGaps нельзя — иначе линия тянется через серый «Состояние».
+                ...(isSetMetric ? { spanGaps: false } : {}),
             };
         };
 
@@ -4963,15 +4995,31 @@ const DeviceMonitorPage = () => {
         return ((x - chartBounds.dayStart) / range) * 100;
     }, [chartBounds.dayEnd, chartBounds.dayStart]);
 
-    /** Время под вертикалью — то же в тултипе графика и на дорожке «Состояние». */
+    /** Время в тултипе — ближайшая точка данных; значения считаются по X crosshair отдельно. */
     const hoverCursorTimeLabel = useMemo(() => {
         if (!hoverCursor.active || !Number.isFinite(hoverCursor.ts)) return '';
-        return new Date(hoverCursor.ts).toLocaleTimeString('ru-RU', {
+        const keys = TELEMETRY_SLOT_KEYS.map((s) => telemetrySelection[s]).filter(Boolean);
+        let nearestTs = null;
+        let nearestDiff = Number.POSITIVE_INFINITY;
+        keys.forEach((key) => {
+            const series = chartDisplaySeries[key] || [];
+            for (const p of series) {
+                if (!p || !Number.isFinite(p.x)) continue;
+                if (p.y === null || p.y === undefined || Number.isNaN(Number(p.y))) continue;
+                const diff = Math.abs(p.x - hoverCursor.ts);
+                if (diff < nearestDiff) {
+                    nearestDiff = diff;
+                    nearestTs = p.x;
+                }
+            }
+        });
+        const ts = Number.isFinite(nearestTs) ? nearestTs : hoverCursor.ts;
+        return new Date(ts).toLocaleTimeString('ru-RU', {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
         });
-    }, [hoverCursor.active, hoverCursor.ts]);
+    }, [hoverCursor.active, hoverCursor.ts, chartDisplaySeries, telemetrySelection.slot1, telemetrySelection.slot2, telemetrySelection.slot3]);
 
     const findSegmentAtTs = useCallback((segments, ts) => {
         if (!Array.isArray(segments) || !Number.isFinite(ts)) return null;
@@ -5065,21 +5113,33 @@ const DeviceMonitorPage = () => {
         return { covered: true, value: seg.y };
     }, []);
 
-    /** Непрерывные каналы: ближайшая точка в пределах tolerance по времени, иначе строку скрываем. */
-    const nearestTooltipCoverage = useCallback((series, ts, tolerance) => {
+    /**
+     * Пересечение вертикали crosshair с отрезком линии (линейная интерполяция по X).
+     * Не nearest-point — иначе на диагонали тултип «прыгает» к вершине.
+     */
+    const linearInterpTooltipCoverage = useCallback((series, ts, tolerance) => {
         if (!Array.isArray(series) || !series.length || !Number.isFinite(ts)) return { covered: false, value: null };
-        let nearest = null;
-        let nearestDiff = Number.POSITIVE_INFINITY;
-        for (const p of series) {
-            if (!p || !Number.isFinite(p.x)) continue;
-            if (p.y === null || p.y === undefined || Number.isNaN(Number(p.y))) continue;
-            const diff = Math.abs(p.x - ts);
-            if (diff < nearestDiff) { nearestDiff = diff; nearest = p; }
+        const pts = series
+            .filter((p) => p && Number.isFinite(p.x) && p.y !== null && p.y !== undefined && !Number.isNaN(Number(p.y)))
+            .map((p) => ({ x: p.x, y: Number(p.y) }))
+            .sort((a, b) => a.x - b.x);
+        if (!pts.length) return { covered: false, value: null };
+        const tol = Number.isFinite(tolerance) ? tolerance : 0;
+        if (ts < pts[0].x - tol || ts > pts[pts.length - 1].x + tol) return { covered: false, value: null };
+
+        if (ts <= pts[0].x) return { covered: true, value: pts[0].y };
+        if (ts >= pts[pts.length - 1].x) return { covered: true, value: pts[pts.length - 1].y };
+
+        for (let i = 0; i < pts.length - 1; i += 1) {
+            const a = pts[i];
+            const b = pts[i + 1];
+            if (ts < a.x || ts > b.x) continue;
+            if (b.x === a.x) return { covered: true, value: b.y };
+            const t = (ts - a.x) / (b.x - a.x);
+            const y = a.y + t * (b.y - a.y);
+            return { covered: true, value: Math.round(y * 10) / 10 };
         }
-        if (!nearest) return { covered: false, value: null };
-        if (Number.isFinite(tolerance) && nearestDiff > tolerance) return { covered: false, value: null };
-        const v = Number(nearest.y);
-        return Number.isFinite(v) ? { covered: true, value: v } : { covered: false, value: null };
+        return { covered: false, value: null };
     }, []);
 
     const hoverInfo = useMemo(() => {
@@ -5090,7 +5150,7 @@ const DeviceMonitorPage = () => {
         const welderSeg = findSegmentAtTs(timelineRows.welder, hoverCursor.ts);
         const welderLabel = welderSeg?.value ? welderNameByRfid[welderSeg.value] || null : null;
 
-        /** Допуск по времени для непрерывных каналов — 2% ширины окна (нет данных дальше → строку скрываем). */
+        /** Допуск по времени — 2% ширины окна (нет данных дальше → строку скрываем). */
         const tooltipTolerance = Math.max((activeWindow.end - activeWindow.start) * 0.02, 1500);
         const SET_METRIC_KEYS = new Set(['setWeldingCurrent', 'setWeldingVoltage']);
 
@@ -5100,7 +5160,7 @@ const DeviceMonitorPage = () => {
             const stepped = usesSteppedChartChannel(channelKey);
             const res = stepped
                 ? steppedTooltipCoverage(raw, hoverCursor.ts, tooltipTolerance)
-                : nearestTooltipCoverage(raw, hoverCursor.ts, tooltipTolerance);
+                : linearInterpTooltipCoverage(raw, hoverCursor.ts, tooltipTolerance);
             const channel = TELEMETRY_CHANNELS_CONFIG.find((c) => c.key === channelKey);
             if (!channel) return;
             const color = resolveChannelColor(channelKey);
@@ -5152,7 +5212,7 @@ const DeviceMonitorPage = () => {
         telemetrySelection.slot3,
         resolveChannelColor,
         steppedTooltipCoverage,
-        nearestTooltipCoverage,
+        linearInterpTooltipCoverage,
         timelineRows,
         findSegmentAtTs,
         welderNameByRfid
@@ -5518,11 +5578,40 @@ const DeviceMonitorPage = () => {
         if (!chartWrapperRef.current) return;
         const rect = chartWrapperRef.current.getBoundingClientRect();
         if (!rect.width) return;
-        const left = Number.isFinite(plotArea.leftPx) ? plotArea.leftPx : 0;
-        const width = Number.isFinite(plotArea.widthPx) && plotArea.widthPx > 0 ? plotArea.widthPx : rect.width;
-        const xPxRaw = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-        let plotCursorX = Math.max(left, Math.min(left + width, xPxRaw));
-        let ratio = Math.max(0, Math.min(1, (plotCursorX - left) / width));
+
+        const pa = plotAreaRef.current;
+        const chartEl = chartCanvasRef.current;
+        const wrapperLeft = Number.isFinite(pa.leftPx) ? pa.leftPx : 0;
+        const chartLeft = Number.isFinite(pa.chartLeftPx) ? pa.chartLeftPx : wrapperLeft;
+        const width = Number.isFinite(pa.widthPx) && pa.widthPx > 0 ? pa.widthPx : rect.width;
+        const height = Number.isFinite(pa.heightPx) && pa.heightPx > 0 ? pa.heightPx : 0;
+
+        // ts/percent считаем в системе chart-canvas (как белая crosshair), иначе смещение тултипа.
+        let plotCursorX = wrapperLeft;
+        let ratio = 0;
+        let usedChartLocal = false;
+        if (chartEl && width > 0) {
+            const elRect = chartEl.getBoundingClientRect();
+            const xLocal = event.clientX - elRect.left;
+            const yLocal = event.clientY - elRect.top;
+            const inChartPlot =
+                height > 0
+                && xLocal >= chartLeft
+                && xLocal <= chartLeft + width
+                && yLocal >= pa.topPx
+                && yLocal <= pa.topPx + height;
+            if (inChartPlot || (xLocal >= chartLeft && xLocal <= chartLeft + width)) {
+                const clampedLocal = Math.max(chartLeft, Math.min(chartLeft + width, xLocal));
+                ratio = Math.max(0, Math.min(1, (clampedLocal - chartLeft) / width));
+                plotCursorX = wrapperLeft + ratio * width;
+                usedChartLocal = true;
+            }
+        }
+        if (!usedChartLocal) {
+            const xPxRaw = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+            plotCursorX = Math.max(wrapperLeft, Math.min(wrapperLeft + width, xPxRaw));
+            ratio = Math.max(0, Math.min(1, (plotCursorX - wrapperLeft) / width));
+        }
         let ts = activeWindow.start + ratio * (activeWindow.end - activeWindow.start);
 
         const errorsTrackRect = errorsLaneTrackRef.current?.getBoundingClientRect?.();
@@ -5533,26 +5622,18 @@ const DeviceMonitorPage = () => {
             if (snapSeg) {
                 ts = errorSegmentCenterTs(snapSeg);
                 ratio = Math.max(0, Math.min(1, (ts - activeWindow.start) / Math.max(activeWindow.end - activeWindow.start, 1)));
-                plotCursorX = left + ratio * width;
+                plotCursorX = wrapperLeft + ratio * width;
                 setPlotDotAtTimelineTs(ts);
             }
-        } else {
-            const chartEl = chartCanvasRef.current;
-            const pa = plotAreaRef.current;
-            const plotLeft = Number.isFinite(pa.chartLeftPx) ? pa.chartLeftPx : pa.leftPx;
-            const plotWidth = Number.isFinite(pa.widthPx) && pa.widthPx > 0 ? pa.widthPx : 0;
-            const plotHeight = Number.isFinite(pa.heightPx) && pa.heightPx > 0 ? pa.heightPx : 0;
-            let inChartPlot = false;
-            if (chartEl && plotWidth > 0 && plotHeight > 0) {
-                const elRect = chartEl.getBoundingClientRect();
-                const xLocal = event.clientX - elRect.left;
-                const yLocal = event.clientY - elRect.top;
-                inChartPlot =
-                    xLocal >= plotLeft &&
-                    xLocal <= plotLeft + plotWidth &&
-                    yLocal >= pa.topPx &&
-                    yLocal <= pa.topPx + plotHeight;
-            }
+        } else if (chartEl && width > 0 && height > 0) {
+            const elRect = chartEl.getBoundingClientRect();
+            const xLocal = event.clientX - elRect.left;
+            const yLocal = event.clientY - elRect.top;
+            const inChartPlot =
+                xLocal >= chartLeft
+                && xLocal <= chartLeft + width
+                && yLocal >= pa.topPx
+                && yLocal <= pa.topPx + height;
             if (!inChartPlot) {
                 setPlotDot((prev) => (prev.visible ? { visible: false, leftPx: 0, topPx: 0 } : prev));
             }
@@ -5574,8 +5655,6 @@ const DeviceMonitorPage = () => {
     }, [
         activeWindow.start,
         activeWindow.end,
-        plotArea.leftPx,
-        plotArea.widthPx,
         isEventOnChartAxis,
         chartPanActive,
         timelineRows.errors,
