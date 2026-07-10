@@ -1427,7 +1427,7 @@
 }
 
 .bottom-panel__body:has(.telemetry-controls--collapsed) {
-    grid-template-columns: minmax(120px, 140px) minmax(0, 1fr);
+    grid-template-columns: minmax(156px, 172px) minmax(0, 1fr);
 }
 
 .telemetry-controls {
@@ -1441,6 +1441,10 @@
     max-width: 100%;
     width: 100%;
     overflow: hidden;
+}
+
+.telemetry-controls--collapsed {
+    overflow: visible;
 }
 
 .telemetry-controls__machine-meta {
@@ -1475,10 +1479,13 @@
     flex-shrink: 0;
     margin-bottom: 8px;
     position: relative;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .telemetry-toolbar-btn {
     flex: 0 0 28px;
+    flex-shrink: 0;
     width: 28px;
     height: 28px;
     display: inline-flex;
@@ -1490,6 +1497,7 @@
     color: rgba(188, 183, 197, 0.85);
     cursor: pointer;
     padding: 0;
+    z-index: 1;
 }
 
 .telemetry-toolbar-btn:hover:not(:disabled) {
@@ -1514,28 +1522,46 @@
 }
 
 .telemetry-toolbar-date {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-width: 0;
     height: 28px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 4px;
     border-radius: 5px;
     border: 1px solid rgba(87, 77, 95, 0.55);
     background: rgba(32, 25, 39, 0.92);
     color: rgba(242, 241, 244, 0.9);
     cursor: pointer;
-    padding: 0 8px;
+    padding: 0 6px;
     font-size: 12px;
+    overflow: hidden;
 }
 
 .telemetry-toolbar-date-text {
     text-decoration: underline;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .telemetry-toolbar-date-weekday {
     opacity: 0.85;
+    flex-shrink: 0;
+}
+
+.telemetry-controls--collapsed .telemetry-graph-toolbar {
+    gap: 4px;
+}
+
+.telemetry-controls--collapsed .telemetry-toolbar-date {
+    padding: 0 4px;
+    font-size: 11px;
+}
+
+.telemetry-controls--collapsed .telemetry-toolbar-date-weekday {
+    display: none;
 }
 
 .telemetry-item--slider {
@@ -1598,22 +1624,29 @@
 
 .telemetry-color-palette {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3px;
     width: 100%;
+    max-width: 100%;
     padding: 4px 0 8px;
+    overflow-x: hidden;
     overflow-y: auto;
     flex: 1;
     min-height: 0;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .telemetry-color-palette-swatch {
     width: 100%;
-    aspect-ratio: 1.6;
-    border-radius: 4px;
+    min-width: 0;
+    height: 12px;
+    aspect-ratio: auto;
+    border-radius: 3px;
     border: 1px solid transparent;
     cursor: pointer;
     padding: 0;
+    box-sizing: border-box;
 }
 
 .telemetry-color-palette-swatch.selected {
@@ -1948,6 +1981,36 @@
     min-height: 0;
     width: 100%;
     max-width: 100%;
+    /* Скроллбар слева от списка каналов */
+    direction: rtl;
+    scrollbar-width: thin;
+    scrollbar-color: #4a6fa5 transparent;
+}
+
+.telemetry-list > * {
+    direction: ltr;
+}
+
+.telemetry-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.telemetry-list::-webkit-scrollbar-track {
+    background: transparent;
+    border-left: 1px solid rgba(70, 100, 150, 0.45);
+    margin: 2px 0;
+}
+
+.telemetry-list::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #5b86c4 0%, #3d5f94 100%);
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    min-height: 28px;
+}
+
+.telemetry-list::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #6b96d4 0%, #4d6fa4 100%);
 }
 
 .telemetry-item {

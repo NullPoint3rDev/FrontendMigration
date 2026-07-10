@@ -2541,12 +2541,23 @@ const DeviceMonitorPage = () => {
             if (Number.isFinite(prefs.yAxisLeftMax)) setYAxisLeftMax(clampLeftYMax(prefs.yAxisLeftMax));
             if (Number.isFinite(prefs.yAxisRightMax)) setYAxisRightMax(clampRightYMax(prefs.yAxisRightMax));
             if (typeof prefs.graphExpandedLayout === 'boolean') setGraphExpandedLayout(prefs.graphExpandedLayout);
+            if (prefs.channelColorOverrides && typeof prefs.channelColorOverrides === 'object') {
+                const nextColors = {};
+                Object.entries(prefs.channelColorOverrides).forEach(([key, hex]) => {
+                    if (typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex)) nextColors[key] = hex;
+                });
+                setChannelColorOverrides(nextColors);
+            } else {
+                setChannelColorOverrides({});
+            }
             const date = prefs.selectedGraphDate || toLocalDateInput(new Date());
             if (prefs.timeWindow && Number.isFinite(prefs.timeWindow.start) && Number.isFinite(prefs.timeWindow.end)) {
                 historyPinWindowsRef.current[date] = { start: prefs.timeWindow.start, end: prefs.timeWindow.end };
             }
             pendingRestoreRef.current = { mode: prefs.mode || 'live', applied: false };
             if (!selectedGraphDateRef.current) setSelectedGraphDate(date);
+        } else {
+            setChannelColorOverrides({});
         }
         prefsRestoredRef.current = true;
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -6099,6 +6110,7 @@ const DeviceMonitorPage = () => {
                 : null,
             telemetrySelection,
             mainsVoltagePhases,
+            channelColorOverrides,
             graphExpandedLayout,
             yAxisLeftMax,
             yAxisRightMax,
@@ -6117,6 +6129,7 @@ const DeviceMonitorPage = () => {
         timeWindow.end,
         telemetrySelection,
         mainsVoltagePhases,
+        channelColorOverrides,
         graphExpandedLayout,
         yAxisLeftMax,
         yAxisRightMax,
