@@ -1237,8 +1237,8 @@ const usesSteppedChartChannel = (channelKey) => (
 );
 
 /**
- * Сжимает плоские участки, но не склеивает Y>0 через паузу > WELDING_SERIES_MAX_GAP_MS
- * (иначе снова «прямоугольник» на полдня при двух точках с одним током).
+ * Сжимает плоские участки. Не вставляем нули в длинное плато Y>0 —
+ * иначе рвём шов на графике и тултип (точки в истории только на смене Y).
  */
 function compressSteppedSeries(points) {
     const n = points?.length || 0;
@@ -1255,12 +1255,6 @@ function compressSteppedSeries(points) {
         const yCur = Number(cur.y);
         const yPrev = Number(prev.y);
         if (yCur !== yPrev) {
-            out.push(cur);
-            continue;
-        }
-        if (yCur > 0 && cur.x - prev.x > WELDING_SERIES_MAX_GAP_MS) {
-            out.push({ x: prev.x, y: 0 });
-            out.push({ x: cur.x, y: 0 });
             out.push(cur);
             continue;
         }
@@ -5072,7 +5066,9 @@ const DeviceMonitorPage = () => {
                     : (graphUsesServerData ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.04)'),
                 fill: isCurrent || isVoltage,
                 yAxisID: resolveChannelYAxisId(channelKey),
-                ...(stepped ? { stepped: 'after' } : {}),
+                // Chart.js: stepped:'after' при flip=false рисует Y следующей точки (как before).
+                // 'before' → lineTo(target.x, previous.y) — держит текущее Y до следующего x (нужно для тултипа).
+                ...(stepped ? { stepped: 'before' } : {}),
                 // Уставки и сварка: не мостить null/дыры — иначе заливка тянется через серый «Состояние».
                 ...((isSetMetric || isCurrent || isVoltage) ? { spanGaps: false } : {}),
             };
@@ -5208,8 +5204,8 @@ const DeviceMonitorPage = () => {
     }, []);
 
     /**
-     * Chart.js stepped: 'after' — горизонталь y_i на [x_i, x_{i+1}); при нескольких точках с одним x
-     * (вертикальный фронт) для горизонтали берём последний y на этом x.
+     * Chart.js stepped:'before' рисует удержание y_i до x_{i+1} (см. _steppedLineTo).
+     * При нескольких точках с одним x (вертикальный фронт) для плато берём последний y на этом x.
      */
     const valueAtTsSteppedAfter = useCallback((series, ts) => {
         if (!Array.isArray(series) || !Number.isFinite(ts)) return null;
@@ -5251,8 +5247,8 @@ const DeviceMonitorPage = () => {
     ), [valueAtTsSteppedAfter]);
 
     /**
-     * Тултип stepped:'after': y на [x_i, x_{i+1}) — строго внутри нарисованного ряда.
-     * Не clamp к last при ts > last (иначе значения «висят» справа от иглы, где линии уже нет).
+     * Тултип = Y горизонтали Chart.js stepped:'before' (держим y_i на [x_i, x_{i+1})).
+     * Не обнуляем по MAX_GAP: на длинном плато в истории точек мало, линия всё равно на y_i.
      */
     const steppedTooltipCoverage = useCallback((series, ts, tolerance = 0) => {
         if (!Array.isArray(series) || !Number.isFinite(ts)) return { covered: false, value: null };
@@ -5271,21 +5267,18 @@ const DeviceMonitorPage = () => {
             .sort((a, b) => a[0] - b[0])
             .map(([x, arr]) => {
                 arr.sort((a, b) => a.idx - b.idx);
+                // Вертикальный фронт 0→Y: для удержания плато берём последний y на этом x.
                 return { x, y: arr[arr.length - 1].y };
             });
         if (!distinct.length) return { covered: false, value: null };
 
         const first = distinct[0].x;
         const last = distinct[distinct.length - 1].x;
-        // Вне [first, last] Chart.js ничего не рисует — тултип молчит (tolerance не расширяет hold).
         if (ts < first || ts > last) return { covered: false, value: null };
 
         let seg = distinct[distinct.length - 1];
         for (let i = 0; i < distinct.length - 1; i += 1) {
             if (ts < distinct[i + 1].x) {
-                if (distinct[i + 1].x - distinct[i].x > WELDING_SERIES_MAX_GAP_MS && ts > distinct[i].x) {
-                    return { covered: true, value: 0 };
-                }
                 seg = distinct[i];
                 break;
             }
