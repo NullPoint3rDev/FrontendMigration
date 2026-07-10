@@ -2801,6 +2801,32 @@
     user-select: none;
 }
 
+.chart-pan-surface--history-reveal {
+    position: relative;
+}
+
+/* «Перо» проявления графика слева направо во время загрузки суток. */
+.monitor-history-reveal-edge {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    z-index: 11;
+    pointer-events: none;
+    transform: translateX(-1px);
+    background: linear-gradient(
+        180deg,
+        rgba(62, 199, 255, 0) 0%,
+        rgba(62, 199, 255, 0.85) 18%,
+        rgba(255, 255, 255, 0.95) 50%,
+        rgba(62, 199, 255, 0.85) 82%,
+        rgba(62, 199, 255, 0) 100%
+    );
+    box-shadow:
+        0 0 10px rgba(62, 199, 255, 0.55),
+        0 0 22px rgba(62, 199, 255, 0.28);
+}
+
 .chart-card--history-pending .chart-wrapper {
     position: relative;
 }

@@ -1978,6 +1978,10 @@ const DeviceMonitorPage = () => {
     const fullDayLoadedWindowRef = useRef(null);
     /** История: график отрисован после «Загр. данные» или восстановления из localStorage. */
     const [historyChartReady, setHistoryChartReady] = useState(false);
+    /** После прихода данных — проявление графика L→R под блюром (пока идёт анимация, pending UI остаётся). */
+    const [historyRevealActive, setHistoryRevealActive] = useState(false);
+    const [historyRevealProgress, setHistoryRevealProgress] = useState(1);
+    const historyRevealRafRef = useRef(null);
     /** #9: восстановление настроек графика из localStorage (per-MAC). */
     const graphPrefsRef = useRef(undefined);
     if (graphPrefsRef.current === undefined) {
@@ -2073,7 +2077,7 @@ const DeviceMonitorPage = () => {
     }, [todayPinExplore]);
 
     const graphUsesServerData = isHistoryMode || todayPinExplore;
-    const graphHistoryPending = graphUsesServerData && !historyChartReady;
+    const graphHistoryPending = graphUsesServerData && (!historyChartReady || historyRevealActive);
     const graphUsesServerDataRef = useRef(graphUsesServerData);
     useEffect(() => {
         graphUsesServerDataRef.current = graphUsesServerData;
@@ -2083,7 +2087,45 @@ const DeviceMonitorPage = () => {
         if (graphUsesServerData) return;
         historyLoadingCountRef.current = 0;
         setHistoryLoading(false);
+        setHistoryRevealActive(false);
+        setHistoryRevealProgress(1);
+        if (historyRevealRafRef.current != null) {
+            cancelAnimationFrame(historyRevealRafRef.current);
+            historyRevealRafRef.current = null;
+        }
     }, [graphUsesServerData]);
+
+    /** Проявление графика слева направо после загрузки суток (блюр/текст остаются до конца). */
+    const startHistoryReveal = useCallback(() => {
+        if (historyRevealRafRef.current != null) {
+            cancelAnimationFrame(historyRevealRafRef.current);
+            historyRevealRafRef.current = null;
+        }
+        setHistoryRevealActive(true);
+        setHistoryRevealProgress(0);
+        const durationMs = 1200;
+        const t0 = performance.now();
+        const tick = (now) => {
+            const t = Math.min(1, (now - t0) / durationMs);
+            // ease-out: быстрее в начале, чтобы сразу было видно движение
+            const eased = 1 - (1 - t) ** 2.2;
+            setHistoryRevealProgress(eased);
+            if (t < 1) {
+                historyRevealRafRef.current = requestAnimationFrame(tick);
+            } else {
+                historyRevealRafRef.current = null;
+                setHistoryRevealProgress(1);
+                setHistoryRevealActive(false);
+            }
+        };
+        historyRevealRafRef.current = requestAnimationFrame(tick);
+    }, []);
+
+    useEffect(() => () => {
+        if (historyRevealRafRef.current != null) {
+            cancelAnimationFrame(historyRevealRafRef.current);
+        }
+    }, []);
 
     const toLocalDateInput = (d) => {
         const pad = (n) => String(n).padStart(2, '0');
@@ -4860,7 +4902,8 @@ const DeviceMonitorPage = () => {
 
     /** Те же точки, что рисует Chart.js; тултип сварки — из hoverSamples bundle. */
     const chartDisplaySeries = useMemo(() => {
-        if (graphHistoryPending) {
+        // Во время L→R reveal данные уже есть (historyChartReady) — не очищаем серии.
+        if (graphUsesServerData && !historyChartReady) {
             return { ...DEFAULT_TELEMETRY_SERIES };
         }
         const src = graphUsesServerData ? historySeriesSnapshot : telemetrySeries;
@@ -4883,7 +4926,7 @@ const DeviceMonitorPage = () => {
         });
         return out;
     }, [
-        graphHistoryPending,
+        historyChartReady,
         graphUsesServerData,
         historySeriesSnapshot,
         historyTimelineSnapshot,
@@ -5103,13 +5146,13 @@ const DeviceMonitorPage = () => {
     ]);
 
     const timelineInWindow = useMemo(() => {
-        if (graphHistoryPending) return [];
+        if (graphUsesServerData && !historyChartReady) return [];
         if (graphUsesServerData) {
             return buildHistoryTimelineForWindow(activeWindow.start, activeWindow.end);
         }
         return timelineSamples.filter((s) => s.x >= activeWindow.start && s.x <= activeWindow.end);
     }, [
-        graphHistoryPending,
+        historyChartReady,
         timelineSamples,
         graphUsesServerData,
         activeWindow.start,
@@ -6199,9 +6242,13 @@ const DeviceMonitorPage = () => {
             };
             setYAxisLeftMax(Y_AXIS_LEFT.MAX);
             setYAxisRightMax(Y_AXIS_RIGHT.MAX);
+            // Данные уже в стейте — проявляем L→R под блюром, затем снимаем pending.
+            startHistoryReveal();
             return true;
         } catch {
             setHistoryError('Не удалось загрузить историю с сервера.');
+            setHistoryRevealActive(false);
+            setHistoryRevealProgress(1);
             return false;
         }
     }, [
@@ -6212,6 +6259,7 @@ const DeviceMonitorPage = () => {
         buildHistoryTimelineForWindow,
         persistHistoryPinWindow,
         clampPinWindowToDay,
+        startHistoryReveal,
     ]);
 
     /** #8: подгрузка выбранных графиков за целые сутки (00:00–сейчас для сегодня, 00:00–24:00 для прошлых). */
@@ -6220,6 +6268,12 @@ const DeviceMonitorPage = () => {
         if (!dateStr) return;
         const { dayStart, dayEnd } = getDayBoundsForDateStr(dateStr);
         const loadEnd = isTodayDateStr(dateStr) ? Math.min(Date.now(), dayEnd) : dayEnd;
+        if (historyRevealRafRef.current != null) {
+            cancelAnimationFrame(historyRevealRafRef.current);
+            historyRevealRafRef.current = null;
+        }
+        setHistoryRevealActive(false);
+        setHistoryRevealProgress(0);
         setTimeWindow({ start: dayStart, end: loadEnd, touched: true });
         await loadHistoryFullDay(dateStr);
     }, [selectedGraphDate, getDayBoundsForDateStr, isTodayDateStr, loadHistoryFullDay]);
@@ -7225,9 +7279,19 @@ const DeviceMonitorPage = () => {
                                             </div>
                                         </div>
                                         <div
-                                            className={`chart-pan-surface${graphUsesServerData ? ' chart-pan-surface--enabled' : ''}${chartPanActive ? ' chart-pan-surface--grabbing' : ''}${graphUsesServerData && historyLoading && !graphHistoryPending ? ' chart-pan-surface--history-loading' : ''}${graphHistoryPending ? ' monitor-chart-blur-target' : ''}`}
+                                            className={`chart-pan-surface${graphUsesServerData ? ' chart-pan-surface--enabled' : ''}${chartPanActive ? ' chart-pan-surface--grabbing' : ''}${graphUsesServerData && historyLoading && !graphHistoryPending ? ' chart-pan-surface--history-loading' : ''}${graphHistoryPending ? ' monitor-chart-blur-target' : ''}${historyRevealActive ? ' chart-pan-surface--history-reveal' : ''}`}
+                                            style={historyRevealActive || (graphHistoryPending && historyRevealProgress < 1)
+                                                ? { clipPath: `inset(0 ${(1 - historyRevealProgress) * 100}% 0 0)` }
+                                                : undefined}
                                             onMouseDown={graphHistoryPending ? undefined : handleChartPanMouseDown}
                                         >
+                                            {historyRevealActive && (
+                                                <div
+                                                    className="monitor-history-reveal-edge"
+                                                    style={{ left: `${historyRevealProgress * 100}%` }}
+                                                    aria-hidden
+                                                />
+                                            )}
                                             {graphUsesServerData && historyLoading && !graphHistoryPending && (
                                                 <div
                                                     className={`monitor-history-load-overlay${historyChartHasStaleContent ? ' monitor-history-load-overlay--stale' : ''}`}
@@ -7497,11 +7561,11 @@ const DeviceMonitorPage = () => {
                                                 </div>
                                             </div>
                                         </div>
-                                        {graphHistoryPending && historyLoading && (
+                                        {graphHistoryPending && (
                                             <div className="monitor-chart-pending-overlay" role="status" aria-live="polite" aria-busy="true">
                                                 <div className="monitor-chart-pending-overlay-panel">
                                                     <span className="monitor-history-load-spinner" aria-hidden />
-                                                    <span>{historyLoadingMessage}</span>
+                                                    <span>{historyRevealActive ? 'Отрисовка графика…' : historyLoadingMessage}</span>
                                                 </div>
                                             </div>
                                         )}
