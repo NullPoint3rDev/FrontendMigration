@@ -719,8 +719,8 @@ const isHistoryPointWelding = (p) => {
 };
 
 /**
- * Макс. пауза между опросами, через которую ещё тянем сварочный Y (stepped:'after').
- * Больше — принудительно гасим в 0, иначе «дуга» заливает дыры без точек на дорожке «Состояние».
+ * Макс. пауза между сварочными опросами: дальше — новый сегмент (не тянем дугу через дыру).
+ * Удержание Y — только до следующей точки опроса / конца сегмента, без «+20с вперёд».
  */
 const WELDING_SERIES_MAX_GAP_MS = 20000;
 
@@ -741,12 +741,12 @@ const isHistoryPointSetSuppressed = (p) => {
 const isTsInWeldingSegments = (ts, segments) => (
     Array.isArray(segments)
     && segments.some((seg) => Number.isFinite(seg?.start) && Number.isFinite(seg?.end)
-        && ts >= seg.start && ts <= seg.end)
+        && ts >= seg.start && ts < seg.end)
 );
 
 /**
  * Сегменты дорожки «Состояние» (stepped: 'after' — до следующей точки опроса).
- * maxGapMs: не продлевать сегмент через паузу опроса (для сварки — как на графике).
+ * maxGapMs: для сварки — не склеивать куски через паузу опроса; конец сегмента = следующий опрос (без +N сек).
  */
 function buildTimelineSegments(samples, predicate, valueGetter, windowEnd, maxGapMs) {
     const segments = [];
@@ -761,11 +761,8 @@ function buildTimelineSegments(samples, predicate, valueGetter, windowEnd, maxGa
             const needNew = !current || gapBreak || (valueGetter && current.value !== v);
             if (needNew) {
                 if (current) {
-                    if (gapBreak && gapLimit != null) {
-                        current.end = Math.min(s.x, current.end + gapLimit);
-                    } else {
-                        current.end = s.x;
-                    }
+                    // Конец предыдущего — на текущем опросе (stepped: after до этой точки).
+                    current.end = s.x;
                     segments.push(current);
                 }
                 current = { start: s.x, end: s.x, value: v };
@@ -773,15 +770,16 @@ function buildTimelineSegments(samples, predicate, valueGetter, windowEnd, maxGa
                 current.end = s.x;
             }
         } else if (current) {
-            current.end = gapLimit != null ? Math.min(s.x, current.end + gapLimit) : s.x;
+            // Idle/offline опрос закрывает сегмент ровно здесь — график и дорожка совпадают.
+            current.end = s.x;
             segments.push(current);
             current = null;
         }
     });
     if (current) {
-        // Online/offline тянем до windowEnd; сварку — на MAX_GAP после последнего отсчёта (как импульс на графике).
         if (gapLimit != null) {
-            current.end = current.end + gapLimit;
+            // Нет следующего опроса: короткий хвост, чтобы сегмент/импульс были видны.
+            current.end = current.end + Math.min(gapLimit, 3000);
             if (Number.isFinite(windowEnd)) current.end = Math.min(current.end, windowEnd);
         } else if (Number.isFinite(windowEnd)) {
             current.end = Math.max(current.end, windowEnd);
@@ -1016,11 +1014,65 @@ function appendWeldingPulseSeries(prev, yRaw, wasWelding, nowWelding, lastYRef, 
 }
 
 /**
- * Сварка на истории (stepped:'after', как дорожка «Состояние»):
- * точка опроса держит Y до следующей; y>0 только при isWelding.
- * Не закрываем дугу в том же x (иначе «игла» без тултипа, а жёлтый ещё тянется вперёд).
- * Пауза > MAX_GAP — гасим в 0 в prevX+MAX_GAP.
+ * Сварка на графике = ровно жёлтые сегменты «Состояние».
+ * Внутри сегмента — stepped по опросам; на seg.end жёсткий сброс в 0 (нельзя залезть на зелёный).
  */
+function buildWeldingSeriesForSegments(points, mapY, segments) {
+    const series = [];
+    const push = (x, yRaw) => {
+        if (!Number.isFinite(x)) return;
+        const y = Math.round(Number(yRaw) * 10) / 10;
+        const prev = series[series.length - 1];
+        if (prev && prev.x === x && prev.y === y) return;
+        series.push({ x, y });
+    };
+
+    if (!points?.length) return series;
+    push(points[0].ts, 0);
+
+    const segs = (segments || [])
+        .filter((s) => Number.isFinite(s?.start) && Number.isFinite(s?.end) && s.end > s.start)
+        .sort((a, b) => a.start - b.start);
+    if (!segs.length) {
+        points.forEach((p) => push(p.ts, 0));
+        return series;
+    }
+
+    const sorted = points.filter((p) => p && Number.isFinite(p.ts)).sort((a, b) => a.ts - b.ts);
+
+    segs.forEach((seg) => {
+        push(seg.start, 0);
+        let lastY = 0;
+        sorted.forEach((p) => {
+            if (p.ts < seg.start || p.ts >= seg.end) return;
+            if (!isHistoryPointWelding(p)) return;
+            const raw = Number(mapY(p));
+            const y = Number.isFinite(raw) && raw > 0 ? Math.round(raw * 10) / 10 : 0;
+            if (!(y > 0)) return;
+            if (lastY === 0) {
+                push(p.ts, 0);
+                push(p.ts, y);
+            } else if (y !== lastY) {
+                push(p.ts, y);
+            } else {
+                push(p.ts, y);
+            }
+            lastY = y;
+        });
+        if (lastY > 0) {
+            push(seg.end, lastY);
+            push(seg.end, 0);
+        } else {
+            push(seg.end, 0);
+        }
+    });
+
+    const lastPt = sorted[sorted.length - 1];
+    if (lastPt) push(lastPt.ts, 0);
+    return series;
+}
+
+/** @deprecated ponytail: оставлен для live/совместимости; история идёт через buildWeldingSeriesForSegments. */
 function buildWeldingPulseSeriesFromHistoryPoints(points, mapY) {
     const series = [];
     if (!points?.length) return series;
@@ -1044,12 +1096,8 @@ function buildWeldingPulseSeriesFromHistoryPoints(points, mapY) {
         const raw = welding ? Number(mapY(p)) : 0;
         const y = welding && Number.isFinite(raw) && raw > 0 ? Math.round(raw * 10) / 10 : 0;
 
-        if (prevX != null && x - prevX > WELDING_SERIES_MAX_GAP_MS) {
-            if (prevY > 0) {
-                const zeroAt = prevX + WELDING_SERIES_MAX_GAP_MS;
-                push(zeroAt, prevY);
-                push(zeroAt, 0);
-            }
+        if (prevX != null && x - prevX > WELDING_SERIES_MAX_GAP_MS && prevY > 0) {
+            push(x, 0);
             prevY = 0;
         }
 
@@ -1057,13 +1105,6 @@ function buildWeldingPulseSeriesFromHistoryPoints(points, mapY) {
         prevX = x;
         prevY = y;
     });
-
-    // Последняя дуга: держим до MAX_GAP, затем 0 (совпадает с удлинением жёлтого сегмента).
-    if (prevX != null && prevY > 0) {
-        const zeroAt = prevX + WELDING_SERIES_MAX_GAP_MS;
-        push(zeroAt, prevY);
-        push(zeroAt, 0);
-    }
 
     return series;
 }
@@ -4625,32 +4666,44 @@ const DeviceMonitorPage = () => {
     }, [chartBounds, timeWindow.start, timeWindow.end, graphUsesServerData, LIVE_WINDOW_MS]);
 
     /**
-     * Сварочный ток/напряжение в истории — только где isWelding (как жёлтая дорожка).
-     * Одна точка на опрос + обрыв по паузе >20с — без «прямоугольников» через серый участок.
+     * Сварка на графике — те же сегменты, что жёлтая «Состояние» (считаем так же, как timelineRows.welding).
      */
     const historyWeldingChartBundle = useMemo(() => {
         if (!graphUsesServerData) return null;
         const windowStart = activeWindow.start;
         const windowEnd = activeWindow.end;
+        const timeline = buildHistoryTimelineForWindow(windowStart, windowEnd);
+        const sanitized = sanitizeBriefOfflineBetweenOnline(timeline, windowEnd, 5000);
+        let lastTs = null;
+        sanitized.forEach((s) => {
+            if (Number.isFinite(s?.x)) lastTs = lastTs == null ? s.x : Math.max(lastTs, s.x);
+        });
+        let laneEnd = windowEnd;
+        if (lastTs != null) laneEnd = Math.min(laneEnd, lastTs);
+        if (selectedGraphDate && isTodayDateStr(selectedGraphDate)) {
+            laneEnd = Math.min(laneEnd, Date.now());
+        }
+        laneEnd = Math.max(windowStart, laneEnd);
+        const segs = buildTimelineSegments(
+            sanitized,
+            (s) => Boolean(s.isWelding),
+            null,
+            laneEnd,
+            WELDING_SERIES_MAX_GAP_MS
+        );
+
         const pts = [];
         historyCacheRef.current.pointsByTs.forEach((p, ts) => {
             if (ts >= windowStart && ts <= windowEnd) pts.push(p);
         });
         pts.sort((a, b) => a.ts - b.ts);
 
-        const weldTs = new Set();
-        pts.forEach((p) => {
-            if (isHistoryPointWelding(p)) weldTs.add(p.ts);
-        });
-        const mapCurrent = (p) => (weldTs.has(p.ts) ? mapHistoryFactCurrentY(p) : 0);
-        const mapVoltage = (p) => (weldTs.has(p.ts) ? mapHistoryFactVoltageY(p) : 0);
-
-        // Без gate по weldTs: синтетические точки prevX+MAX_GAP (сброс дуги) должны остаться.
-        const cur = buildWeldingPulseSeriesFromHistoryPoints(pts, mapCurrent);
-        const vol = buildWeldingPulseSeriesFromHistoryPoints(pts, mapVoltage);
+        const cur = buildWeldingSeriesForSegments(pts, mapHistoryFactCurrentY, segs);
+        const vol = buildWeldingSeriesForSegments(pts, mapHistoryFactVoltageY, segs);
         return {
             weldingCurrent: decimateWeldingPulseSeriesSafe(cur, HISTORY_CHART_MAX_POINTS),
             weldingVoltage: decimateWeldingPulseSeriesSafe(vol, HISTORY_CHART_MAX_POINTS),
+            segments: segs,
         };
     }, [
         graphUsesServerData,
@@ -4658,6 +4711,9 @@ const DeviceMonitorPage = () => {
         activeWindow.end,
         historyCacheRevision,
         HISTORY_CHART_MAX_POINTS,
+        buildHistoryTimelineForWindow,
+        selectedGraphDate,
+        isTodayDateStr,
     ]);
 
     /** Те же точки, что рисует Chart.js; тултип сварки — из hoverSamples bundle. */
@@ -5163,9 +5219,13 @@ const DeviceMonitorPage = () => {
                 if (!SET_METRIC_KEYS.has(channelKey)) return;
                 value = 0;
             }
-            // Сварка: строку только при реальной дуге (Y>0) — совпадает с отрисовкой импульсов.
-            if (WELD_METRIC_KEYS.has(channelKey) && !(Number(value) > 0)) {
-                return;
+            // Сварка: только над жёлтым сегментом и только при Y>0 (график = дорожка = тултип).
+            if (WELD_METRIC_KEYS.has(channelKey)) {
+                const segs = graphUsesServerData
+                    ? (historyWeldingChartBundle?.segments || timelineRows.welding)
+                    : timelineRows.welding;
+                if (!isTsInWeldingSegments(hoverCursor.ts, segs)) return;
+                if (!(Number(value) > 0)) return;
             }
             selectedRows.push({
                 key: `${slotName}-${channelKey}`,
@@ -5200,6 +5260,7 @@ const DeviceMonitorPage = () => {
         steppedTooltipCoverage,
         linearInterpTooltipCoverage,
         timelineRows,
+        historyWeldingChartBundle,
         findSegmentAtTs,
         welderNameByRfid
     ]);
