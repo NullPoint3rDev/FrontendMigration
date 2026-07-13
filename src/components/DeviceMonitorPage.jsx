@@ -703,25 +703,35 @@ function getMachineActivityModeFromPanelState(state) {
 }
 
 /**
- * Live-дорожка «Состояние»: зелёный при живом panel-state, кроме дежурного / явного Выкл.
- * ponytail: корневой status=Offline сам по себе серым не делаем — иначе мигает при «Включен».
+ * Live-дорожка «Состояние»: зелёный только при явном вкл/сварке/ожидании.
+ * Нет текста + status Offline (или пусто) → серый. Не угадываем «в сети» по одному HTTP 200.
  */
 function isLiveLaneOnlineFromPanelState(state) {
     if (!state) return false;
     if (isStandbyFromPanelState(state)) return false;
     const text = pickMachineStateTextFromPanel(state);
-    if (!text) return true; // ответ есть, текста нет — считаем в сети
-    const stateLower = String(text).toLowerCase().trim();
-    if (stateLower.includes('включ') || stateLower.includes('ожидан') || stateLower.includes('waiting')
-        || stateLower.includes('свар') || stateLower.includes('weld')
-        || stateLower.includes('idle') || stateLower.includes('ready') || stateLower === 'on') {
+    const flat = flattenPanelState(state);
+    const st = String(flat.status || flat.Status || '').toLowerCase().trim();
+
+    if (text) {
+        const stateLower = String(text).toLowerCase().trim();
+        if (stateLower.includes('включ') || stateLower.includes('ожидан') || stateLower.includes('waiting')
+            || stateLower.includes('свар') || stateLower.includes('weld')
+            || stateLower.includes('idle') || stateLower.includes('ready') || stateLower === 'on') {
+            return true;
+        }
+        if (stateLower.includes('выключ') || stateLower === 'выкл' || stateLower.startsWith('выкл')
+            || stateLower.includes('не в сети')) {
+            return false;
+        }
+    }
+    if (st === 'welding' || st === 'сварка' || st === 'on' || st === 'idle' || st === 'waiting') {
         return true;
     }
-    if (stateLower.includes('выключ') || stateLower === 'выкл' || stateLower.startsWith('выкл')
-        || stateLower.includes('не в сети')) {
+    if (st === 'offline' || st === 'off' || st.includes('не в сети') || !st) {
         return false;
     }
-    return true;
+    return false;
 }
 
 function buildHistoryPointFromPanelPoll(state, xPoll, weldingNow) {
@@ -3533,6 +3543,16 @@ const DeviceMonitorPage = () => {
 
                 // Убеждаемся, что status сохраняется (приоритет params.status, если он был установлен выше)
                 const finalStatus = params.status || data.state.status || null;
+                const statusLc = String(finalStatus || '').toLowerCase().trim();
+
+                // Нет свежего текста состояния — не оставляем в merge устаревший «Включен» при Offline.
+                if (!params['Состояние аппарата'] && !params.WeldingMachineState) {
+                    if (statusLc === 'offline' || statusLc === 'off') {
+                        params['Состояние аппарата'] = '';
+                        params.WeldingMachineState = '';
+                        params.weldingMachineState = '';
+                    }
+                }
 
                 // Сохраняем RFID код из предыдущих данных, если он не пришел в новом ответе
                 const existingData = deviceData[mac];
@@ -4765,18 +4785,24 @@ const DeviceMonitorPage = () => {
         || currentStatusData.weldingMachineState
         || null;
     const machineStateFromPanel = pickMachineStateTextFromPanel(panelStateFresh);
-    // Не подставляем «Не в сети» при живом poll без текста — status=Offline мигает, список оборудования уже «Включен».
+    const statusLower = String(
+        panelStateFresh?.status || panelStateFresh?.Status || currentStatusData.status || ''
+    ).toLowerCase().trim();
+    // Свежий panel/status важнее store: иначе merge оставляет «Включен», когда аппарат уже Offline.
     const machineStateValue = (() => {
-        if (machineStateFromStore) return machineStateFromStore;
         if (machineStateFromPanel) return machineStateFromPanel;
+        if (statusLower === 'welding' || statusLower === 'сварка' || statusLower.includes('weld')) return 'Сварка';
+        if (statusLower === 'error' || statusLower.includes('авари')) return 'Ошибка';
+        if (statusLower === 'on' || statusLower === 'idle' || statusLower === 'waiting') return 'Включен';
+        if (statusLower === 'offline' || statusLower === 'off' || statusLower.includes('не в сети')) {
+            return 'Не в сети';
+        }
+        // Store только если status не Offline (иначе устаревший «Включен»).
+        if (machineStateFromStore && statusLower !== 'offline' && statusLower !== 'off') {
+            return machineStateFromStore;
+        }
         if (!hasLivePanel) return 'Не в сети';
-        const st = String(
-            currentStatusData.status || panelStateFresh?.status || panelStateFresh?.Status || ''
-        ).toLowerCase().trim();
-        if (st === 'welding' || st.includes('weld') || st === 'сварка') return 'Сварка';
-        if (st === 'error' || st.includes('error') || st.includes('авари')) return 'Ошибка';
-        // Offline/пустой status при успешном panel-state = аппарат отвечает → как в списке оборудования.
-        return 'Включен';
+        return 'Не в сети';
     })();
     const machineStateDisplayValue = formatWeldingMachineStateDisplay(machineStateValue);
     const machineStateColor = getStateColor(machineStateValue) || 'rgba(242, 241, 244, 0.9)';
