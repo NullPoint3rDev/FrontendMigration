@@ -989,6 +989,7 @@ const resolveSetChartY = ({
                               idleSource,
                               holdRef,
                               now,
+                              holdWhileOnline = false,
                           }) => {
     let candidate;
     if (wNow) {
@@ -1006,7 +1007,8 @@ const resolveSetChartY = ({
     }
 
     const { value, at } = holdRef.current;
-    if (value > 0 && now - at < SET_METRIC_HOLD_MS) {
+    // Пока аппарат включён — не рвём уставку нулём опроса (State.I=0 ≠ сброс уставки).
+    if (value > 0 && (holdWhileOnline || now - at < SET_METRIC_HOLD_MS)) {
         return value;
     }
     return candidate;
@@ -3143,6 +3145,8 @@ const DeviceMonitorPage = () => {
                     null;
                 const hasWelder = Boolean(stateRfid && String(stateRfid).trim());
                 const wasWelderPresent = prevWelderPresentForChartRef.current === true;
+                // Та же логика, что зелёная дорожка: не рвать уставку из‑за мигающего status=Offline.
+                const setSuppressedNow = !isLiveLaneOnlineFromPanelState(response);
                 const setCurrentY = resolveSetChartY({
                     wNow,
                     wasWelding: wasArc,
@@ -3150,6 +3154,7 @@ const DeviceMonitorPage = () => {
                     idleSource: yi,
                     holdRef: lastSetWeldingCurrentHoldRef,
                     now: xPoll,
+                    holdWhileOnline: !setSuppressedNow,
                 });
                 const setVoltageY = resolveSetChartY({
                     wNow,
@@ -3158,9 +3163,8 @@ const DeviceMonitorPage = () => {
                     idleSource: yu,
                     holdRef: lastSetWeldingVoltageHoldRef,
                     now: xPoll,
+                    holdWhileOnline: !setSuppressedNow,
                 });
-                // Выкл / Выкл(деж) / Не в сети — уставка не рисуется (разрыв, y = null).
-                const setSuppressedNow = getMachineActivityModeFromPanelState(response) === 'off';
                 setTelemetrySeries(prev => {
                     const next = { ...prev };
                     TELEMETRY_CHANNELS_CONFIG.forEach(channel => {
@@ -4675,8 +4679,8 @@ const DeviceMonitorPage = () => {
 
     const controlFactCurrent = isWeldingActive ? getCurrentValue() : '0';
     const controlFactVoltage = isWeldingActive ? getVoltageValue() : '0';
-    /** Уставка отсутствует (панель/график/тултип = 0) при Выкл / Выкл(деж) / Не в сети. */
-    const isSetMetricSuppressed = !hasData || getMachineActivityModeFromPanelState(deviceData[machineMac]) === 'off';
+    /** Уставка отсутствует (панель/график/тултип = 0) при Выкл / Выкл(деж); не из‑за мигающего Offline. */
+    const isSetMetricSuppressed = !hasData || !isLiveLaneOnlineFromPanelState(deviceData[machineMac]);
     const controlSetCurrent = isSetMetricSuppressed
         ? '0'
         : (isWeldingActive ? idleControlMetricsRef.current.current : getCurrentValue());
