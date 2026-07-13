@@ -50,6 +50,10 @@ import {
     isStandbyMachineState,
     STANDBY_MACHINE_STATE_DISPLAY,
 } from '../utils/weldingMachineStateDisplay';
+import {
+    getMachineActivityModeFromTextAndStatus,
+    isStateLaneOnlineMode,
+} from '../utils/weldingMachineActivityMode';
 import { despikeValuesMedian3, despikeValuesMedian3WithinRuns } from '../utils/weldingDespike';
 import { resolveSliderTrackUrl, trackOff, knobOn, knobOff, shadow as sliderShadow } from '../utils/graphSliderAssets';
 
@@ -666,40 +670,16 @@ function isWeldingFromPanelState(state) {
 function getMachineActivityModeFromPanelState(state) {
     if (!state) return 'off';
     if (isWeldingFromPanelState(state)) return 'welding';
-
     const data = flattenPanelState(state);
     const weldingMachineState = data['Состояние аппарата'] ||
         data['WeldingMachineState'] ||
         data.weldingMachineState ||
         data['State.WeldingMachineState'] ||
         null;
-    const status = data.status || data.Status || null;
-    // Текст состояния аппарата приоритетнее корневого status (часто Offline при живом «Включен»).
-    const stateLower = String(weldingMachineState || '').toLowerCase().trim();
-    const statusLower = String(status || '').toLowerCase().trim();
-
-    if (isStandbyMachineState(weldingMachineState)) {
-        return 'off';
-    }
-    if (stateLower.includes('waiting') || stateLower.includes('ожидан')
-        || stateLower.includes('включ') || stateLower === 'on'
-        || stateLower.includes('idle') || stateLower.includes('ready')) {
-        return 'on';
-    }
-    // Явный Выкл по тексту состояния (не путать с «Включен»).
-    if (stateLower.includes('выключ') || stateLower === 'выкл' || stateLower.startsWith('выкл')
-        || stateLower.includes('не в сети')) {
-        return 'off';
-    }
-    // status=Offline без текста состояния — ненадёжен для live (мигает при включённом аппарате).
-    if (!stateLower && (statusLower === 'off' || statusLower.includes('offline') || statusLower.includes('не в сети'))) {
-        return 'off';
-    }
-    if (!stateLower && (statusLower.includes('waiting') || statusLower === 'on' || statusLower.includes('idle'))) {
-        return 'on';
-    }
-
-    return 'on';
+    return getMachineActivityModeFromTextAndStatus(
+        weldingMachineState,
+        data.status || data.Status || null
+    );
 }
 
 function buildHistoryPointFromPanelPoll(state, xPoll, weldingNow) {
@@ -717,7 +697,7 @@ function buildHistoryPointFromPanelPoll(state, xPoll, weldingNow) {
         setCurrent: weldingNow ? null : (yi > 0 ? yi : null),
         setVoltage: weldingNow ? null : (yu > 0 ? yu : null),
         gasFlowLpm: sample.gasFlow ?? null,
-        status: weldingNow ? 'Welding' : String(flat.status || flat.Status || 'Idle'),
+        status: weldingNow ? 'Welding' : (flat.status || flat.Status || null),
         isWelding: weldingNow,
         machineStateText: pickMachineStateTextFromPanel(state),
         errorCode: parseErrorCodeForTimeline(state),
@@ -739,6 +719,12 @@ const isHistoryPointWelding = (p) => {
         || text.includes('сварка') || text.includes('welding');
 };
 
+function getMachineActivityModeFromHistoryPoint(p) {
+    if (!p) return 'off';
+    if (isHistoryPointWelding(p)) return 'welding';
+    return getMachineActivityModeFromTextAndStatus(p.machineStateText, p.status);
+}
+
 /**
  * Макс. пауза между сварочными опросами: дальше — новый сегмент (не тянем дугу через дыру).
  * Удержание Y — только до следующей точки опроса / конца сегмента, без «+20с вперёд».
@@ -746,20 +732,10 @@ const isHistoryPointWelding = (p) => {
 const WELDING_SERIES_MAX_GAP_MS = 20000;
 
 /**
- * Уставка не рисуется, когда на «Состояние» серый/выкл: offline, дежурный, явный Выкл.
+ * Уставка не рисуется, когда на «Состояние» серый/выкл.
  * Те же критерии, что isOnline у дорожки (иначе линия тянется через выключенный аппарат).
  */
-const isHistoryPointSetSuppressed = (p) => {
-    if (!p) return true;
-    if (isStandbyMachineState(p.machineStateText)) return true;
-    const st = String(p.status || '').toLowerCase().trim();
-    if (st === 'offline') return true;
-    const text = String(p.machineStateText || '').toLowerCase().trim();
-    if (!text) return false;
-    if (text.includes('не в сети') || text.includes('offline')) return true;
-    if (text === 'off' || text === 'выкл' || text.includes('выключ')) return true;
-    return false;
-};
+const isHistoryPointSetSuppressed = (p) => !isStateLaneOnlineMode(getMachineActivityModeFromHistoryPoint(p));
 
 const isTsInWeldingSegments = (ts, segments) => (
     Array.isArray(segments)
@@ -2231,12 +2207,11 @@ const DeviceMonitorPage = () => {
         });
         points.sort((a, b) => a.ts - b.ts);
         return points.map((p) => {
-            const st = String(p.status || '').toLowerCase();
-            const standby = isStandbyMachineState(p.machineStateText);
+            const mode = getMachineActivityModeFromHistoryPoint(p);
             return {
                 x: p.ts,
-                isOnline: st !== 'offline' && !standby,
-                isWelding: isHistoryPointWelding(p) && !standby,
+                isOnline: isStateLaneOnlineMode(mode),
+                isWelding: mode === 'welding',
                 errorCode: p.errorCode,
                 rfid: p.rfid,
             };
@@ -3202,14 +3177,16 @@ const DeviceMonitorPage = () => {
                     return next;
                 });
                 prevWelderPresentForChartRef.current = hasWelder;
-                // Как в staging: не-standby успешный poll → зелёная дорожка.
+                // Зелёный только при Включен/Сварка — не любой успешный poll.
+                const activityMode = getMachineActivityModeFromPanelState(response);
+                const laneOnline = isStateLaneOnlineMode(activityMode);
                 setTimelineSamples(prev => {
                     const next = [
                         ...prev,
                         {
                             x: xPoll,
-                            isOnline: true,
-                            isWelding: wNow,
+                            isOnline: laneOnline,
+                            isWelding: activityMode === 'welding',
                             errorCode,
                             rfid: stateRfid ? String(stateRfid).trim() : null
                         }
@@ -3267,8 +3244,8 @@ const DeviceMonitorPage = () => {
                         {
                             x: xPoll,
                             y: 1,
-                            isOnline: true,
-                            isWelding: wNow,
+                            isOnline: laneOnline,
+                            isWelding: activityMode === 'welding',
                             errorCode,
                             rfid: stateRfid ? String(stateRfid).trim() : null
                         },
