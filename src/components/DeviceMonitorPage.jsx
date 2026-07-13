@@ -669,6 +669,12 @@ function isWeldingFromPanelState(state) {
     if (weldCurrent > 1 && !weldingMachineState) {
         return true;
     }
+    // Core: state=0 «Аппарат включен», но weldingCurrent >> уставки — дуга (см. CorePacket.isArcActive).
+    const weldRaw = Number(data.WeldingCurrent ?? data['Core.WeldingCurrent'] ?? NaN);
+    const setI = Number(data.Current ?? 0);
+    if (Number.isFinite(weldRaw) && weldRaw > 10 && weldRaw > setI + 5) {
+        return true;
+    }
     return false;
 }
 
@@ -710,12 +716,14 @@ function buildHistoryPointFromPanelPoll(state, xPoll, weldingNow) {
     };
 }
 
-/** Сварка только по явному флагу/статусу/тексту «Сварка» — без эвристик по току и «свароч*». */
+/** Сварка: текст/флаг или факт. ток дуги из API (>10А — уставка в setCurrent, не в current). */
 const isHistoryPointWelding = (p) => {
     if (!p) return false;
     if (isStandbyMachineState(p.machineStateText)) return false;
     if (p.isWelding === true) return true;
     if (p.isWelding === false) return false;
+    const factI = Number(p.current);
+    if (Number.isFinite(factI) && factI > 10) return true;
     const st = String(p.status || '').toLowerCase().trim();
     if (st === 'welding' || st === 'сварка') return true;
     const text = String(p.machineStateText || '').toLowerCase().trim();
@@ -3182,7 +3190,6 @@ const DeviceMonitorPage = () => {
                     return next;
                 });
                 prevWelderPresentForChartRef.current = hasWelder;
-                // Зелёный только при Включен/Сварка — не любой успешный poll.
                 const activityMode = getMachineActivityModeFromPanelState(response);
                 const laneOnline = isStateLaneOnlineMode(activityMode);
                 setTimelineSamples(prev => {
@@ -3191,7 +3198,7 @@ const DeviceMonitorPage = () => {
                         {
                             x: xPoll,
                             isOnline: laneOnline,
-                            isWelding: activityMode === 'welding',
+                            isWelding: wNow,
                             errorCode,
                             rfid: stateRfid ? String(stateRfid).trim() : null
                         }
@@ -3250,7 +3257,7 @@ const DeviceMonitorPage = () => {
                             x: xPoll,
                             y: 1,
                             isOnline: laneOnline,
-                            isWelding: activityMode === 'welding',
+                            isWelding: wNow,
                             errorCode,
                             rfid: stateRfid ? String(stateRfid).trim() : null
                         },
