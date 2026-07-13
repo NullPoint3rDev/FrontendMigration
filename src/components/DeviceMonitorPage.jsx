@@ -635,14 +635,6 @@ function hasMonitorPanelPayload(data) {
 function isWeldingFromPanelState(state) {
     if (isStandbyFromPanelState(state)) return false;
     const data = flattenPanelState(state);
-    const status = data.status || data.Status;
-    if (status) {
-        const statusLower = String(status).toLowerCase().trim();
-        if (statusLower === 'welding' || statusLower === 'сварка'
-            || statusLower.includes('сварка') || statusLower.includes('welding')) {
-            return true;
-        }
-    }
     const weldingMachineState = data['Состояние аппарата'] ||
         data['WeldingMachineState'] ||
         data.weldingMachineState ||
@@ -661,6 +653,14 @@ function isWeldingFromPanelState(state) {
             stateLower === 'выкл' || stateLower === 'off' ||
             stateLower === 'аппарат включен') {
             return false;
+        }
+    }
+    const status = data.status || data.Status;
+    if (status) {
+        const statusLower = String(status).toLowerCase().trim();
+        if (statusLower === 'welding' || statusLower === 'сварка'
+            || statusLower.includes('сварка') || statusLower.includes('welding')) {
+            return true;
         }
     }
     // Нет текста состояния (бэк прислал телеметрию без WeldingMachineState) — сварку определяем по факт. току.
@@ -4525,18 +4525,6 @@ const DeviceMonitorPage = () => {
         const data = deviceData[machineMac];
         if (!data) return false;
 
-        // 1. status Welding приоритетнее текста «Аппарат включен» (live-hold на бэке)
-        const status = data.status || data.Status;
-        if (status) {
-            const statusLower = String(status).toLowerCase().trim();
-            if (statusLower === 'welding' || statusLower === 'сварка' ||
-                statusLower === 'weld' ||
-                statusLower.includes('сварка') ||
-                statusLower.includes('welding')) {
-                return true;
-            }
-        }
-
         const weldingMachineState = data['Состояние аппарата'] ||
             data['WeldingMachineState'] ||
             data.weldingMachineState ||
@@ -4562,7 +4550,18 @@ const DeviceMonitorPage = () => {
             }
         }
 
-        // 2. Проверяем ток сварки ТОЛЬКО если WeldingMachineState не определен или неоднозначен
+        const status = data.status || data.Status;
+        if (status) {
+            const statusLower = String(status).toLowerCase().trim();
+            if (statusLower === 'welding' || statusLower === 'сварка' ||
+                statusLower === 'weld' ||
+                statusLower.includes('сварка') ||
+                statusLower.includes('welding')) {
+                return true;
+            }
+        }
+
+        // 3. Проверяем ток сварки ТОЛЬКО если WeldingMachineState не определен или неоднозначен
         // НЕ используем ток как основной индикатор, так как аппарат может быть включен без сварки
         const current = parseFloat(data.Current || data['State.I'] || 0);
         if (current > 1 && !weldingMachineState) {
