@@ -187,19 +187,55 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         return { minDate: tenYearsAgo, maxDate: today }
     }, [])
 
-    const validateEquipmentDate = (iso) => {
-        if (!iso) return ''
-        const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/)
-        if (!m) return 'Некорректная дата'
+    const parseIsoDay = (iso) => {
+        const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/)
+        if (!m) return null
         const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
         d.setHours(0, 0, 0, 0)
+        return d
+    }
+
+    const validateEquipmentDate = (iso) => {
+        if (!iso) return ''
+        const d = parseIsoDay(iso)
+        if (!d) return 'Некорректная дата'
         if (d > dateLimits.maxDate) return 'Дата не может быть в будущем'
         if (d < dateLimits.minDate) return 'Дата не может быть старше 10 лет'
         return ''
     }
 
+    // ponytail: зеркало бэка — commission ≥ manufacture
+    const validateFieldDate = (field, iso, data = formData) => {
+        const base = validateEquipmentDate(iso)
+        if (base || !iso) return base
+        const mfg = parseIsoDay(data.manufactureDate)
+        const com = parseIsoDay(field === 'commissioningDate' ? iso : data.commissioningDate)
+        const mfgDay = field === 'manufactureDate' ? parseIsoDay(iso) : mfg
+        if (mfgDay && com && com < mfgDay) {
+            return field === 'manufactureDate'
+                ? 'Дата изготовления не может быть позже даты ввода в эксплуатацию'
+                : 'Дата ввода в эксплуатацию не может быть раньше даты изготовления'
+        }
+        return ''
+    }
+
     const handleDateFieldChange = (field, iso) => {
-        handleInputChange(field, iso)
+        const next = { ...formData, [field]: iso }
+        setFormData(next)
+        setErrors((prev) => {
+            const n = { ...prev }
+            const err = validateFieldDate(field, iso, next)
+            if (err) n[field] = err
+            else delete n[field]
+            if (field === 'manufactureDate' || field === 'commissioningDate') {
+                const other = field === 'manufactureDate' ? 'commissioningDate' : 'manufactureDate'
+                const otherErr = validateFieldDate(other, next[other], next)
+                if (otherErr) n[other] = otherErr
+                else delete n[other]
+            }
+            return n
+        })
+        if (apiError) setApiError('')
     }
 
     const handleOperatingHoursChange = (field, value) => {
@@ -596,7 +632,9 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                 return
             }
             for (const field of ['manufactureDate', 'commissioningDate', 'lastMaintenanceDate']) {
-                const err = validateEquipmentDate(formData[field])
+                const err = field === 'lastMaintenanceDate'
+                    ? validateEquipmentDate(formData[field])
+                    : validateFieldDate(field, formData[field])
                 if (err) nextErrors[field] = err
             }
             if (Object.keys(nextErrors).length > 0) {
@@ -671,20 +709,32 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
         onClose()
     }
 
-    const renderDateField = (field, label, required = false) => (
-        <div className="form-field">
-            <label>{label}</label>
-            <WelderDateField
-                value={formData[field]}
-                onChange={(iso) => handleDateFieldChange(field, iso)}
-                disabled={gated}
-                minDate={dateLimits.minDate}
-                maxDate={dateLimits.maxDate}
-                validate={validateEquipmentDate}
-            />
-            {errors[field] && <span className="error-message">{errors[field]}</span>}
-        </div>
-    )
+    const renderDateField = (field, label) => {
+        let minDate = dateLimits.minDate
+        let maxDate = dateLimits.maxDate
+        if (field === 'commissioningDate') {
+            const mfg = parseIsoDay(formData.manufactureDate)
+            if (mfg && mfg > minDate) minDate = mfg
+        }
+        if (field === 'manufactureDate') {
+            const com = parseIsoDay(formData.commissioningDate)
+            if (com && com < maxDate) maxDate = com
+        }
+        return (
+            <div className="form-field">
+                <label>{label}</label>
+                <WelderDateField
+                    value={formData[field]}
+                    onChange={(iso) => handleDateFieldChange(field, iso)}
+                    disabled={gated}
+                    minDate={minDate}
+                    maxDate={maxDate}
+                    validate={validateEquipmentDate}
+                />
+                {errors[field] && <span className="error-message">{errors[field]}</span>}
+            </div>
+        )
+    }
 
     if (!isOpen) return null
 
