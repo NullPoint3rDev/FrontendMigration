@@ -682,7 +682,9 @@ function getMachineActivityModeFromPanelState(state) {
     if (stateLower.includes('waiting') || stateLower.includes('ожидан')) {
         return 'on';
     }
-    if (stateLower.includes('выключ') || stateLower === 'off' || stateLower.includes('offline') || stateLower.includes('не в сети')) {
+    // «Выкл» / «Выкл(деж)» — без обязательного «выключ» (иначе деж. остаётся on → зелёная дорожка).
+    if (stateLower.includes('выключ') || stateLower === 'выкл' || stateLower.startsWith('выкл')
+        || stateLower === 'off' || stateLower.includes('offline') || stateLower.includes('не в сети')) {
         return 'off';
     }
     if (stateLower.includes('включ') || stateLower === 'on' || stateLower.includes('idle') || stateLower.includes('ready')) {
@@ -3191,12 +3193,14 @@ const DeviceMonitorPage = () => {
                     return next;
                 });
                 prevWelderPresentForChartRef.current = hasWelder;
+                // Зелёная дорожка только при реальном «вкл»; Выкл / Выкл(деж) → серый.
+                const laneOnline = getMachineActivityModeFromPanelState(response) !== 'off';
                 setTimelineSamples(prev => {
                     const next = [
                         ...prev,
                         {
                             x: xPoll,
-                            isOnline: true,
+                            isOnline: laneOnline,
                             isWelding: wNow,
                             errorCode,
                             rfid: stateRfid ? String(stateRfid).trim() : null
@@ -3255,7 +3259,7 @@ const DeviceMonitorPage = () => {
                         {
                             x: xPoll,
                             y: 1,
-                            isOnline: true,
+                            isOnline: laneOnline,
                             isWelding: wNow,
                             errorCode,
                             rfid: stateRfid ? String(stateRfid).trim() : null

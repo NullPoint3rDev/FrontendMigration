@@ -10,13 +10,16 @@ export function isWaitingMachineState(state) {
         || stateLower.includes('аппарат в режиме ожидания');
 }
 
-/** Дежурный режим. */
+/** Дежурный режим (в т.ч. уже отформатированное «Выкл(деж)»). */
 export function isStandbyMachineState(state) {
     if (state == null || state === '') return false;
     const stateLower = String(state).toLowerCase().trim();
     return stateLower.includes('дежурн')
         || stateLower.includes('standby')
-        || stateLower === 'дежурный режим';
+        || stateLower === 'дежурный режим'
+        || stateLower === 'выкл(деж)'
+        || stateLower.includes('выкл(деж)')
+        || /\(деж\)/.test(stateLower);
 }
 
 export const STANDBY_MACHINE_STATE_DISPLAY = 'Выкл(деж)';
