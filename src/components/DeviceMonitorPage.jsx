@@ -663,7 +663,12 @@ function isWeldingFromPanelState(state) {
             return true;
         }
     }
-    // ponytail: без текста состояния не угадываем сварку по току (уставка в State.I даёт ложные дуги).
+    // Нет текста состояния (бэк прислал телеметрию без WeldingMachineState) — сварку определяем по факт. току.
+    // Порог >1 А и условие !weldingMachineState, как в staging: в простое Current=0, ложной дуги нет.
+    const { current: weldCurrent } = extractCurrentVoltageFromPanelState(state);
+    if (weldCurrent > 1 && !weldingMachineState) {
+        return true;
+    }
     return false;
 }
 
