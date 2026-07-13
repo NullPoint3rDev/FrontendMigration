@@ -5225,7 +5225,7 @@ const DeviceMonitorPage = () => {
         );
         const errors = buildSegments(
             timelineInWindow,
-            (s) => Boolean(s.isOnline) && Number.isFinite(Number(s.errorCode)) && Number(s.errorCode) > 0,
+            (s) => Number.isFinite(Number(s.errorCode)) && Number(s.errorCode) > 0,
             (s) => Number(s.errorCode),
             wEnd
         ).map((seg) => ({ ...seg, label: formatErrorCodeLabel(seg.value) }));

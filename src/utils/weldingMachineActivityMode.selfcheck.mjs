@@ -15,6 +15,8 @@ assert(getMachineActivityModeFromTextAndStatus('', 'Idle') === 'on', 'empty + Id
 assert(getMachineActivityModeFromTextAndStatus('', '') === 'off', 'empty poll not green');
 assert(getMachineActivityModeFromTextAndStatus('Выкл', null) === 'off', 'выкл');
 assert(getMachineActivityModeFromTextAndStatus('Дежурный режим', 'On') === 'off', 'standby');
+assert(getMachineActivityModeFromTextAndStatus('Авария', 'Error') === 'on', 'error → green state lane');
+assert(getMachineActivityModeFromTextAndStatus('', 'Error') === 'on', 'status Error → on');
 assert(isStateLaneOnlineMode('on') && isStateLaneOnlineMode('welding') && !isStateLaneOnlineMode('off'), 'lane mask');
 
 console.log('weldingMachineActivityMode.selfcheck: ok');

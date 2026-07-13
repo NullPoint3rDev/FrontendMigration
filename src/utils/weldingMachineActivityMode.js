@@ -1,8 +1,18 @@
 import { isStandbyMachineState } from './weldingMachineStateDisplay.js';
 
+/** Авария/ошибка: аппарат в сети — зелёная «Состояние» + красная «Ошибки» (как staging). */
+export function isErrorMachineState(weldingMachineState, status) {
+    const stateLower = String(weldingMachineState || '').toLowerCase().trim();
+    const statusLower = String(status || '').toLowerCase().trim();
+    return stateLower === 'авария'
+        || stateLower.includes('ошибк') || stateLower.includes('error')
+        || stateLower.includes('emergency') || stateLower.includes('failure')
+        || statusLower === 'error' || statusLower.includes('error');
+}
+
 /**
  * Режим для дорожки «Состояние»: on | welding | off.
- * Зелёный только при on/welding (Включен, в т.ч. ожидание; Сварка). Иначе серый.
+ * Зелёный при on/welding (Включен, ожидание, Сварка, ошибка при живой связи). Иначе серый.
  */
 export function getMachineActivityModeFromTextAndStatus(weldingMachineState, status, { weldingHint } = {}) {
     if (weldingHint === true) return 'welding';
@@ -11,6 +21,8 @@ export function getMachineActivityModeFromTextAndStatus(weldingMachineState, sta
     const statusLower = String(status || '').toLowerCase().trim();
 
     if (isStandbyMachineState(weldingMachineState)) return 'off';
+
+    if (isErrorMachineState(weldingMachineState, status)) return 'on';
 
     if (stateLower === 'сварка' || stateLower === 'welding'
         || stateLower.includes('сварка') || stateLower.includes('welding')
