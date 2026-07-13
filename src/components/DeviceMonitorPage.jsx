@@ -133,8 +133,8 @@ const OFFLINE_GLUE_GAP_MS = 8000;
  */
 const WELDING_GLUE_GAP_MS = 45000;
 
-/** Одиночные вспышки isWelding короче этого — шум опроса, не шов. */
-const WELDING_MIN_ISLAND_MS = 4000;
+/** Одиночные вспышки isWelding короче этого — шум опроса, не шов (≈2 poll panel-state). */
+const WELDING_MIN_ISLAND_MS = 1500;
 
 /** Сколько каналов (кроме сети по фазам) одновременно на основном графике — при заполнении остальные в списке тусклые, переключение только после снятия выбора. */
 const TELEMETRY_GRAPH_SLOT_COUNT = 3;
@@ -635,6 +635,14 @@ function hasMonitorPanelPayload(data) {
 function isWeldingFromPanelState(state) {
     if (isStandbyFromPanelState(state)) return false;
     const data = flattenPanelState(state);
+    const status = data.status || data.Status;
+    if (status) {
+        const statusLower = String(status).toLowerCase().trim();
+        if (statusLower === 'welding' || statusLower === 'сварка'
+            || statusLower.includes('сварка') || statusLower.includes('welding')) {
+            return true;
+        }
+    }
     const weldingMachineState = data['Состояние аппарата'] ||
         data['WeldingMachineState'] ||
         data.weldingMachineState ||
@@ -653,14 +661,6 @@ function isWeldingFromPanelState(state) {
             stateLower === 'выкл' || stateLower === 'off' ||
             stateLower === 'аппарат включен') {
             return false;
-        }
-    }
-    const status = data.status || data.Status;
-    if (status) {
-        const statusLower = String(status).toLowerCase().trim();
-        if (statusLower === 'welding' || statusLower === 'сварка'
-            || statusLower.includes('сварка') || statusLower.includes('welding')) {
-            return true;
         }
     }
     // Нет текста состояния (бэк прислал телеметрию без WeldingMachineState) — сварку определяем по факт. току.
@@ -4525,8 +4525,18 @@ const DeviceMonitorPage = () => {
         const data = deviceData[machineMac];
         if (!data) return false;
 
-        // 1. ПРИОРИТЕТ: Проверяем состояние аппарата из properties (это основное поле для определения сварки!)
-        // status из корня может быть "Offline" даже когда идет сварка, поэтому проверяем WeldingMachineState первым
+        // 1. status Welding приоритетнее текста «Аппарат включен» (live-hold на бэке)
+        const status = data.status || data.Status;
+        if (status) {
+            const statusLower = String(status).toLowerCase().trim();
+            if (statusLower === 'welding' || statusLower === 'сварка' ||
+                statusLower === 'weld' ||
+                statusLower.includes('сварка') ||
+                statusLower.includes('welding')) {
+                return true;
+            }
+        }
+
         const weldingMachineState = data['Состояние аппарата'] ||
             data['WeldingMachineState'] ||
             data.weldingMachineState ||
@@ -4538,14 +4548,11 @@ const DeviceMonitorPage = () => {
             if (isStandbyMachineState(weldingMachineState)) {
                 return false;
             }
-            // Проверяем, содержит ли состояние информацию о сварке
-            // ВАЖНО: только явное указание "Сварка" или "Welding", не "Аппарат включен"
             if (stateLower === 'сварка' || stateLower === 'welding' ||
                 stateLower.includes('сварка') || stateLower.includes('welding') ||
                 stateLower.includes('сварочн') || stateLower.includes('weld')) {
                 return true;
             }
-            // Если явно указано, что сварки нет (включен, ожидание, выключен и т.д.)
             if (stateLower.includes('ожидан') || stateLower.includes('waiting') ||
                 stateLower.includes('выключ') || stateLower.includes('off') ||
                 stateLower.includes('включен') || stateLower.includes('on') ||
@@ -4555,21 +4562,7 @@ const DeviceMonitorPage = () => {
             }
         }
 
-        // 2. Проверяем status из корня объекта (вторичная проверка)
-        // ВАЖНО: status из корня может быть "Offline" даже при сварке, поэтому это вторичная проверка
-        const status = data.status || data.Status;
-        if (status) {
-            const statusLower = String(status).toLowerCase().trim();
-            // Проверяем различные варианты статуса "Сварка"
-            if (statusLower === 'welding' || statusLower === 'сварка' ||
-                statusLower === 'weld' ||
-                statusLower.includes('сварка') ||
-                statusLower.includes('welding')) {
-                return true;
-            }
-        }
-
-        // 3. Проверяем ток сварки ТОЛЬКО если WeldingMachineState не определен или неоднозначен
+        // 2. Проверяем ток сварки ТОЛЬКО если WeldingMachineState не определен или неоднозначен
         // НЕ используем ток как основной индикатор, так как аппарат может быть включен без сварки
         const current = parseFloat(data.Current || data['State.I'] || 0);
         if (current > 1 && !weldingMachineState) {
