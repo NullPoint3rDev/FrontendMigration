@@ -702,38 +702,6 @@ function getMachineActivityModeFromPanelState(state) {
     return 'on';
 }
 
-/**
- * Live-дорожка «Состояние»: зелёный только при явном вкл/сварке/ожидании.
- * Нет текста + status Offline (или пусто) → серый. Не угадываем «в сети» по одному HTTP 200.
- */
-function isLiveLaneOnlineFromPanelState(state) {
-    if (!state) return false;
-    if (isStandbyFromPanelState(state)) return false;
-    const text = pickMachineStateTextFromPanel(state);
-    const flat = flattenPanelState(state);
-    const st = String(flat.status || flat.Status || '').toLowerCase().trim();
-
-    if (text) {
-        const stateLower = String(text).toLowerCase().trim();
-        if (stateLower.includes('включ') || stateLower.includes('ожидан') || stateLower.includes('waiting')
-            || stateLower.includes('свар') || stateLower.includes('weld')
-            || stateLower.includes('idle') || stateLower.includes('ready') || stateLower === 'on') {
-            return true;
-        }
-        if (stateLower.includes('выключ') || stateLower === 'выкл' || stateLower.startsWith('выкл')
-            || stateLower.includes('не в сети')) {
-            return false;
-        }
-    }
-    if (st === 'welding' || st === 'сварка' || st === 'on' || st === 'idle' || st === 'waiting') {
-        return true;
-    }
-    if (st === 'offline' || st === 'off' || st.includes('не в сети') || !st) {
-        return false;
-    }
-    return false;
-}
-
 function buildHistoryPointFromPanelPoll(state, xPoll, weldingNow) {
     const { current, voltage } = extractCurrentVoltageFromPanelState(state);
     const yi = Math.round(Number(current) * 10) / 10;
@@ -3155,8 +3123,7 @@ const DeviceMonitorPage = () => {
                     null;
                 const hasWelder = Boolean(stateRfid && String(stateRfid).trim());
                 const wasWelderPresent = prevWelderPresentForChartRef.current === true;
-                // Та же логика, что зелёная дорожка: не рвать уставку из‑за мигающего status=Offline.
-                const setSuppressedNow = !isLiveLaneOnlineFromPanelState(response);
+                // Как в staging: после standby early-return успешный poll → уставка пишется как есть.
                 const setCurrentY = resolveSetChartY({
                     wNow,
                     wasWelding: wasArc,
@@ -3164,7 +3131,6 @@ const DeviceMonitorPage = () => {
                     idleSource: yi,
                     holdRef: lastSetWeldingCurrentHoldRef,
                     now: xPoll,
-                    holdWhileOnline: !setSuppressedNow,
                 });
                 const setVoltageY = resolveSetChartY({
                     wNow,
@@ -3173,7 +3139,6 @@ const DeviceMonitorPage = () => {
                     idleSource: yu,
                     holdRef: lastSetWeldingVoltageHoldRef,
                     now: xPoll,
-                    holdWhileOnline: !setSuppressedNow,
                 });
                 setTelemetrySeries(prev => {
                     const next = { ...prev };
@@ -3210,13 +3175,13 @@ const DeviceMonitorPage = () => {
                         } else if (channel.key === 'setWeldingCurrent') {
                             next.setWeldingCurrent = trimSeriesByTime(
                                 prev.setWeldingCurrent || [],
-                                { x: xPoll, y: setSuppressedNow ? null : setCurrentY },
+                                { x: xPoll, y: setCurrentY },
                                 LIVE_WINDOW_MS
                             );
                         } else if (channel.key === 'setWeldingVoltage') {
                             next.setWeldingVoltage = trimSeriesByTime(
                                 prev.setWeldingVoltage || [],
-                                { x: xPoll, y: setSuppressedNow ? null : setVoltageY },
+                                { x: xPoll, y: setVoltageY },
                                 LIVE_WINDOW_MS
                             );
                         } else if (channel.key === 'welderPresence') {
@@ -3237,14 +3202,13 @@ const DeviceMonitorPage = () => {
                     return next;
                 });
                 prevWelderPresentForChartRef.current = hasWelder;
-                // Зелёный ↔ серый по тексту состояния, не по мигающему status=Offline.
-                const laneOnline = isLiveLaneOnlineFromPanelState(response);
+                // Как в staging: не-standby успешный poll → зелёная дорожка.
                 setTimelineSamples(prev => {
                     const next = [
                         ...prev,
                         {
                             x: xPoll,
-                            isOnline: laneOnline,
+                            isOnline: true,
                             isWelding: wNow,
                             errorCode,
                             rfid: stateRfid ? String(stateRfid).trim() : null
@@ -3303,7 +3267,7 @@ const DeviceMonitorPage = () => {
                         {
                             x: xPoll,
                             y: 1,
-                            isOnline: laneOnline,
+                            isOnline: true,
                             isWelding: wNow,
                             errorCode,
                             rfid: stateRfid ? String(stateRfid).trim() : null
@@ -4722,14 +4686,9 @@ const DeviceMonitorPage = () => {
 
     const controlFactCurrent = isWeldingActive ? getCurrentValue() : '0';
     const controlFactVoltage = isWeldingActive ? getVoltageValue() : '0';
-    /** Уставка отсутствует (панель/график/тултип = 0) при Выкл / Выкл(деж); не из‑за мигающего Offline. */
-    const isSetMetricSuppressed = !hasData || !isLiveLaneOnlineFromPanelState(deviceData[machineMac]);
-    const controlSetCurrent = isSetMetricSuppressed
-        ? '0'
-        : (isWeldingActive ? idleControlMetricsRef.current.current : getCurrentValue());
-    const controlSetVoltage = isSetMetricSuppressed
-        ? '0'
-        : (isWeldingActive ? idleControlMetricsRef.current.voltage : getVoltageValue());
+    // Как в staging: уставка с панели, без suppress по status=Offline.
+    const controlSetCurrent = isWeldingActive ? idleControlMetricsRef.current.current : getCurrentValue();
+    const controlSetVoltage = isWeldingActive ? idleControlMetricsRef.current.voltage : getVoltageValue();
 
     /**
      * При включении «Установленный ток/напряжение» — сразу засеиваем серию актуальным значением из панели
@@ -4746,7 +4705,7 @@ const DeviceMonitorPage = () => {
         const seedCurrent = hasSetCurrent && !prevSetSelectionRef.current.current;
         const seedVoltage = hasSetVoltage && !prevSetSelectionRef.current.voltage;
         prevSetSelectionRef.current = { current: hasSetCurrent, voltage: hasSetVoltage };
-        if ((!seedCurrent && !seedVoltage) || !hasData || isSetMetricSuppressed) return;
+        if ((!seedCurrent && !seedVoltage) || !hasData) return;
         const now = Date.now();
         setTelemetrySeries((prev) => {
             const next = { ...prev };
@@ -4776,34 +4735,14 @@ const DeviceMonitorPage = () => {
     const rfidCode = getRfidCode();
     const hasRfidCode = rfidCode !== null;
     const currentStatusData = deviceData[machineMac] || {};
-    const panelStateFresh = lastPanelStateRef.current;
-    const hasLivePanel = hasData
-        || hasMonitorPanelPayload(currentStatusData)
-        || hasMonitorPanelPayload(panelStateFresh);
-    const machineStateFromStore = currentStatusData['Состояние аппарата']
-        || currentStatusData['WeldingMachineState']
-        || currentStatusData.weldingMachineState
-        || null;
-    const machineStateFromPanel = pickMachineStateTextFromPanel(panelStateFresh);
-    const statusLower = String(
-        panelStateFresh?.status || panelStateFresh?.Status || currentStatusData.status || ''
-    ).toLowerCase().trim();
-    // Свежий panel/status важнее store: иначе merge оставляет «Включен», когда аппарат уже Offline.
-    const machineStateValue = (() => {
-        if (machineStateFromPanel) return machineStateFromPanel;
-        if (statusLower === 'welding' || statusLower === 'сварка' || statusLower.includes('weld')) return 'Сварка';
-        if (statusLower === 'error' || statusLower.includes('авари')) return 'Ошибка';
-        if (statusLower === 'on' || statusLower === 'idle' || statusLower === 'waiting') return 'Включен';
-        if (statusLower === 'offline' || statusLower === 'off' || statusLower.includes('не в сети')) {
-            return 'Не в сети';
-        }
-        // Store только если status не Offline (иначе устаревший «Включен»).
-        if (machineStateFromStore && statusLower !== 'offline' && statusLower !== 'off') {
-            return machineStateFromStore;
-        }
-        if (!hasLivePanel) return 'Не в сети';
-        return 'Не в сети';
-    })();
+    // Как в staging: живая панель → текст из WeldingMachineState; иначе «Не в сети».
+    const hasLivePanel = hasData || hasMonitorPanelPayload(currentStatusData);
+    const machineStateValue = !hasLivePanel
+        ? 'Не в сети'
+        : (currentStatusData['Состояние аппарата']
+            || currentStatusData['WeldingMachineState']
+            || currentStatusData.weldingMachineState
+            || 'Не в сети');
     const machineStateDisplayValue = formatWeldingMachineStateDisplay(machineStateValue);
     const machineStateColor = getStateColor(machineStateValue) || 'rgba(242, 241, 244, 0.9)';
     const statusPhaseA = parseNumberOrNull(
