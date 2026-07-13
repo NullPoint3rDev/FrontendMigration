@@ -3421,14 +3421,29 @@ const DeviceMonitorPage = () => {
 
     const processStructuredData = (data) => {
         try {
-            if (data.state && data.state.properties) {
+            if (!data.state) return;
+            {
                 const mac = data.mac || machineMac; // берём из payload, fallback на выбранный MAC
                 const params = {};
+                const properties = (data.state.properties && typeof data.state.properties === 'object')
+                    ? data.state.properties
+                    : {};
 
                 // Сохраняем status из корня state (это ключевое поле для определения состояния сварки!)
                 // status может быть: "Offline", "Welding", "On", "Error" и т.д.
                 if (data.state.status !== undefined && data.state.status !== null) {
                     params.status = data.state.status;
+                }
+
+                // Текст состояния с корня (иногда нет в properties) — иначе UI пишет «Не в сети» при живом poll.
+                const rootStateText = data.state['Состояние аппарата']
+                    || data.state.WeldingMachineState
+                    || data.state.weldingMachineState
+                    || data.state['State.WeldingMachineState']
+                    || null;
+                if (rootStateText != null && String(rootStateText).trim() !== '') {
+                    params['Состояние аппарата'] = String(rootStateText).trim();
+                    params.WeldingMachineState = String(rootStateText).trim();
                 }
 
                 // error_code из корня: всегда кладём в params (пустая строка = нет кода), иначе merge в updateDeviceData
@@ -3439,57 +3454,65 @@ const DeviceMonitorPage = () => {
                     ecTrim !== '' && ecTrim.toLowerCase() !== 'null' && ecTrim !== '0' ? ecTrim : '';
 
                 // Извлекаем ВСЕ параметры из структурированных данных
-                Object.entries(data.state.properties).forEach(([key, prop]) => {
-                    if (prop && prop.value) {
+                Object.entries(properties).forEach(([key, prop]) => {
+                    const rawVal = (prop && typeof prop === 'object' && Object.prototype.hasOwnProperty.call(prop, 'value'))
+                        ? prop.value
+                        : prop;
+                    if (rawVal === undefined || rawVal === null) return;
+                    const value = typeof rawVal === 'string' ? rawVal : rawVal;
+                    if (value === '') return;
+
                         // Обрабатываем все параметры Core
                         if (key === 'Voltage') {
                             // Напряжение в десятых долях вольта
-                            const decimalValue = parseInt(prop.value, 10);
+                            const decimalValue = parseInt(value, 10);
                             params[key] = (decimalValue / 10).toFixed(1);
                         } else if (key === 'Current') {
                             // Ток
-                            params[key] = prop.value;
+                            params[key] = value;
                         } else if (key === 'WeldingCurrent') {
                             // Ток сварки
-                            params[key] = prop.value;
+                            params[key] = value;
                         } else if (key === 'WeldingVoltage') {
                             // Напряжение сварки
-                            params[key] = prop.value;
+                            params[key] = value;
                         } else if (key === 'GasFlow') {
                             // Расход газа
-                            params[key] = prop.value;
-                        } else if (key === 'WeldingMachineState') {
-                            // Состояние сварочного аппарата
-                            params[key] = prop.value;
+                            params[key] = value;
+                        } else if (key === 'WeldingMachineState' || key === 'Состояние аппарата' || key === 'State.WeldingMachineState') {
+                            const text = String(value).trim();
+                            params[key] = text;
+                            params['Состояние аппарата'] = text;
+                            params.WeldingMachineState = text;
                         } else if (key === 'JobNumber') {
                             // Номер работы
-                            params[key] = prop.value;
+                            params[key] = value;
                         } else if (key === 'Inductance') {
                             // Индуктивность
-                            params[key] = prop.value;
+                            params[key] = value;
                         } else if (key.startsWith('Errors')) {
                             // Ошибки
-                            params[key] = prop.value;
+                            params[key] = value;
                         } else if (key.startsWith('VoltagePhase')) {
                             // Напряжения фаз
-                            params[key] = prop.value;
+                            params[key] = value;
                         } else if (key.startsWith('Temperature') || key.includes('Temperature')) {
                             // Температуры
-                            params[key] = prop.value;
+                            params[key] = value;
                         } else if (key === 'WireIndex') {
                             // Индекс проволоки
-                            params[key] = prop.value;
+                            params[key] = value;
                         } else if (key === 'Flags') {
                             // Флаги
-                            params[key] = prop.value;
+                            params[key] = value;
                         } else if (key === 'RFID' || key === 'Rfid' || key === 'rfid' || key === 'RFIDCode' || key === 'RfidCode' || key === 'RFID.Hex') {
                             // RFID код
-                            params[key] = prop.value;
+                            params[key] = value;
                             // Также сохраняем как RFID для единообразия
-                            params.RFID = prop.value;
+                            params.RFID = value;
                         } else if (key === 'State.I' || key === 'State.U') {
                             // Старые параметры (для совместимости)
-                            const decimalValue = parseInt(prop.value, 16);
+                            const decimalValue = parseInt(value, 16);
                             if (key === 'State.U') {
                                 params[key] = (decimalValue / 10).toFixed(1);
                             } else {
@@ -3497,9 +3520,8 @@ const DeviceMonitorPage = () => {
                             }
                         } else {
                             // Все остальные параметры
-                            params[key] = prop.value;
+                            params[key] = value;
                         }
-                    }
                 });
 
                 params.errorCode = normalizedErrorCode;
@@ -4240,7 +4262,8 @@ const DeviceMonitorPage = () => {
 
     const getSystemParameters = () => {
         const data = deviceData[machineMac];
-        const isDeviceOff = (!hasData && !hasMonitorPanelPayload(data)) || Object.keys(deviceData).length === 0;
+        const isDeviceOff = (!hasData && !hasMonitorPanelPayload(data) && !hasMonitorPanelPayload(lastPanelStateRef.current))
+            || (Object.keys(deviceData).length === 0 && !lastPanelStateRef.current);
 
         const params = [];
 
@@ -4733,10 +4756,28 @@ const DeviceMonitorPage = () => {
     const rfidCode = getRfidCode();
     const hasRfidCode = rfidCode !== null;
     const currentStatusData = deviceData[machineMac] || {};
-    const hasLivePanel = hasData || hasMonitorPanelPayload(currentStatusData);
-    const machineStateValue = !hasLivePanel
-        ? 'Не в сети'
-        : (currentStatusData['Состояние аппарата'] || currentStatusData['WeldingMachineState'] || currentStatusData.weldingMachineState || 'Не в сети');
+    const panelStateFresh = lastPanelStateRef.current;
+    const hasLivePanel = hasData
+        || hasMonitorPanelPayload(currentStatusData)
+        || hasMonitorPanelPayload(panelStateFresh);
+    const machineStateFromStore = currentStatusData['Состояние аппарата']
+        || currentStatusData['WeldingMachineState']
+        || currentStatusData.weldingMachineState
+        || null;
+    const machineStateFromPanel = pickMachineStateTextFromPanel(panelStateFresh);
+    // Не подставляем «Не в сети» при живом poll без текста — status=Offline мигает, список оборудования уже «Включен».
+    const machineStateValue = (() => {
+        if (machineStateFromStore) return machineStateFromStore;
+        if (machineStateFromPanel) return machineStateFromPanel;
+        if (!hasLivePanel) return 'Не в сети';
+        const st = String(
+            currentStatusData.status || panelStateFresh?.status || panelStateFresh?.Status || ''
+        ).toLowerCase().trim();
+        if (st === 'welding' || st.includes('weld') || st === 'сварка') return 'Сварка';
+        if (st === 'error' || st.includes('error') || st.includes('авари')) return 'Ошибка';
+        // Offline/пустой status при успешном panel-state = аппарат отвечает → как в списке оборудования.
+        return 'Включен';
+    })();
     const machineStateDisplayValue = formatWeldingMachineStateDisplay(machineStateValue);
     const machineStateColor = getStateColor(machineStateValue) || 'rgba(242, 241, 244, 0.9)';
     const statusPhaseA = parseNumberOrNull(
