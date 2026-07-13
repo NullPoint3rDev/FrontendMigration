@@ -674,24 +674,54 @@ function getMachineActivityModeFromPanelState(state) {
         data['State.WeldingMachineState'] ||
         null;
     const status = data.status || data.Status || null;
-    const stateLower = String(weldingMachineState || status || '').toLowerCase().trim();
+    // Текст состояния аппарата приоритетнее корневого status (часто Offline при живом «Включен»).
+    const stateLower = String(weldingMachineState || '').toLowerCase().trim();
+    const statusLower = String(status || '').toLowerCase().trim();
 
     if (isStandbyMachineState(weldingMachineState)) {
         return 'off';
     }
-    if (stateLower.includes('waiting') || stateLower.includes('ожидан')) {
+    if (stateLower.includes('waiting') || stateLower.includes('ожидан')
+        || stateLower.includes('включ') || stateLower === 'on'
+        || stateLower.includes('idle') || stateLower.includes('ready')) {
         return 'on';
     }
-    // «Выкл» / «Выкл(деж)» — без обязательного «выключ» (иначе деж. остаётся on → зелёная дорожка).
+    // Явный Выкл по тексту состояния (не путать с «Включен»).
     if (stateLower.includes('выключ') || stateLower === 'выкл' || stateLower.startsWith('выкл')
-        || stateLower === 'off' || stateLower.includes('offline') || stateLower.includes('не в сети')) {
+        || stateLower.includes('не в сети')) {
         return 'off';
     }
-    if (stateLower.includes('включ') || stateLower === 'on' || stateLower.includes('idle') || stateLower.includes('ready')) {
+    // status=Offline без текста состояния — ненадёжен для live (мигает при включённом аппарате).
+    if (!stateLower && (statusLower === 'off' || statusLower.includes('offline') || statusLower.includes('не в сети'))) {
+        return 'off';
+    }
+    if (!stateLower && (statusLower.includes('waiting') || statusLower === 'on' || statusLower.includes('idle'))) {
         return 'on';
     }
 
     return 'on';
+}
+
+/**
+ * Live-дорожка «Состояние»: зелёный при живом panel-state, кроме дежурного / явного Выкл.
+ * ponytail: корневой status=Offline сам по себе серым не делаем — иначе мигает при «Включен».
+ */
+function isLiveLaneOnlineFromPanelState(state) {
+    if (!state) return false;
+    if (isStandbyFromPanelState(state)) return false;
+    const text = pickMachineStateTextFromPanel(state);
+    if (!text) return true; // ответ есть, текста нет — считаем в сети
+    const stateLower = String(text).toLowerCase().trim();
+    if (stateLower.includes('включ') || stateLower.includes('ожидан') || stateLower.includes('waiting')
+        || stateLower.includes('свар') || stateLower.includes('weld')
+        || stateLower.includes('idle') || stateLower.includes('ready') || stateLower === 'on') {
+        return true;
+    }
+    if (stateLower.includes('выключ') || stateLower === 'выкл' || stateLower.startsWith('выкл')
+        || stateLower.includes('не в сети')) {
+        return false;
+    }
+    return true;
 }
 
 function buildHistoryPointFromPanelPoll(state, xPoll, weldingNow) {
@@ -3193,8 +3223,8 @@ const DeviceMonitorPage = () => {
                     return next;
                 });
                 prevWelderPresentForChartRef.current = hasWelder;
-                // Зелёная дорожка только при реальном «вкл»; Выкл / Выкл(деж) → серый.
-                const laneOnline = getMachineActivityModeFromPanelState(response) !== 'off';
+                // Зелёный ↔ серый по тексту состояния, не по мигающему status=Offline.
+                const laneOnline = isLiveLaneOnlineFromPanelState(response);
                 setTimelineSamples(prev => {
                     const next = [
                         ...prev,
