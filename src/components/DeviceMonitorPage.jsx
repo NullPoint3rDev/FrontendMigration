@@ -249,6 +249,18 @@ const DAILY_STATS_REFRESH_MS = 10000;
 /** Интервал poll panel-state (см. startPolling). */
 const PANEL_STATE_POLL_MS = 1300;
 
+/** Live-точки сегодняшнего дня не теряем при входе в «Ист.» — иначе шов есть в Live, а в сутках пропал. */
+function keepTodayLiveHistoryPoints(prevCache, dateStr, dayStart, dayEnd) {
+    const out = new Map();
+    if (!prevCache?.pointsByTs || prevCache.date !== dateStr) return out;
+    prevCache.pointsByTs.forEach((p, ts) => {
+        if (p?.source === 'live' && Number.isFinite(ts) && ts >= dayStart && ts <= dayEnd) {
+            out.set(ts, p);
+        }
+    });
+    return out;
+}
+
 function applyDailyStatsDto(
     setDailyActivity,
     setDailyWireConsumptionKg,
@@ -2432,7 +2444,12 @@ const DeviceMonitorPage = () => {
                     date: selectedGraphDate,
                     dayStart: db.dayStart,
                     dayEnd: db.dayEnd,
-                    pointsByTs: new Map(),
+                    pointsByTs: keepTodayLiveHistoryPoints(
+                        historyCacheRef.current,
+                        selectedGraphDate,
+                        db.dayStart,
+                        db.dayEnd
+                    ),
                 };
                 pinDragPreviewRef.current = null;
                 setPinDragPreview(null);
@@ -6485,7 +6502,12 @@ const DeviceMonitorPage = () => {
             date: todayStr,
             dayStart: db.dayStart,
             dayEnd: db.dayEnd,
-            pointsByTs: new Map(),
+            pointsByTs: keepTodayLiveHistoryPoints(
+                historyCacheRef.current,
+                todayStr,
+                db.dayStart,
+                db.dayEnd
+            ),
         };
         pinDragPreviewRef.current = null;
         setPinDragPreview(null);
