@@ -14,7 +14,6 @@ import {
     deleteMacRegistryEntries,
     fetchMacEquipmentTypes,
     fetchMacRegistry,
-    formatMacTyping,
     normalizeMacDigits,
     unblockMacRegistryEntries,
 } from '../api/macAddressRegistryApi';
@@ -244,12 +243,7 @@ function MacAddressesPage() {
     };
 
     const handleMacInputChange = (e) => {
-        const raw = e.target.value.replace(/[^0-9A-Fa-f ]/g, '').toUpperCase().slice(0, 14);
-        setNewMac(raw);
-    };
-
-    const handleMacInputBlur = () => {
-        setNewMac((prev) => formatMacTyping(prev));
+        setNewMac(e.target.value.toUpperCase());
     };
 
     const handleApplyDates = () => {
@@ -442,8 +436,6 @@ function MacAddressesPage() {
                                 className="mac-toolbar-input"
                                 value={newMac}
                                 onChange={handleMacInputChange}
-                                onBlur={handleMacInputBlur}
-                                placeholder="E098 060B 22D2"
                                 disabled={!canAddMacRegistry}
                                 autoComplete="off"
                                 spellCheck={false}
