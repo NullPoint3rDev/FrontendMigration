@@ -274,12 +274,12 @@ function MacAddressesPage() {
         }
         setAdding(true);
         try {
-            const existsResp = await checkMacRegistryExists(newMac);
+            const existsResp = await checkMacRegistryExists(digits);
             if (existsResp?.exists) {
                 setAddError('MAC-адрес уже есть в реестре');
                 return;
             }
-            await createMacRegistryEntry({ mac: newMac, equipmentTypeId: Number(newTypeId) });
+            await createMacRegistryEntry({ mac: digits, equipmentTypeId: Number(newTypeId) });
             setNewMac('');
             setSelectedIds([]);
             await loadData();

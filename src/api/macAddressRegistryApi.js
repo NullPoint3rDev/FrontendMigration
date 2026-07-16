@@ -51,6 +51,15 @@ export function formatMacTyping(raw) {
     return `${digits.slice(0, 4)} ${digits.slice(4, 8)} ${digits.slice(8)}`;
 }
 
+export function isDebugMac(value) {
+    const cleaned = String(value || '').replace(/[^0-9A-Fa-fxX]/g, '');
+    return cleaned.length === 12 && /^x{12}$/i.test(cleaned);
+}
+
 export function normalizeMacDigits(value) {
-    return String(value || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+    const cleaned = String(value || '').replace(/[^0-9A-Fa-fxX]/g, '');
+    if (/^x{12}$/i.test(cleaned)) {
+        return 'XXXXXXXXXXXX';
+    }
+    return cleaned.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
 }
