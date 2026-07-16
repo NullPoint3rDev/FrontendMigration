@@ -125,22 +125,30 @@ function MacAddressesPage() {
         try {
             const types = await fetchMacEquipmentTypes();
             setEquipmentTypes(Array.isArray(types) ? types : []);
-            if (!newTypeId && types?.length) {
-                setNewTypeId(String(types[0].id));
-            }
+            setNewTypeId((prev) => prev || (types?.[0]?.id != null ? String(types[0].id) : ''));
         } catch (e) {
             console.error(e);
         }
-    }, [newTypeId]);
+    }, []);
 
     const loadData = useCallback(async () => {
+        const typeNone = typeFilter.length === 1 && typeFilter[0] === '__NONE__';
+        const statusNone = statusFilter.length === 1 && statusFilter[0] === '__NONE__';
+        if (typeNone || statusNone) {
+            setItems([]);
+            setTotal(0);
+            setLoading(false);
+            setError('');
+            return;
+        }
+
         setLoading(true);
         setError('');
         try {
-            const typeIds = typeFilter.length > 0 && !(typeFilter.length === 1 && typeFilter[0] === '__NONE__')
+            const typeIds = typeFilter.length > 0
                 ? typeFilter.map((id) => Number(id))
                 : undefined;
-            const statuses = statusFilter.length > 0 && !(statusFilter.length === 1 && statusFilter[0] === '__NONE__')
+            const statuses = statusFilter.length > 0
                 ? statusFilter
                 : undefined;
 
@@ -235,12 +243,13 @@ function MacAddressesPage() {
         setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
     };
 
-    const toggleSelectAll = () => {
-        if (selectedIds.length === items.length) {
-            setSelectedIds([]);
-        } else {
-            setSelectedIds(items.map((i) => i.id));
-        }
+    const handleMacInputChange = (e) => {
+        const raw = e.target.value.replace(/[^0-9A-Fa-f ]/g, '').toUpperCase().slice(0, 14);
+        setNewMac(raw);
+    };
+
+    const handleMacInputBlur = () => {
+        setNewMac((prev) => formatMacTyping(prev));
     };
 
     const handleApplyDates = () => {
@@ -432,9 +441,12 @@ function MacAddressesPage() {
                                 type="text"
                                 className="mac-toolbar-input"
                                 value={newMac}
-                                onChange={(e) => setNewMac(formatMacTyping(e.target.value))}
+                                onChange={handleMacInputChange}
+                                onBlur={handleMacInputBlur}
                                 placeholder="E098 060B 22D2"
                                 disabled={!canAddMacRegistry}
+                                autoComplete="off"
+                                spellCheck={false}
                             />
                         </div>
                         <div className="mac-toolbar-tile mac-toolbar-type">
@@ -506,13 +518,7 @@ function MacAddressesPage() {
                         <table className="welders-table mac-addresses-table">
                             <thead>
                             <tr>
-                                <th>
-                                    <input
-                                        type="checkbox"
-                                        checked={items.length > 0 && selectedIds.length === items.length}
-                                        onChange={toggleSelectAll}
-                                    />
-                                </th>
+                                <th />
                                 <th onClick={() => toggleSort('id')} className={sortField === 'id' ? 'sort-active' : ''}>
                                     <span>№</span>
                                     <span className={`sort-arrow ${sortField === 'id' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
