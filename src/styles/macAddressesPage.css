@@ -1,0 +1,138 @@
+.network-equipment-shell {
+    min-height: 100vh;
+    background: #0b1220;
+}
+
+.network-equipment-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 12px 24px 0;
+}
+
+.network-equipment-tab {
+    color: #8fa0b8;
+    text-decoration: none;
+    padding: 8px 14px;
+    border-radius: 8px 8px 0 0;
+    font-size: 14px;
+}
+
+.network-equipment-tab.active {
+    color: #ffb347;
+    background: rgba(255, 179, 71, 0.08);
+}
+
+.mac-addresses-page .mac-toolbar {
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.mac-toolbar-inputs {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.mac-inline-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #c7d2e3;
+    font-size: 13px;
+}
+
+.mac-inline-field input,
+.mac-inline-field select {
+    background: #111827;
+    border: 1px solid #2a3448;
+    color: #e5edf9;
+    border-radius: 6px;
+    padding: 8px 10px;
+    min-width: 160px;
+}
+
+.mac-add-btn {
+    min-width: 120px;
+}
+
+.mac-admin-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mac-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #1a2333;
+    border: 1px solid #334155;
+    color: #dbe4f2;
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.mac-action-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.mac-page-error {
+    color: #ff7b7b;
+    padding: 0 16px 8px;
+}
+
+.mac-addresses-table .mac-cell {
+    color: #ffb347;
+    font-family: monospace;
+    letter-spacing: 0.04em;
+}
+
+.mac-date-filter .welder-date-field {
+    margin-bottom: 8px;
+    flex: 1;
+}
+
+.mac-date-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.mac-date-filter-label {
+    color: #c7d2e3;
+    min-width: 28px;
+    font-size: 13px;
+}
+
+.mac-date-filter-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.mac-filter-ok-btn,
+.mac-filter-reset-btn {
+    flex: 1;
+    border-radius: 6px;
+    padding: 8px 10px;
+    border: 1px solid #334155;
+    background: #111827;
+    color: #dbe4f2;
+    cursor: pointer;
+}
+
+.mac-addresses-page .status-badge.status-waiting {
+    color: #9aa8bc;
+}
+
+.mac-addresses-page .status-badge.status-active {
+    color: #35d07f;
+}
+
+.mac-addresses-page .status-badge.status-blocked {
+    color: #ec2b3c;
+}

@@ -10,6 +10,7 @@ export const VIEW_ONLY = {
 };
 
 export const WORK_WITH_REPORTS = 'work_with_reports';
+export const WIFI_MODULES_WT2 = 'wifi_modules_wt2';
 
 const EQUIPMENT_DOMAIN = new Set([
     VIEW_ONLY.equipment,
@@ -192,6 +193,20 @@ export function canWorkWithReports(user, roleName) {
     if (isAdminAlloyRole(roleName)) return true;
     if (!enforceGrants(roleName)) return true;
     return hasInSet(parseAllowedUserActions(user), WORK_WITH_REPORTS);
+}
+
+export function canReadMacRegistry(user, roleName) {
+    if (isAdminAlloyRole(roleName)) return true;
+    if (!enforceGrants(roleName)) return true;
+    return hasInSet(parseAllowedUserActions(user), WIFI_MODULES_WT2);
+}
+
+export function canAddMacRegistry(user, roleName) {
+    if (isAdminAlloyRole(roleName)) return true;
+    if (!enforceGrants(roleName)) return true;
+    const actions = parseAllowedUserActions(user);
+    if (hasInSet(actions, VIEW_ONLY.equipment)) return false;
+    return hasInSet(actions, WIFI_MODULES_WT2);
 }
 
 /** id пунктов write в секции (для снятия галочек при включении view_only). */

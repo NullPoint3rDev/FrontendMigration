@@ -569,6 +569,11 @@ const AddEquipmentModal = ({ isOpen, onClose, onSave, welders = [], organization
                 setMacChecking(false)
                 return
             }
+            if (!existsResp?.inRegistry) {
+                setMacCheckError('MAC-адрес не найден в реестре. Сначала добавьте его на странице MAC Адреса')
+                setMacChecking(false)
+                return
+            }
 
             // Отладочный MAC (xxxxxxxxxxxx) — соединение сразу «успешно», без ожидания железа
             if (/^x{12}$/i.test(mac.replace(/[^0-9A-Fa-fxX]/g, ''))) {

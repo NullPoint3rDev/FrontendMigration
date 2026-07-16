@@ -11,6 +11,8 @@ import {
     canReadOrganizations,
     canWriteOrganizations,
     canWorkWithReports,
+    canReadMacRegistry,
+    canAddMacRegistry,
 } from '../utils/userPermissions';
 
 export function useCurrentUserPermissions() {
@@ -59,5 +61,8 @@ export function useCurrentUserPermissions() {
         canReadOrganizations: canReadOrganizations(user, roleName),
         canWriteOrganizations: canWriteOrganizations(user, roleName),
         canWorkWithReports: canWorkWithReports(user, roleName),
+        canReadMacRegistry: canReadMacRegistry(user, roleName),
+        canAddMacRegistry: canAddMacRegistry(user, roleName),
+        isAdminAlloy: roleName === 'ADMIN_ALLOY',
     };
 }

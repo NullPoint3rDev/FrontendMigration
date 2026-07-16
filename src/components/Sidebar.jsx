@@ -144,7 +144,7 @@ const Sidebar = () => {
                             </button>
                             <button
                                 className={`submenu-item ${isActive('/network-equipment') ? 'active' : ''}`}
-                                onClick={() => handleNavigate('/network-equipment')}
+                                onClick={() => handleNavigate('/network-equipment/mac-addresses')}
                             >
                                 <span className="submenu-marker" />
                                 <span>Сетевое оборудование</span>

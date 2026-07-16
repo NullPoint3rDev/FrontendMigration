@@ -51,12 +51,12 @@ const PrivateRoute = ({ children }) => {
 const Layout = ({ children }) => {
     const location = useLocation();
     const isEquipmentPage = location.pathname === '/equipment';
+    const isNetworkEquipmentPage = location.pathname.startsWith('/network-equipment');
     const isWeldersPage = location.pathname === '/welders' || location.pathname.startsWith('/welders/');
     const isEmployeesPage = location.pathname === '/employees' || location.pathname.startsWith('/employees/');
     const isEnterpriseMapPage = location.pathname === '/enterprise-map' || location.pathname.startsWith('/enterprise-map/');
 
-    // Для страниц без Material-UI обёртки (избегаем конфликтов стилей и пустого контента)
-    if (isEquipmentPage || isWeldersPage || isEmployeesPage || isEnterpriseMapPage) {
+    if (isEquipmentPage || isNetworkEquipmentPage || isWeldersPage || isEmployeesPage || isEnterpriseMapPage) {
         return (
             <div className="app">
                 <Sidebar />
@@ -163,7 +163,7 @@ function App() {
 
                                             {/* 2. Ресурсы */}
                                             <Route path="/equipment" element={<WeldingEquipmentPage />} />
-                                            <Route path="/network-equipment" element={<NetworkEquipmentPage />} />
+                                            <Route path="/network-equipment/*" element={<NetworkEquipmentPage />} />
                                             <Route path="/materials" element={<MaterialsPage />} />
                                             <Route path="/wps" element={<WPSPage />} />
                                             <Route path="/device-monitor" element={<DeviceMonitorPage />} />
