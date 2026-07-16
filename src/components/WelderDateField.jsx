@@ -130,12 +130,34 @@ export function MiniCalendar({ selectedIso, minDate, maxDate, onPick, showYearNa
 }
 
 /** Поле даты: ручной ввод DD.MM.YYYY + кастомный календарь. value/onChange в ISO (YYYY-MM-DD). */
-export default function WelderDateField({ value, onChange, placeholder, disabled, minDate, maxDate, validate, className }) {
+export default function WelderDateField({
+    value,
+    onChange,
+    placeholder,
+    disabled,
+    minDate,
+    maxDate,
+    validate,
+    className,
+    fixedPopup = false,
+}) {
     const [text, setText] = useState(isoToDisplayDate(value));
     const [error, setError] = useState('');
     const [open, setOpen] = useState(false);
+    const [popupStyle, setPopupStyle] = useState(null);
     const wrapRef = useRef(null);
     const focusedRef = useRef(false);
+
+    const updatePopupPosition = () => {
+        if (!fixedPopup || !wrapRef.current) return;
+        const rect = wrapRef.current.getBoundingClientRect();
+        setPopupStyle({
+            position: 'fixed',
+            top: rect.bottom + 4,
+            left: rect.left,
+            zIndex: 10000,
+        });
+    };
 
     useEffect(() => {
         if (focusedRef.current) return;
@@ -148,6 +170,18 @@ export default function WelderDateField({ value, onChange, placeholder, disabled
         document.addEventListener('mousedown', onDoc);
         return () => document.removeEventListener('mousedown', onDoc);
     }, [open]);
+
+    useEffect(() => {
+        if (!open || !fixedPopup) return;
+        updatePopupPosition();
+        const onReposition = () => updatePopupPosition();
+        window.addEventListener('resize', onReposition);
+        window.addEventListener('scroll', onReposition, true);
+        return () => {
+            window.removeEventListener('resize', onReposition);
+            window.removeEventListener('scroll', onReposition, true);
+        };
+    }, [open, fixedPopup]);
 
     const runValidate = (iso) => {
         const err = validate ? (validate(iso) || '') : '';
@@ -210,14 +244,26 @@ export default function WelderDateField({ value, onChange, placeholder, disabled
                 height="16"
                 viewBox="0 0 16 16"
                 fill="none"
-                onClick={() => { if (!disabled) setOpen(o => !o); }}
+                onClick={() => {
+                    if (disabled) return;
+                    setOpen((o) => {
+                        const next = !o;
+                        if (next && fixedPopup) {
+                            requestAnimationFrame(updatePopupPosition);
+                        }
+                        return next;
+                    });
+                }}
             >
                 <rect x="3" y="4" width="10" height="9" rx="1" stroke="currentColor" strokeWidth="1.2" />
                 <path d="M3 7H13" stroke="currentColor" strokeWidth="1.2" />
                 <path d="M6 2V5M10 2V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
             </svg>
             {open && !disabled && (
-                <div className="welder-date-popup">
+                <div
+                    className={`welder-date-popup ${fixedPopup ? 'welder-date-popup-fixed' : ''}`}
+                    style={fixedPopup ? popupStyle : undefined}
+                >
                     <MiniCalendar selectedIso={value} minDate={minDate} maxDate={maxDate} onPick={handlePick} />
                 </div>
             )}

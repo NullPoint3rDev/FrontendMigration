@@ -80,8 +80,12 @@ function MacAddressesPage() {
     const [dateFrom, setDateFrom] = useState(savedState?.dateFrom || '');
     const [dateTo, setDateTo] = useState(savedState?.dateTo || '');
 
-    const [sortField, setSortField] = useState(savedState?.sortField || 'id');
-    const [sortDirection, setSortDirection] = useState(savedState?.sortDirection === 'desc' ? 'desc' : 'asc');
+    const [sortField, setSortField] = useState(savedState?.sortField || 'sessionCount');
+    const [sortDirection, setSortDirection] = useState(
+        savedState?.sortDirection != null
+            ? (savedState.sortDirection === 'desc' ? 'desc' : 'asc')
+            : 'desc'
+    );
     const [page, setPage] = useState(typeof savedState?.page === 'number' ? savedState.page : 0);
 
     const [newMac, setNewMac] = useState('');
@@ -396,7 +400,7 @@ function MacAddressesPage() {
                         )}
                     </div>
 
-                    <div className="filter-tile">
+                    <div className="filter-tile mac-date-filter-tile">
                         <button type="button" className="filter-tile-header" onClick={() => toggleFilterSection('date')}>
                             <span>Дата занесения</span>
                             <span className="filter-arrow">{expandedFilters.date ? '▾' : '▸'}</span>
@@ -405,11 +409,11 @@ function MacAddressesPage() {
                             <div className="filter-tile-content mac-date-filter">
                                 <div className="mac-date-filter-row">
                                     <span className="mac-date-filter-label">От</span>
-                                    <WelderDateField value={dateFromDraft} onChange={setDateFromDraft} />
+                                    <WelderDateField value={dateFromDraft} onChange={setDateFromDraft} fixedPopup />
                                 </div>
                                 <div className="mac-date-filter-row">
                                     <span className="mac-date-filter-label">До</span>
-                                    <WelderDateField value={dateToDraft} onChange={setDateToDraft} />
+                                    <WelderDateField value={dateToDraft} onChange={setDateToDraft} fixedPopup />
                                 </div>
                                 <div className="mac-date-filter-actions">
                                     <button type="button" className="mac-filter-ok-btn" onClick={handleApplyDates}>Ок</button>
@@ -421,38 +425,40 @@ function MacAddressesPage() {
                 </div>
 
                 <div className="equipment-content-column">
-                    <div className="content-header">
-                        <div className="add-device-tile mac-add-tile">
-                            <label className="mac-inline-field">
-                                <span>MAC:</span>
-                                <input
-                                    type="text"
-                                    value={newMac}
-                                    onChange={(e) => setNewMac(formatMacTyping(e.target.value))}
-                                    placeholder="E098 060B 22D2"
-                                    disabled={!canAddMacRegistry}
-                                />
-                            </label>
-                            <label className="mac-inline-field">
-                                <span>Тип</span>
-                                <select
-                                    value={newTypeId}
-                                    onChange={(e) => setNewTypeId(e.target.value)}
-                                    disabled={!canAddMacRegistry}
-                                >
-                                    {equipmentTypes.map((t) => (
-                                        <option key={t.id} value={t.id}>{t.name}</option>
-                                    ))}
-                                </select>
-                            </label>
+                    <div className="content-header mac-content-header">
+                        <div className="mac-toolbar-tile mac-toolbar-mac">
+                            <span className="mac-toolbar-label">MAC:</span>
+                            <input
+                                type="text"
+                                className="mac-toolbar-input"
+                                value={newMac}
+                                onChange={(e) => setNewMac(formatMacTyping(e.target.value))}
+                                placeholder="E098 060B 22D2"
+                                disabled={!canAddMacRegistry}
+                            />
+                        </div>
+                        <div className="mac-toolbar-tile mac-toolbar-type">
+                            <span className="mac-toolbar-label">Тип</span>
+                            <select
+                                className="mac-toolbar-select"
+                                value={newTypeId}
+                                onChange={(e) => setNewTypeId(e.target.value)}
+                                disabled={!canAddMacRegistry}
+                            >
+                                {equipmentTypes.map((t) => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="mac-toolbar-tile mac-toolbar-add">
                             <button
                                 type="button"
-                                className="add-device-btn"
+                                className="mac-toolbar-add-btn"
                                 onClick={handleAdd}
                                 disabled={!canAddMacRegistry || adding}
                             >
-                                <span className="add-icon">+</span>
                                 <span>Добавить</span>
+                                <span className="add-icon">+</span>
                             </button>
                         </div>
                         <div className="welders-stats-tile">
