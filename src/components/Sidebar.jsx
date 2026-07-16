@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useReportsUnsaved } from '../contexts/ReportsUnsavedContext'
 import { FaChevronDown, FaChevronRight } from 'react-icons/fa'
@@ -17,9 +17,20 @@ const Sidebar = () => {
     const location = useLocation()
     const reportsUnsaved = useReportsUnsaved()
     const [expandedGroups, setExpandedGroups] = useState({
-        enterprise: true,  // По умолчанию раскрыто
-        resources: true   // По умолчанию раскрыто
+        enterprise: true,
+        resources: true,
+        networkEquipment: location.pathname.startsWith('/network-equipment'),
     })
+
+    useEffect(() => {
+        if (location.pathname.startsWith('/network-equipment')) {
+            setExpandedGroups((prev) => ({
+                ...prev,
+                resources: true,
+                networkEquipment: true,
+            }))
+        }
+    }, [location.pathname])
 
     const isActive = (path) => {
         if (path === '/') {
@@ -142,13 +153,33 @@ const Sidebar = () => {
                                 <span className="submenu-marker" />
                                 <span>Сварочное оборудование</span>
                             </button>
-                            <button
-                                className={`submenu-item ${isActive('/network-equipment') ? 'active' : ''}`}
-                                onClick={() => handleNavigate('/network-equipment/mac-addresses')}
-                            >
-                                <span className="submenu-marker" />
-                                <span>Сетевое оборудование</span>
-                            </button>
+                            <div className="submenu-branch">
+                                <button
+                                    type="button"
+                                    className={`submenu-item submenu-branch-toggle ${isActive('/network-equipment') ? 'active' : ''}`}
+                                    onClick={() => toggleGroup('networkEquipment')}
+                                >
+                                    <span className="submenu-marker" />
+                                    <span>Сетевое оборудование</span>
+                                    {expandedGroups.networkEquipment ? (
+                                        <FaChevronDown className="submenu-branch-arrow" />
+                                    ) : (
+                                        <FaChevronRight className="submenu-branch-arrow" />
+                                    )}
+                                </button>
+                                {expandedGroups.networkEquipment && (
+                                    <div className="submenu-nested">
+                                        <button
+                                            type="button"
+                                            className={`submenu-item ${isActive('/network-equipment/mac-addresses') ? 'active' : ''}`}
+                                            onClick={() => handleNavigate('/network-equipment/mac-addresses')}
+                                        >
+                                            <span className="submenu-marker" />
+                                            <span>MAC Адреса</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                             <button
                                 className={`submenu-item ${isActive('/materials') ? 'active' : ''}`}
                                 onClick={() => handleNavigate('/materials')}

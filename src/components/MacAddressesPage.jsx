@@ -3,6 +3,7 @@ import { FaBell, FaLock, FaLockOpen } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import '../styles/weldersPage.css';
 import '../styles/addWelderPage.css';
+import '../styles/macAddressesPage.css';
 import UserProfile from './UserProfile';
 import WelderDateField from './WelderDateField';
 import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
@@ -420,8 +421,8 @@ function MacAddressesPage() {
                 </div>
 
                 <div className="equipment-content-column">
-                    <div className="content-header mac-toolbar">
-                        <div className="mac-toolbar-inputs">
+                    <div className="content-header">
+                        <div className="add-device-tile mac-add-tile">
                             <label className="mac-inline-field">
                                 <span>MAC:</span>
                                 <input
@@ -446,7 +447,7 @@ function MacAddressesPage() {
                             </label>
                             <button
                                 type="button"
-                                className="add-device-btn mac-add-btn"
+                                className="add-device-btn"
                                 onClick={handleAdd}
                                 disabled={!canAddMacRegistry || adding}
                             >
@@ -459,7 +460,7 @@ function MacAddressesPage() {
                             <div className="stat-item"><span>Выбрано: {selectedIds.length}</span></div>
                         </div>
                         {isAdminAlloy && (
-                            <div className="mac-admin-actions">
+                            <>
                                 <button
                                     type="button"
                                     className="mac-action-btn"
@@ -487,7 +488,7 @@ function MacAddressesPage() {
                                     <span>×</span>
                                     <span>Удалить</span>
                                 </button>
-                            </div>
+                            </>
                         )}
                     </div>
 
@@ -506,13 +507,48 @@ function MacAddressesPage() {
                                         onChange={toggleSelectAll}
                                     />
                                 </th>
-                                <th onClick={() => toggleSort('id')} className={sortField === 'id' ? 'sort-active' : ''}>№</th>
-                                <th onClick={() => toggleSort('mac')} className={sortField === 'mac' ? 'sort-active' : ''}>MAC</th>
-                                <th onClick={() => toggleSort('equipmentTypeName')} className={sortField === 'equipmentTypeName' ? 'sort-active' : ''}>Тип</th>
-                                <th onClick={() => toggleSort('dateCreated')} className={sortField === 'dateCreated' ? 'sort-active' : ''}>Дата/время занесения</th>
-                                <th onClick={() => toggleSort('enteredByName')} className={sortField === 'enteredByName' ? 'sort-active' : ''}>ФИО вводившего</th>
-                                <th onClick={() => toggleSort('sessionCount')} className={sortField === 'sessionCount' ? 'sort-active' : ''}>Кол-во сессий</th>
-                                <th onClick={() => toggleSort('status')} className={sortField === 'status' ? 'sort-active' : ''}>Статус</th>
+                                <th onClick={() => toggleSort('id')} className={sortField === 'id' ? 'sort-active' : ''}>
+                                    <span>№</span>
+                                    <span className={`sort-arrow ${sortField === 'id' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'id' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
+                                </th>
+                                <th onClick={() => toggleSort('mac')} className={sortField === 'mac' ? 'sort-active' : ''}>
+                                    <span>MAC</span>
+                                    <span className={`sort-arrow ${sortField === 'mac' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'mac' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
+                                </th>
+                                <th onClick={() => toggleSort('equipmentTypeName')} className={sortField === 'equipmentTypeName' ? 'sort-active' : ''}>
+                                    <span>Тип</span>
+                                    <span className={`sort-arrow ${sortField === 'equipmentTypeName' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'equipmentTypeName' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
+                                </th>
+                                <th onClick={() => toggleSort('dateCreated')} className={sortField === 'dateCreated' ? 'sort-active' : ''}>
+                                    <span>Дата/время занесения</span>
+                                    <span className={`sort-arrow ${sortField === 'dateCreated' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'dateCreated' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
+                                </th>
+                                <th onClick={() => toggleSort('enteredByName')} className={sortField === 'enteredByName' ? 'sort-active' : ''}>
+                                    <span>ФИО вводившего</span>
+                                    <span className={`sort-arrow ${sortField === 'enteredByName' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'enteredByName' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
+                                </th>
+                                <th onClick={() => toggleSort('sessionCount')} className={sortField === 'sessionCount' ? 'sort-active' : ''}>
+                                    <span>Кол-во сессий</span>
+                                    <span className={`sort-arrow ${sortField === 'sessionCount' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'sessionCount' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
+                                </th>
+                                <th onClick={() => toggleSort('status')} className={sortField === 'status' ? 'sort-active' : ''}>
+                                    <span>Статус</span>
+                                    <span className={`sort-arrow ${sortField === 'status' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
+                                        {sortField === 'status' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
+                                    </span>
+                                </th>
                             </tr>
                             </thead>
                             <tbody>

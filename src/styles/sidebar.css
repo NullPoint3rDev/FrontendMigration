@@ -229,6 +229,30 @@
     color: #af893d;
 }
 
+.submenu-branch {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.submenu-branch-toggle {
+    justify-content: flex-start;
+}
+
+.submenu-branch-arrow {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: 10px;
+    color: rgba(188, 183, 197, 0.75);
+}
+
+.submenu-nested {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-left: 14px;
+}
+
 .menu-text {
     flex: 1;
     text-align: left;

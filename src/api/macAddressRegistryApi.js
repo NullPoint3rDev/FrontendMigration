@@ -1,22 +1,8 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+import { api } from '../services/api';
 
-function authHeaders() {
-    const token = localStorage.getItem('token');
-    return {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-}
+const API_URL = '/mac-address-registry';
 
-async function parseJson(res) {
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-        throw new Error(data.message || data.error || `HTTP ${res.status}`);
-    }
-    return data;
-}
-
-export async function fetchMacRegistry(params = {}) {
+function buildQuery(params = {}) {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
         if (value == null || value === '') return;
@@ -26,61 +12,36 @@ export async function fetchMacRegistry(params = {}) {
             qs.set(key, String(value));
         }
     });
-    const res = await fetch(`${API_URL}/mac-address-registry?${qs.toString()}`, {
-        headers: authHeaders(),
-    });
-    return parseJson(res);
+    const query = qs.toString();
+    return query ? `?${query}` : '';
+}
+
+export async function fetchMacRegistry(params = {}) {
+    return api.get(`${API_URL}${buildQuery(params)}`);
 }
 
 export async function fetchMacEquipmentTypes() {
-    const res = await fetch(`${API_URL}/mac-address-registry/equipment-types`, {
-        headers: authHeaders(),
-    });
-    return parseJson(res);
+    return api.get(`${API_URL}/equipment-types`);
 }
 
 export async function checkMacRegistryExists(mac) {
-    const qs = new URLSearchParams({ mac });
-    const res = await fetch(`${API_URL}/mac-address-registry/mac-exists?${qs.toString()}`, {
-        headers: authHeaders(),
-    });
-    return parseJson(res);
+    return api.get(`${API_URL}/mac-exists${buildQuery({ mac })}`);
 }
 
 export async function createMacRegistryEntry({ mac, equipmentTypeId }) {
-    const res = await fetch(`${API_URL}/mac-address-registry`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ mac, equipmentTypeId }),
-    });
-    return parseJson(res);
+    return api.post(API_URL, { mac, equipmentTypeId });
 }
 
 export async function blockMacRegistryEntries(ids) {
-    const res = await fetch(`${API_URL}/mac-address-registry/block`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ ids }),
-    });
-    return parseJson(res);
+    return api.post(`${API_URL}/block`, { ids });
 }
 
 export async function unblockMacRegistryEntries(ids) {
-    const res = await fetch(`${API_URL}/mac-address-registry/unblock`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ ids }),
-    });
-    return parseJson(res);
+    return api.post(`${API_URL}/unblock`, { ids });
 }
 
 export async function deleteMacRegistryEntries(ids) {
-    const res = await fetch(`${API_URL}/mac-address-registry`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-        body: JSON.stringify({ ids }),
-    });
-    return parseJson(res);
+    return api.delete(API_URL, { body: JSON.stringify({ ids }) });
 }
 
 export function formatMacTyping(raw) {

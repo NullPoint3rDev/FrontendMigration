@@ -1,33 +1,4 @@
-.network-equipment-shell {
-    min-height: 100vh;
-    background: #0b1220;
-}
-
-.network-equipment-tabs {
-    display: flex;
-    gap: 8px;
-    padding: 12px 24px 0;
-}
-
-.network-equipment-tab {
-    color: #8fa0b8;
-    text-decoration: none;
-    padding: 8px 14px;
-    border-radius: 8px 8px 0 0;
-    font-size: 14px;
-}
-
-.network-equipment-tab.active {
-    color: #ffb347;
-    background: rgba(255, 179, 71, 0.08);
-}
-
-.mac-addresses-page .mac-toolbar {
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.mac-toolbar-inputs {
+.mac-addresses-page .mac-add-tile {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -38,54 +9,50 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #c7d2e3;
+    color: #d9d6df;
     font-size: 13px;
 }
 
 .mac-inline-field input,
 .mac-inline-field select {
-    background: #111827;
-    border: 1px solid #2a3448;
-    color: #e5edf9;
-    border-radius: 6px;
-    padding: 8px 10px;
-    min-width: 160px;
-}
-
-.mac-add-btn {
-    min-width: 120px;
-}
-
-.mac-admin-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    background: #0d1a28;
+    border: 1px solid rgba(79, 70, 90, 0.45);
+    color: #f0f4ff;
+    border-radius: 3px;
+    padding: 6px 10px;
+    min-width: 150px;
+    font-size: 13px;
 }
 
 .mac-action-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: #1a2333;
-    border: 1px solid #334155;
-    color: #dbe4f2;
-    border-radius: 6px;
-    padding: 8px 12px;
+    background: #122536;
+    border: none;
+    color: #ffffff;
+    border-radius: 3px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
+    flex-shrink: 0;
+    margin-left: 8px;
 }
 
 .mac-action-btn:disabled {
-    opacity: 0.45;
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
 .mac-page-error {
     color: #ff7b7b;
-    padding: 0 16px 8px;
+    padding: 0 4px 8px;
+    font-size: 13px;
 }
 
 .mac-addresses-table .mac-cell {
-    color: #ffb347;
+    color: #af893d;
     font-family: monospace;
     letter-spacing: 0.04em;
 }
@@ -103,7 +70,7 @@
 }
 
 .mac-date-filter-label {
-    color: #c7d2e3;
+    color: rgba(242, 241, 244, 0.9);
     min-width: 28px;
     font-size: 13px;
 }
@@ -117,12 +84,13 @@
 .mac-filter-ok-btn,
 .mac-filter-reset-btn {
     flex: 1;
-    border-radius: 6px;
+    border-radius: 3px;
     padding: 8px 10px;
-    border: 1px solid #334155;
-    background: #111827;
+    border: none;
+    background: #0d1a28;
     color: #dbe4f2;
     cursor: pointer;
+    font-size: 13px;
 }
 
 .mac-addresses-page .status-badge.status-waiting {
@@ -135,4 +103,8 @@
 
 .mac-addresses-page .status-badge.status-blocked {
     color: #ec2b3c;
+}
+
+.mac-addresses-page .welders-table tbody tr.table-row-blocked td {
+    color: rgba(236, 43, 60, 0.85);
 }
