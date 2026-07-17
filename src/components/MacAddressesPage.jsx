@@ -79,7 +79,7 @@ function MacAddressesPage() {
     const [dateFrom, setDateFrom] = useState(savedState?.dateFrom || '');
     const [dateTo, setDateTo] = useState(savedState?.dateTo || '');
 
-    const [sortField, setSortField] = useState(savedState?.sortField || 'sessionCount');
+    const [sortField, setSortField] = useState(savedState?.sortField || 'dateCreated');
     const [sortDirection, setSortDirection] = useState(
         savedState?.sortDirection != null
             ? (savedState.sortDirection === 'desc' ? 'desc' : 'asc')
@@ -119,6 +119,26 @@ function MacAddressesPage() {
             page,
         });
     }, [searchTerm, typeFilter, statusFilter, dateFromDraft, dateToDraft, dateFrom, dateTo, sortField, sortDirection, page]);
+
+    useEffect(() => {
+        if (dateFromDraft && dateToDraft) {
+            setDateFrom(dateFromDraft);
+            setDateTo(dateToDraft);
+            setPage(0);
+            return;
+        }
+        if (!dateFromDraft && !dateToDraft) {
+            setDateFrom('');
+            setDateTo('');
+            return;
+        }
+        if (dateFromDraft && !dateToDraft) {
+            setDateFrom('');
+            setDateTo('');
+        }
+    }, [dateFromDraft, dateToDraft]);
+
+    const dateFilterPending = Boolean(dateFromDraft && !dateToDraft);
 
     const loadTypes = useCallback(async () => {
         try {
@@ -246,18 +266,23 @@ function MacAddressesPage() {
         setNewMac(e.target.value.toUpperCase());
     };
 
-    const handleApplyDates = () => {
-        setDateFrom(dateFromDraft || '');
-        setDateTo(dateToDraft || '');
-        setPage(0);
-    };
-
     const handleResetDates = () => {
         setDateFromDraft('');
         setDateToDraft('');
         setDateFrom('');
         setDateTo('');
         setPage(0);
+    };
+
+    const handleOpenEquipment = (row) => {
+        if (!row?.weldingMachineId) return;
+        const params = new URLSearchParams({
+            machine: row.weldingMachineName || '',
+            mac: normalizeMacDigits(row.mac || ''),
+            name: row.weldingMachineName || '',
+            organizationUnit: row.organizationUnitName || '',
+        });
+        navigate(`/device-monitor?${params.toString()}`);
     };
 
     const handleAdd = async () => {
@@ -419,7 +444,6 @@ function MacAddressesPage() {
                                     <WelderDateField value={dateToDraft} onChange={setDateToDraft} fixedPopup />
                                 </div>
                                 <div className="mac-date-filter-actions">
-                                    <button type="button" className="mac-filter-ok-btn" onClick={handleApplyDates}>Ок</button>
                                     <button type="button" className="mac-filter-reset-btn" onClick={handleResetDates}>Сброс</button>
                                 </div>
                             </div>
@@ -427,7 +451,8 @@ function MacAddressesPage() {
                     </div>
                 </div>
 
-                <div className="equipment-content-column">
+                <div className={`equipment-content-column ${dateFilterPending ? 'mac-content-pending' : ''}`}>
+                    {dateFilterPending && <div className="mac-content-blur-overlay" aria-hidden />}
                     <div className="content-header mac-content-header">
                         <div className="mac-toolbar-tile mac-toolbar-mac">
                             <span className="mac-toolbar-label">MAC:</span>
@@ -535,6 +560,9 @@ function MacAddressesPage() {
                                         {sortField === 'dateCreated' ? (sortDirection === 'asc' ? '▴' : '▾') : '▾'}
                                     </span>
                                 </th>
+                                <th>
+                                    <span>Подразделение</span>
+                                </th>
                                 <th onClick={() => toggleSort('enteredByName')} className={sortField === 'enteredByName' ? 'sort-active' : ''}>
                                     <span>ФИО вводившего</span>
                                     <span className={`sort-arrow ${sortField === 'enteredByName' ? (sortDirection === 'asc' ? 'sort-asc' : 'sort-desc') : ''}`}>
@@ -557,9 +585,9 @@ function MacAddressesPage() {
                             </thead>
                             <tbody>
                             {loading ? (
-                                <tr><td colSpan={8}>Загрузка...</td></tr>
+                                <tr><td colSpan={9}>Загрузка...</td></tr>
                             ) : items.length === 0 ? (
-                                <tr><td colSpan={8}>Нет данных</td></tr>
+                                <tr><td colSpan={9}>Нет данных</td></tr>
                             ) : items.map((row, index) => (
                                 <tr
                                     key={row.id}
@@ -573,9 +601,22 @@ function MacAddressesPage() {
                                         />
                                     </td>
                                     <td>{page * 50 + index + 1}</td>
-                                    <td className="mac-cell">{row.mac}</td>
+                                    <td className="mac-cell">
+                                        {row.weldingMachineId ? (
+                                            <button
+                                                type="button"
+                                                className="mac-cell-link"
+                                                onClick={() => handleOpenEquipment(row)}
+                                            >
+                                                {row.mac}
+                                            </button>
+                                        ) : (
+                                            row.mac
+                                        )}
+                                    </td>
                                     <td>{row.equipmentTypeName || '—'}</td>
                                     <td>{row.dateCreatedDisplay || '—'}</td>
+                                    <td>{row.organizationUnitName || '—'}</td>
                                     <td>{row.enteredByName || '—'}</td>
                                     <td>{row.sessionCount ?? 0}</td>
                                     <td>

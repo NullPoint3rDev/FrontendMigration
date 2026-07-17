@@ -148,9 +148,8 @@
     margin-top: 8px;
 }
 
-.mac-filter-ok-btn,
 .mac-filter-reset-btn {
-    flex: 1;
+    width: 100%;
     border-radius: 3px;
     padding: 8px 10px;
     border: none;
@@ -158,6 +157,36 @@
     color: #dbe4f2;
     cursor: pointer;
     font-size: 13px;
+}
+
+.mac-addresses-page .equipment-content-column.mac-content-pending {
+    position: relative;
+}
+
+.mac-content-blur-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    backdrop-filter: blur(3px);
+    background: rgba(10, 8, 14, 0.35);
+    pointer-events: auto;
+    cursor: not-allowed;
+}
+
+.mac-cell-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #9f511f;
+    font-family: monospace;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.mac-cell-link:hover {
+    color: #c06a2a;
 }
 
 .mac-addresses-page .status-badge.status-waiting {
