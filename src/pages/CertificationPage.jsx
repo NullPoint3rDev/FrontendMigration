@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FaBell } from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
+import HeaderClock from '../components/HeaderClock';
 import { createCertification, updateCertification, getCertificationById, deleteCertification } from '../api/certificationApi';
 import '../styles/certificationPage.css';
 
@@ -577,6 +578,7 @@ function CertificationPage() {
                     <h1 className="page-title">Сварщики</h1>
                 </div>
                 <div className="header-right">
+                    <HeaderClock />
                     <button
                         className="control-btn notifications-btn"
                         onClick={() => navigate('/notifications')}

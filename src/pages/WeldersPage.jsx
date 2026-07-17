@@ -3,6 +3,7 @@ import { FaChevronRight, FaChevronDown, FaBell, FaArrowRight } from 'react-icons
 import '../styles/weldersPage.css';
 import { useNavigate, useLocation } from 'react-router-dom';
 import UserProfile from '../components/UserProfile';
+import HeaderClock from '../components/HeaderClock';
 import MoveWeldersModal from '../components/MoveWeldersModal';
 import WelderIcon from '../images/WelderIcon.png';
 import {
@@ -932,6 +933,7 @@ function WeldersPage() {
             <div className="welders-page-header-row">
                 <h1 className="welders-page-title-header">Сварщики</h1>
                 <div className="welders-tiles-controls">
+                    <HeaderClock />
                     <button
                         className="control-btn notifications-btn"
                         onClick={() => navigate('/notifications')}

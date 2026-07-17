@@ -41,6 +41,8 @@ import {
     FaRedo,
 } from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
+import HeaderClock from './HeaderClock';
+import { formatMoscowDate, formatMoscowTime } from '../utils/moscowTime';
 import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
 import MonitorWeldersTab from './MonitorWeldersTab';
 import '../styles/monitorWeldersTab.css';
@@ -1818,9 +1820,7 @@ function parseMachineModules(modulesJson) {
 
 function formatInfoDate(value) {
     if (!value) return '—';
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return String(value);
-    return d.toLocaleDateString('ru-RU');
+    return formatMoscowDate(value);
 }
 
 function formatMacGroups(mac) {
@@ -3390,7 +3390,7 @@ const DeviceMonitorPage = () => {
                 updateDeviceData({
                     [mac]: {
                         ...params,
-                        timestamp: timestamp || new Date().toLocaleTimeString()
+                        timestamp: timestamp || formatMoscowTime()
                     }
                 });
             }
@@ -3537,7 +3537,7 @@ const DeviceMonitorPage = () => {
                     [mac]: {
                         ...params,
                         status: finalStatus, // Сохраняем status для определения состояния сварки
-                        timestamp: data.timestamp || new Date().toLocaleTimeString(),
+                        timestamp: data.timestamp || formatMoscowTime(),
                         lastDatetimeUpdate: data.state.lastDatetimeUpdate || data.state.dateCreated || null,
                         localServerPacketDatetime: data.state.localServerPacketDatetime || null,
                         dateCreated: data.state.dateCreated || null
@@ -4058,11 +4058,7 @@ const DeviceMonitorPage = () => {
                         font: { size: 10 },
                         padding: 6,
                         callback: function(val) {
-                            return new Date(val).toLocaleTimeString('ru-RU', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                second: showSeconds ? '2-digit' : undefined
-                            });
+                            return formatMoscowTime(val, { second: showSeconds });
                         }
                     },
                     border: { display: false },
@@ -4473,8 +4469,8 @@ const DeviceMonitorPage = () => {
         };
 
         const errorDate = getTimestamp();
-        const timeStr = errorDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-        const dateStr = errorDate.toLocaleDateString('ru-RU');
+        const timeStr = formatMoscowTime(errorDate);
+        const dateStr = formatMoscowDate(errorDate);
 
         // Ошибки: при наличии числового error_code в корне state — только подписи из EQUIPMENT_ERROR_MESSAGES
         // (как EquipmentErrorMessages на бэке), без текста свойства «Ошибки» из другого словаря парсера — иначе
@@ -4786,9 +4782,9 @@ const DeviceMonitorPage = () => {
     // Форматирование даты
     const formatDate = () => {
         if (lastUpdate) {
-            return lastUpdate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            return formatMoscowDate(lastUpdate);
         }
-        return new Date().toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return formatMoscowDate(new Date());
     };
 
     const handleNavigateCreateWelderFromRfid = () => {
@@ -4991,7 +4987,7 @@ const DeviceMonitorPage = () => {
         if (!Number.isFinite(ts)) return '';
         const step = 5 * 60 * 1000;
         const snapped = Math.round(ts / step) * step;
-        return new Date(snapped).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        return formatMoscowTime(snapped);
     }, []);
 
     const historyChartHasStaleContent = useMemo(() => {
@@ -5073,10 +5069,7 @@ const DeviceMonitorPage = () => {
                         font: { size: 10 },
                         padding: 6,
                         callback(val) {
-                            return new Date(val).toLocaleTimeString('ru-RU', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            });
+                            return formatMoscowTime(val);
                         }
                     },
                     border: { display: false },
@@ -5274,11 +5267,7 @@ const DeviceMonitorPage = () => {
     /** Время в тултипе — по X курсора (не nearest-point: иначе 09:55 при курсоре на 10:45). */
     const hoverCursorTimeLabel = useMemo(() => {
         if (!hoverCursor.active || !Number.isFinite(hoverCursor.ts)) return '';
-        return new Date(hoverCursor.ts).toLocaleTimeString('ru-RU', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-        });
+        return formatMoscowTime(hoverCursor.ts, { second: true });
     }, [hoverCursor.active, hoverCursor.ts]);
 
     const findSegmentAtTs = useCallback((segments, ts) => {
@@ -6650,13 +6639,7 @@ const DeviceMonitorPage = () => {
                     </div>
                 </div>
                 <div className="monitor-page-header-controls">
-                    <span className="monitor-page-header-clock" aria-hidden="true">
-                        {new Date(currentTime).toLocaleTimeString('ru-RU', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false,
-                        })}
-                    </span>
+                    <HeaderClock />
                     <button
                         type="button"
                         className="monitor-page-notifications-btn"
@@ -7286,7 +7269,7 @@ const DeviceMonitorPage = () => {
                                                     const stamp = chartBounds.dayStart + ratio * (chartBounds.dayEnd - chartBounds.dayStart);
                                                     return (
                                                         <span key={`tick-${idx}`} className="monitor-overlay-ruler-tick-static">
-                                                        {new Date(stamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                                                        {formatMoscowTime(stamp)}
                                                     </span>
                                                     );
                                                 })}

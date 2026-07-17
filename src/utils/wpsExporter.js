@@ -2,6 +2,8 @@
 // Утилита для экспорта WPS в Excel формат
 // Требует установки: npm install xlsx file-saver
 
+import { formatMoscowDate } from './moscowTime';
+
 // Функция для динамической загрузки библиотеки XLSX
 const loadXLSX = async () => {
     try {
@@ -48,8 +50,8 @@ export const exportWPSToExcel = async (wps) => {
             ['ГОСТ', wps.gostStandard || ''],
             ['Статус', getStatusLabel(wps.status) || ''],
             [''],
-            ['Дата создания', wps.dateCreated ? new Date(wps.dateCreated).toLocaleDateString('ru-RU') : ''],
-            ['Дата обновления', wps.dateUpdated ? new Date(wps.dateUpdated).toLocaleDateString('ru-RU') : '']
+            ['Дата создания', wps.dateCreated ? formatMoscowDate(wps.dateCreated) : ''],
+            ['Дата обновления', wps.dateUpdated ? formatMoscowDate(wps.dateUpdated) : '']
         ];
 
         // Создаем рабочую книгу
@@ -127,8 +129,8 @@ export const exportWPSToCSV = (wps) => {
             'ГОСТ,' + (wps.gostStandard || ''),
             'Статус,' + getStatusLabel(wps.status),
             '',
-            'Дата создания,' + (wps.dateCreated ? new Date(wps.dateCreated).toLocaleDateString('ru-RU') : ''),
-            'Дата обновления,' + (wps.dateUpdated ? new Date(wps.dateUpdated).toLocaleDateString('ru-RU') : '')
+            'Дата создания,' + (wps.dateCreated ? formatMoscowDate(wps.dateCreated) : ''),
+            'Дата обновления,' + (wps.dateUpdated ? formatMoscowDate(wps.dateUpdated) : '')
         ].join('\n');
 
         // Создаем Blob и скачиваем
@@ -174,7 +176,7 @@ export const exportAllWPSToExcel = async (wpsList) => {
             ['Список всех технологических карт сварки (WPS)'],
             [''],
             ['Общее количество WPS:', wpsList.length],
-            ['Дата экспорта:', new Date().toLocaleDateString('ru-RU')],
+            ['Дата экспорта:', formatMoscowDate(new Date())],
             [''],
             ['№', 'Название', 'Описание', 'Метод сварки', 'Материал', 'Толщина', 'Ток (А)', 'Напряжение (В)', 'Скорость подачи', 'Расход газа', 'ГОСТ', 'Статус']
         ];
@@ -244,7 +246,7 @@ export const exportAllWPSToCSV = (wpsList) => {
             'Список всех технологических карт сварки (WPS)',
             '',
             'Общее количество WPS,' + wpsList.length,
-            'Дата экспорта,' + new Date().toLocaleDateString('ru-RU'),
+            'Дата экспорта,' + formatMoscowDate(new Date()),
             '',
             '№,Название,Описание,Метод сварки,Материал,Толщина,Ток (А),Напряжение (В),Скорость подачи,Расход газа,ГОСТ,Статус'
         ];

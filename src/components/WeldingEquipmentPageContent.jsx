@@ -19,6 +19,7 @@ import { getArchivePanelState } from '../api/archiveDeviceApi';
 import {
     resolveLastWeldDisplay,
     seedLastWeldFromMachines,
+    parseDbLastWeldMs,
 } from '../utils/weldingMachineLastWeld';
 import { getMachineStatusBadgeShort } from '../utils/weldingMachineStateDisplay';
 import { api } from '../services/api';
@@ -637,8 +638,8 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         if (mac && lastWeldByMac[mac] != null) return lastWeldByMac[mac];
         if (mac && lastWeldByMacRef.current?.[mac] != null) return lastWeldByMacRef.current[mac];
         if (!item?.lastWeldAt) return 0;
-        const parsed = new Date(item.lastWeldAt).getTime();
-        return Number.isFinite(parsed) ? parsed : 0;
+        const parsed = parseDbLastWeldMs(item);
+        return parsed ?? 0;
     };
 
     const getOnlineStatusRankForSort = (item) => {

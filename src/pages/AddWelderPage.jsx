@@ -5,6 +5,7 @@ import { FaBell, FaChevronRight, FaChevronDown } from 'react-icons/fa';
 import { RiRfidFill } from 'react-icons/ri';
 import { FaTrash } from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
+import HeaderClock from '../components/HeaderClock';
 import AddRfidPassModal from '../components/AddRfidPassModal';
 import AddMachineModal from '../components/AddMachineModal';
 import { createWelder, getWelderById, updateWelder, uploadWelderPhoto, deleteWelderPhoto, getWelderPhoto, getWelderPhotoUrl, getWelderPositions } from '../api/welderApi';
@@ -1438,6 +1439,7 @@ function AddWelderPage() {
                     <h1 className="page-title">{isEditMode ? 'Страница сварщика' : 'Добавление нового сварщика'}</h1>
                 </div>
                 <div className="header-right">
+                    <HeaderClock />
                     <button
                         className="control-btn notifications-btn"
                         onClick={() => goWithUnsavedGuard('/notifications')}

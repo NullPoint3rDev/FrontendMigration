@@ -5,6 +5,7 @@ import '../styles/weldersPage.css';
 import '../styles/addWelderPage.css';
 import '../styles/macAddressesPage.css';
 import UserProfile from './UserProfile';
+import HeaderClock from './HeaderClock';
 import WelderDateField from './WelderDateField';
 import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
 import {
@@ -347,6 +348,7 @@ function MacAddressesPage() {
             <div className="welders-page-header-row">
                 <h1 className="welders-page-title-header">MAC Адреса</h1>
                 <div className="welders-tiles-controls">
+                    <HeaderClock />
                     <button type="button" className="control-btn notifications-btn" onClick={() => navigate('/notifications')}>
                         <FaBell className="notifications-icon" />
                         <span className="notifications-badge" />
@@ -561,7 +563,7 @@ function MacAddressesPage() {
                                     </span>
                                 </th>
                                 <th>
-                                    <span>Подразделение</span>
+                                    <span>Предприятие</span>
                                 </th>
                                 <th onClick={() => toggleSort('enteredByName')} className={sortField === 'enteredByName' ? 'sort-active' : ''}>
                                     <span>ФИО вводившего</span>
@@ -616,7 +618,7 @@ function MacAddressesPage() {
                                     </td>
                                     <td>{row.equipmentTypeName || '—'}</td>
                                     <td>{row.dateCreatedDisplay || '—'}</td>
-                                    <td>{row.organizationUnitName || '—'}</td>
+                                    <td>{row.organizationName || '—'}</td>
                                     <td>{row.enteredByName || '—'}</td>
                                     <td>{row.sessionCount ?? 0}</td>
                                     <td>

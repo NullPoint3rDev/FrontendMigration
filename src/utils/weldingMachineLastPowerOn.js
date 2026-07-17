@@ -1,3 +1,4 @@
+import { formatMoscowDateTime, parseApiDateTime } from './moscowTime';
 import { isStandbyMachineState } from './weldingMachineStateDisplay';
 
 const CORE_UPTIME_SEC_TO_MS = 1000;
@@ -68,20 +69,11 @@ export function computeLastPowerOnFromPanelState(stateObj, nowMs = Date.now()) {
 
 export function formatLastPowerOnDisplay(timestampMs) {
     if (timestampMs == null || !Number.isFinite(timestampMs)) return null;
-    return new Date(timestampMs).toLocaleString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    return formatMoscowDateTime(timestampMs);
 }
 
 export function parseDbLastPoweredOnMs(item) {
-    const raw = item?.lastPoweredOnAt;
-    if (raw == null || raw === '') return null;
-    const t = new Date(raw).getTime();
-    return Number.isFinite(t) ? t : null;
+    return parseApiDateTime(item?.lastPoweredOnAt);
 }
 
 /** Заполняет ref/state из lastPoweredOnAt в ответе API. */

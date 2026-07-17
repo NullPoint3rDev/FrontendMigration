@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 
 const UserProfile = lazy(() => import('./UserProfile'));
+const HeaderClock = lazy(() => import('./HeaderClock'));
 const WeldingEquipmentPageContent = lazy(() => import('./WeldingEquipmentPageContent'));
 
 /**
@@ -35,6 +36,9 @@ function WeldingEquipmentPage() {
             <div className="equipment-page-header-row">
                 <h1 className="equipment-page-title-header">Сварочное оборудование</h1>
                 <div className="equipment-page-controls">
+                    <Suspense fallback={null}>
+                        <HeaderClock />
+                    </Suspense>
                     <button
                         type="button"
                         className="control-btn notifications-btn"

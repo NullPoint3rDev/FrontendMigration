@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaSearch, FaBell, FaUser, FaEdit } from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
+import HeaderClock from '../components/HeaderClock';
 import CreateEnterpriseModal from '../components/CreateEnterpriseModal';
 import OrganizationLogo from '../images/OrganizationLogo.png';
 import ResourcesLogo from '../images/ResourcesLogo.png';
@@ -296,6 +297,7 @@ function EnterpriseListPage() {
             <div className="enterprise-map-header-row">
                 <h1 className="enterprise-map-page-title">Карты предприятий</h1>
                 <div className="tiles-controls">
+                    <HeaderClock />
                     <button
                         className="control-btn notifications-btn"
                         onClick={() => navigate('/notifications')}

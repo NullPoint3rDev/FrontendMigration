@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import ReportPeriodModal from './ReportPeriodModal';
 import ReportViewer from './ReportViewer';
 import { reportApi, reportHelpers } from '../api/reportApi';
+import { formatMoscowDate } from '../utils/moscowTime';
 import '../styles/baseReportPage.css';
 
 const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) => {
@@ -44,7 +45,7 @@ const BaseReportPage = ({ reportType, title, description, icon, commonErrors }) 
                 ? Object.keys(onlineData[0])
                 : (requestData?.selectedColumns || []);
             const template = {
-                name: `${title} - ${new Date().toLocaleDateString('ru-RU')}`,
+                name: `${title} - ${formatMoscowDate(new Date())}`,
                 columns: inferredColumns,
                 format: reportData.format
             };

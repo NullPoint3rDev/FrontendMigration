@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchLibraryDocuments, uploadLibraryDocument, downloadLibraryDocument, deleteLibraryDocument } from '../api/libraryApi';
+import { formatMoscowDateTime } from '../utils/moscowTime';
 import '../styles/equipmentPage.css';
 
 const LibraryPage = () => {
@@ -123,7 +124,7 @@ const LibraryPage = () => {
               <td>{doc.fileName}</td>
               <td>{doc.comment}</td>
               <td>{doc.uploader}</td>
-              <td>{doc.uploadDate ? new Date(doc.uploadDate).toLocaleString() : ''}</td>
+              <td>{doc.uploadDate ? formatMoscowDateTime(doc.uploadDate) : ''}</td>
               <td>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button className="action-btn edit" onClick={() => handleDownload(doc.id, doc.fileName)}>

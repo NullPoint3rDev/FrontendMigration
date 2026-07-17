@@ -1,4 +1,6 @@
 /** Последний шов на аппарате (список «Сварочное оборудование»). */
+import { formatMoscowDateTime, parseApiDateTime } from './moscowTime';
+
 export function isWeldingPanelState(stateObj) {
     if (!stateObj) return false;
     const props = stateObj.properties || {};
@@ -30,23 +32,12 @@ export function isWeldingPanelState(stateObj) {
 }
 
 export function parseDbLastWeldMs(item) {
-    const raw = item?.lastWeldAt;
-    if (raw == null || raw === '') return null;
-    const t = new Date(raw).getTime();
-    return Number.isFinite(t) ? t : null;
+    return parseApiDateTime(item?.lastWeldAt);
 }
 
 export function formatLastWeldDisplay(timestampMs) {
     if (timestampMs == null || !Number.isFinite(timestampMs)) return null;
-    // Список оборудования: всегда московское время (как на сервере/телеметрии).
-    return new Date(timestampMs).toLocaleString('ru-RU', {
-        timeZone: 'Europe/Moscow',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    return formatMoscowDateTime(timestampMs);
 }
 
 export function seedLastWeldFromMachines(machines, lastWeldByMacRef, setLastWeldByMac) {

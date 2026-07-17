@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
+import { formatMoscowDate, formatMoscowDateTime, formatMoscowTime } from '../utils/moscowTime';
 import '../styles/reportViewer.css';
 
 const ReportViewer = ({ data, template, onClose }) => {
@@ -96,9 +97,9 @@ const ReportViewer = ({ data, template, onClose }) => {
                 columns.map(column => {
                     let value = row[column.field];
                     if (column.type === 'date' && value) {
-                        value = new Date(value).toLocaleDateString();
+                        value = formatMoscowDate(value);
                     } else if (column.type === 'time' && value) {
-                        value = new Date(value).toLocaleTimeString();
+                        value = formatMoscowTime(value);
                     }
                     // Пустые значения выводим как 0 по требованию
                     const safe = (value === undefined || value === null || value === '') ? 0 : value;
@@ -190,11 +191,11 @@ const ReportViewer = ({ data, template, onClose }) => {
                                             {(() => {
                                                 let value = row[column.field];
                                                 if (column.type === 'date' && value) {
-                                                    return new Date(value).toLocaleDateString();
+                                                    return formatMoscowDate(value);
                                                 } else if (column.type === 'time' && value) {
-                                                    return new Date(value).toLocaleTimeString();
+                                                    return formatMoscowTime(value);
                                                 } else if (column.type === 'datetime' && value) {
-                                                    return new Date(value).toLocaleString('ru-RU');
+                                                    return formatMoscowDateTime(value);
                                                 }
                                                 // Пустые значения отображаем как 0 по требованию
                                                 return (value === undefined || value === null || value === '') ? 0 : value;

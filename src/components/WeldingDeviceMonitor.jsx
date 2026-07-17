@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { WEBSOCKET_URL } from '../config';
+import { formatMoscowTime } from '../utils/moscowTime';
 import {
     Card,
     CardContent,
@@ -85,7 +86,7 @@ const WeldingDeviceMonitor = () => {
                 [mac]: {
                     ...prev[mac],
                     ...params,
-                    timestamp: new Date().toLocaleTimeString()
+                    timestamp: formatMoscowTime()
                 }
             }));
         } catch (err) {

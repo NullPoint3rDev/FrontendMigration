@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatMoscowDateTime } from '../utils/moscowTime';
 import '../styles/messages.css';
 
 const MessagesList = ({ messages, selectedIds = [], onToggleSelect, onOpenMessage, loading }) => {
@@ -50,7 +51,7 @@ const MessagesList = ({ messages, selectedIds = [], onToggleSelect, onOpenMessag
                 {msg.subject || '(Без темы)'}
               {msg.attachments && msg.attachments.length > 0 && <span className="icon-attach">📎</span>}
             </td>
-            <td>{msg.dateSent ? new Date(msg.dateSent).toLocaleString() : ''}</td>
+            <td>{msg.dateSent ? formatMoscowDateTime(msg.dateSent) : ''}</td>
             <td></td>
           </tr>
         ))}

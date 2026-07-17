@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchLibraryDocuments, uploadLibraryDocument, downloadLibraryDocument } from '../api/libraryApi';
+import { formatMoscowDateTime } from '../utils/moscowTime';
 
 const LibraryPage = () => {
   const [documents, setDocuments] = useState([]);
@@ -85,7 +86,7 @@ const LibraryPage = () => {
               <td style={{ border: '1px solid #ccc', padding: 8 }}>{doc.fileName}</td>
               <td style={{ border: '1px solid #ccc', padding: 8 }}>{doc.comment}</td>
               <td style={{ border: '1px solid #ccc', padding: 8 }}>{doc.uploader}</td>
-              <td style={{ border: '1px solid #ccc', padding: 8 }}>{doc.uploadDate ? new Date(doc.uploadDate).toLocaleString() : ''}</td>
+              <td style={{ border: '1px solid #ccc', padding: 8 }}>{doc.uploadDate ? formatMoscowDateTime(doc.uploadDate) : ''}</td>
               <td style={{ border: '1px solid #ccc', padding: 8 }}>
                 <button onClick={() => handleDownload(doc.id, doc.fileName)}>Скачать</button>
               </td>

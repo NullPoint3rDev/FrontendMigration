@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { reportApi, reportHelpers } from '../api/reportApi';
 import * as XLSX from 'xlsx';
+import { formatMoscowDateTime } from '../utils/moscowTime';
 import '../styles/reportsList.css';
 
 const ReportsList = ({ reportType, reportName, onViewReport }) => {
@@ -129,16 +130,7 @@ const ReportsList = ({ reportType, reportName, onViewReport }) => {
         }
     };
 
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        return date.toLocaleString('ru-RU', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
+    const formatDate = (dateString) => formatMoscowDateTime(dateString);
 
     const getFormatIcon = (format) => {
         const normalizedFormat = format === 'EXCEL' ? 'xlsx' : format.toLowerCase();

@@ -4,6 +4,7 @@ import CreateTemplateModal from './CreateTemplateModal';
 import ReportPeriodModal from './ReportPeriodModal';
 import ReportViewer from './ReportViewer';
 import {reportApi, reportHelpers} from '../api/reportApi';
+import { formatMoscowDate, formatMoscowDateTime, formatMoscowTime } from '../utils/moscowTime';
 import '../styles/myReportsPage.css';
 
 const MyReportsPage = () => {
@@ -454,7 +455,7 @@ const MyReportsPage = () => {
             
             // Показываем отчет онлайн всегда, даже если данных нет (отобразится заглушка "Нет данных")
             const template = {
-                name: `${currentTemplate.name} - ${new Date().toLocaleDateString('ru-RU')}`,
+                name: `${currentTemplate.name} - ${formatMoscowDate(new Date())}`,
                 columns: currentTemplate.columns, // Используем выбранные столбцы из шаблона
                 format: currentTemplate.format
             };
@@ -516,10 +517,10 @@ const MyReportsPage = () => {
             template.columns.forEach(column => {
                 switch (column) {
                     case 'Дата':
-                        row[column] = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('ru-RU');
+                        row[column] = formatMoscowDate(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000);
                         break;
                     case 'Время':
-                        row[column] = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                        row[column] = formatMoscowTime();
                         break;
                     case 'Сварщик':
                         row[column] = `Сварщик ${Math.floor(Math.random() * 10) + 1}`;
@@ -712,7 +713,7 @@ const MyReportsPage = () => {
                                             </p>
                                             {template.lastUsed && (
                                                 <p className="template-last-used">
-                                                    Последнее использование: {new Date(template.lastUsed).toLocaleString('ru-RU')}
+                                                    Последнее использование: {formatMoscowDateTime(template.lastUsed)}
                                                 </p>
                                             )}
                                         </div>
@@ -818,7 +819,7 @@ const MyReportsPage = () => {
                                                     </div>
                                                 </td>
                                                 <td className="report-date-cell">
-                                                    {new Date(report.generatedAt || report.createdAt || Date.now()).toLocaleString('ru-RU')}
+                                                    {formatMoscowDateTime(report.generatedAt || report.createdAt || Date.now())}
                                                 </td>
                                                 <td className="report-format-cell">
                                                     <span className="format-badge">{report.format || 'Неизвестно'}</span>

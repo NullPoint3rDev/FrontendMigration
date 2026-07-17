@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '../config';
 import { getAuthHeaders } from '../services/api';
+import { formatMoscowDateTime } from '../utils/moscowTime';
 
 const API_URL = `${API_BASE_URL}/automated-reports`;
 
@@ -272,7 +273,7 @@ export const automatedReportsHelpers = {
         if (diff < 3600000) return `Через ${Math.floor(diff / 60000)} мин`;
         if (diff < 86400000) return `Через ${Math.floor(diff / 3600000)} ч`;
         
-        return date.toLocaleString('ru-RU');
+        return formatMoscowDateTime(date);
     },
 
     // Получить статус автоматизированного отчета

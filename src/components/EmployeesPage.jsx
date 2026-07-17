@@ -3,6 +3,7 @@ import { FaChevronRight, FaChevronDown, FaBell } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import '../styles/weldersPage.css';
 import UserProfile from './UserProfile';
+import HeaderClock from './HeaderClock';
 import {
     getAllUserAccounts,
     deleteUserAccount,
@@ -574,6 +575,7 @@ function EmployeesPage() {
             <div className="welders-page-header-row">
                 <h1 className="welders-page-title-header">Пользователи</h1>
                 <div className="welders-tiles-controls">
+                    <HeaderClock />
                     <button
                         className="control-btn notifications-btn"
                         onClick={() => navigate('/notifications')}

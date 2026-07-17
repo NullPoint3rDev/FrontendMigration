@@ -5,6 +5,7 @@ import { api } from '../services/api';
 import '../styles/enterpriseMapPage.css';
 
 const UserProfile = lazy(() => import('./UserProfile'));
+const HeaderClock = lazy(() => import('./HeaderClock'));
 const EnterpriseMapPageSimpleContent = lazy(() => import('./EnterpriseMapPageSimpleContent'));
 
 /**
@@ -73,6 +74,9 @@ function EnterpriseMapPageSimple() {
                     <h1 className="enterprise-map-page-title">Карта предприятия</h1>
                 )}
                 <div className="tiles-controls">
+                    <Suspense fallback={null}>
+                        <HeaderClock />
+                    </Suspense>
                     <button
                         type="button"
                         className="control-btn notifications-btn"

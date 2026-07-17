@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getUserNotifications, markNotificationAsRead, deleteNotification, getAutomatedReportNotifications } from '../api/notificationApi';
+import { formatMoscowDateTime } from '../utils/moscowTime';
 import '../styles/notificationsSection.css';
 
 const NotificationsSection = () => {
@@ -271,12 +272,11 @@ const NotificationsSection = () => {
                                         </span>
                                     </td>
                                     <td className="notification-date-cell">
-                                        {notification.dateCreated ? 
-                                            new Date(notification.dateCreated).toLocaleString('ru-RU') :
-                                            notification.createdAt ? 
-                                                new Date(notification.createdAt).toLocaleString('ru-RU') :
-                                                'Дата не указана'
-                                        }
+                                        {notification.dateCreated
+                                            ? formatMoscowDateTime(notification.dateCreated)
+                                            : notification.createdAt
+                                                ? formatMoscowDateTime(notification.createdAt)
+                                                : 'Дата не указана'}
                                     </td>
                                     <td>
                                         <div className="notification-actions">

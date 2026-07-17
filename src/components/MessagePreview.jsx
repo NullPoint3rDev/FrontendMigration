@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatMoscowDateTime } from '../utils/moscowTime';
 import '../styles/messages.css';
 import { downloadInboxMessageAttachment } from '../api/inboxMessageApi';
 
@@ -36,7 +37,7 @@ const MessagePreview = ({ message, onDelete, onNewMessage }) => {
                     {message.subject || '(Без темы)'}
                 </div>
                 <div className="preview-date">
-                    {message.dateSent ? new Date(message.dateSent).toLocaleString() : ''}
+                    {message.dateSent ? formatMoscowDateTime(message.dateSent) : ''}
                 </div>
             </div>
 

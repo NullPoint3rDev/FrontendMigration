@@ -4,6 +4,7 @@ import { FaBell, FaChevronRight, FaChevronDown } from 'react-icons/fa';
 import { RiRfidFill } from 'react-icons/ri';
 import { FaTrash } from 'react-icons/fa';
 import UserProfile from '../components/UserProfile';
+import HeaderClock from '../components/HeaderClock';
 import AddRfidPassModal from '../components/AddRfidPassModal';
 import EmailVerifyModal from '../components/EmailVerifyModal';
 import { getRoles, createUserAccount, getUserAccountById, updateUserAccount } from '../api/userAccountApi';
@@ -1104,6 +1105,7 @@ function AddUserPage() {
                     </div>
                 </div>
                 <div className="header-right">
+                    <HeaderClock />
                     <button
                         type="button"
                         className="control-btn notifications-btn"
