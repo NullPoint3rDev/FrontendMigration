@@ -198,11 +198,20 @@
 }
 
 .mac-addresses-page .status-badge.status-blocked {
-    color: #ec2b3c;
+    color: #9aa8bc;
 }
 
-.mac-addresses-page .welders-table tbody tr.table-row-blocked td {
-    color: rgba(236, 43, 60, 0.85);
+.mac-addresses-page .resave-confirm-buttons--single {
+    justify-content: center;
+}
+
+.mac-addresses-page .resave-confirm-buttons--single .resave-confirm-btn {
+    min-width: 120px;
+    justify-content: center;
+}
+
+.mac-date-filter .welder-date-field.has-error input[type="text"] {
+    outline: 1px solid rgba(236, 43, 60, 0.75);
 }
 
 .welder-date-popup-fixed {

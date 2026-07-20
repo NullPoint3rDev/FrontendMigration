@@ -31,7 +31,6 @@ import {
     FaBell,
     FaCompress,
     FaExpand,
-    FaDownload,
     FaFillDrip,
     FaTimes,
     FaSave,
@@ -2090,7 +2089,9 @@ const DeviceMonitorPage = () => {
     }, [todayPinExplore]);
 
     const graphUsesServerData = isHistoryMode || todayPinExplore;
-    const graphHistoryPending = graphUsesServerData && (!historyChartReady || historyRevealActive);
+    const historyAwaitingLoad = graphUsesServerData && !historyChartReady && !historyLoading && !historyRevealActive;
+    const graphHistoryPending = graphUsesServerData && (historyRevealActive || (historyLoading && !historyChartReady));
+    const historyChartBlocked = graphHistoryPending || historyAwaitingLoad;
     const graphUsesServerDataRef = useRef(graphUsesServerData);
     useEffect(() => {
         graphUsesServerDataRef.current = graphUsesServerData;
@@ -6133,7 +6134,7 @@ const DeviceMonitorPage = () => {
     }, [activeTab, handleChartWheel]);
 
     const handleTimelinePinMouseDown = (pin) => {
-        if (graphHistoryPending) return;
+        if (historyChartBlocked) return;
         // Live: перетаскивание пинов запрещено (история включается кнопками «История» / «Загр. данные»).
         if (!graphUsesServerDataRef.current) return;
         pinDragSessionDateRef.current = selectedGraphDateRef.current;
@@ -6998,17 +6999,6 @@ const DeviceMonitorPage = () => {
                                                 ) : null}
                                             </button>
                                         )}
-                                        {graphUsesServerData && telemetryColorUiMode !== 'palette' && (
-                                            <button
-                                                type="button"
-                                                className={`telemetry-toolbar-btn${!fullDayLoaded && !historyLoading ? ' telemetry-toolbar-btn--accent' : ''}`}
-                                                onClick={handleLoadFullDay}
-                                                disabled={fullDayLoaded || historyLoading}
-                                                title="Загрузить данные за сутки"
-                                            >
-                                                <FaDownload aria-hidden style={{ width: 12, height: 12 }} />
-                                            </button>
-                                        )}
                                         {telemetryColorUiMode === 'palette' && (
                                             <button
                                                 type="button"
@@ -7259,10 +7249,10 @@ const DeviceMonitorPage = () => {
                                     <div
                                         className="chart-wrapper"
                                         ref={chartWrapperRef}
-                                        onMouseMove={graphHistoryPending ? undefined : handleSharedHoverMove}
-                                        onMouseLeave={graphHistoryPending ? undefined : handleSharedHoverLeave}
+                                        onMouseMove={historyChartBlocked ? undefined : handleSharedHoverMove}
+                                        onMouseLeave={historyChartBlocked ? undefined : handleSharedHoverLeave}
                                     >
-                                        <div className={`monitor-overlay-ruler${graphHistoryPending ? ' monitor-chart-blur-target' : ''}`} ref={timelineRulerRef}>
+                                        <div className={`monitor-overlay-ruler${historyChartBlocked ? ' monitor-chart-blur-target' : ''}`} ref={timelineRulerRef}>
                                             <div className="monitor-overlay-ruler-scale">
                                                 {Array.from({ length: 9 }, (_, idx) => {
                                                     const ratio = idx / 8;
@@ -7313,7 +7303,7 @@ const DeviceMonitorPage = () => {
                                             style={historyRevealActive || (graphHistoryPending && historyRevealProgress < 1)
                                                 ? { clipPath: `inset(0 ${(1 - historyRevealProgress) * 100}% 0 0)` }
                                                 : undefined}
-                                            onMouseDown={graphHistoryPending ? undefined : handleChartPanMouseDown}
+                                            onMouseDown={historyChartBlocked ? undefined : handleChartPanMouseDown}
                                         >
                                             {historyRevealActive && (
                                                 <div
@@ -7354,7 +7344,18 @@ const DeviceMonitorPage = () => {
                                                             }
                                                         }}
                                                     />
-                                                    {plotDot.visible && !chartPanActive && !graphHistoryPending && (
+                                                    {historyAwaitingLoad && (
+                                                        <div className="monitor-history-canvas-load-prompt">
+                                                            <button
+                                                                type="button"
+                                                                className="monitor-history-canvas-load-btn"
+                                                                onClick={handleLoadFullDay}
+                                                            >
+                                                                {`Загрузить данные за ${isoToDisplayDate(selectedGraphDate || todayDateStr)}`}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    {plotDot.visible && !chartPanActive && !historyChartBlocked && (
                                                         <span
                                                             className="monitor-plot-cursor-dot"
                                                             style={{
@@ -7442,7 +7443,7 @@ const DeviceMonitorPage = () => {
                                                                 : <FaExpand aria-hidden style={{ width: 11, height: 11 }} />}
                                                         </button>
                                                     </div>
-                                                    {hoverCursor.active && !chartPanActive && !graphHistoryPending && plotArea.heightPx > 0 && (
+                                                    {hoverCursor.active && !chartPanActive && !historyChartBlocked && plotArea.heightPx > 0 && (
                                                         <div
                                                             className="monitor-hover-crosshair monitor-hover-crosshair--in-chart"
                                                             style={{
@@ -7453,7 +7454,7 @@ const DeviceMonitorPage = () => {
                                                             }}
                                                         />
                                                     )}
-                                                    {hoverCursor.active && !chartPanActive && !graphHistoryPending && (hoverCursorTimeLabel || hoverInfo) && (
+                                                    {hoverCursor.active && !chartPanActive && !historyChartBlocked && (hoverCursorTimeLabel || hoverInfo) && (
                                                         <div
                                                             className="monitor-hover-tooltip"
                                                             style={{
@@ -7569,7 +7570,7 @@ const DeviceMonitorPage = () => {
                                                             )}
                                                         </div>
                                                     </div>
-                                                    {hoverCursor.active && !chartPanActive && !graphHistoryPending && (
+                                                    {hoverCursor.active && !chartPanActive && !historyChartBlocked && (
                                                         <div
                                                             className="monitor-lanes-crosshair-shell"
                                                             style={{

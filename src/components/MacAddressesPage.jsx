@@ -43,6 +43,13 @@ function savePageState(state) {
     } catch (_) {}
 }
 
+function isoToLocalDate(iso) {
+    if (!iso) return null;
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
 function statusClass(statusLabel) {
     if (statusLabel === 'Активен') return 'status-active';
     if (statusLabel === 'Заблокирован') return 'status-blocked';
@@ -92,6 +99,17 @@ function MacAddressesPage() {
     const [newTypeId, setNewTypeId] = useState('');
     const [addError, setAddError] = useState('');
     const [adding, setAdding] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showBlockWarn, setShowBlockWarn] = useState(false);
+    const [bulkActionPending, setBulkActionPending] = useState(false);
+
+    const todayDay = useMemo(() => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        return d;
+    }, []);
+
+    const dateFromAsDate = useMemo(() => isoToLocalDate(dateFromDraft), [dateFromDraft]);
 
     const [expandedFilters, setExpandedFilters] = useState({
         type: true,
@@ -138,6 +156,34 @@ function MacAddressesPage() {
             setDateTo('');
         }
     }, [dateFromDraft, dateToDraft]);
+
+    useEffect(() => {
+        if (!dateFromDraft) {
+            if (dateToDraft) setDateToDraft('');
+            return;
+        }
+        if (dateToDraft && dateToDraft < dateFromDraft) {
+            setDateToDraft('');
+        }
+    }, [dateFromDraft, dateToDraft]);
+
+    const validateDateFrom = useCallback((iso) => {
+        if (!iso) return '';
+        const d = isoToLocalDate(iso);
+        if (!d) return 'Некорректная дата';
+        if (d.getTime() > todayDay.getTime()) return 'Дата не может быть позже сегодня';
+        return '';
+    }, [todayDay]);
+
+    const validateDateTo = useCallback((iso) => {
+        if (!iso) return '';
+        if (!dateFromDraft) return 'Сначала укажите дату «От»';
+        const d = isoToLocalDate(iso);
+        if (!d) return 'Некорректная дата';
+        if (d.getTime() > todayDay.getTime()) return 'Дата не может быть позже сегодня';
+        if (iso < dateFromDraft) return 'Дата «До» не может быть раньше «От»';
+        return '';
+    }, [dateFromDraft, todayDay]);
 
     const dateFilterPending = Boolean(dateFromDraft && !dateToDraft);
 
@@ -319,6 +365,7 @@ function MacAddressesPage() {
     const runBulkAction = async (action) => {
         if (!isAdminAlloy || selectedIds.length === 0) return;
         setError('');
+        setBulkActionPending(true);
         try {
             if (action === 'block') await blockMacRegistryEntries(selectedIds);
             if (action === 'unblock') await unblockMacRegistryEntries(selectedIds);
@@ -327,7 +374,28 @@ function MacAddressesPage() {
             await loadData();
         } catch (e) {
             setError(e.message || 'Ошибка операции');
+        } finally {
+            setBulkActionPending(false);
         }
+    };
+
+    const handleBlockClick = () => {
+        if (!selectedHasUnblocked) return;
+        if (selectedHasLinkedMachine) {
+            setShowBlockWarn(true);
+            return;
+        }
+        runBulkAction('block');
+    };
+
+    const handleDeleteClick = () => {
+        if (selectedIds.length === 0) return;
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDelete = async () => {
+        setShowDeleteConfirm(false);
+        await runBulkAction('delete');
     };
 
     const selectedHasBlocked = useMemo(
@@ -336,6 +404,10 @@ function MacAddressesPage() {
     );
     const selectedHasUnblocked = useMemo(
         () => items.some((i) => selectedIds.includes(i.id) && i.status !== 'BLOCKED'),
+        [items, selectedIds]
+    );
+    const selectedHasLinkedMachine = useMemo(
+        () => items.some((i) => selectedIds.includes(i.id) && i.weldingMachineId != null),
         [items, selectedIds]
     );
 
@@ -439,11 +511,25 @@ function MacAddressesPage() {
                             <div className="filter-tile-content mac-date-filter">
                                 <div className="mac-date-filter-row">
                                     <span className="mac-date-filter-label">От</span>
-                                    <WelderDateField value={dateFromDraft} onChange={setDateFromDraft} fixedPopup />
+                                    <WelderDateField
+                                        value={dateFromDraft}
+                                        onChange={setDateFromDraft}
+                                        fixedPopup
+                                        maxDate={todayDay}
+                                        validate={validateDateFrom}
+                                    />
                                 </div>
                                 <div className="mac-date-filter-row">
                                     <span className="mac-date-filter-label">До</span>
-                                    <WelderDateField value={dateToDraft} onChange={setDateToDraft} fixedPopup />
+                                    <WelderDateField
+                                        value={dateToDraft}
+                                        onChange={setDateToDraft}
+                                        fixedPopup
+                                        disabled={!dateFromDraft}
+                                        minDate={dateFromAsDate}
+                                        maxDate={todayDay}
+                                        validate={validateDateTo}
+                                    />
                                 </div>
                                 <div className="mac-date-filter-actions">
                                     <button type="button" className="mac-filter-reset-btn" onClick={handleResetDates}>Сброс</button>
@@ -502,7 +588,7 @@ function MacAddressesPage() {
                                     type="button"
                                     className="mac-action-btn"
                                     disabled={!selectedHasUnblocked}
-                                    onClick={() => runBulkAction('block')}
+                                    onClick={handleBlockClick}
                                 >
                                     <FaLock />
                                     <span>Блок</span>
@@ -519,8 +605,8 @@ function MacAddressesPage() {
                                 <button
                                     type="button"
                                     className="delete-btn"
-                                    disabled={selectedIds.length === 0}
-                                    onClick={() => runBulkAction('delete')}
+                                    disabled={selectedIds.length === 0 || bulkActionPending}
+                                    onClick={handleDeleteClick}
                                 >
                                     <span>×</span>
                                     <span>Удалить</span>
@@ -593,7 +679,7 @@ function MacAddressesPage() {
                             ) : items.map((row, index) => (
                                 <tr
                                     key={row.id}
-                                    className={`${selectedIds.includes(row.id) ? 'selected' : ''} ${row.status === 'BLOCKED' ? 'table-row-blocked' : ''}`}
+                                    className={selectedIds.includes(row.id) ? 'selected' : ''}
                                 >
                                     <td>
                                         <input
@@ -633,6 +719,70 @@ function MacAddressesPage() {
                     </div>
                 </div>
             </div>
+
+            {showDeleteConfirm && (
+                <div className="modal-overlay modal-overlay-no-close-on-backdrop">
+                    <div className="resave-confirm-modal delete-confirm-modal">
+                        <button
+                            type="button"
+                            className="resave-confirm-close-btn"
+                            onClick={() => setShowDeleteConfirm(false)}
+                            aria-label="Закрыть"
+                        >
+                            ×
+                        </button>
+                        <div className="resave-confirm-icon">⚠</div>
+                        <div className="resave-confirm-question">Удалить выбранные MAC-адреса?</div>
+                        <div className="resave-confirm-buttons">
+                            <button
+                                type="button"
+                                className="resave-confirm-btn resave-confirm-btn-no"
+                                onClick={() => setShowDeleteConfirm(false)}
+                            >
+                                <span className="resave-confirm-icon-x">×</span>
+                                <span>Нет</span>
+                            </button>
+                            <button
+                                type="button"
+                                className="resave-confirm-btn resave-confirm-btn-yes"
+                                onClick={confirmDelete}
+                                disabled={bulkActionPending}
+                            >
+                                <span className="resave-confirm-icon-check">✓</span>
+                                <span>Да</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showBlockWarn && (
+                <div className="modal-overlay modal-overlay-no-close-on-backdrop">
+                    <div className="resave-confirm-modal mac-block-warn-modal">
+                        <button
+                            type="button"
+                            className="resave-confirm-close-btn"
+                            onClick={() => setShowBlockWarn(false)}
+                            aria-label="Закрыть"
+                        >
+                            ×
+                        </button>
+                        <div className="resave-confirm-icon">⚠</div>
+                        <div className="resave-confirm-question">
+                            Нельзя заблокировать MAC-адрес, привязанный к аппарату
+                        </div>
+                        <div className="resave-confirm-buttons resave-confirm-buttons--single">
+                            <button
+                                type="button"
+                                className="resave-confirm-btn resave-confirm-btn-yes"
+                                onClick={() => setShowBlockWarn(false)}
+                            >
+                                <span>ОК</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
