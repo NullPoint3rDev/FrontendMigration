@@ -22,7 +22,6 @@ import {
     parseDbLastWeldMs,
 } from '../utils/weldingMachineLastWeld';
 import { getMachineStatusBadgeShort } from '../utils/weldingMachineStateDisplay';
-import { hasActiveEquipmentError } from '../utils/weldingMachineActivityMode';
 import { api } from '../services/api';
 import { getRoles } from '../api/userAccountApi';
 import { useCurrentUserPermissions } from '../hooks/useCurrentUserPermissions';
@@ -530,11 +529,9 @@ function WeldingEquipmentPageContent({ initialUser = null }) {
         try {
             const props = stateObj?.properties || {};
             const deviceModel = machine?.deviceModel;
-            const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState || null;
-            const status = stateObj?.status || stateObj?.Status;
-            if (hasActiveEquipmentError(stateObj, rawState, status)) return 'error';
 
             if (deviceModel === 'CORE') {
+                const rawState = props?.WeldingMachineState?.value || props?.WeldingMachineState;
                 if (rawState !== undefined && rawState !== null) {
                     const normalized = String(rawState).toLowerCase();
                     // Для Core: ЖЁЛТАЯ плашка (сварка) ТОЛЬКО при явном состоянии "Сварка"

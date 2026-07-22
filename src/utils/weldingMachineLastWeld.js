@@ -1,6 +1,5 @@
 /** Последний шов на аппарате (список «Сварочное оборудование»). */
 import { formatMoscowDateTime, parseApiDateTime } from './moscowTime';
-import { hasActiveEquipmentError } from './weldingMachineActivityMode';
 
 export function isWeldingPanelState(stateObj) {
     if (!stateObj) return false;
@@ -12,8 +11,6 @@ export function isWeldingPanelState(stateObj) {
         || stateObj?.WeldingMachineState
         || stateObj?.['Состояние аппарата']
         || null;
-    const status = stateObj.status || stateObj.Status;
-    if (hasActiveEquipmentError(stateObj, rawState, status)) return false;
     if (rawState != null) {
         const stateLower = String(rawState).toLowerCase().trim();
         if (stateLower === 'сварка' || stateLower === 'welding'
@@ -22,6 +19,7 @@ export function isWeldingPanelState(stateObj) {
             return true;
         }
     }
+    const status = stateObj.status || stateObj.Status;
     if (status) {
         const statusLower = String(status).toLowerCase().trim();
         if (statusLower === 'welding' || statusLower === 'сварка' || statusLower.includes('welding')) {

@@ -1,40 +1,5 @@
 import { isStandbyMachineState } from './weldingMachineStateDisplay.js';
 
-/** Числовой код ошибки из плоского panel-state / deviceData (>0 = активная ошибка). */
-export function parseActiveErrorCode(data) {
-    if (!data || typeof data !== 'object') return null;
-
-    const parseRaw = (direct) => {
-        if (direct === undefined || direct === null) return null;
-        const raw = String(direct).trim();
-        if (!raw || raw.toLowerCase() === 'null' || raw === '0') return null;
-        const firstPart = raw.split(/[;,]/).map((s) => s.trim()).find(Boolean) || raw;
-        const numeric = parseInt(firstPart, 10);
-        if (Number.isFinite(numeric) && numeric > 0) return numeric;
-        return null;
-    };
-
-    const direct = data.errorCode ?? data.ErrorCode ?? data.error_code
-        ?? data['State.Error'] ?? data['Ошибка'] ?? data['Ошибки'];
-    const fromDirect = parseRaw(direct);
-    if (fromDirect != null) return fromDirect;
-
-    const props = data.properties;
-    if (props && typeof props === 'object') {
-        for (const key of ['ErrorCode', 'errorCode', 'State.Error', 'Ошибка', 'Ошибки', 'Errors']) {
-            if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
-            const v = props[key];
-            const raw = v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, 'value')
-                ? v.value
-                : v;
-            const parsed = parseRaw(raw);
-            if (parsed != null) return parsed;
-        }
-    }
-
-    return null;
-}
-
 /** Авария/ошибка: аппарат в сети — зелёная «Состояние» + красная «Ошибки» (как staging). */
 export function isErrorMachineState(weldingMachineState, status) {
     const stateLower = String(weldingMachineState || '').toLowerCase().trim();
@@ -45,20 +10,11 @@ export function isErrorMachineState(weldingMachineState, status) {
         || statusLower === 'error' || statusLower.includes('error');
 }
 
-/** По прошивке: при активной ошибке сварки быть не может. */
-export function hasActiveEquipmentError(data, weldingMachineState, status) {
-    if (parseActiveErrorCode(data) != null) return true;
-    return isErrorMachineState(weldingMachineState, status);
-}
-
 /**
  * Режим для дорожки «Состояние»: on | welding | off.
  * Зелёный при on/welding (Включен, ожидание, Сварка, ошибка при живой связи). Иначе серый.
  */
-export function getMachineActivityModeFromTextAndStatus(weldingMachineState, status, { weldingHint, errorCode } = {}) {
-    const errorData = errorCode != null ? { errorCode } : null;
-    if (hasActiveEquipmentError(errorData, weldingMachineState, status)) return 'on';
-
+export function getMachineActivityModeFromTextAndStatus(weldingMachineState, status, { weldingHint } = {}) {
     if (weldingHint === true) return 'welding';
 
     const stateLower = String(weldingMachineState || '').toLowerCase().trim();

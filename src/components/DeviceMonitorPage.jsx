@@ -53,9 +53,7 @@ import {
 } from '../utils/weldingMachineStateDisplay';
 import {
     getMachineActivityModeFromTextAndStatus,
-    hasActiveEquipmentError,
     isStateLaneOnlineMode,
-    parseActiveErrorCode,
 } from '../utils/weldingMachineActivityMode';
 import { despikeValuesMedian3, despikeValuesMedian3WithinRuns } from '../utils/weldingDespike';
 import { resolveSliderTrackUrl, trackOff, knobOn, knobOff, shadow as sliderShadow } from '../utils/graphSliderAssets';
@@ -656,8 +654,6 @@ function isWeldingFromPanelState(state) {
         data['State.WeldingMachineState'] ||
         data.properties?.['WeldingMachineState'] ||
         data.properties?.['Состояние аппарата'];
-    const status = data.status || data.Status;
-    if (hasActiveEquipmentError(data, weldingMachineState, status)) return false;
     if (weldingMachineState) {
         const stateLower = String(weldingMachineState).toLowerCase().trim();
         if (stateLower === 'сварка' || stateLower === 'welding'
@@ -672,6 +668,7 @@ function isWeldingFromPanelState(state) {
             return false;
         }
     }
+    const status = data.status || data.Status;
     if (status) {
         const statusLower = String(status).toLowerCase().trim();
         if (statusLower === 'welding' || statusLower === 'сварка'
@@ -679,6 +676,7 @@ function isWeldingFromPanelState(state) {
             return true;
         }
     }
+    // Нет текста состояния (бэк прислал телеметрию без WeldingMachineState) — сварку определяем по факт. току.
     // Порог >1 А и условие !weldingMachineState, как в staging: в простое Current=0, ложной дуги нет.
     const { current: weldCurrent } = extractCurrentVoltageFromPanelState(state);
     if (weldCurrent > 1 && !weldingMachineState) {
@@ -695,19 +693,17 @@ function isWeldingFromPanelState(state) {
 
 function getMachineActivityModeFromPanelState(state) {
     if (!state) return 'off';
+    if (isWeldingFromPanelState(state)) return 'welding';
     const data = flattenPanelState(state);
     const weldingMachineState = data['Состояние аппарата'] ||
         data['WeldingMachineState'] ||
         data.weldingMachineState ||
         data['State.WeldingMachineState'] ||
         null;
-    const status = data.status || data.Status || null;
-    const errorCode = parseActiveErrorCode(data);
-    if (hasActiveEquipmentError(data, weldingMachineState, status)) {
-        return getMachineActivityModeFromTextAndStatus(weldingMachineState, status, { errorCode });
-    }
-    if (isWeldingFromPanelState(state)) return 'welding';
-    return getMachineActivityModeFromTextAndStatus(weldingMachineState, status, { errorCode });
+    return getMachineActivityModeFromTextAndStatus(
+        weldingMachineState,
+        data.status || data.Status || null
+    );
 }
 
 function buildHistoryPointFromPanelPoll(state, xPoll, weldingNow) {
@@ -736,9 +732,7 @@ function buildHistoryPointFromPanelPoll(state, xPoll, weldingNow) {
 /** Сварка: текст/флаг или факт. ток дуги из API (>10А — уставка в setCurrent, не в current). */
 const isHistoryPointWelding = (p) => {
     if (!p) return false;
-    if (parseActiveErrorCode(p) != null) return false;
     if (isStandbyMachineState(p.machineStateText)) return false;
-    if (hasActiveEquipmentError(p, p.machineStateText, p.status)) return false;
     if (p.isWelding === true) return true;
     if (p.isWelding === false) return false;
     const factI = Number(p.current);
@@ -753,12 +747,8 @@ const isHistoryPointWelding = (p) => {
 
 function getMachineActivityModeFromHistoryPoint(p) {
     if (!p) return 'off';
-    const errorCode = parseActiveErrorCode(p);
-    if (hasActiveEquipmentError(p, p.machineStateText, p.status)) {
-        return getMachineActivityModeFromTextAndStatus(p.machineStateText, p.status, { errorCode });
-    }
     if (isHistoryPointWelding(p)) return 'welding';
-    return getMachineActivityModeFromTextAndStatus(p.machineStateText, p.status, { errorCode });
+    return getMachineActivityModeFromTextAndStatus(p.machineStateText, p.status);
 }
 
 /**
@@ -1689,7 +1679,15 @@ function sanitizeBriefOfflineBetweenOnline(samples, windowEnd, maxOfflineMs) {
 }
 
 function parseErrorCodeForTimeline(state) {
-    return parseActiveErrorCode(flattenPanelState(state));
+    const data = flattenPanelState(state);
+    const direct = data.errorCode || data.ErrorCode || data['error_code'] || data['State.Error'] || data['Ошибка'] || data['Ошибки'];
+    if (direct === undefined || direct === null) return null;
+    const raw = String(direct).trim();
+    if (!raw || raw.toLowerCase() === 'null' || raw === '0') return null;
+    const firstPart = raw.split(/[;,]/).map(s => s.trim()).find(Boolean) || raw;
+    const numeric = parseInt(firstPart, 10);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+    return null;
 }
 
 function formatErrorCodeLabel(errorCode) {
@@ -4258,14 +4256,11 @@ const DeviceMonitorPage = () => {
 
         // 1. Состояние аппарата
         const weldingMachineState = data ? (data['Состояние аппарата'] || data['WeldingMachineState'] || data.weldingMachineState) : null;
-        const panelStatus = data ? (data.status || data.Status) : null;
-        const showErrorState = data && hasActiveEquipmentError(data, weldingMachineState, panelStatus);
         if (weldingMachineState || isDeviceOff) {
-            const displayState = showErrorState ? 'Ошибка' : weldingMachineState;
-            const stateColor = showErrorState ? '#f06c7b' : (weldingMachineState ? getStateColor(weldingMachineState) : null);
+            const stateColor = weldingMachineState ? getStateColor(weldingMachineState) : null;
             params.push({
                 label: 'Состояние аппарата',
-                value: isDeviceOff ? 'Не в сети' : formatWeldingMachineStateDisplay(displayState),
+                value: isDeviceOff ? 'Не в сети' : formatWeldingMachineStateDisplay(weldingMachineState),
                 stateColor: stateColor // Добавляем цвет для состояния
             });
         }
@@ -4557,9 +4552,6 @@ const DeviceMonitorPage = () => {
             data['State.WeldingMachineState'] ||
             data.properties?.['WeldingMachineState'] ||
             data.properties?.['Состояние аппарата'];
-        const status = data.status || data.Status;
-        if (hasActiveEquipmentError(data, weldingMachineState, status)) return false;
-
         if (weldingMachineState) {
             const stateLower = String(weldingMachineState).toLowerCase().trim();
             if (isStandbyMachineState(weldingMachineState)) {
@@ -4579,6 +4571,7 @@ const DeviceMonitorPage = () => {
             }
         }
 
+        const status = data.status || data.Status;
         if (status) {
             const statusLower = String(status).toLowerCase().trim();
             if (statusLower === 'welding' || statusLower === 'сварка' ||
@@ -4739,20 +4732,14 @@ const DeviceMonitorPage = () => {
     const currentStatusData = deviceData[machineMac] || {};
     // Как в staging: живая панель → текст из WeldingMachineState; иначе «Не в сети».
     const hasLivePanel = hasData || hasMonitorPanelPayload(currentStatusData);
-    const panelStateText = currentStatusData['Состояние аппарата']
-        || currentStatusData['WeldingMachineState']
-        || currentStatusData.weldingMachineState
-        || 'Не в сети';
-    const panelStatus = currentStatusData.status || currentStatusData.Status;
-    const hasEquipmentError = hasLivePanel
-        && hasActiveEquipmentError(currentStatusData, panelStateText, panelStatus);
     const machineStateValue = !hasLivePanel
         ? 'Не в сети'
-        : (hasEquipmentError ? 'Ошибка' : panelStateText);
+        : (currentStatusData['Состояние аппарата']
+            || currentStatusData['WeldingMachineState']
+            || currentStatusData.weldingMachineState
+            || 'Не в сети');
     const machineStateDisplayValue = formatWeldingMachineStateDisplay(machineStateValue);
-    const machineStateColor = hasEquipmentError
-        ? '#f06c7b'
-        : (getStateColor(machineStateValue) || 'rgba(242, 241, 244, 0.9)');
+    const machineStateColor = getStateColor(machineStateValue) || 'rgba(242, 241, 244, 0.9)';
     const statusPhaseA = parseNumberOrNull(
         currentStatusData['Напряжение фазы А'] ??
         currentStatusData['VoltagePhaseA'] ??
