@@ -44,6 +44,10 @@ export function formatWeldingMachineStateDisplay(state) {
 
 /** Бейдж статуса в списках оборудования / у сварщика */
 export function getMachineStatusBadge(status, rawState) {
+    if (status === 'error') {
+        return { text: 'Ошибка', className: 'error', color: undefined };
+    }
+
     if (rawState !== null && rawState !== undefined && rawState !== '') {
         if (isStandbyMachineState(rawState)) {
             return { text: STANDBY_MACHINE_STATE_DISPLAY, className: 'off', color: '#7B8BA6' };
@@ -92,6 +96,10 @@ export function getMachineStatusBadge(status, rawState) {
 
 /** Краткий бейдж для таблицы оборудования (Вкл / Выкл) */
 export function getMachineStatusBadgeShort(status, rawState) {
+    if (status === 'error') {
+        return { text: 'Ошибка', className: 'error' };
+    }
+
     if (rawState !== null && rawState !== undefined && rawState !== '') {
         if (isStandbyMachineState(rawState)) {
             return { text: STANDBY_MACHINE_STATE_DISPLAY, className: 'off', color: 'rgba(188, 183, 197, 0.5)' };
