@@ -30,6 +30,7 @@ const EmployeesPage = lazy(() => import('./components/EmployeesPage'));
 const AddUserPage = lazy(() => import('./pages/AddUserPage'));
 const DeviceMonitorPage = lazy(() => import('./components/DeviceMonitorPage'));
 const DeviceTestPage = lazy(() => import('./components/DeviceTestPage'));
+const V2ProtocolTestPage = lazy(() => import('./pages/V2ProtocolTestPage'));
 
 const theme = createTheme({
     palette: {
@@ -140,6 +141,12 @@ function App() {
                 <Suspense fallback={<div className="main-content"><h2>Загрузка...</h2></div>}>
                     <Routes>
                         <Route path="/login" element={<AuthPage />} />
+                        {/* Hidden v2 protocol lab — no sidebar/nav */}
+                        <Route path="/v2-protocol-test" element={
+                            <PrivateRoute>
+                                <V2ProtocolTestPage />
+                            </PrivateRoute>
+                        } />
                         <Route path="/*" element={
                             <PrivateRoute>
                                 <ReportsUnsavedProvider>
