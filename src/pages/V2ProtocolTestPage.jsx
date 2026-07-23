@@ -6,6 +6,7 @@ import {
 } from '../api/v2ProtocolTestApi';
 
 const POLL_MS = 1000;
+const MAX_EVENTS = 100;
 
 /** UI type → piggyback cmd byte on OUT, expected IN type (null = only OUT). */
 const CMD_EXPECT = {
@@ -73,7 +74,7 @@ export default function V2ProtocolTestPage() {
                 afterIdRef.current = ev[ev.length - 1].id;
                 matchAwaiting(ev);
                 // newest on top; API batch is ascending by id
-                setEvents((prev) => [...[...ev].reverse(), ...prev].slice(0, 300));
+                setEvents((prev) => [...[...ev].reverse(), ...prev].slice(0, MAX_EVENTS));
             }
             setError(null);
         } catch (e) {
@@ -106,7 +107,7 @@ export default function V2ProtocolTestPage() {
                     json: body,
                 },
                 ...prev,
-            ].slice(0, 300));
+            ].slice(0, MAX_EVENTS));
 
             await postV2TestCommand(body);
             await poll();
