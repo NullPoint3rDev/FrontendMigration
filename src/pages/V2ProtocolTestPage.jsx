@@ -140,7 +140,13 @@ export default function V2ProtocolTestPage() {
 
 const styles = {
     page: {
-        minHeight: '100vh',
+        // #root: overflow hidden + flex column — скролл внутри этой страницы
+        flex: '1 1 auto',
+        minHeight: 0,
+        width: '100%',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch',
         background: '#111827',
         color: '#e5e7eb',
         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
