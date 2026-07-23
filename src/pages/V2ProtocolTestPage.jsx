@@ -19,7 +19,6 @@ export default function V2ProtocolTestPage() {
     const [fromIdx, setFromIdx] = useState('41');
     const [toIdx, setToIdx] = useState('99');
     const afterIdRef = useRef(0);
-    const bottomRef = useRef(null);
 
     const poll = useCallback(async () => {
         try {
@@ -30,7 +29,8 @@ export default function V2ProtocolTestPage() {
             setMeta(m);
             if (Array.isArray(ev) && ev.length > 0) {
                 afterIdRef.current = ev[ev.length - 1].id;
-                setEvents((prev) => [...prev, ...ev].slice(-300));
+                // newest on top; API batch is ascending by id
+                setEvents((prev) => [...[...ev].reverse(), ...prev].slice(0, 300));
             }
             setError(null);
         } catch (e) {
@@ -43,10 +43,6 @@ export default function V2ProtocolTestPage() {
         const id = setInterval(poll, POLL_MS);
         return () => clearInterval(id);
     }, [poll]);
-
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [events.length]);
 
     const send = async (body) => {
         try {
@@ -132,7 +128,6 @@ export default function V2ProtocolTestPage() {
                         </div>
                     </article>
                 ))}
-                <div ref={bottomRef} />
             </div>
         </div>
     );
