@@ -7,6 +7,14 @@ import {
 
 const POLL_MS = 1000;
 
+/** UI type → piggyback cmd byte on OUT, expected IN type (null = only OUT). */
+const CMD_EXPECT = {
+    REQ_SESSION_INFO: { outCmd: 0x03, inType: 0x04 },
+    REQ_HISTORY: { outCmd: 0x05, inType: 0x07 },
+    PRIO_HISTORY: { outCmd: 0x08, inType: 0x07 },
+    STOP_HISTORY: { outCmd: 0x09, inType: null },
+};
+
 /**
  * Hidden test page for protocol v2 (not in sidebar).
  * Open: /v2-protocol-test
@@ -18,7 +26,41 @@ export default function V2ProtocolTestPage() {
     const [session, setSession] = useState('1');
     const [fromIdx, setFromIdx] = useState('41');
     const [toIdx, setToIdx] = useState('99');
+    const [goldIds, setGoldIds] = useState(() => new Set());
     const afterIdRef = useRef(0);
+    const goldIdsRef = useRef(new Set());
+    // ponytail: match OUT cmd then IN replies until next send
+    const awaitRef = useRef(null);
+
+    const markGold = useCallback((ids) => {
+        const next = new Set(goldIdsRef.current);
+        for (const id of ids) next.add(id);
+        goldIdsRef.current = next;
+        setGoldIds(next);
+    }, []);
+
+    const matchAwaiting = useCallback((batchAsc) => {
+        const awaiting = awaitRef.current;
+        if (!awaiting || !batchAsc.length) return;
+        const hit = [];
+        for (const e of batchAsc) {
+            const j = e.json || {};
+            if (!awaiting.seenOut
+                    && e.direction === 'OUT'
+                    && Number(j.serverCommandType) === awaiting.outCmd) {
+                hit.push(e.id);
+                awaiting.seenOut = true;
+                continue;
+            }
+            if (awaiting.seenOut
+                    && awaiting.inType != null
+                    && e.direction === 'IN'
+                    && Number(j.type) === awaiting.inType) {
+                hit.push(e.id);
+            }
+        }
+        if (hit.length) markGold(hit);
+    }, [markGold]);
 
     const poll = useCallback(async () => {
         try {
@@ -29,6 +71,7 @@ export default function V2ProtocolTestPage() {
             setMeta(m);
             if (Array.isArray(ev) && ev.length > 0) {
                 afterIdRef.current = ev[ev.length - 1].id;
+                matchAwaiting(ev);
                 // newest on top; API batch is ascending by id
                 setEvents((prev) => [...[...ev].reverse(), ...prev].slice(0, 300));
             }
@@ -36,7 +79,7 @@ export default function V2ProtocolTestPage() {
         } catch (e) {
             setError(e.message || String(e));
         }
-    }, []);
+    }, [matchAwaiting]);
 
     useEffect(() => {
         poll();
@@ -46,11 +89,37 @@ export default function V2ProtocolTestPage() {
 
     const send = async (body) => {
         try {
+            const expect = CMD_EXPECT[body.type] || null;
+            awaitRef.current = expect
+                ? { outCmd: expect.outCmd, inType: expect.inType, seenOut: false }
+                : null;
+            const localId = `cmd-${Date.now()}`;
+            goldIdsRef.current = new Set([localId]);
+            setGoldIds(new Set([localId]));
+            setEvents((prev) => [
+                {
+                    id: localId,
+                    direction: 'CMD',
+                    tsEpochMs: Date.now(),
+                    mac: meta?.testMac || '',
+                    rawHex: '',
+                    json: body,
+                },
+                ...prev,
+            ].slice(0, 300));
+
             await postV2TestCommand(body);
             await poll();
         } catch (e) {
             setError(e.message || String(e));
         }
+    };
+
+    const clearUi = () => {
+        setEvents([]);
+        goldIdsRef.current = new Set();
+        setGoldIds(new Set());
+        awaitRef.current = null;
     };
 
     return (
@@ -63,6 +132,8 @@ export default function V2ProtocolTestPage() {
                     pending cmds: {meta?.pendingCommands ?? '—'}
                     {' · '}
                     poll {POLL_MS}ms
+                    {' · '}
+                    <span style={styles.goldHint}>gold = your cmd + reply</span>
                 </div>
                 {error && <div style={styles.error}>{error}</div>}
             </header>
@@ -101,7 +172,7 @@ export default function V2ProtocolTestPage() {
                 <button type="button" style={styles.btn} onClick={() => send({ type: 'STOP_HISTORY' })}>
                     0x09 stop history
                 </button>
-                <button type="button" style={styles.btnSecondary} onClick={() => setEvents([])}>
+                <button type="button" style={styles.btnSecondary} onClick={clearUi}>
                     clear UI
                 </button>
             </section>
@@ -110,27 +181,40 @@ export default function V2ProtocolTestPage() {
                 {events.length === 0 && (
                     <div style={styles.empty}>Waiting for packets from device…</div>
                 )}
-                {events.map((ev) => (
-                    <article key={ev.id} style={ev.direction === 'IN' ? styles.cardIn : styles.cardOut}>
-                        <div style={styles.cardHead}>
-                            <strong>{ev.direction}</strong>
-                            <span>#{ev.id}</span>
-                            <span>{new Date(ev.tsEpochMs).toLocaleTimeString()}</span>
-                            <span>{ev.mac}</span>
-                        </div>
-                        <div style={styles.block}>
-                            <div style={styles.blockTitle}>raw hex</div>
-                            <pre style={styles.pre}>{ev.rawHex}</pre>
-                        </div>
-                        <div style={styles.block}>
-                            <div style={styles.blockTitle}>json</div>
-                            <pre style={styles.pre}>{JSON.stringify(ev.json, null, 2)}</pre>
-                        </div>
-                    </article>
-                ))}
+                {events.map((ev) => {
+                    const gold = goldIds.has(ev.id);
+                    const base = cardStyle(ev.direction);
+                    return (
+                        <article key={ev.id} style={gold ? { ...base, ...styles.cardGold } : base}>
+                            <div style={styles.cardHead}>
+                                <strong style={gold ? styles.goldText : undefined}>{ev.direction}</strong>
+                                <span>#{ev.id}</span>
+                                <span>{new Date(ev.tsEpochMs).toLocaleTimeString()}</span>
+                                <span>{ev.mac}</span>
+                                {gold && <span style={styles.goldText}>★</span>}
+                            </div>
+                            {ev.rawHex ? (
+                                <div style={styles.block}>
+                                    <div style={styles.blockTitle}>raw hex</div>
+                                    <pre style={styles.pre}>{ev.rawHex}</pre>
+                                </div>
+                            ) : null}
+                            <div style={styles.block}>
+                                <div style={styles.blockTitle}>json</div>
+                                <pre style={styles.pre}>{JSON.stringify(ev.json, null, 2)}</pre>
+                            </div>
+                        </article>
+                    );
+                })}
             </div>
         </div>
     );
+}
+
+function cardStyle(direction) {
+    if (direction === 'CMD') return styles.cardCmd;
+    if (direction === 'IN') return styles.cardIn;
+    return styles.cardOut;
 }
 
 const styles = {
@@ -151,6 +235,8 @@ const styles = {
     header: { marginBottom: 16 },
     h1: { margin: '0 0 8px', fontSize: 20, fontWeight: 600 },
     meta: { fontSize: 13, opacity: 0.85 },
+    goldHint: { color: '#fbbf24' },
+    goldText: { color: '#fbbf24' },
     error: { marginTop: 8, color: '#fca5a5', fontSize: 13 },
     commands: {
         display: 'flex',
@@ -202,6 +288,17 @@ const styles = {
         border: '1px solid #166534',
         borderRadius: 8,
         padding: 12,
+    },
+    cardCmd: {
+        background: '#42200666',
+        border: '1px solid #ca8a04',
+        borderRadius: 8,
+        padding: 12,
+    },
+    cardGold: {
+        background: '#42200699',
+        border: '1px solid #fbbf24',
+        boxShadow: '0 0 0 1px #fbbf2444',
     },
     cardHead: {
         display: 'flex',
